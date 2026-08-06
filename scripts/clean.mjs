@@ -11,6 +11,7 @@ const generatedFiles = [
   "build/dark-fighter.map",
   "build/dark-fighter.lbl",
   "build/manifest.json",
+  "build/previews/gameplay-screen.png",
   "dist/dark-fighter-boot.bin",
   "dist/dark-fighter.xex",
   "dist/dark-fighter.atr",

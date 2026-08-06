@@ -29,15 +29,30 @@ Nie trzeba instalować natywnego `cc65`. Projekt używa przypiętej wersji `ca65
 npm install
 npm run build
 npm test
+npm run preview
 npm run package
 ```
 
 Wyniki pojawią się w `dist/`:
 
-- `dark-fighter.xex` — uruchamianie bezpośrednio w emulatorze;
+- `dark-fighter.xex` — uruchamianie bezpośrednio w emulatorze jako `dist/dark-fighter.xex`;
 - `dark-fighter.atr` — obraz dyskietki bootujący bez DOS-u;
 - `dark-fighter-boot.bin` — surowy ładunek sektorów startowych.
 - `dark-fighter-0.1.1.zip` — kompletne wydanie: źródła, dokumentacja i binaria.
+
+## Podgląd ekranu
+
+Polecenie `npm run preview` tworzy `build/previews/gameplay-screen.png`.
+Jest to deterministyczny, powiększony metodą nearest-neighbour podgląd
+kanonicznej klatki ANTIC 4 z HUD-em, konstrukcjami bocznymi oraz statkami PMG.
+Generator czyta bezpośrednio dane i wartości rejestrów z `src/main.s`; nie
+utrzymuje osobnej kopii grafiki gry. Kolory RGB są stabilnym przybliżeniem
+sygnału Atari PAL, dlatego mogą nieznacznie różnić się od palety konkretnego
+emulatora albo fizycznego odbiornika.
+
+Plik `dist/dark-fighter.xex` należy wskazać emulatorowi jako program wykonywalny
+Atari. W Atari800 trzeba dodatkowo przypisać joystick hosta do portu 1 w
+konfiguracji wejścia; sam wybór pliku XEX nie wykonuje tego mapowania.
 
 ## Uruchamianie na Atari 65XE przez SIO2SD
 
