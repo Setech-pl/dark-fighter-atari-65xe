@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
-const releaseName = "dark-fighter-0.1.0";
+const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
+const releaseName = `dark-fighter-${packageDefinition.version}`;
 const outputPath = path.join(rootDirectory, "dist", `${releaseName}.zip`);
 
 const topLevelFiles = [
@@ -140,4 +141,3 @@ const archive = Buffer.concat([
 
 fs.writeFileSync(outputPath, archive);
 console.log(`Release package written: dist/${releaseName}.zip (${archive.length} bytes, ${relativeFiles.length} files)`);
-

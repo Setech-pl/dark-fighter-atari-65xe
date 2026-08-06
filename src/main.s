@@ -33,8 +33,10 @@ COLPM0      = $D012
 COLPM1      = $D013
 COLPM2      = $D014
 COLPM3      = $D015
+COLPF0      = $D016
 COLPF1      = $D017
 COLPF2      = $D018
+COLPF3      = $D019
 COLBK       = $D01A
 PRIOR       = $D01B
 GRACTL      = $D01D
@@ -59,6 +61,7 @@ DMACTL      = $D400
 DLISTL      = $D402
 DLISTH      = $D403
 PMBASE      = $D407
+CHBASE      = $D409
 VCOUNT      = $D40B
 NMIEN       = $D40E
 
@@ -72,16 +75,25 @@ PLAYER1     = PMG_BASE + $0500
 PLAYER2     = PMG_BASE + $0600
 PLAYER3     = PMG_BASE + $0700
 SCREEN      = $4000
+CHARSET     = $4400
 
 PLAYER_H    = 16
 ENEMY_H     = 12
 PLAYER_X_MIN = 48
-PLAYER_X_MAX = 208
+PLAYER_X_MAX = 200
 PLAYER_Y_MIN = 64
 PLAYER_Y_MAX = 208
 
 ; Atari screen-code values for the OS character set.
 CH_SPACE    = 0
+CH_PANEL_SOLID = 1
+CH_PANEL_EDGE = 2
+CH_PANEL_RIVET = 3
+CH_PANEL_TRUSS = 4
+CH_PANEL_DAMAGE = 5
+CH_PANEL_FRAME = 6
+CH_PANEL_STRIPE = 7
+CH_SEPARATOR = 9
 CH_STAR     = 10
 CH_DASH     = 13
 CH_DOT      = 14
@@ -104,6 +116,7 @@ fire_timer:         .res 1
 hit_timer:          .res 1
 damage_timer:       .res 1
 rng_state:          .res 1
+corridor_phase:     .res 1
 score_bcd_lo:       .res 1
 score_bcd_hi:       .res 1
 row_counter:        .res 1
@@ -150,6 +163,7 @@ start:
     sta AUDCTL
 
     jsr clear_pmg
+    jsr copy_charset
     jsr clear_screen
     jsr init_state
     jsr init_screen
@@ -164,27 +178,34 @@ start:
 
     lda #>PMG_BASE
     sta PMBASE
+    lda #>CHARSET
+    sta CHBASE
 
-    lda #$00
+    lda #$01                    ; double-width ships at 160-color-clock scale
     sta SIZEP0
     sta SIZEP1
     sta SIZEP2
     sta SIZEP3
+    lda #$00
     sta SIZEM
     sta PRIOR
 
     lda #$0E                    ; cold white player hull
     sta COLPM0
-    lda #$08                    ; dark steel enemy hull
+    lda #$0C                    ; pale enemy hull
     sta COLPM1
     lda #$46                    ; hostile red scanner
     sta COLPM2
     lda #$28                    ; amber engine plume
     sta COLPM3
-    lda #$0C                    ; text/stars
+    lda #$0E                    ; HUD and stars
+    sta COLPF0
+    lda #$84                    ; worn steel-blue structures
     sta COLPF1
-    lda #$02                    ; near-black playfield
+    lda #$28                    ; amber telemetry
     sta COLPF2
+    lda #$46                    ; red identification stripes
+    sta COLPF3
     lda #$00
     sta COLBK
 
@@ -251,6 +272,7 @@ init_state:
     sta damage_timer
     sta score_bcd_lo
     sta score_bcd_hi
+    sta corridor_phase
 
     lda #$04
     sta scroll_timer
@@ -268,6 +290,21 @@ clear_pmg:
     sta PMG_BASE+$500,x
     sta PMG_BASE+$600,x
     sta PMG_BASE+$700,x
+    inx
+    bne @loop
+    rts
+
+copy_charset:
+    ldx #$00
+@loop:
+    lda charset_data+$000,x
+    sta CHARSET+$000,x
+    lda charset_data+$100,x
+    sta CHARSET+$100,x
+    lda charset_data+$200,x
+    sta CHARSET+$200,x
+    lda charset_data+$300,x
+    sta CHARSET+$300,x
     inx
     bne @loop
     rts
@@ -295,7 +332,7 @@ init_screen:
     inx
     bne @title_loop
 @title_done:
-    lda #CH_DASH
+    lda #CH_SEPARATOR
     ldx #39
 @divider:
     sta SCREEN+40,x
@@ -308,8 +345,8 @@ init_screen:
     sta dst_ptr+1
     lda #22
     sta row_counter
-@star_rows:
-    jsr generate_star_row
+@corridor_rows:
+    jsr generate_corridor_row
     clc
     lda dst_ptr
     adc #40
@@ -318,7 +355,7 @@ init_screen:
     inc dst_ptr+1
 :
     dec row_counter
-    bne @star_rows
+    bne @corridor_rows
     rts
 
 ; -----------------------------------------------------------------------------
@@ -405,7 +442,7 @@ draw_player:
 fire_bullet:
     lda player_x
     clc
-    adc #$04
+    adc #$08
     sta bullet_x
     sta HPOSM0
     lda player_y
@@ -599,6 +636,9 @@ add_ten_points:
     rts
 
 update_score_display:
+    lda #CH_ZERO
+    sta SCREEN+6
+
     lda score_bcd_hi
     lsr
     lsr
@@ -606,13 +646,13 @@ update_score_display:
     lsr
     clc
     adc #CH_ZERO
-    sta SCREEN+20
+    sta SCREEN+7
 
     lda score_bcd_hi
     and #$0F
     clc
     adc #CH_ZERO
-    sta SCREEN+21
+    sta SCREEN+8
 
     lda score_bcd_lo
     lsr
@@ -621,13 +661,13 @@ update_score_display:
     lsr
     clc
     adc #CH_ZERO
-    sta SCREEN+22
+    sta SCREEN+9
 
     lda score_bcd_lo
     and #$0F
     clc
     adc #CH_ZERO
-    sta SCREEN+23
+    sta SCREEN+10
     rts
 
 ; -----------------------------------------------------------------------------
@@ -679,12 +719,42 @@ update_starfield:
     sta dst_ptr
     lda #>(SCREEN+80)
     sta dst_ptr+1
-    jsr generate_star_row
+    jsr generate_corridor_row
 @done:
     rts
 
-generate_star_row:
+; Generates one bounded row: six structural cells per side and 28 star cells.
+; Called once every four frames after the 840-byte background copy.
+generate_corridor_row:
+    lda corridor_phase
+    and #$07
+    tax
+    lda corridor_row_offsets,x
+    tax
     ldy #$00
+@left_wall:
+    lda corridor_left_tiles,x
+    sta (dst_ptr),y
+    inx
+    iny
+    cpy #$06
+    bne @left_wall
+
+    lda corridor_phase
+    and #$07
+    tax
+    lda corridor_row_offsets,x
+    tax
+    ldy #34
+@right_wall:
+    lda corridor_right_tiles,x
+    sta (dst_ptr),y
+    inx
+    iny
+    cpy #40
+    bne @right_wall
+
+    ldy #$06
 @cell:
     jsr random_byte
     and #$0F
@@ -702,8 +772,9 @@ generate_star_row:
 @store:
     sta (dst_ptr),y
     iny
-    cpy #40
+    cpy #34
     bne @cell
+    inc corridor_phase
     rts
 
 random_byte:
@@ -766,58 +837,164 @@ update_sound:
 .segment "RODATA"
 
 hud_ascii:
-    .byte "DARK FIGHTER  SCORE "
+    .byte "SCORE 00000  FUEL 5  ARM 4  LIFE X03"
     .byte $00
 
 player_shape:
     .byte %00011000
-    .byte %00111100
+    .byte %00011000
     .byte %00111100
     .byte %01111110
-    .byte %01011010
+    .byte %01111110
+    .byte %11111111
     .byte %11111111
     .byte %11011011
     .byte %11111111
     .byte %11111111
     .byte %01111110
-    .byte %01111110
-    .byte %00111100
     .byte %00111100
     .byte %00100100
-    .byte %00100100
+    .byte %01000010
+    .byte %01000010
     .byte %00000000
 
 player_engine_shape:
-    .byte $00,$00,$00,$00,$00,$00,$00,$00
     .byte $00,$00,$00,$00
     .byte %00011000
+    .byte %00011000
+    .byte %00100100
+    .byte %00100100
+    .byte %00011000
+    .byte %00011000
+    .byte $00,$00
     .byte %00111100
     .byte %00011000
-    .byte %00011000
+    .byte $00,$00
 
 enemy_shape:
-    .byte %00011000
+    .byte %10000001
+    .byte %11000011
+    .byte %11100111
+    .byte %01111110
     .byte %00111100
     .byte %01111110
-    .byte %11011011
-    .byte %11111111
-    .byte %10111101
     .byte %11111111
     .byte %01111110
-    .byte %01100110
-    .byte %00100100
-    .byte %00100100
-    .byte %00011000
+    .byte %11011011
+    .byte %11000011
+    .byte %10000001
+    .byte %10000001
 
 scanner_shape:
     .byte $80,$40,$20,$10,$08,$04,$02,$01
     .byte $01,$02,$04,$08,$10,$20,$40,$80
 
+corridor_row_offsets:
+    .byte 0,6,12,18,24,30,36,42
+
+corridor_left_tiles:
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID, CH_PANEL_EDGE,   CH_PANEL_FRAME,  CH_PANEL_TRUSS
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_RIVET, CH_PANEL_SOLID,  CH_PANEL_FRAME,  CH_PANEL_TRUSS
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID, CH_PANEL_DAMAGE, CH_SPACE,        CH_PANEL_EDGE
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_FRAME, CH_PANEL_FRAME,  CH_SPACE,        CH_SPACE
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID, CH_PANEL_RIVET,  CH_PANEL_TRUSS,  CH_SPACE
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_DAMAGE,CH_PANEL_SOLID,  CH_PANEL_TRUSS,  CH_PANEL_EDGE
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_FRAME, CH_SPACE,        CH_SPACE,        CH_PANEL_TRUSS
+    .byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID, CH_PANEL_EDGE,   CH_PANEL_RIVET,  CH_PANEL_TRUSS
+
+corridor_right_tiles:
+    .byte CH_PANEL_TRUSS, CH_PANEL_FRAME,  CH_PANEL_EDGE,  CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+    .byte CH_PANEL_TRUSS, CH_PANEL_FRAME,  CH_PANEL_SOLID, CH_PANEL_RIVET, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+    .byte CH_PANEL_EDGE,  CH_SPACE,        CH_PANEL_DAMAGE,CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+    .byte CH_SPACE,       CH_SPACE,        CH_PANEL_FRAME, CH_PANEL_FRAME, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+    .byte CH_SPACE,       CH_PANEL_TRUSS,  CH_PANEL_RIVET, CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+    .byte CH_PANEL_EDGE,  CH_PANEL_TRUSS,  CH_PANEL_SOLID, CH_PANEL_DAMAGE,CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+    .byte CH_PANEL_TRUSS, CH_SPACE,        CH_SPACE,       CH_PANEL_FRAME, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+    .byte CH_PANEL_TRUSS, CH_PANEL_RIVET,  CH_PANEL_EDGE,  CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
+
+; ANTIC 4 character set. Each byte stores four two-bit pixels.
+; Pixel values: 0=black, 1=white, 2=steel blue, 3=amber/red (bit 7 of
+; the screen code selects COLPF3 for the red variant).
+charset_data:
+    ; 0: space
+    .byte $00,$00,$00,$00,$00,$00,$00,$00
+    ; 1-8: structural tiles
+    .byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA
+    .byte $A0,$80,$80,$80,$80,$80,$80,$A0
+    .byte $AA,$82,$92,$82,$82,$92,$82,$AA
+    .byte $82,$28,$28,$82,$82,$28,$28,$82
+    .byte $AA,$A0,$88,$02,$80,$22,$08,$AA
+    .byte $AA,$82,$82,$82,$82,$82,$82,$AA
+    .byte $30,$30,$30,$30,$30,$30,$30,$30
+    .byte $AA,$A8,$A8,$AA,$AA,$8A,$8A,$AA
+    ; 9: HUD separator
+    .byte $00,$00,$00,$00,$00,$00,$00,$AA
+    ; 10: bright star
+    .byte $00,$00,$10,$54,$10,$00,$00,$00
+    ; 11-12: unused
+    .repeat 16
+        .byte $00
+    .endrepeat
+    ; 13: dash, 14: dim star, 15: unused
+    .byte $00,$00,$00,$55,$00,$00,$00,$00
+    .byte $00,$00,$00,$00,$00,$10,$00,$00
+    .byte $00,$00,$00,$00,$00,$00,$00,$00
+
+    ; 16-25: amber digits 0-9
+    .byte $3C,$C3,$C3,$C3,$C3,$C3,$3C,$00
+    .byte $0C,$3C,$0C,$0C,$0C,$0C,$3F,$00
+    .byte $3C,$C3,$03,$0C,$30,$C0,$FF,$00
+    .byte $FC,$03,$03,$3C,$03,$03,$FC,$00
+    .byte $0C,$3C,$CC,$FF,$0C,$0C,$0C,$00
+    .byte $FF,$C0,$FC,$03,$03,$03,$FC,$00
+    .byte $3C,$C0,$FC,$C3,$C3,$C3,$3C,$00
+    .byte $FF,$03,$0C,$0C,$30,$30,$30,$00
+    .byte $3C,$C3,$C3,$3C,$C3,$C3,$3C,$00
+    .byte $3C,$C3,$C3,$3F,$03,$03,$3C,$00
+
+    ; 26-32: punctuation not used by the gameplay screen
+    .repeat 56
+        .byte $00
+    .endrepeat
+
+    ; 33-58: white uppercase A-Z
+    .byte $14,$41,$41,$55,$41,$41,$41,$00 ; A
+    .byte $54,$41,$41,$54,$41,$41,$54,$00 ; B
+    .byte $15,$40,$40,$40,$40,$40,$15,$00 ; C
+    .byte $54,$41,$41,$41,$41,$41,$54,$00 ; D
+    .byte $55,$40,$40,$54,$40,$40,$55,$00 ; E
+    .byte $55,$40,$40,$54,$40,$40,$40,$00 ; F
+    .byte $15,$40,$40,$45,$41,$41,$15,$00 ; G
+    .byte $41,$41,$41,$55,$41,$41,$41,$00 ; H
+    .byte $55,$04,$04,$04,$04,$04,$55,$00 ; I
+    .byte $05,$01,$01,$01,$01,$41,$14,$00 ; J
+    .byte $41,$44,$50,$40,$50,$44,$41,$00 ; K
+    .byte $40,$40,$40,$40,$40,$40,$55,$00 ; L
+    .byte $41,$55,$55,$41,$41,$41,$41,$00 ; M
+    .byte $41,$51,$51,$45,$45,$41,$41,$00 ; N
+    .byte $14,$41,$41,$41,$41,$41,$14,$00 ; O
+    .byte $54,$41,$41,$54,$40,$40,$40,$00 ; P
+    .byte $14,$41,$41,$41,$45,$44,$15,$00 ; Q
+    .byte $54,$41,$41,$54,$44,$41,$41,$00 ; R
+    .byte $15,$40,$40,$14,$01,$01,$54,$00 ; S
+    .byte $55,$04,$04,$04,$04,$04,$04,$00 ; T
+    .byte $41,$41,$41,$41,$41,$41,$14,$00 ; U
+    .byte $41,$41,$41,$41,$41,$14,$04,$00 ; V
+    .byte $41,$41,$41,$55,$55,$55,$41,$00 ; W
+    .byte $41,$41,$14,$04,$14,$41,$41,$00 ; X
+    .byte $41,$41,$14,$04,$04,$04,$04,$00 ; Y
+    .byte $55,$01,$04,$04,$10,$40,$55,$00 ; Z
+
+    .repeat 552
+        .byte $00
+    .endrepeat
+
+    .assert * - charset_data = $400, error, "ANTIC 4 charset must be 1024 bytes"
+
 display_list:
     .byte $70,$70,$70              ; 24 blank scan lines
-    .byte $42,<SCREEN,>SCREEN      ; ANTIC 2 + LMS
+    .byte $44,<SCREEN,>SCREEN      ; ANTIC 4 + LMS
     .repeat 23
-        .byte $02
+        .byte $04
     .endrepeat
     .byte $41,<display_list,>display_list
-

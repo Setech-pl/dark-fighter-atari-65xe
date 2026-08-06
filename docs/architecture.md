@@ -4,13 +4,16 @@ Gra przejmuje ekran i pracuje bez usług DOS-u. Główna pętla synchronizuje si
 
 ## Obraz
 
-- ANTIC mode 2 zapewnia znakowe tło 40×24.
-- Tło przesuwa pole gwiazd w dół, tworząc wrażenie stałego lotu naprzód.
+- ANTIC mode 4 zapewnia czterokolorowe tło znakowe 40×24 o efektywnej szerokości 160 color clocks.
+- Własny zestaw znaków w RAM buduje HUD, pole gwiazd i moduły konstrukcji po bokach korytarza.
+- Tło przesuwa pole gwiazd oraz konstrukcje w dół, tworząc wrażenie stałego lotu naprzód.
 - Player 0: korpus statku gracza.
 - Player 3: pomarańczowy ślad silnika gracza.
 - Player 1: korpus przeciwnika.
 - Player 2: animowany czerwony skaner przeciwnika.
 - Missile 0: pocisk gracza.
+
+Kopiowanie 21 wierszy tła i wygenerowanie nowego wiersza odbywa się raz na cztery ramki. Przybliżony pesymistyczny koszt tej ścieżki to 19 000 cykli 6502, wobec około 35 500 cykli dostępnych w ramce PAL. W pozostałych trzech ramkach procedura kończy się po kilkunastu cyklach. Koszt jest ograniczony stałą liczbą 840 kopiowanych bajtów, 12 znaków konstrukcji i 28 komórek pola gwiazd.
 
 ## Sterowanie i logika
 
@@ -28,4 +31,3 @@ Linker tworzy jeden surowy blok ładowany pod `$2000`. Skrypt builda:
 2. opakowuje ten sam blok jako plik XEX z wektorem RUNAD;
 3. umieszcza blok w pierwszych sektorach standardowego obrazu ATR 90 KB;
 4. waliduje zakresy, rekordy i sumy kontrolne.
-

@@ -11,12 +11,19 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
   assert.match(source, /PMG_BASE\s*=\s*\$3800/);
   assert.match(source, /SCREEN\s*=\s*\$4000/);
+  assert.match(source, /CHARSET\s*=\s*\$4400/);
+  assert.match(source, /sta CHBASE/);
+  assert.match(source, /\.byte \$44,<SCREEN,>SCREEN\s+; ANTIC 4 \+ LMS/);
   assert.match(source, /lda #\$3E\s+; normal playfield, single-line PMG DMA/);
   assert.match(source, /lda #\$70\s*\n@wait_for_line:/);
+});
+
+test("accepted gameplay screen reference and its mapping decision are versioned", () => {
+  assert.ok(fs.existsSync(path.join(rootDirectory, "assets", "graphics", "dark-fighter-screen-concept-v1.png")));
+  assert.ok(fs.existsSync(path.join(rootDirectory, "docs", "decisions", "ADR-002-gameplay-screen.md")));
 });
 
 test("linker rejects code growth into reserved runtime graphics RAM", () => {
   const config = fs.readFileSync(path.join(rootDirectory, "cfg", "atari-boot.cfg"), "utf8");
   assert.match(config, /MAIN: start = \$2000, size = \$1000/);
 });
-

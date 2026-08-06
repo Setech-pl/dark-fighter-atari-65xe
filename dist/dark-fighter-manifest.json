@@ -1,25 +1,25 @@
 {
   "formatVersion": 1,
-  "gameVersion": "0.1.0",
+  "gameVersion": "0.1.1",
   "target": "Atari 65XE PAL / 64 KB",
   "toolchain": "romdev-toolchain-cc65@0.1.3",
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 9,
-  "payloadBytes": 1141,
+  "bootSectors": 19,
+  "payloadBytes": 2388,
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 1141,
-      "sha256": "542e213994ff3644e822c3c42aabe8f717c566e947398bb416d70a61047c6f46"
+      "bytes": 2388,
+      "sha256": "234949c36de366a307b51d0488dcedbd6682685bdd1156815bb3875a5bffc8eb"
     },
     "dark-fighter.xex": {
-      "bytes": 1153,
-      "sha256": "d26da77da03dabb427fe787f5cfc70bad0fc9d4ad7687713cedb28dd28a83a57"
+      "bytes": 2400,
+      "sha256": "4cb01bf0140f38e5d07e259d0d21f7bea7229a3e48f0f320d5d056a840e6cade"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "6f71545f8d8aeb7cb6fd2eb5f47d5ff5227753a40b6ee159d50c9e6bc21b2c73"
+      "sha256": "3baaa32f30012cb65456ff043976ed1e567b71540e836d099063def1840a55ab"
     }
   }
 }

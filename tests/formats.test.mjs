@@ -7,10 +7,11 @@ import { atrConstants, parseAtr, parseXex, validateBuildDirectory } from "../scr
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
+const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
 
 test("generated artifact set is internally consistent", () => {
   const { manifest } = validateBuildDirectory(rootDirectory);
-  assert.equal(manifest.gameVersion, "0.1.0");
+  assert.equal(manifest.gameVersion, packageDefinition.version);
   assert.equal(manifest.target, "Atari 65XE PAL / 64 KB");
   assert.ok(manifest.payloadBytes > 6);
   assert.ok(manifest.bootSectors >= 1 && manifest.bootSectors <= 255);
@@ -32,4 +33,3 @@ test("ATR uses standard single-density geometry", () => {
   assert.equal(parsed.body.length, 720 * 128);
   assert.equal(atr.length, 92176);
 });
-

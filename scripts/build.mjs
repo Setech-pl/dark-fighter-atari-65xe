@@ -10,6 +10,8 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
 const buildDirectory = path.join(rootDirectory, "build");
 const distDirectory = path.join(rootDirectory, "dist");
+const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
+const gameVersion = packageDefinition.version;
 const quiet = process.argv.includes("--quiet");
 
 function ensureDirectory(fsApi, directory) {
@@ -161,7 +163,7 @@ async function build() {
 
   const manifest = {
     formatVersion: 1,
-    gameVersion: "0.1.0",
+    gameVersion,
     target: "Atari 65XE PAL / 64 KB",
     toolchain: "romdev-toolchain-cc65@0.1.3",
     loadAddress,
@@ -189,7 +191,7 @@ async function build() {
   validateBuildDirectory(rootDirectory);
 
   if (!quiet) {
-    console.log(`Dark Fighter 0.1.0 built successfully`);
+    console.log(`Dark Fighter ${gameVersion} built successfully`);
     console.log(`  payload : ${rawPayload.length} bytes / ${bootSectors} sectors @ $${loadAddress.toString(16)}`);
     console.log(`  entry   : $${startAddress.toString(16)}`);
     console.log(`  XEX     : ${xex.length} bytes`);
@@ -201,4 +203,3 @@ build().catch((error) => {
   console.error(error.stack ?? error.message);
   process.exitCode = 1;
 });
-
