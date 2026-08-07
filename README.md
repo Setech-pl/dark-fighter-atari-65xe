@@ -1,101 +1,121 @@
 # Dark Fighter
 
+![Dark Fighter — retro space battle banner](assets/graphics/dark-fighter-banner-03-retro-box-art.png)
+
 `Dark Fighter` to nieoficjalny, hobbystyczny i niekomercyjny fan-art
-`Battlestar Galactica` w formie pionowej strzelanki kosmicznej dla Atari 65XE
-PAL z 64 KB RAM. Projekt może wykorzystywać elementy ekosystemu BSG zgodnie z
-decyzjami właściciela, ale nie sugeruje oficjalnego związku ani poparcia
-właścicieli marki. Dynamika rozgrywki nawiązuje do `River Raid`: gracz stale
-przemieszcza się przez niebezpieczny sektor, omija przeszkody i atakuje cele.
+`Battlestar Galactica`: pionowa strzelanka kosmiczna dla stockowego Atari 65XE
+PAL z 64 KB RAM. Gracz pilotuje Vipera przeciwko myśliwcom Cylonów. Projekt
+nie jest oficjalnym produktem ani nie sugeruje związku lub poparcia
+właścicieli marki; wszystkie dane Atari, grafiki, animacje, audio i kod
+powstają od nowa dla tego projektu.
 
-Aktualny build `0.1.1` jest pierwszym technicznym vertical slice'em z zaakceptowanym kierunkiem ekranu. Zawiera:
+## Bieżący vertical slice
 
-- pięciosekundowy ekran startowy z Galactiką, oznaczeniem `BSG` i podpisem
-  `SETECH GAME STUDIO`;
-- sterowanie statkiem joystickiem w porcie 1;
-- strzelanie przyciskiem FIRE;
-- przeciwnika z animowanym czerwonym skanerem;
-- sprzętową grafikę Player/Missile;
-- przewijane w dół pole gwiazd;
-- przewijane moduły korytarza, własny charset ANTIC 4 i HUD zgodny z zaakceptowaną kompozycją;
-- kolizje, wynik i efekty dźwiękowe POKEY;
-- plik `XEX` dla emulatora;
-- bootowalny obraz `ATR` dla emulatora i SIO2SD.
+Zaakceptowany build `0.1.1` potwierdza przenośny łańcuch builda i pierwszy
+ekran gameplayu. Obecnie zawiera:
 
-## Wymagania
+- sterowanie joystickiem w porcie 1 i strzelanie pojedynczym FIRE;
+- jednego przeciwnika z czerwonym skanerem, sprzętowe PMG, kolizje i score;
+- przewijane tło ANTIC 4, własny charset, prosty HUD i efekty POKEY;
+- samowystarczalny XEX oraz bootowalny ATR dla emulatora i SIO2SD;
+- zaakceptowany pięciosekundowy loader ANTIC F: bitmapę 320×192, Galactikę
+  z `BSG`, kremowy tytuł, zielone `SETECH GAME STUDIO`, dwa LMS, dwa DLI
+  i dokładnie 250 pełnych ramek PAL;
+- czyste przejście z loadera do ANTIC 4 bez kosztu loadera w gameplay main
+  loop lub gameplay VBI.
+
+## Docelowa gra
+
+Docelowo Viper stale leci przez powtarzalne poziomy, walczy z różnymi rolami
+Cylon fighters i unika zagrożeń. Open space będzie przeplatać się z
+zapowiadanymi korytarzami bitwy między Battlestarem po lewej i Cylon capital
+ship po prawej. Plan obejmuje hull percentage, zniszczenie i restart, debris
+z zawsze osiągalną trasą, wybór między zebraniem i zestrzeleniem repair drone,
+proceduralne fale, kontrolowaną losowość oraz broadside crossfire bez faction
+immunity.
+
+Te systemy są **planowane i nie są jeszcze zaimplementowane**. Kanoniczne
+decyzje i statusy znajdują się w
+[`docs/game-design.md`](docs/game-design.md), kolejność prac w
+[`docs/roadmap.md`](docs/roadmap.md), a stan obecny i docelowe granice systemów
+w [`docs/architecture.md`](docs/architecture.md).
+
+Gra pozostaje jednym resident gameplay programem bez ładowania pakietów między
+normalnymi poziomami. Title loader jest jedyną obecną fazą ładowania.
+
+## Wymagania builda
 
 - Node.js 24 lub nowszy;
 - npm;
-- opcjonalnie emulator Altirra (Windows) albo Atari800/Atari800MacX;
-- do prawdziwego Atari: SIO2SD oraz karta SD.
+- macOS Intel albo Windows;
+- opcjonalnie Altirra (Windows), Atari800 lub Atari800MacX;
+- dla prawdziwego Atari: SIO2SD i karta SD.
 
-Nie trzeba instalować natywnego `cc65`. Projekt używa przypiętej wersji `ca65/ld65` skompilowanej do WebAssembly, dzięki czemu ten sam build działa na macOS Intel i Windows.
+Nie trzeba instalować natywnego `cc65`. Przypięty `ca65/ld65` działa przez
+WebAssembly, dzięki czemu macOS Intel i Windows używają tego samego toolchainu.
 
-## Pierwszy build
+## Build i walidacja
 
 ```bash
 npm install
 npm run build
 npm test
 npm run preview
+npm run verify
 npm run package
 ```
 
-Wyniki pojawią się w `dist/`:
+Najważniejsze wyniki w `dist/`:
 
-- `dark-fighter.xex` — uruchamianie bezpośrednio w emulatorze jako `dist/dark-fighter.xex`;
-- `dark-fighter.atr` — obraz dyskietki bootujący bez DOS-u;
-- `dark-fighter-boot.bin` — surowy ładunek sektorów startowych.
-- `dark-fighter-0.1.1.zip` — kompletne wydanie: źródła, dokumentacja i binaria.
+- `dark-fighter.xex` — program wykonywalny dla emulatora;
+- `dark-fighter.atr` — standardowy obraz 90 KB bootujący bez DOS-u;
+- `dark-fighter-boot.bin` — surowy payload sektorów startowych;
+- `dark-fighter-manifest.json` — adresy, rozmiary i sumy kontrolne;
+- `dark-fighter-0.1.1.zip` — archiwum wydania tworzone przez `npm run package`.
 
-## Podglądy ekranów
+Standardowy ATR ma dużo miejsca na nośniku, ale ta pojemność nie jest
+dodatkowym resident RAM podczas gameplayu.
 
-Polecenie `npm run preview` tworzy:
+## Deterministyczne preview
 
-- `build/previews/loader-screen.png` — ekran startowy skompilowany z
+`npm run preview` tworzy:
+
+- `build/previews/loader-screen.png` z
   `assets/graphics/loader-bitmap.json`;
-- `build/previews/gameplay-screen.png` — kanoniczną klatkę gameplayu.
+- `build/previews/gameplay-screen.png` z kanonicznych danych `src/main.s`.
 
-Loader jest podglądem 320×192 ANTIC F z 1 bitem na piksel, a gameplay
-podglądem znakowego ANTIC 4. Oba PNG są deterministyczne i powiększone 2×
-metodą nearest-neighbour. Bitmapa, include dla asemblera i loader preview
-powstają z tego samego Atari-native źródła; referencyjny
-`assets/graphics/loader.png` pozostaje niezmienionym wzorcem wysokiej
-rozdzielczości. Kolory RGB są stabilnym przybliżeniem rejestrów Atari PAL,
-dlatego mogą nieznacznie różnić się od palety konkretnego emulatora albo
-fizycznego odbiornika.
+Oba obrazy mają 640×384, są skalowane 2× nearest-neighbour i powstają bez
+zewnętrznego narzędzia graficznego. Kolory RGB są stabilnym przybliżeniem
+rejestrów Atari PAL, więc mogą nieznacznie różnić się od konkretnego emulatora
+lub fizycznego odbiornika. Zaakceptowanego loader assetu nie należy zmieniać
+podczas implementacji planowanych systemów gameplayu.
 
-Plik `dist/dark-fighter.xex` należy wskazać emulatorowi jako program wykonywalny
-Atari. W Atari800 trzeba dodatkowo przypisać joystick hosta do portu 1 w
-konfiguracji wejścia; sam wybór pliku XEX nie wykonuje tego mapowania.
+W Atari800 należy osobno przypisać joystick hosta do portu 1; samo wskazanie
+XEX nie tworzy mapowania wejścia.
 
-## Uruchamianie na Atari 65XE przez SIO2SD
+## Atari 65XE i SIO2SD
 
 1. Skopiuj `dist/dark-fighter.atr` na kartę SD.
 2. Zamontuj obraz jako `D1:` w SIO2SD.
-3. Włóż joystick do portu 1.
-4. Włącz Atari, trzymając `OPTION`, aby wyłączyć BASIC.
-5. Sprawdź, że loader pozostaje widoczny przez co najmniej pięć sekund i
-   automatycznie przechodzi do gry.
-6. Statek porusza się we wszystkich kierunkach, FIRE strzela.
+3. Podłącz joystick do portu 1.
+4. Włącz Atari z wciśniętym `OPTION`, aby wyłączyć BASIC.
+5. Sprawdź loader widoczny dokładnie przez pięć sekund i automatyczne przejście
+   do gameplayu.
+6. Sprawdź ruch we wszystkich kierunkach oraz FIRE.
 
-Pierwsze uruchomienie na fizycznym sprzęcie należy traktować jako test sprzętowy. Procedura raportowania wyniku znajduje się w `docs/hardware-testing.md`.
+Emulator jest koniecznym, ale niewystarczającym testem. Procedura raportowania
+real hardware znajduje się w
+[`docs/hardware-testing.md`](docs/hardware-testing.md).
 
 ## Struktura
 
 ```text
 src/                    kod 6502
-cfg/                    mapa pamięci dla ld65
-assets/                 źródła grafiki, muzyki i SFX
-levels/                 definicje sektorów
-scripts/                przenośny build i walidacja obrazów
-tests/                  testy formatów i kontraktów builda
-docs/                   architektura, decyzje i testy sprzętowe
-dist/                   gotowe pliki do uruchomienia
+cfg/                    konfiguracja linkera
+assets/                 edytowalne źródła grafiki, muzyki i SFX
+levels/                 przyszłe data-driven definicje poziomów
+scripts/                przenośny build, preview i walidacja
+tests/                  testy formatów i kontraktów
+docs/                   projekt gry, architektura, roadmapa i ADR-y
+dist/                   wygenerowane pliki do uruchomienia
 ```
-
-## Status projektu
-
-Wersja `0.1.1` dowodzi pełnego łańcucha: źródło 6502 → asembler → binarny
-program → XEX → bootowalny ATR. Bieżący branch dodaje pierwszy ekran programu,
-generowany z wersjonowanego źródła Atari-native i automatycznie przechodzący do
-zaakceptowanego gameplayu po 250 pełnych ramkach PAL.

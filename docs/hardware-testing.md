@@ -11,8 +11,8 @@
 ## Lista kontrolna
 
 - obraz bootuje bez DOS-u i bez komunikatu `BOOT ERROR`;
-- loader pojawia się jako pierwszy ekran i pozostaje stabilny przez co najmniej
-  pięć sekund;
+- loader pojawia się jako pierwszy ekran i pozostaje stabilny przez pełne
+  pięć sekund, czyli 250 ramek PAL;
 - tytuł, profil Galactiki, `BSG`, trzy silniki i zielony podpis studia są
   czytelne;
 - bitmapa 320×192 jest stabilna, bez poziomego rozdarcia przy drugim LMS po
