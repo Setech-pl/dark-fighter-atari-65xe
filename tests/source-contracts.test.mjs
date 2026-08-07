@@ -23,7 +23,7 @@ test("accepted gameplay screen reference and its mapping decision are versioned"
   assert.ok(fs.existsSync(path.join(rootDirectory, "docs", "decisions", "ADR-002-gameplay-screen.md")));
 });
 
-test("linker rejects code growth into reserved runtime graphics RAM", () => {
+test("linker allows transient PMG padding but protects active PMG data", () => {
   const config = fs.readFileSync(path.join(rootDirectory, "cfg", "atari-boot.cfg"), "utf8");
-  assert.match(config, /MAIN: start = \$2000, size = \$1000/);
+  assert.match(config, /MAIN: start = \$2000, size = \$1B00/);
 });

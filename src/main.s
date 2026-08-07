@@ -11,6 +11,7 @@
 
 DOSVEC      = $000A
 APPMHI      = $0014
+VDSLST      = $0200
 MEMLO       = $02E7
 
 ; -----------------------------------------------------------------------------
@@ -62,6 +63,7 @@ DLISTL      = $D402
 DLISTH      = $D403
 PMBASE      = $D407
 CHBASE      = $D409
+WSYNC       = $D40A
 VCOUNT      = $D40B
 NMIEN       = $D40E
 
@@ -121,6 +123,9 @@ score_bcd_lo:       .res 1
 score_bcd_hi:       .res 1
 row_counter:        .res 1
 stick_value:        .res 1
+loader_frame_count: .res 1
+loader_dli_phase:   .res 1
+loader_repeat_value:.res 1
 src_ptr:            .res 2
 dst_ptr:            .res 2
 
@@ -136,10 +141,10 @@ boot_header:
 
 ; The OS enters at BOOTAD+6 after loading the consecutive boot sectors.
 boot_entry:
-    lda #<$3000
+    lda #<$3B00
     sta MEMLO
     sta APPMHI
-    lda #>$3000
+    lda #>$3B00
     sta MEMLO+1
     sta APPMHI+1
 
@@ -162,6 +167,11 @@ start:
     sta GRACTL
     sta AUDCTL
 
+    jsr unpack_loader_bitmap
+    jsr show_loader
+
+    ; Rebuild gameplay with DMA off so no partially prepared frame is visible.
+    ; This also reclaims loader-only payload bytes in PMG alignment padding.
     jsr clear_pmg
     jsr copy_charset
     jsr clear_screen
@@ -209,16 +219,17 @@ start:
     lda #$00
     sta COLBK
 
+    lda #$68                    ; quiet, continuous engine bed
+    sta AUDF3
+    lda #$22
+    sta AUDC3
+
+    jsr wait_frame_start
     lda #$03                    ; enable players and missiles
     sta GRACTL
     lda #$3E                    ; normal playfield, single-line PMG DMA
     sta DMACTL
     sta HITCLR
-
-    lda #$68                    ; quiet, continuous engine bed
-    sta AUDF3
-    lda #$22
-    sta AUDC3
 
 main_loop:
     jsr wait_frame
@@ -245,6 +256,157 @@ wait_frame:
     lda VCOUNT
     cmp #$70
     beq @leave_line
+    rts
+
+; Returns just after VCOUNT leaves zero, before the visible display begins.
+wait_frame_start:
+@wait_for_zero:
+    lda VCOUNT
+    bne @wait_for_zero
+@leave_zero:
+    lda VCOUNT
+    beq @leave_zero
+    rts
+
+; The loader uses a 320x192 ANTIC F bitmap. PMG remains disabled. Two DLIs
+; switch the high-resolution foreground at exact scanline boundaries.
+show_loader:
+    lda #<loader_display_list
+    sta DLISTL
+    lda #>loader_display_list
+    sta DLISTH
+
+    lda #$00                    ; normal CTIA/GTIA interpretation of ANTIC F
+    sta PRIOR
+    jsr set_loader_title_palette
+
+    lda #<loader_dli
+    sta VDSLST
+    lda #>loader_dli
+    sta VDSLST+1
+    lda #$00
+    sta loader_dli_phase
+
+    ; DMA starts before the first display-list line of a fresh PAL frame.
+    jsr wait_frame_start
+    lda #$80                    ; DLI only; OS VBI remains disabled
+    sta NMIEN
+    lda #$22                    ; normal playfield DMA, no PMG DMA
+    sta DMACTL
+
+    lda #LOADER_DURATION_FRAMES
+    sta loader_frame_count
+@frame:
+    jsr wait_frame_start
+    jsr set_loader_title_palette
+    dec loader_frame_count
+    bne @frame
+
+    ; The 250th full frame has completed. Blank the next frame before rebuild.
+    lda #$00
+    sta NMIEN
+    sta DMACTL
+    rts
+
+set_loader_title_palette:
+    lda #LOADER_TITLE_COLPF1
+    sta COLPF1
+    lda #LOADER_TITLE_COLPF2
+    sta COLPF2
+    lda #LOADER_TITLE_COLBK
+    sta COLBK
+    rts
+
+; WSYNC aligns each palette switch to the first color clock of the following
+; zone. Including a worst-case WSYNC stall, each DLI is bounded by 160 cycles.
+; Only A is used and preserved; X and Y are untouched.
+loader_dli:
+    pha
+    lda #$00
+    sta WSYNC
+    lda loader_dli_phase
+    bne @studio
+
+    lda #LOADER_SHIP_COLPF1
+    sta COLPF1
+    lda #LOADER_SHIP_COLPF2
+    sta COLPF2
+    inc loader_dli_phase
+    pla
+    rti
+
+@studio:
+    lda #LOADER_STUDIO_COLPF1
+    sta COLPF1
+    lda #LOADER_STUDIO_COLPF2
+    sta COLPF2
+    lda #$00                    ; restore title phase for the next frame
+    sta loader_dli_phase
+    pla
+    rti
+
+; PackBits commands: 1..127 literal bytes, $81..$FF repeated byte counts,
+; and $00 terminator. The host compiler verifies an exact 7680-byte expansion.
+unpack_loader_bitmap:
+    lda #<loader_bitmap_packbits
+    sta src_ptr
+    lda #>loader_bitmap_packbits
+    sta src_ptr+1
+    lda #<LOADER_BITMAP_ADDRESS
+    sta dst_ptr
+    lda #>LOADER_BITMAP_ADDRESS
+    sta dst_ptr+1
+
+@command:
+    ldy #$00
+    lda (src_ptr),y
+    beq @done
+    tax
+    jsr loader_advance_src
+    txa
+    bmi @repeat
+
+@literal:
+    ldy #$00
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    jsr loader_advance_src
+    jsr loader_advance_dst
+    dex
+    bne @literal
+    jmp @command
+
+@repeat:
+    and #$7F
+    tax
+    ldy #$00
+    lda (src_ptr),y
+    sta loader_repeat_value
+    jsr loader_advance_src
+@repeat_byte:
+    ldy #$00
+    lda loader_repeat_value
+    sta (dst_ptr),y
+    jsr loader_advance_dst
+    dex
+    bne @repeat_byte
+    jmp @command
+
+@done:
+    rts
+
+loader_advance_src:
+    inc src_ptr
+    bne :+
+    inc src_ptr+1
+:
+    rts
+
+loader_advance_dst:
+    inc dst_ptr
+    bne :+
+    inc dst_ptr+1
+:
     rts
 
 init_state:
@@ -998,3 +1160,5 @@ display_list:
         .byte $04
     .endrepeat
     .byte $41,<display_list,>display_list
+
+.include "loader-screen.inc"

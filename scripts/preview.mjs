@@ -2,6 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
+import {
+  compileLoaderBitmap,
+  loadLoaderBitmapDefinition,
+} from "./loader-assets.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -26,6 +30,12 @@ export const DEFAULT_PREVIEW_PATH = path.join(
   "build",
   "previews",
   "gameplay-screen.png",
+);
+export const DEFAULT_LOADER_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "loader-screen.png",
 );
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -369,20 +379,23 @@ function createCanonicalScreen(graphics) {
   return screen;
 }
 
-function drawAnticScreen(colorRegisters, screen, graphics) {
+function drawAnticScreen(colorRegisters, screen, graphics, colorRegistersForRow) {
+  const initialRegisters = colorRegistersForRow?.(0) ?? colorRegisters;
   const pixels = new Uint8Array(SOURCE_WIDTH * SOURCE_HEIGHT);
-  const background = requireValue(colorRegisters, "COLBK");
+  const background = requireValue(initialRegisters, "COLBK");
   pixels.fill(background);
 
-  const playfieldColors = [
-    background,
-    requireValue(colorRegisters, "COLPF0"),
-    requireValue(colorRegisters, "COLPF1"),
-  ];
-  const normalThirdColor = requireValue(colorRegisters, "COLPF2");
-  const inverseThirdColor = requireValue(colorRegisters, "COLPF3");
-
   for (let characterRow = 0; characterRow < SCREEN_ROWS; characterRow += 1) {
+    const rowRegisters = colorRegistersForRow?.(characterRow) ?? colorRegisters;
+    const rowBackground = requireValue(rowRegisters, "COLBK");
+    const playfieldColors = [
+      rowBackground,
+      requireValue(rowRegisters, "COLPF0"),
+      requireValue(rowRegisters, "COLPF1"),
+    ];
+    const normalThirdColor = requireValue(rowRegisters, "COLPF2");
+    const inverseThirdColor = requireValue(rowRegisters, "COLPF3");
+
     for (let column = 0; column < SCREEN_COLUMNS; column += 1) {
       const screenCode = screen[characterRow * SCREEN_COLUMNS + column];
       const characterIndex = screenCode & 0x7f;
@@ -611,6 +624,49 @@ export function createGameplayPreview(source) {
   return encodePng(scaleAndConvertToRgb(registerPixels));
 }
 
+export function createLoaderPreview(loaderDefinition) {
+  const loaderAsset = compileLoaderBitmap(loaderDefinition);
+  const memory = new Uint8Array(0x10000);
+  const firstPartBytes =
+    loaderAsset.secondLmsLine * loaderAsset.bytesPerRow;
+  memory.set(
+    loaderAsset.bitmapBytes.subarray(0, firstPartBytes),
+    loaderAsset.bitmapAddress,
+  );
+  memory.set(
+    loaderAsset.bitmapBytes.subarray(firstPartBytes),
+    loaderAsset.secondLmsAddress,
+  );
+
+  const registerPixels = new Uint8Array(SOURCE_WIDTH * SOURCE_HEIGHT);
+  for (let y = 0; y < loaderAsset.height; y += 1) {
+    const zone = loaderAsset.paletteZones.find(
+      ({ startLine, endLine }) => y >= startLine && y <= endLine,
+    );
+    if (!zone) {
+      throw new Error(`Loader preview line ${y} has no palette zone`);
+    }
+    const sourceAddress =
+      y < loaderAsset.secondLmsLine
+        ? loaderAsset.bitmapAddress + y * loaderAsset.bytesPerRow
+        : loaderAsset.secondLmsAddress +
+          (y - loaderAsset.secondLmsLine) * loaderAsset.bytesPerRow;
+    const background = zone.values.get("COLPF2");
+    for (
+      let byteColumn = 0;
+      byteColumn < loaderAsset.bytesPerRow;
+      byteColumn += 1
+    ) {
+      const value = memory[sourceAddress + byteColumn];
+      for (let bit = 0; bit < 8; bit += 1) {
+        registerPixels[y * SOURCE_WIDTH + byteColumn * 8 + bit] =
+          value & (0x80 >>> bit) ? zone.foregroundValue : background;
+      }
+    }
+  }
+  return encodePng(scaleAndConvertToRgb(registerPixels));
+}
+
 export function inspectPng(png) {
   if (!png.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
     throw new Error("Invalid PNG signature");
@@ -689,12 +745,37 @@ export function generateGameplayPreview({
   return { outputPath, bytes: png.length, ...inspectPng(png) };
 }
 
+export function generateLoaderPreview({
+  definitionPath = path.join(
+    rootDirectory,
+    "assets",
+    "graphics",
+    "loader-bitmap.json",
+  ),
+  outputPath = DEFAULT_LOADER_PREVIEW_PATH,
+} = {}) {
+  const definition = loadLoaderBitmapDefinition(definitionPath);
+  const png = createLoaderPreview(definition);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, png);
+  return { outputPath, bytes: png.length, ...inspectPng(png) };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const result = generateGameplayPreview();
+    const gameplayResult = generateGameplayPreview();
     console.log(`Gameplay preview generated successfully`);
-    console.log(`  PNG : ${path.relative(rootDirectory, result.outputPath)}`);
-    console.log(`  size: ${result.width}x${result.height}, ${result.bytes} bytes`);
+    console.log(`  PNG : ${path.relative(rootDirectory, gameplayResult.outputPath)}`);
+    console.log(
+      `  size: ${gameplayResult.width}x${gameplayResult.height}, ${gameplayResult.bytes} bytes`,
+    );
+
+    const loaderResult = generateLoaderPreview();
+    console.log(`Loader preview generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, loaderResult.outputPath)}`);
+    console.log(
+      `  size: ${loaderResult.width}x${loaderResult.height}, ${loaderResult.bytes} bytes`,
+    );
   } catch (error) {
     console.error(error.stack ?? error.message);
     process.exitCode = 1;

@@ -118,7 +118,10 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(boot[1] === manifest.bootSectors, "Boot sector count differs from manifest");
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
-  invariant(boot.length <= 0x1000, "Linked payload overlaps the reserved $3000 boundary");
+  invariant(
+    boot.length <= 0x1b00,
+    "Linked payload overlaps active PMG data at $3B00",
+  );
 
   const parsedXex = parseXex(xex);
   invariant(parsedXex.segments.length === 2, "XEX must contain the payload and RUNAD segments");
@@ -152,4 +155,3 @@ export const atrConstants = {
   sectorSize: ATR_SECTOR_SIZE,
   sectorCount: ATR_SECTOR_COUNT,
 };
-

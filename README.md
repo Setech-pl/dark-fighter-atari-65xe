@@ -1,9 +1,16 @@
 # Dark Fighter
 
-`Dark Fighter` to pionowa strzelanka kosmiczna dla Atari 65XE PAL z 64 KB RAM. Dynamika rozgrywki nawiązuje do `River Raid`: gracz stale przemieszcza się przez niebezpieczny sektor, omija przeszkody i atakuje cele. Kierunek wizualny czerpie z surowego, militarnego science-fiction w duchu `Battlestar Galactica` (2004), ale gra ma własne statki, nazwy i uniwersum.
+`Dark Fighter` to nieoficjalny, hobbystyczny i niekomercyjny fan-art
+`Battlestar Galactica` w formie pionowej strzelanki kosmicznej dla Atari 65XE
+PAL z 64 KB RAM. Projekt może wykorzystywać elementy ekosystemu BSG zgodnie z
+decyzjami właściciela, ale nie sugeruje oficjalnego związku ani poparcia
+właścicieli marki. Dynamika rozgrywki nawiązuje do `River Raid`: gracz stale
+przemieszcza się przez niebezpieczny sektor, omija przeszkody i atakuje cele.
 
 Aktualny build `0.1.1` jest pierwszym technicznym vertical slice'em z zaakceptowanym kierunkiem ekranu. Zawiera:
 
+- pięciosekundowy ekran startowy z Galactiką, oznaczeniem `BSG` i podpisem
+  `SETECH GAME STUDIO`;
 - sterowanie statkiem joystickiem w porcie 1;
 - strzelanie przyciskiem FIRE;
 - przeciwnika z animowanym czerwonym skanerem;
@@ -40,15 +47,22 @@ Wyniki pojawią się w `dist/`:
 - `dark-fighter-boot.bin` — surowy ładunek sektorów startowych.
 - `dark-fighter-0.1.1.zip` — kompletne wydanie: źródła, dokumentacja i binaria.
 
-## Podgląd ekranu
+## Podglądy ekranów
 
-Polecenie `npm run preview` tworzy `build/previews/gameplay-screen.png`.
-Jest to deterministyczny, powiększony metodą nearest-neighbour podgląd
-kanonicznej klatki ANTIC 4 z HUD-em, konstrukcjami bocznymi oraz statkami PMG.
-Generator czyta bezpośrednio dane i wartości rejestrów z `src/main.s`; nie
-utrzymuje osobnej kopii grafiki gry. Kolory RGB są stabilnym przybliżeniem
-sygnału Atari PAL, dlatego mogą nieznacznie różnić się od palety konkretnego
-emulatora albo fizycznego odbiornika.
+Polecenie `npm run preview` tworzy:
+
+- `build/previews/loader-screen.png` — ekran startowy skompilowany z
+  `assets/graphics/loader-bitmap.json`;
+- `build/previews/gameplay-screen.png` — kanoniczną klatkę gameplayu.
+
+Loader jest podglądem 320×192 ANTIC F z 1 bitem na piksel, a gameplay
+podglądem znakowego ANTIC 4. Oba PNG są deterministyczne i powiększone 2×
+metodą nearest-neighbour. Bitmapa, include dla asemblera i loader preview
+powstają z tego samego Atari-native źródła; referencyjny
+`assets/graphics/loader.png` pozostaje niezmienionym wzorcem wysokiej
+rozdzielczości. Kolory RGB są stabilnym przybliżeniem rejestrów Atari PAL,
+dlatego mogą nieznacznie różnić się od palety konkretnego emulatora albo
+fizycznego odbiornika.
 
 Plik `dist/dark-fighter.xex` należy wskazać emulatorowi jako program wykonywalny
 Atari. W Atari800 trzeba dodatkowo przypisać joystick hosta do portu 1 w
@@ -60,7 +74,9 @@ konfiguracji wejścia; sam wybór pliku XEX nie wykonuje tego mapowania.
 2. Zamontuj obraz jako `D1:` w SIO2SD.
 3. Włóż joystick do portu 1.
 4. Włącz Atari, trzymając `OPTION`, aby wyłączyć BASIC.
-5. Statek porusza się we wszystkich kierunkach, FIRE strzela.
+5. Sprawdź, że loader pozostaje widoczny przez co najmniej pięć sekund i
+   automatycznie przechodzi do gry.
+6. Statek porusza się we wszystkich kierunkach, FIRE strzela.
 
 Pierwsze uruchomienie na fizycznym sprzęcie należy traktować jako test sprzętowy. Procedura raportowania wyniku znajduje się w `docs/hardware-testing.md`.
 
@@ -79,4 +95,7 @@ dist/                   gotowe pliki do uruchomienia
 
 ## Status projektu
 
-Wersja `0.1.1` dowodzi pełnego łańcucha: źródło 6502 → asembler → binarny program → XEX → bootowalny ATR, a także wprowadza pierwszy ekran oparty na zaakceptowanym koncepcie. Następny etap to test wizualny w emulatorze, korekta sprite'ów i pewne mapowanie joysticka przed rozbudową rozgrywki.
+Wersja `0.1.1` dowodzi pełnego łańcucha: źródło 6502 → asembler → binarny
+program → XEX → bootowalny ATR. Bieżący branch dodaje pierwszy ekran programu,
+generowany z wersjonowanego źródła Atari-native i automatycznie przechodzący do
+zaakceptowanego gameplayu po 250 pełnych ramkach PAL.

@@ -11,6 +11,17 @@
 ## Lista kontrolna
 
 - obraz bootuje bez DOS-u i bez komunikatu `BOOT ERROR`;
+- loader pojawia się jako pierwszy ekran i pozostaje stabilny przez co najmniej
+  pięć sekund;
+- tytuł, profil Galactiki, `BSG`, trzy silniki i zielony podpis studia są
+  czytelne;
+- bitmapa 320×192 jest stabilna, bez poziomego rozdarcia przy drugim LMS po
+  linii 102;
+- trzy zespoły napędowe pozostają rozdzielone, kadłub jest neutralnie
+  stalowoszary, a dziób zwęża się warstwami;
+- granice koloru po liniach 39 i 163 nie przecinają tytułu, okrętu ani podpisu;
+- przejście do gameplayu jest automatyczne i nie pokazuje częściowo
+  przebudowanego charsetu ani ekranu;
 - tytuł oraz gwiazdy są stabilne;
 - statek porusza się w czterech kierunkach i nie wychodzi poza ekran;
 - FIRE tworzy jasny pocisk;
@@ -30,4 +41,3 @@ Zapisz:
 - etap, na którym wystąpił błąd;
 - zdjęcie lub krótki film ekranu;
 - informację, czy ten sam ATR działa w emulatorze.
-
