@@ -21,8 +21,11 @@ ekran gameplayu. Obecnie zawiera:
 - zaakceptowany pięciosekundowy loader ANTIC F: bitmapę 320×192, Galactikę
   z `BSG`, kremowy tytuł, zielone `SETECH GAME STUDIO`, dwa LMS, dwa DLI
   i dokładnie 250 pełnych ramek PAL;
-- czyste przejście z loadera do ANTIC 4 bez kosztu loadera w gameplay main
-  loop lub gameplay VBI.
+- interaktywne menu ANTIC 4 z ekranami `OPTIONS`, `TOP SCORES`, potwierdzeniem
+  `EXIT` i opcją `SOUND: ON/OFF`;
+- czyste przejście z loadera do menu, a następnie przez `START GAME` do
+  istniejącego gameplayu, bez kosztu loadera w gameplay main loop lub
+  gameplay VBI.
 
 ## Docelowa gra
 
@@ -82,9 +85,11 @@ dodatkowym resident RAM podczas gameplayu.
 
 - `build/previews/loader-screen.png` z
   `assets/graphics/loader-bitmap.json`;
+- `build/previews/start-menu.png` z tych samych danych menu, charsetu i palety,
+  których używa program;
 - `build/previews/gameplay-screen.png` z kanonicznych danych `src/main.s`.
 
-Oba obrazy mają 640×384, są skalowane 2× nearest-neighbour i powstają bez
+Wszystkie obrazy mają 640×384, są skalowane 2× nearest-neighbour i powstają bez
 zewnętrznego narzędzia graficznego. Kolory RGB są stabilnym przybliżeniem
 rejestrów Atari PAL, więc mogą nieznacznie różnić się od konkretnego emulatora
 lub fizycznego odbiornika. Zaakceptowanego loader assetu nie należy zmieniać
@@ -100,8 +105,10 @@ XEX nie tworzy mapowania wejścia.
 3. Podłącz joystick do portu 1.
 4. Włącz Atari z wciśniętym `OPTION`, aby wyłączyć BASIC.
 5. Sprawdź loader widoczny dokładnie przez pięć sekund i automatyczne przejście
-   do gameplayu.
-6. Sprawdź ruch we wszystkich kierunkach oraz FIRE.
+   do menu.
+6. Sprawdź nawigację menu, ekrany podrzędne i uruchomienie gry przez
+   `START GAME`.
+7. Sprawdź ruch we wszystkich kierunkach oraz FIRE w gameplayu.
 
 Emulator jest koniecznym, ale niewystarczającym testem. Procedura raportowania
 real hardware znajduje się w

@@ -20,8 +20,26 @@
 - trzy zespoły napędowe pozostają rozdzielone, kadłub jest neutralnie
   stalowoszary, a dziób zwęża się warstwami;
 - granice koloru po liniach 39 i 163 nie przecinają tytułu, okrętu ani podpisu;
-- przejście do gameplayu jest automatyczne i nie pokazuje częściowo
+- przejście do main menu jest automatyczne i nie pokazuje częściowo
   przebudowanego charsetu ani ekranu;
+- menu nie uruchamia gameplayu samoczynnie;
+- `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` są czytelne i występują
+  w tej kolejności, a domyślny marker wskazuje `START GAME`;
+- pojedyncze wychylenie UP/DOWN przesuwa marker dokładnie raz, wybór zawija się
+  między pierwszą i ostatnią pozycją, a trzymanie kierunku nie autorepeatuje;
+- FIRE wybiera dokładnie raz i wymaga puszczenia przed kolejną akcją;
+- `OPTIONS` pozwala zmienić `SOUND: ON/OFF` przez LEFT/RIGHT lub FIRE, `BACK`
+  wraca do menu, a wybór pozostaje zachowany po ponownym wejściu;
+- przy SOUND OFF strzał, trafienie i tło silnika są niesłyszalne, kanały nie
+  zostawiają zawieszonego tonu, a obraz i sterowanie zachowują timing;
+- `TOP SCORES` pokazuje dziesięć wierszy `01`–`10`; pierwszy FIRE po wejściu
+  nie wraca natychmiast, a osobne naciśnięcie wraca do menu;
+- `EXIT GAME?` domyślnie wskazuje `NO`; NO wraca do menu;
+- wybranie YES pokazuje `DARK FIGHTER ENDED` oraz `PRESS RESET TO RESTART`,
+  wycisza audio i pozostaje stabilne bez próby powrotu do DOS-u aż do RESET;
+- `START GAME` uruchamia gameplay dopiero po świadomym FIRE;
+- FIRE użyty do startu nie tworzy natychmiast pocisku; po puszczeniu kolejne
+  FIRE działa normalnie;
 - tytuł oraz gwiazdy są stabilne;
 - statek porusza się w czterech kierunkach i nie wychodzi poza ekran;
 - FIRE tworzy jasny pocisk;

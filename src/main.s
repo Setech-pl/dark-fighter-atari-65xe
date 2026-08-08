@@ -52,6 +52,7 @@ AUDF2       = $D202
 AUDC2       = $D203
 AUDF3       = $D204
 AUDC3       = $D205
+AUDC4       = $D207
 AUDCTL      = $D208
 
 ; -----------------------------------------------------------------------------
@@ -97,9 +98,27 @@ CH_PANEL_FRAME = 6
 CH_PANEL_STRIPE = 7
 CH_SEPARATOR = 9
 CH_STAR     = 10
+CH_MENU_MARKER = 11
 CH_DASH     = 13
 CH_DOT      = 14
+CH_SLASH    = 15
 CH_ZERO     = 16
+CH_COLON    = 26
+CH_QUESTION = 31
+
+KAWASAKI_GREEN = $EC
+GAMEPLAY_COLPF3 = $46
+MAIN_MENU_HIGHLIGHT_XOR = $C0
+
+STATE_LOADER       = 0
+STATE_MAIN_MENU    = 1
+STATE_OPTIONS      = 2
+STATE_TOP_SCORES   = 3
+STATE_EXIT_CONFIRM = 4
+STATE_EXITED       = 5
+STATE_GAMEPLAY     = 6
+
+FRONTEND_DEFAULT_SELECTION = 0
 
 .segment "ZEROPAGE"
 
@@ -128,6 +147,12 @@ loader_dli_phase:   .res 1
 loader_repeat_value:.res 1
 src_ptr:            .res 2
 dst_ptr:            .res 2
+frontend_data_ptr:  .res 2
+game_state:         .res 1
+frontend_selection: .res 1
+frontend_input_armed:.res 1
+sound_enabled:      .res 1
+gameplay_fire_gate: .res 1
 
 .segment "CODE"
 
@@ -167,19 +192,15 @@ start:
     sta GRACTL
     sta AUDCTL
 
+    sta game_state                 ; STATE_LOADER
     jsr unpack_loader_bitmap
     jsr show_loader
 
-    ; Rebuild gameplay with DMA off so no partially prepared frame is visible.
+    ; Rebuild the shared ANTIC 4 frontend/gameplay display with DMA off.
     ; This also reclaims loader-only payload bytes in PMG alignment padding.
     jsr clear_pmg
     jsr copy_charset
     jsr clear_screen
-    jsr init_state
-    jsr init_screen
-    jsr draw_player
-    jsr draw_enemy
-    jsr update_score_display
 
     lda #<display_list
     sta DLISTL
@@ -214,22 +235,436 @@ start:
     sta COLPF1
     lda #$28                    ; amber telemetry
     sta COLPF2
-    lda #$46                    ; red identification stripes
+    lda #KAWASAKI_GREEN        ; active main-menu label
     sta COLPF3
     lda #$00
     sta COLBK
 
+    jsr silence_audio
+    lda #$01
+    sta sound_enabled           ; options default: SOUND ON
+    jsr enter_main_menu
+    jmp frontend_loop
+
+; -----------------------------------------------------------------------------
+; Frontend state machine
+
+frontend_loop:
+    jsr wait_frame
+    lda STICK0
+    and #$0F
+    sta stick_value
+    cmp #$0F
+    bne @active_input
+    lda TRIG0
+    beq @active_input
+
+    lda #$01
+    sta frontend_input_armed
+    jmp frontend_loop
+
+@active_input:
+    lda frontend_input_armed
+    beq frontend_loop
+    lda #$00
+    sta frontend_input_armed
+    jsr dispatch_frontend_input
+    jmp frontend_loop
+
+dispatch_frontend_input:
+    lda game_state
+    cmp #STATE_MAIN_MENU
+    beq handle_main_menu_input
+    cmp #STATE_OPTIONS
+    beq handle_options_input
+    cmp #STATE_TOP_SCORES
+    beq handle_top_scores_input
+    cmp #STATE_EXIT_CONFIRM
+    beq handle_exit_input
+    rts
+
+handle_main_menu_input:
+    ldx #$03
+    lda stick_value
+    and #$01
+    bne :+
+    jsr toggle_main_menu_highlight
+    jmp move_selection_up
+:
+    lda stick_value
+    and #$02
+    bne :+
+    jsr toggle_main_menu_highlight
+    jmp move_selection_down
+:
+    lda TRIG0
+    bne @done
+
+    lda frontend_selection
+    bne :+
+    jmp start_gameplay
+:
+    cmp #$01
+    beq @options
+    cmp #$02
+    beq @top_scores
+    jmp enter_exit_confirmation
+@done:
+    rts
+@options:
+    jmp enter_options
+@top_scores:
+    jmp enter_top_scores
+
+handle_options_input:
+    ldx #$01
+    lda stick_value
+    and #$01
+    beq move_selection_up
+    lda stick_value
+    and #$02
+    beq move_selection_down
+    lda frontend_selection
+    bne @back_row
+    lda stick_value
+    and #$0C
+    cmp #$0C
+    bne toggle_sound
+    lda TRIG0
+    beq toggle_sound
+    rts
+@back_row:
+    lda TRIG0
+    bne @done
+    jmp enter_main_menu
+@done:
+    rts
+
+handle_top_scores_input:
+    lda TRIG0
+    bne @done
+    jmp enter_main_menu
+@done:
+    rts
+
+handle_exit_input:
+    lda stick_value
+    and #$05                    ; UP or LEFT selects NO
+    cmp #$05
+    bne @select_no
+    lda stick_value
+    and #$0A                    ; DOWN or RIGHT selects YES
+    cmp #$0A
+    bne @select_yes
+    lda TRIG0
+    bne @done
+    lda frontend_selection
+    beq @return_to_menu
+    jmp enter_exited_state
+@return_to_menu:
+    jmp enter_main_menu
+@done:
+    rts
+@select_no:
+    lda #$00
+    beq set_exit_selection
+@select_yes:
+    lda #$01
+set_exit_selection:
+    sta frontend_selection
+    jsr update_frontend_marker
+    rts
+
+move_selection_up:
+    lda frontend_selection
+    bne :+
+    stx frontend_selection
+    jmp update_frontend_marker
+:
+    dec frontend_selection
+    jmp update_frontend_marker
+
+move_selection_down:
+    lda frontend_selection
+    cpx frontend_selection
+    bne :+
+    lda #$00
+    sta frontend_selection
+    jmp update_frontend_marker
+:
+    inc frontend_selection
+    jmp update_frontend_marker
+
+toggle_sound:
+    lda sound_enabled
+    eor #$01
+    sta sound_enabled
+    bne :+
+    jsr silence_audio
+:
+    jmp draw_sound_value
+
+enter_main_menu:
+    lda #STATE_MAIN_MENU
+    bne enter_frontend_state
+
+enter_options:
+    lda #STATE_OPTIONS
+    bne enter_frontend_state
+
+enter_top_scores:
+    lda #STATE_TOP_SCORES
+    bne enter_frontend_state
+
+enter_exit_confirmation:
+    lda #STATE_EXIT_CONFIRM
+
+enter_frontend_state:
+    sta game_state
+    lda #FRONTEND_DEFAULT_SELECTION
+    sta frontend_selection
+    lda #$00
+    sta frontend_input_armed
+    sta DMACTL
+    jsr render_frontend_state
+    jsr wait_frame_start
+    lda #$22                    ; ANTIC 4 playfield, PMG remains disabled
+    sta DMACTL
+    rts
+
+enter_exited_state:
+    lda #STATE_EXITED
+    sta game_state
+    lda #$00
+    sta DMACTL
+    sta GRACTL
+    jsr silence_audio
+    jsr render_frontend_state
+    jsr wait_frame_start
+    lda #$22
+    sta DMACTL
+@wait:
+    jsr wait_frame
+    jmp @wait
+
+render_frontend_state:
+    lda game_state
+    sec
+    sbc #STATE_MAIN_MENU
+    asl
+    tax
+    lda frontend_screen_data,x
+    sta frontend_data_ptr
+    lda frontend_screen_data+1,x
+    sta frontend_data_ptr+1
+    jsr render_frontend_data
+    lda game_state
+    cmp #STATE_OPTIONS
+    bne :+
+    jsr draw_sound_value
+    jmp update_frontend_marker
+:
+    cmp #STATE_TOP_SCORES
+    bne :+
+    jmp draw_top_score_rows
+:
+    cmp #STATE_EXITED
+    beq @done
+    jmp update_frontend_marker
+@done:
+    rts
+
+render_frontend_data:
+    jsr clear_screen
+@record:
+    jsr read_frontend_data
+    cmp #$FF
+    beq @done
+    sta dst_ptr
+    jsr read_frontend_data
+    sta dst_ptr+1
+@text:
+    jsr read_frontend_data
+    cmp #$00
+    beq @record
+    sec
+    sbc #$20
+    ldy #$00
+    sta (dst_ptr),y
+    inc dst_ptr
+    bne @text
+    inc dst_ptr+1
+    jmp @text
+@done:
+    rts
+
+read_frontend_data:
+    ldy #$00
+    lda (frontend_data_ptr),y
+    inc frontend_data_ptr
+    bne :+
+    inc frontend_data_ptr+1
+:
+    rts
+
+update_frontend_marker:
+    lda game_state
+    ldx #$00
+    ldy #$04
+    cmp #STATE_MAIN_MENU
+    beq @clear
+    ldx #$04
+    ldy #$02
+    cmp #STATE_OPTIONS
+    beq @clear
+    ldx #$06
+    cmp #STATE_EXIT_CONFIRM
+    bne @done
+@clear:
+    stx loader_dli_phase
+    sty loader_repeat_value
+@clear_next:
+    lda #CH_SPACE
+    jsr draw_frontend_marker
+    inx
+    dec loader_repeat_value
+    bne @clear_next
+    lda frontend_selection
+    clc
+    adc loader_dli_phase
+    tax
+    lda #CH_MENU_MARKER
+    jsr draw_frontend_marker
+    cpx #$04
+    bcs @done
+    jmp toggle_main_menu_highlight
+@done:
+    rts
+
+; A is the screen code and X is the absolute marker-position index.
+draw_frontend_marker:
+    sta row_counter
+    txa
+    asl
+    tay
+    lda frontend_marker_positions,y
+    sta dst_ptr
+    iny
+    lda frontend_marker_positions,y
+    sta dst_ptr+1
+    ldy #$00
+    lda row_counter
+    sta (dst_ptr),y
+    rts
+
+; Main-menu labels use duplicate A-Z glyphs whose pixels select colour 3.
+; EOR is reversible, so navigation restores the old row before highlighting
+; the new one. The ten cells following each marker cover the longest label.
+toggle_main_menu_highlight:
+    ldy #11
+@character:
+    lda (dst_ptr),y
+    beq @next
+    eor #MAIN_MENU_HIGHLIGHT_XOR
+    sta (dst_ptr),y
+@next:
+    dey
+    cpy #1
+    bne @character
+    rts
+
+draw_sound_value:
+    lda sound_enabled
+    beq @off
+    lda #46                     ; screen code N
+    sta SCREEN+10*40+22
+    lda #CH_SPACE
+    sta SCREEN+10*40+23
+    rts
+@off:
+    lda #38                     ; screen code F
+    sta SCREEN+10*40+22
+    sta SCREEN+10*40+23
+    rts
+
+draw_top_score_rows:
+    lda #<(SCREEN+5*40+12)
+    sta dst_ptr
+    lda #>(SCREEN+5*40+12)
+    sta dst_ptr+1
+    ldx #$00
+@row:
+    ldy #14
+@copy:
+    lda top_score_row_template,y
+    sta (dst_ptr),y
+    dey
+    bpl @copy
+
+    lda #CH_ZERO
+    ldy #$00
+    sta (dst_ptr),y
+    iny
+    cpx #$09
+    beq @ten
+    txa
+    clc
+    adc #CH_ZERO+1
+    sta (dst_ptr),y
+    bne @next
+@ten:
+    lda #CH_ZERO+1
+    dey
+    sta (dst_ptr),y
+    iny
+    lda #CH_ZERO
+    sta (dst_ptr),y
+@next:
+    clc
+    lda dst_ptr
+    adc #40
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
+    inx
+    cpx #10
+    bne @row
+    rts
+
+; One reset path owns all gameplay state, hardware latches, PMG and audio.
+start_gameplay:
+    lda #STATE_GAMEPLAY
+    sta game_state
+    lda #$00
+    sta DMACTL
+    sta GRACTL
+    sta gameplay_fire_gate
+    jsr silence_audio
+    jsr clear_pmg
+    jsr clear_screen
+    jsr init_state
+    jsr init_screen
+    jsr draw_player
+    jsr draw_enemy
+    jsr update_score_display
+    sta HITCLR
+
+    lda #GAMEPLAY_COLPF3       ; restore red structural accents for gameplay
+    sta COLPF3
+
+    lda sound_enabled
+    beq @display
     lda #$68                    ; quiet, continuous engine bed
     sta AUDF3
     lda #$22
     sta AUDC3
-
+@display:
     jsr wait_frame_start
     lda #$03                    ; enable players and missiles
     sta GRACTL
     lda #$3E                    ; normal playfield, single-line PMG DMA
     sta DMACTL
-    sta HITCLR
 
 main_loop:
     jsr wait_frame
@@ -567,6 +1002,14 @@ read_input:
     sta HPOSP3
     jsr draw_player
 
+    lda gameplay_fire_gate
+    bne @fire_ready
+    lda TRIG0
+    beq @done
+    lda #$01
+    sta gameplay_fire_gate
+    rts
+@fire_ready:
     lda TRIG0
     bne @done
     lda bullet_active
@@ -617,12 +1060,15 @@ fire_bullet:
     lda #$01
     sta bullet_active
 
+    lda sound_enabled
+    beq @done
     lda #$32
     sta AUDF1
     lda #$A8
     sta AUDC1
     lda #$07
     sta fire_timer
+@done:
     rts
 
 update_bullet:
@@ -952,15 +1398,23 @@ random_byte:
 ; POKEY sound
 
 play_hit_sound:
+    lda sound_enabled
+    beq @done
     lda #$20
     sta AUDF2
     lda #$88
     sta AUDC2
     lda #$0E
     sta hit_timer
+@done:
     rts
 
 update_sound:
+    lda sound_enabled
+    bne @enabled
+    jsr silence_audio
+    jmp @damage
+@enabled:
     lda fire_timer
     beq @hit
     dec fire_timer
@@ -993,6 +1447,15 @@ update_sound:
     sta COLBK
     rts
 
+silence_audio:
+    lda #$00
+    sta AUDC1
+    sta AUDC2
+    sta AUDC3
+    sta AUDC4
+    sta AUDCTL
+    rts
+
 ; -----------------------------------------------------------------------------
 ; Read-only data
 
@@ -1001,6 +1464,10 @@ update_sound:
 hud_ascii:
     .byte "SCORE 00000  FUEL 5  ARM 4  LIFE X03"
     .byte $00
+
+frontend_screen_data:
+    .word main_menu_screen_data, options_screen_data, top_scores_screen_data
+    .word exit_screen_data, ended_screen_data
 
 player_shape:
     .byte %00011000
@@ -1075,8 +1542,9 @@ corridor_right_tiles:
     .byte CH_PANEL_TRUSS, CH_PANEL_RIVET,  CH_PANEL_EDGE,  CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID
 
 ; ANTIC 4 character set. Each byte stores four two-bit pixels.
-; Pixel values: 0=black, 1=white, 2=steel blue, 3=amber/red (bit 7 of
-; the screen code selects COLPF3 for the red variant).
+; Pixel values: 0=black, 1=white, 2=steel blue, 3=COLPF2 or COLPF3 when
+; bit 7 of the screen code is set. The frontend sets COLPF3 to Kawasaki
+; green; gameplay restores red before enabling DMA.
 charset_data:
     ; 0: space
     .byte $00,$00,$00,$00,$00,$00,$00,$00
@@ -1093,14 +1561,15 @@ charset_data:
     .byte $00,$00,$00,$00,$00,$00,$00,$AA
     ; 10: bright star
     .byte $00,$00,$10,$54,$10,$00,$00,$00
-    ; 11-12: unused
-    .repeat 16
+    ; 11: menu selection marker, 12: unused
+    .byte $C0,$F0,$FC,$FF,$FC,$F0,$C0,$00
+    .repeat 8
         .byte $00
     .endrepeat
-    ; 13: dash, 14: dim star, 15: unused
+    ; 13: dash, 14: dim star, 15: slash
     .byte $00,$00,$00,$55,$00,$00,$00,$00
     .byte $00,$00,$00,$00,$00,$10,$00,$00
-    .byte $00,$00,$00,$00,$00,$00,$00,$00
+    .byte $01,$01,$04,$04,$10,$10,$40,$40
 
     ; 16-25: amber digits 0-9
     .byte $3C,$C3,$C3,$C3,$C3,$C3,$3C,$00
@@ -1114,8 +1583,13 @@ charset_data:
     .byte $3C,$C3,$C3,$3C,$C3,$C3,$3C,$00
     .byte $3C,$C3,$C3,$3F,$03,$03,$3C,$00
 
-    ; 26-32: punctuation not used by the gameplay screen
-    .repeat 56
+    ; 26: colon, 27-30 unused, 31: question mark, 32 unused
+    .byte $00,$10,$10,$00,$10,$10,$00,$00
+    .repeat 32
+        .byte $00
+    .endrepeat
+    .byte $14,$41,$01,$04,$04,$00,$04,$00
+    .repeat 8
         .byte $00
     .endrepeat
 
@@ -1147,9 +1621,112 @@ charset_data:
     .byte $41,$41,$14,$04,$04,$04,$04,$00 ; Y
     .byte $55,$01,$04,$04,$10,$40,$55,$00 ; Z
 
-    .repeat 552
+; Frontend data occupies otherwise-unused character slots 59 and above. The
+; game never renders those screen codes, so the fixed 1 KB charset allocation
+; doubles as compact resident storage without reserving another RAM range.
+frontend_charset_data:
+; Screen stream: screen address, zero-terminated ASCII; $FF ends a screen.
+main_menu_screen_data:
+    .word SCREEN+4*40+14
+    .byte "DARK FIGHTER",0
+    .word SCREEN+9*40+15
+    .byte "START GAME",0
+    .word SCREEN+11*40+16
+    .byte "OPTIONS",0
+    .word SCREEN+13*40+15
+    .byte "TOP SCORES",0
+    .word SCREEN+15*40+18
+    .byte "EXIT",0
+    .word SCREEN+21*40+14
+    .byte "FIRE SELECT",0
+    .byte $FF
+
+options_screen_data:
+    .word SCREEN+4*40+16
+    .byte "OPTIONS",0
+    .word SCREEN+10*40+14
+    .byte "SOUND: OFF",0
+    .word SCREEN+14*40+18
+    .byte "BACK",0
+    .byte $FF
+
+top_scores_screen_data:
+    .word SCREEN+2*40+15
+    .byte "TOP SCORES",0
+    .word SCREEN+21*40+16
+    .byte "FIRE BACK",0
+    .byte $FF
+
+exit_screen_data:
+    .word SCREEN+7*40+15
+    .byte "EXIT GAME?",0
+    .word SCREEN+13*40+14
+    .byte "NO",0
+    .word SCREEN+13*40+23
+    .byte "YES",0
+    .byte $FF
+
+ended_screen_data:
+    .word SCREEN+9*40+11
+    .byte "DARK FIGHTER ENDED",0
+    .word SCREEN+13*40+9
+    .byte "PRESS RESET TO RESTART",0
+    .byte $FF
+
+; Screen addresses for main-menu rows, options rows, and exit choices.
+frontend_marker_positions:
+    .word SCREEN+9*40+13, SCREEN+11*40+14
+    .word SCREEN+13*40+13, SCREEN+15*40+16
+    .word SCREEN+10*40+12, SCREEN+14*40+16
+    .word SCREEN+13*40+12, SCREEN+13*40+21
+
+top_score_row_template:
+    .byte CH_ZERO,CH_ZERO,CH_SPACE,CH_SPACE
+    .byte CH_DASH,CH_DASH,CH_DASH,CH_SPACE,CH_SPACE
+    .byte CH_ZERO,CH_ZERO,CH_ZERO,CH_ZERO,CH_ZERO,CH_ZERO
+frontend_charset_data_end:
+
+    .assert frontend_charset_data_end - frontend_charset_data = 233, error, "frontend charset data size changed"
+    .repeat 71
         .byte $00
     .endrepeat
+
+green_menu_charset_data:
+    ; 97-122: uppercase A-Z using pixel value 3 for COLPF3 highlighting.
+    .byte $3C,$C3,$C3,$FF,$C3,$C3,$C3,$00 ; A
+    .byte $FC,$C3,$C3,$FC,$C3,$C3,$FC,$00 ; B
+    .byte $3F,$C0,$C0,$C0,$C0,$C0,$3F,$00 ; C
+    .byte $FC,$C3,$C3,$C3,$C3,$C3,$FC,$00 ; D
+    .byte $FF,$C0,$C0,$FC,$C0,$C0,$FF,$00 ; E
+    .byte $FF,$C0,$C0,$FC,$C0,$C0,$C0,$00 ; F
+    .byte $3F,$C0,$C0,$CF,$C3,$C3,$3F,$00 ; G
+    .byte $C3,$C3,$C3,$FF,$C3,$C3,$C3,$00 ; H
+    .byte $FF,$0C,$0C,$0C,$0C,$0C,$FF,$00 ; I
+    .byte $0F,$03,$03,$03,$03,$C3,$3C,$00 ; J
+    .byte $C3,$CC,$F0,$C0,$F0,$CC,$C3,$00 ; K
+    .byte $C0,$C0,$C0,$C0,$C0,$C0,$FF,$00 ; L
+    .byte $C3,$FF,$FF,$C3,$C3,$C3,$C3,$00 ; M
+    .byte $C3,$F3,$F3,$CF,$CF,$C3,$C3,$00 ; N
+    .byte $3C,$C3,$C3,$C3,$C3,$C3,$3C,$00 ; O
+    .byte $FC,$C3,$C3,$FC,$C0,$C0,$C0,$00 ; P
+    .byte $3C,$C3,$C3,$C3,$CF,$CC,$3F,$00 ; Q
+    .byte $FC,$C3,$C3,$FC,$CC,$C3,$C3,$00 ; R
+    .byte $3F,$C0,$C0,$3C,$03,$03,$FC,$00 ; S
+    .byte $FF,$0C,$0C,$0C,$0C,$0C,$0C,$00 ; T
+    .byte $C3,$C3,$C3,$C3,$C3,$C3,$3C,$00 ; U
+    .byte $C3,$C3,$C3,$C3,$C3,$3C,$0C,$00 ; V
+    .byte $C3,$C3,$C3,$FF,$FF,$FF,$C3,$00 ; W
+    .byte $C3,$C3,$3C,$0C,$3C,$C3,$C3,$00 ; X
+    .byte $C3,$C3,$3C,$0C,$0C,$0C,$0C,$00 ; Y
+    .byte $FF,$03,$0C,$0C,$30,$C0,$FF,$00 ; Z
+green_menu_charset_data_end:
+
+    .repeat 40
+        .byte $00
+    .endrepeat
+
+    .assert green_menu_charset_data - charset_data = 97*8, error, "green menu glyphs must start at character 97"
+    .assert green_menu_charset_data_end - green_menu_charset_data = 26*8, error, "green menu alphabet size changed"
 
     .assert * - charset_data = $400, error, "ANTIC 4 charset must be 1024 bytes"
 

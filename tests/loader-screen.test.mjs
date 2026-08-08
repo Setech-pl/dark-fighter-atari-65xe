@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  anticFRegisterForBitmapBit,
   compileLoaderBitmap,
   createLoaderDisplayListBytes,
   encodeLoaderBitmapPixels,
@@ -190,13 +191,60 @@ test("three ANTIC F zones use black luminance-zero backgrounds and $EC studio", 
   for (const zone of compiled.paletteZones) {
     assert.equal(zone.values.get("COLBK"), 0x00);
     assert.equal(zone.values.get("COLPF2") & 0x0f, 0);
-    assert.equal(
-      (zone.values.get("COLPF2") & 0xf0) |
-        (zone.values.get("COLPF1") & 0x0e),
-      zone.foregroundValue,
-    );
+    assert.equal(anticFRegisterForBitmapBit(zone.values, 1), zone.foregroundValue);
+    assert.equal(anticFRegisterForBitmapBit(zone.values, 0), zone.values.get("COLPF2"));
   }
-  assert.equal(compiled.paletteZones[2].values.get("COLPF1"), 0xec);
+  const [title, ship, studio] = compiled.paletteZones;
+  assert.equal(title.values.get("COLPF1"), 0x1e);
+  assert.equal(anticFRegisterForBitmapBit(title.values, 1), 0x1e);
+  assert.equal(ship.values.get("COLPF1"), 0x0a);
+  assert.equal(anticFRegisterForBitmapBit(ship.values, 1), 0x0a);
+  assert.equal(studio.values.get("COLPF1"), 0xec);
+  assert.equal(studio.values.get("COLPF2"), 0xe0);
+  assert.equal(anticFRegisterForBitmapBit(studio.values, 1), 0xec);
+});
+
+test("studio bitmap set pixels use the assembled COLPF1=$EC DLI mapping", () => {
+  const labels = readLabels();
+  const dliAddress = labels.get("loader_dli");
+  assert.ok(Number.isInteger(dliAddress));
+  const dliBytes = readXexBytes(dliAddress, 64);
+  const studioWrites = Buffer.from([
+    0xa9, 0xec, 0x8d, 0x17, 0xd0,
+    0xa9, 0xe0, 0x8d, 0x18, 0xd0,
+  ]);
+  assert.notEqual(
+    dliBytes.indexOf(studioWrites),
+    -1,
+    "loader DLI must write COLPF1=$EC then COLPF2=$E0",
+  );
+
+  const studio = compiled.paletteZones[2];
+  assert.deepEqual([studio.startLine, studio.endLine], [164, 191]);
+  let studioSetPixel = -1;
+  for (let y = studio.startLine; y <= studio.endLine && studioSetPixel < 0; y += 1) {
+    const row = compiled.pixels.subarray(y * compiled.width, (y + 1) * compiled.width);
+    if (row.includes(1)) {
+      studioSetPixel = y;
+    }
+  }
+  assert.notEqual(studioSetPixel, -1, "studio band must contain set bitmap pixels");
+  assert.equal(anticFRegisterForBitmapBit(studio.values, 1), 0xec);
+  assert.equal(anticFRegisterForBitmapBit(studio.values, 0), 0xe0);
+
+  const titlePalette = source.slice(
+    source.indexOf("set_loader_title_palette:"),
+    source.indexOf("loader_dli:"),
+  );
+  assert.match(titlePalette, /lda #LOADER_TITLE_COLPF1\s+sta COLPF1/);
+  assert.match(titlePalette, /lda #LOADER_TITLE_COLPF2\s+sta COLPF2/);
+  const dliSource = source.slice(
+    source.indexOf("loader_dli:"),
+    source.indexOf("unpack_loader_bitmap:"),
+  );
+  assert.match(dliSource, /pha[\s\S]+sta WSYNC[\s\S]+pla\s+rti/);
+  assert.match(dliSource, /lda #LOADER_STUDIO_COLPF1\s+sta COLPF1/);
+  assert.match(dliSource, /lda #LOADER_STUDIO_COLPF2\s+sta COLPF2/);
 });
 
 test("generated include is canonical and contains no ANTIC 4 loader assets", () => {
@@ -270,8 +318,9 @@ test("XEX and ATR use the current packed bitmap source", () => {
   );
 });
 
-test("loader still owns exactly 250 full PAL frames and restores gameplay", () => {
-  assert.ok(source.indexOf("jsr show_loader") < source.indexOf("jsr init_state"));
+test("loader still owns exactly 250 full PAL frames and enters the main menu", () => {
+  assert.ok(source.indexOf("jsr show_loader") < source.indexOf("jsr enter_main_menu"));
+  assert.ok(source.indexOf("jsr enter_main_menu") < source.indexOf("start_gameplay:"));
   assert.match(source, /lda #LOADER_DURATION_FRAMES\s+sta loader_frame_count/);
   assert.match(
     source,
@@ -281,6 +330,7 @@ test("loader still owns exactly 250 full PAL frames and restores gameplay", () =
   assert.match(source, /pla\s+rti/);
   assert.match(source, /lda #\$00\s+sta NMIEN\s+sta DMACTL\s+rts/);
   assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_charset/);
+  assert.match(source, /jsr enter_main_menu\s+jmp frontend_loop/);
 });
 
 test("loader memory stays below active PMG data and uses transient graphics RAM", () => {

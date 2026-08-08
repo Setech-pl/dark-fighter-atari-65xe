@@ -3,6 +3,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import {
+  anticFRegisterForBitmapBit,
   compileLoaderBitmap,
   loadLoaderBitmapDefinition,
 } from "./loader-assets.mjs";
@@ -36,6 +37,12 @@ export const DEFAULT_LOADER_PREVIEW_PATH = path.join(
   "build",
   "previews",
   "loader-screen.png",
+);
+export const DEFAULT_START_MENU_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "start-menu.png",
 );
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -170,12 +177,16 @@ function parseDataLines(lines, constants) {
     }
 
     const byteMatch = /^\.byte\s+(.+)$/.exec(line);
-    if (!byteMatch) {
+    const wordMatch = /^\.word\s+(.+)$/.exec(line);
+    if (!byteMatch && !wordMatch) {
       continue;
     }
 
-    for (const argument of splitByteArguments(byteMatch[1])) {
+    for (const argument of splitByteArguments((byteMatch ?? wordMatch)[1])) {
       if (argument.startsWith('"')) {
+        if (wordMatch) {
+          throw new Error("Preview source cannot encode a string with .word");
+        }
         const text = JSON.parse(argument);
         for (const character of text) {
           const code = character.codePointAt(0);
@@ -186,10 +197,16 @@ function parseDataLines(lines, constants) {
         }
       } else {
         const value = evaluateExpression(argument, constants);
-        if (value < -128 || value > 0xff) {
+        if (byteMatch && (value < -128 || value > 0xff)) {
           throw new Error(`Preview source byte is out of range: ${argument}`);
         }
+        if (wordMatch && (value < -32768 || value > 0xffff)) {
+          throw new Error(`Preview source word is out of range: ${argument}`);
+        }
         bytes.push(value & 0xff);
+        if (wordMatch) {
+          bytes.push((value >>> 8) & 0xff);
+        }
       }
     }
   }
@@ -197,7 +214,7 @@ function parseDataLines(lines, constants) {
   return Uint8Array.from(bytes);
 }
 
-function extractLabeledData(source, label, constants) {
+function extractLabeledData(source, label, constants, endLabel) {
   const lines = source.split(/\r?\n/);
   const labelPattern = new RegExp(`^${label}:\\s*$`);
   const startIndex = lines.findIndex((line) => labelPattern.test(stripComment(line).trim()));
@@ -208,7 +225,11 @@ function extractLabeledData(source, label, constants) {
   let endIndex = startIndex + 1;
   for (; endIndex < lines.length; endIndex += 1) {
     const line = stripComment(lines[endIndex]);
-    if (/^[A-Za-z_][A-Za-z0-9_]*:\s*$/.test(line.trim())) {
+    const foundLabel = /^([A-Za-z_][A-Za-z0-9_]*):\s*$/.exec(line.trim());
+    if (
+      foundLabel &&
+      (endLabel ? foundLabel[1] === endLabel : true)
+    ) {
       break;
     }
   }
@@ -283,7 +304,19 @@ function requireLength(name, bytes, expectedLength) {
 export function readGameGraphicsSource(source) {
   const constants = parseConstants(source);
   const initialState = extractConstantStores(extractRoutine(source, "init_state"), constants);
-  const hardwareState = extractConstantStores(extractRoutine(source, "start"), constants);
+  const frontendHardwareState = extractConstantStores(
+    extractRoutine(source, "start"),
+    constants,
+  );
+  const gameplayHardwareState = new Map(frontendHardwareState);
+  const gameplayEntryState = extractConstantStores(
+    extractRoutine(source, "start_gameplay"),
+    constants,
+  );
+  gameplayHardwareState.set(
+    "COLPF3",
+    requireValue(gameplayEntryState, "COLPF3"),
+  );
 
   const graphics = {
     constants,
@@ -295,9 +328,10 @@ export function readGameGraphicsSource(source) {
     corridorRowOffsets: extractLabeledData(source, "corridor_row_offsets", constants),
     corridorLeftTiles: extractLabeledData(source, "corridor_left_tiles", constants),
     corridorRightTiles: extractLabeledData(source, "corridor_right_tiles", constants),
-    charset: extractLabeledData(source, "charset_data", constants),
+    charset: extractLabeledData(source, "charset_data", constants, "display_list"),
     initialState,
-    hardwareState,
+    hardwareState: gameplayHardwareState,
+    frontendHardwareState,
   };
 
   requireLength("player_shape", graphics.playerShape, requireValue(constants, "PLAYER_H"));
@@ -321,6 +355,78 @@ export function readGameGraphicsSource(source) {
   }
 
   return graphics;
+}
+
+function decodeFrontendScreen(bytes, screenAddress) {
+  const records = [];
+  let offset = 0;
+
+  while (offset < bytes.length && bytes[offset] !== 0xff) {
+    if (offset + 2 > bytes.length) {
+      throw new Error("Frontend screen record has a truncated address");
+    }
+    const address = bytes[offset] | (bytes[offset + 1] << 8);
+    offset += 2;
+    const textBytes = [];
+    while (offset < bytes.length && bytes[offset] !== 0) {
+      textBytes.push(bytes[offset]);
+      offset += 1;
+    }
+    if (offset >= bytes.length) {
+      throw new Error("Frontend screen record has unterminated text");
+    }
+    offset += 1;
+
+    const screenOffset = address - screenAddress;
+    if (
+      screenOffset < 0 ||
+      screenOffset >= SCREEN_COLUMNS * SCREEN_ROWS ||
+      screenOffset + textBytes.length > SCREEN_COLUMNS * SCREEN_ROWS
+    ) {
+      throw new Error("Frontend screen record lies outside display memory");
+    }
+    records.push({
+      address,
+      row: Math.floor(screenOffset / SCREEN_COLUMNS),
+      column: screenOffset % SCREEN_COLUMNS,
+      text: String.fromCharCode(...textBytes),
+      textBytes: Uint8Array.from(textBytes),
+    });
+  }
+
+  if (offset >= bytes.length || bytes[offset] !== 0xff) {
+    throw new Error("Frontend screen data is missing its $FF terminator");
+  }
+  return records;
+}
+
+export function readFrontendGraphicsSource(source) {
+  const graphics = readGameGraphicsSource(source);
+  const screenAddress = requireValue(graphics.constants, "SCREEN");
+  const markerBytes = extractLabeledData(
+    source,
+    "frontend_marker_positions",
+    graphics.constants,
+  );
+  requireLength("frontend_marker_positions", markerBytes, 16);
+
+  const markerAddresses = [];
+  for (let offset = 0; offset < markerBytes.length; offset += 2) {
+    markerAddresses.push(markerBytes[offset] | (markerBytes[offset + 1] << 8));
+  }
+
+  return {
+    ...graphics,
+    mainMenuRecords: decodeFrontendScreen(
+      extractLabeledData(source, "main_menu_screen_data", graphics.constants),
+      screenAddress,
+    ),
+    markerAddresses,
+    defaultSelection: requireValue(
+      graphics.constants,
+      "FRONTEND_DEFAULT_SELECTION",
+    ),
+  };
 }
 
 function nextRandomByte(state) {
@@ -376,6 +482,39 @@ function createCanonicalScreen(graphics) {
 
   const zero = requireValue(constants, "CH_ZERO");
   screen.set([zero, zero, zero, zero, zero], 6);
+  return screen;
+}
+
+function createStartMenuScreen(graphics, selection) {
+  const screen = new Uint8Array(SCREEN_COLUMNS * SCREEN_ROWS);
+  const screenAddress = requireValue(graphics.constants, "SCREEN");
+  screen.fill(requireValue(graphics.constants, "CH_SPACE"));
+
+  for (const record of graphics.mainMenuRecords) {
+    const destination = record.address - screenAddress;
+    for (let index = 0; index < record.textBytes.length; index += 1) {
+      screen[destination + index] = (record.textBytes[index] - 0x20) & 0xff;
+    }
+  }
+
+  if (!Number.isInteger(selection) || selection < 0 || selection >= 4) {
+    throw new Error("Main-menu selection must be an index from 0 through 3");
+  }
+  const markerAddress = graphics.markerAddresses[selection];
+  const markerOffset = markerAddress - screenAddress;
+  if (markerOffset < 0 || markerOffset >= screen.length) {
+    throw new Error("Default menu marker lies outside display memory");
+  }
+  screen[markerOffset] = requireValue(graphics.constants, "CH_MENU_MARKER");
+  const highlightXor = requireValue(
+    graphics.constants,
+    "MAIN_MENU_HIGHLIGHT_XOR",
+  );
+  for (let offset = 2; offset <= 11; offset += 1) {
+    if (screen[markerOffset + offset] !== 0) {
+      screen[markerOffset + offset] ^= highlightXor;
+    }
+  }
   return screen;
 }
 
@@ -624,6 +763,23 @@ export function createGameplayPreview(source) {
   return encodePng(scaleAndConvertToRgb(registerPixels));
 }
 
+export function readStartMenuRuntimeState(source, selection) {
+  const graphics = readFrontendGraphicsSource(source);
+  const effectiveSelection = selection ?? graphics.defaultSelection;
+  const screen = createStartMenuScreen(graphics, effectiveSelection);
+  const registerPixels = drawAnticScreen(
+    graphics.frontendHardwareState,
+    screen,
+    graphics,
+  );
+  return { graphics, screen, registerPixels, selection: effectiveSelection };
+}
+
+export function createStartMenuPreview(source) {
+  const { registerPixels } = readStartMenuRuntimeState(source);
+  return encodePng(scaleAndConvertToRgb(registerPixels));
+}
+
 export function createLoaderPreview(loaderDefinition) {
   const loaderAsset = compileLoaderBitmap(loaderDefinition);
   const memory = new Uint8Array(0x10000);
@@ -651,7 +807,6 @@ export function createLoaderPreview(loaderDefinition) {
         ? loaderAsset.bitmapAddress + y * loaderAsset.bytesPerRow
         : loaderAsset.secondLmsAddress +
           (y - loaderAsset.secondLmsLine) * loaderAsset.bytesPerRow;
-    const background = zone.values.get("COLPF2");
     for (
       let byteColumn = 0;
       byteColumn < loaderAsset.bytesPerRow;
@@ -660,7 +815,10 @@ export function createLoaderPreview(loaderDefinition) {
       const value = memory[sourceAddress + byteColumn];
       for (let bit = 0; bit < 8; bit += 1) {
         registerPixels[y * SOURCE_WIDTH + byteColumn * 8 + bit] =
-          value & (0x80 >>> bit) ? zone.foregroundValue : background;
+          anticFRegisterForBitmapBit(
+            zone.values,
+            value & (0x80 >>> bit),
+          );
       }
     }
   }
@@ -761,6 +919,17 @@ export function generateLoaderPreview({
   return { outputPath, bytes: png.length, ...inspectPng(png) };
 }
 
+export function generateStartMenuPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_START_MENU_PREVIEW_PATH,
+} = {}) {
+  const source = fs.readFileSync(sourcePath, "utf8");
+  const png = createStartMenuPreview(source);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, png);
+  return { outputPath, bytes: png.length, ...inspectPng(png) };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const gameplayResult = generateGameplayPreview();
@@ -768,6 +937,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`  PNG : ${path.relative(rootDirectory, gameplayResult.outputPath)}`);
     console.log(
       `  size: ${gameplayResult.width}x${gameplayResult.height}, ${gameplayResult.bytes} bytes`,
+    );
+
+    const startMenuResult = generateStartMenuPreview();
+    console.log(`Start-menu preview generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, startMenuResult.outputPath)}`);
+    console.log(
+      `  size: ${startMenuResult.width}x${startMenuResult.height}, ${startMenuResult.bytes} bytes`,
     );
 
     const loaderResult = generateLoaderPreview();

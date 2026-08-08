@@ -295,10 +295,42 @@ wymagane dla pierwszej kompletnej wersji.
 
 **BINDING**
 
-Docelowa maszyna stanów obejmuje prawidłowy start, aktywną grę, zniszczenie
-gracza, game over oraz restart. Wejście w każdy stan ma być jawne i
-deterministyczne; zniszczenie nie może być wyłącznie krótką zmianą koloru jak
-w bieżącym vertical slice.
+Bieżąca jawna maszyna frontendu prowadzi:
+
+`boot → loader przez 250 ramek PAL → main menu → gameplay`
+
+Gameplay uruchamia się wyłącznie po wybraniu `START GAME`. Menu główne ma
+cztery pozycje w stałej kolejności: `START GAME`, `OPTIONS`, `TOP SCORES`,
+`EXIT`; domyślnie wybrane jest `START GAME`. Joystick portu 1 porusza wybór
+UP/DOWN z zawijaniem, a FIRE aktywuje pozycję. Każde wejście jest bramkowane
+neutralnym puszczeniem, więc przytrzymany kierunek nie wykonuje autorepeatu,
+a FIRE nie przechodzi na następny ekran ani do pierwszego strzału w gameplayu.
+Gameplay i jego timery nie działają w stanach frontendu.
+
+`OPTIONS` zawiera wyłącznie `SOUND: ON/OFF` oraz `BACK`. Dźwięk jest domyślnie
+włączony po bootowaniu, wybór pozostaje w RAM podczas bieżącej sesji i nie musi
+przetrwać RESET ani wyłączenia zasilania. UP/DOWN wybiera wiersz, LEFT/RIGHT
+lub FIRE przełącza SOUND, a FIRE na `BACK` wraca do menu. OFF wycisza wszystkie
+kanały POKEY.
+
+`TOP SCORES` pokazuje dziesięć ponumerowanych wierszy domyślnej tabeli
+`--- 000000`. FIRE wraca do menu. Tabela nie jest jeszcze połączona z wynikami
+zakończonych gier; wpisywanie inicjałów i wstawianie score powstaną razem
+z integracją game over i scoringu. Tabela nie jest zapisywana na dysk i nie
+definiuje trwałego formatu high scores.
+
+`EXIT` najpierw pokazuje `EXIT GAME?`, z `NO` wybranym domyślnie. `NO` wraca do
+menu. `YES` wycisza POKEY, wyłącza gameplay i pozostawia stabilny ekran
+`DARK FIGHTER ENDED` / `PRESS RESET TO RESTART` aż do sprzętowego lub
+emulatorowego RESET. Bootowalny ATR nie ma uniwersalnego desktopu ani DOS-u,
+do którego można bezpiecznie wrócić, dlatego EXIT nie skacze do `DOSVEC` i nie
+wywołuje nieudokumentowanej procedury OS.
+
+Docelowa maszyna gameplayu nadal ma objąć aktywną grę, zniszczenie gracza,
+game over oraz restart. Wejście w każdy stan ma być jawne i deterministyczne;
+zniszczenie nie może być wyłącznie krótką zmianą koloru jak w bieżącym
+vertical slice. Powrót z gameplayu do menu zostanie połączony z tymi stanami,
+a nie dodany jako niezależny skrót w bieżącym milestone.
 
 **OPTIONAL BACKLOG**
 

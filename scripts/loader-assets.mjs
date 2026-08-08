@@ -26,6 +26,18 @@ function parseWord(value, name) {
   return Number.parseInt(value.slice(1), 16);
 }
 
+// In ANTIC F normal interpretation, a clear bitmap bit uses COLPF2 directly.
+// A set bit combines COLPF2's hue with COLPF1's luminance. Keeping this in one
+// function makes source validation and preview rendering follow the hardware.
+export function anticFRegisterForBitmapBit(registers, bitmapBit) {
+  const colpf1 = registers.get("COLPF1");
+  const colpf2 = registers.get("COLPF2");
+  if (!Number.isInteger(colpf1) || !Number.isInteger(colpf2)) {
+    throw new Error("ANTIC F mapping requires COLPF1 and COLPF2 byte values");
+  }
+  return bitmapBit ? (colpf2 & 0xf0) | (colpf1 & 0x0e) : colpf2;
+}
+
 function validatePattern(pattern, name) {
   if (
     !Array.isArray(pattern) ||
@@ -131,8 +143,7 @@ export function validateLoaderBitmapDefinition(definition) {
       );
     }
     const foreground = parseByte(zone.foreground, `${zone.name}.foreground`);
-    const effectiveForeground =
-      (values.get("COLPF2") & 0xf0) | (values.get("COLPF1") & 0x0e);
+    const effectiveForeground = anticFRegisterForBitmapBit(values, 1);
     if (effectiveForeground !== foreground) {
       throw new Error(
         `${zone.name} ANTIC F registers do not produce its foreground`,

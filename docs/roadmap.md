@@ -39,8 +39,8 @@ PMG, pamięć obrazu, charset i zero page mają być raportowane osobno.
   kolizją, wynikiem, przewijaniem i POKEY;
 - zaakceptowany loader ANTIC F 320×192, PackBits, dwa LMS, dwa DLI i dokładnie
   250 pełnych ramek PAL;
-- czyste przejście z loadera do gameplayu bez kosztu loadera w gameplayowej
-  pętli lub VBI.
+- czyste przejście z loadera do wspólnego ekranu ANTIC 4 bez kosztu loadera
+  w gameplayowej pętli lub VBI.
 
 ### Zależności
 
@@ -68,7 +68,55 @@ pomiaru przed rozbudową.
 Nie są jeszcze zaimplementowane: hull percentage, zniszczenie gracza, game
 over, fale, sektory capital ships, debris, repair drone, broadside i boss.
 
-## 2. Audyt budżetu gameplayu i data-driven entity foundations — następne
+## 2. Interaktywny frontend i start menu — ukończone, bieżący build
+
+### Zakres
+
+- jawne stany loader, main menu, options, top scores, exit confirmation,
+  exited i gameplay;
+- menu `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` ze sterowaniem
+  joystickiem portu 1, zawijaniem i neutral-release gating;
+- sesyjna opcja `SOUND: ON/OFF`;
+- dziesięciowierszowa domyślna tabela wyników bez zapisu i inicjałów;
+- bezpieczne Atari-specific EXIT pozostające na ekranie do RESET;
+- jedna ścieżka resetu uruchamiająca istniejący vertical slice;
+- deterministyczny `build/previews/start-menu.png`.
+
+### Zależności
+
+Kamień 1, zaakceptowany loader i istniejąca infrastruktura ANTIC 4.
+
+### Kryteria akceptacji
+
+- loader nadal trwa dokładnie 250 ramek i przechodzi do menu, nie do gameplayu;
+- domyślnym wyborem jest `START GAME`, wejście zawija się i nie autorepeatuje;
+- przytrzymany FIRE nie wraca natychmiast z ekranu ani nie tworzy pierwszego
+  pocisku po `START GAME`;
+- SOUND domyślnie jest ON, wybór trwa w RAM, a OFF wycisza wszystkie kanały;
+- TOP SCORES ma dokładnie dziesięć wierszy i wraca przez FIRE;
+- EXIT domyślnie wybiera NO, a YES nie skacze do DOS-u;
+- 34 testy, build, preview i verify przechodzą; zaakceptowane preview loadera
+  oraz gameplayu pozostają bez zmian.
+
+### Dowody pamięci i wydajności
+
+Względem kamienia 1: kod `+677 B`, dane `+10 B`, zero page `+7 B`, payload
+`+687 B` i boot sectors `49 → 54`; XEX rośnie o 687 B, ATR pozostaje 92 176 B.
+Frontend przechowuje 5 B trwałego stanu i 2-bajtowy tymczasowy wskaźnik w ZP.
+233 B tekstów/tabel zajmuje dawniej zerowe, niewyświetlane sloty wewnątrz
+istniejącego 1 KB charsetu; ekran 1 KB i PMG nie otrzymują nowych rezerwacji.
+Po oczekiwaniu ramki idle frontend wykonuje około 30 cykli pracy logicznej,
+nawigacja mniej niż około 300, a konserwatywne wejście na najcięższy ekran
+poniżej około 11 000 cykli. VBI/DLI bez zmian; menu ma zero aktywnych obiektów
+gameplayu.
+
+### Wykluczenia
+
+Bez hull, player destruction, game over, wstawiania score, initials, SIO/disk
+persistence, pauzy, nowych enemies, formations, debris, repair, capital ships,
+broadside i powrotu z aktywnego gameplayu do menu.
+
+## 3. Audyt budżetu gameplayu i data-driven entity foundations — następne
 
 ### Zakres
 
@@ -81,16 +129,15 @@ over, fale, sektory capital ships, debris, repair drone, broadside i boss.
   rozgrywki;
 - narzędziowy lub testowy sposób raportowania limitów i przepełnienia slotów.
 
-To jest **następna funkcja do implementacji** po zatwierdzeniu bieżącej
-dokumentacji.
+To jest **następna funkcja do implementacji** po zatwierdzeniu frontendu.
 
 ### Zależności
 
-Kamień 1 oraz aktualne map, labels i memory map.
+Kamienie 1–2 oraz aktualne map, labels i memory map.
 
 ### Kryteria akceptacji
 
-- dokumentowany audyt nie nazywa 719-bajtowego gapu przed `$3B00` całkowitą
+- dokumentowany audyt nie nazywa 32-bajtowego gapu przed `$3B00` całkowitą
   wolną pamięcią maszyny;
 - sloty mają stały, wymuszony limit i deterministyczną inicjalizację;
 - brak aktywnej encji zachowuje się identycznie jak zaakceptowany vertical
@@ -111,7 +158,7 @@ niezmierzone koszty jako bramki, nie szacunki udające pomiar.
 Bez nowych enemies, health, debris, repair drone, capital ships, broadside,
 nowych grafik, nowych pocisków, level loadera i overlayów.
 
-## 3. Hull percentage, obrażenia, zniszczenie, game over i restart
+## 4. Hull percentage, obrażenia, zniszczenie, game over i restart
 
 ### Zakres
 
@@ -123,7 +170,7 @@ nowych grafik, nowych pocisków, level loadera i overlayów.
 
 ### Zależności
 
-Kamienie 1–2 i zaakceptowany format player/entity state.
+Kamienie 1–3 i zaakceptowany format player/entity state.
 
 ### Kryteria akceptacji
 
@@ -144,7 +191,7 @@ oddzielony od visible-frame cost.
 Bez debris instant-kill, repair drone, nowych archetypów, fal, sektorów capital
 ships, broadside, bossa i pauzy.
 
-## 4. Deskryptory przeciwników i pierwsze cztery zachowania
+## 5. Deskryptory przeciwników i pierwsze cztery zachowania
 
 ### Zakres
 
@@ -153,11 +200,11 @@ ships, broadside, bossa i pauzy.
 - współdzielone sylwetki oraz parametry prędkości, ognia, odporności, kolizji
   i punktów;
 - ograniczona pula enemy/projectile slots;
-- spójne przekazanie obrażeń i score do systemów z kamienia 3.
+- spójne przekazanie obrażeń i score do systemów z kamienia 4.
 
 ### Zależności
 
-Kamienie 2–3.
+Kamienie 3–4.
 
 ### Kryteria akceptacji
 
@@ -179,7 +226,7 @@ Bez Minelayera, Rammera, Heavy fightera, Ace'a, pełnych formacji, debris,
 repair drone, capital ships i broadside. Nie powstaje osiem osobnych zestawów
 sprite'ów.
 
-## 5. Proceduralne formacje i level wave tables
+## 6. Proceduralne formacje i level wave tables
 
 ### Zakres
 
@@ -193,7 +240,7 @@ sprite'ów.
 
 ### Zależności
 
-Kamień 4.
+Kamień 5.
 
 ### Kryteria akceptacji
 
@@ -214,7 +261,7 @@ enemies/projectiles.
 Bez debris, repair drone, min, sektorów capital ships, broadside, zaawansowanych
 archetypów i skryptów per-frame.
 
-## 6. Debris, safe paths i wybór repair drone
+## 7. Debris, safe paths i wybór repair drone
 
 ### Zakres
 
@@ -226,7 +273,7 @@ archetypów i skryptów per-frame.
 
 ### Zależności
 
-Kamienie 3 i 5; znane ograniczenia ruchu Vipera z bieżącej implementacji.
+Kamienie 4 i 6; znane ograniczenia ruchu Vipera z bieżącej implementacji.
 
 ### Kryteria akceptacji
 
@@ -249,7 +296,7 @@ każdej widocznej ramki.
 Bez min, capital ships, broadside, advanced enemies i dodatkowych power-upów.
 Safe path nie może być ręcznie zakodowaną długą sekwencją klatek.
 
-## 7. Naprzemienne sektory open space i capital-ship corridor
+## 8. Naprzemienne sektory open space i capital-ship corridor
 
 ### Zakres
 
@@ -261,7 +308,7 @@ Safe path nie może być ręcznie zakodowaną długą sekwencją klatek.
 
 ### Zależności
 
-Kamienie 5–6 oraz ustabilizowane event exclusions.
+Kamienie 6–7 oraz ustabilizowane event exclusions.
 
 ### Kryteria akceptacji
 
@@ -283,7 +330,7 @@ korytarza na liczbę obiektów oraz kolizje.
 Bez finalnych hull tiles capital ships, broadside, trafień kadłuba, weapon
 batteries, advanced enemies i mid-game disk access.
 
-## 8. Przewijane side-hull segments i przejścia visual
+## 9. Przewijane side-hull segments i przejścia visual
 
 ### Zakres
 
@@ -296,7 +343,7 @@ batteries, advanced enemies i mid-game disk access.
 
 ### Zależności
 
-Kamień 7 i wynik testu układu korytarza.
+Kamień 8 i wynik testu układu korytarza.
 
 ### Kryteria akceptacji
 
@@ -318,7 +365,7 @@ animacji i ewentualny koszt DLI. PMG pozostaje osobnym, jawnym budżetem.
 Bez aktywnego broadside damage, crossfire, destructible batteries i bossa.
 Capital hulls nie są implementowane głównie jako PMG.
 
-## 9. Broadside, crossfire i trafienia kadłubów
+## 10. Broadside, crossfire i trafienia kadłubów
 
 ### Zakres
 
@@ -331,7 +378,7 @@ Capital hulls nie są implementowane głównie jako PMG.
 
 ### Zależności
 
-Kamienie 7–8 oraz istniejący model obrażeń.
+Kamienie 8–9 oraz istniejący model obrażeń.
 
 ### Kryteria akceptacji
 
@@ -353,7 +400,7 @@ pomiar najgorszego zbiegu fali, debris oraz salwy.
 Bez destructible weapon batteries jako wymagania, advanced enemies, bossa,
 overlayów i ładowania sektorów z dysku.
 
-## 10. Zaawansowani enemies: Minelayer, Rammer, Heavy i Ace
+## 11. Zaawansowani enemies: Minelayer, Rammer, Heavy i Ace
 
 ### Zakres
 
@@ -365,7 +412,7 @@ overlayów i ładowania sektorów z dysku.
 
 ### Zależności
 
-Kamienie 4–6 i 9; wspólny model encji, pocisków, obrażeń i eventów.
+Kamienie 5–7 i 10; wspólny model encji, pocisków, obrażeń i eventów.
 
 ### Kryteria akceptacji
 
@@ -387,7 +434,7 @@ oraz koszt ich kolizji i telegraph effects.
 Bez wymogu czterech nowych pełnych sprite sets, bez nieograniczonych min,
 loadable mission packages i dodatkowych power-upów.
 
-## 11. Boss lub objective capital ship
+## 12. Boss lub objective capital ship
 
 ### Zakres
 
@@ -398,7 +445,7 @@ loadable mission packages i dodatkowych power-upów.
 
 ### Zależności
 
-Kamienie 8–10.
+Kamienie 9–11.
 
 ### Kryteria akceptacji
 
@@ -421,7 +468,7 @@ Bez spekulacyjnego managera overlayów, formatu mission packages, relokacji,
 save state i level-loader API. Destructible batteries poza potrzebą wybranego
 celu pozostają backlogiem.
 
-## 12. Audio, balans, long-duration i real-hardware release validation
+## 13. Audio, balans, long-duration i real-hardware release validation
 
 ### Zakres
 
@@ -433,7 +480,7 @@ celu pozostają backlogiem.
 
 ### Zależności
 
-Kamienie 1–11.
+Kamienie 1–12.
 
 ### Kryteria akceptacji
 
