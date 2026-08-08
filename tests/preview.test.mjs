@@ -7,7 +7,9 @@ import {
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   createGameplayPreview,
+  createStartMenuPreview,
   inspectPng,
+  readFrontendGraphicsSource,
   readGameGraphicsSource,
 } from "../scripts/preview.mjs";
 
@@ -45,6 +47,27 @@ test("gameplay preview output is byte-for-byte deterministic", () => {
   assert.deepEqual(first, second);
 });
 
+test("start-menu preview is deterministic, 640x384, and source-derived", () => {
+  const frontend = readFrontendGraphicsSource(source);
+  assert.deepEqual(
+    frontend.mainMenuRecords.map(({ text }) => text),
+    ["DARK FIGHTER", "START GAME", "OPTIONS", "TOP SCORES", "EXIT", "FIRE SELECT"],
+  );
+  assert.equal(frontend.defaultSelection, 0);
+
+  const first = createStartMenuPreview(source);
+  const second = createStartMenuPreview(source);
+  assert.deepEqual(first, second);
+  assert.deepEqual(
+    [inspectPng(first).width, inspectPng(first).height],
+    [PREVIEW_WIDTH, PREVIEW_HEIGHT],
+  );
+  assert.deepEqual([PREVIEW_WIDTH, PREVIEW_HEIGHT], [640, 384]);
+
+  const changedLabel = replaceOnce(source, '.byte "START GAME",0', '.byte "START GAMA",0');
+  assert.notDeepEqual(createStartMenuPreview(changedLabel), first);
+});
+
 test("preview consumes the canonical charset, screen, PMG, and palette source", () => {
   const graphics = readGameGraphicsSource(source);
   assert.equal(graphics.charset.length, 1024);
@@ -56,6 +79,7 @@ test("preview consumes the canonical charset, screen, PMG, and palette source", 
     ),
     [0x00, 0x0e, 0x84, 0x28, 0x46, 0x0e, 0x0c, 0x46, 0x28],
   );
+  assert.equal(graphics.frontendHardwareState.get("COLPF3"), 0xec);
 
   const canonical = createGameplayPreview(source);
   const variants = [

@@ -5,6 +5,11 @@ import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 import { toolchain } from "romdev-toolchain-cc65";
 import { makeAtr, makeXex, validateBuildDirectory } from "./formats.mjs";
+import {
+  compileLoaderBitmap,
+  loadLoaderBitmapDefinition,
+  renderLoaderCa65Include,
+} from "./loader-assets.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -95,11 +100,33 @@ async function build() {
 
   const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"));
   const config = fs.readFileSync(path.join(rootDirectory, "cfg", "atari-boot.cfg"));
+  const loaderDefinitionPath = path.join(
+    rootDirectory,
+    "assets",
+    "graphics",
+    "loader-bitmap.json",
+  );
+  const loaderDefinition = loadLoaderBitmapDefinition(loaderDefinitionPath);
+  const loaderAsset = compileLoaderBitmap(loaderDefinition);
+  const loaderInclude = Buffer.from(renderLoaderCa65Include(loaderAsset));
+  writeFile(path.join(buildDirectory, "loader-screen.inc"), loaderInclude);
 
   const assembled = await runWasmTool(
     "ca65",
-    { "/project/src/main.s": source },
-    ["--cpu", "6502", "-g", "-o", "/project/build/main.o", "/project/src/main.s"],
+    {
+      "/project/src/main.s": source,
+      "/project/build/loader-screen.inc": loaderInclude,
+    },
+    [
+      "--cpu",
+      "6502",
+      "-g",
+      "-I",
+      "/project/build",
+      "-o",
+      "/project/build/main.o",
+      "/project/src/main.s",
+    ],
     ["/project/build/main.o"],
   );
 
@@ -141,8 +168,10 @@ async function build() {
   if (!Number.isInteger(startAddress) || !Number.isInteger(bootInitAddress)) {
     throw new Error("ld65 label file is missing exported start or boot_return labels");
   }
-  if (rawPayload.length > 0x1000) {
-    throw new Error(`Payload is ${rawPayload.length} bytes and crosses the reserved $3000 boundary`);
+  if (rawPayload.length > 0x1b00) {
+    throw new Error(
+      `Payload is ${rawPayload.length} bytes and crosses the active PMG boundary at $3B00`,
+    );
   }
 
   const bootSectors = Math.ceil(rawPayload.length / 128);
@@ -171,6 +200,22 @@ async function build() {
     bootInitAddress,
     bootSectors,
     payloadBytes: rawPayload.length,
+    loaderScreen: {
+      mode: "ANTIC F",
+      source: "assets/graphics/loader-bitmap.json",
+      sourceSha256: sha256(fs.readFileSync(loaderDefinitionPath)),
+      referenceSha256: loaderDefinition.reference.sha256,
+      width: loaderAsset.width,
+      height: loaderAsset.height,
+      bytesPerRow: loaderAsset.bytesPerRow,
+      bitmapAddress: loaderAsset.bitmapAddress,
+      secondLmsLine: loaderAsset.secondLmsLine,
+      secondLmsAddress: loaderAsset.secondLmsAddress,
+      packedBitmapBytes: loaderAsset.packedBitmap.length,
+      unpackedBitmapBytes: loaderAsset.bitmapBytes.length,
+      dliCount: loaderAsset.dliLines.length,
+      durationFrames: loaderAsset.durationFrames,
+    },
     artifacts: {
       "dark-fighter-boot.bin": { bytes: rawPayload.length, sha256: sha256(rawPayload) },
       "dark-fighter.xex": { bytes: xex.length, sha256: sha256(xex) },
