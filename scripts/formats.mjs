@@ -119,8 +119,8 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
   invariant(
-    boot.length <= 0x1b00,
-    "Linked payload overlaps active PMG data at $3B00",
+    boot.length <= 0x1e00,
+    "Linked payload overlaps player-2 data at $3E00",
   );
 
   const parsedXex = parseXex(xex);

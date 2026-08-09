@@ -18,11 +18,13 @@ ekran gameplayu. Obecnie zawiera:
 - jednego przeciwnika z czerwonym skanerem, sprzętowe PMG, kolizje i score;
 - przewijane tło ANTIC 4, własny charset, prosty HUD i efekty POKEY;
 - samowystarczalny XEX oraz bootowalny ATR dla emulatora i SIO2SD;
-- zaakceptowany pięciosekundowy loader ANTIC F: bitmapę 320×192, Galactikę
+- pięciosekundowy loader mieszający ANTIC F z footerem ANTIC E: bitmapę
+  7680 B, Galactikę
   z `BSG`, kremowy tytuł, zielone `SETECH GAME STUDIO`, dwa LMS, dwa DLI
   i dokładnie 250 pełnych ramek PAL;
-- interaktywne menu ANTIC 4 z ekranami `OPTIONS`, `TOP SCORES`, potwierdzeniem
-  `EXIT` i opcją `SOUND: ON/OFF`;
+- czytelny, mieszany frontend ANTIC 7/6/4/2: duży tytuł, hangar i Viper po
+  lewej, opcje po prawej oraz ekrany `OPTIONS`, `TOP SCORES`, potwierdzenie
+  `EXIT` i opcję `SOUND: ON/OFF`;
 - czyste przejście z loadera do menu, a następnie przez `START GAME` do
   istniejącego gameplayu, bez kosztu loadera w gameplay main loop lub
   gameplay VBI.
@@ -85,8 +87,8 @@ dodatkowym resident RAM podczas gameplayu.
 
 - `build/previews/loader-screen.png` z
   `assets/graphics/loader-bitmap.json`;
-- `build/previews/start-menu.png` z tych samych danych menu, charsetu i palety,
-  których używa program;
+- `build/previews/start-menu.png` z tych samych danych menu, charsetu, PMG i
+  palety, których używa program;
 - `build/previews/gameplay-screen.png` z kanonicznych danych `src/main.s`.
 
 Wszystkie obrazy mają 640×384, są skalowane 2× nearest-neighbour i powstają bez

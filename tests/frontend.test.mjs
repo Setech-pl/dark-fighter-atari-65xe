@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { parseXex } from "../scripts/formats.mjs";
 import {
   readFrontendGraphicsSource,
   readStartMenuRuntimeState,
@@ -11,6 +12,7 @@ import {
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
+const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
 const labels = new Map(
   fs
@@ -20,6 +22,17 @@ const labels = new Map(
     .filter(Boolean)
     .map((match) => [match[2], Number.parseInt(match[1], 16)]),
 );
+
+function readXexBytes(address, length) {
+  const segment = parseXex(xex).segments.find(
+    ({ start, end }) => address >= start && address + length - 1 <= end,
+  );
+  assert.ok(segment, `XEX does not contain $${address.toString(16)}`);
+  return segment.data.subarray(
+    address - segment.start,
+    address - segment.start + length,
+  );
+}
 
 function routine(label) {
   const lines = source.split(/\r?\n/);
@@ -48,12 +61,36 @@ test("boot enters an explicit seven-state frontend/game state machine", () => {
 
 test("main menu labels are exact, ordered, and default to START GAME", () => {
   const frontend = readFrontendGraphicsSource(source);
+  const menuRows = frontend.mainMenuRecords.filter(({ mode }) => mode === 6);
   assert.deepEqual(
-    frontend.mainMenuRecords.slice(0, 5).map(({ text }) => text),
-    ["DARK FIGHTER", "START GAME", "OPTIONS", "TOP SCORES", "EXIT"],
+    menuRows.map(({ text }) => text),
+    ["START GAME", "OPTIONS", "TOP SCORES", "EXIT"],
+  );
+  const title = frontend.mainMenuRecords.find(({ mode }) => mode === 7);
+  assert.deepEqual(
+    [title.text, title.column, title.y],
+    ["DARK FIGHTER", 4, 0],
   );
   assert.equal(frontend.defaultSelection, 0);
   assert.equal(frontend.markerAddresses.length, 8);
+});
+
+test("frontend uses distinct clean 6x7 glyphs within ANTIC 6/7 indices", () => {
+  const frontend = readFrontendGraphicsSource(source);
+  const { constants, frontendCharset } = frontend;
+  const glyph = (character) => {
+    const index = constants.get("CH_FRONT_A") + character.charCodeAt(0) - 0x41;
+    return [...frontendCharset.subarray(index * 8, index * 8 + 8)];
+  };
+  for (let index = 1; index <= constants.get("CH_FRONT_MARKER"); index += 1) {
+    const rows = frontendCharset.subarray(index * 8, index * 8 + 8);
+    assert.equal(rows[7], 0, `glyph ${index} needs a blank eighth row`);
+    assert.ok([...rows].every((row) => (row & 0x03) === 0));
+  }
+  for (const [left, right] of [["E","F"],["O","D"],["R","P"],["I","T"]]) {
+    assert.notDeepEqual(glyph(left), glyph(right), `${left}/${right} must remain distinct`);
+  }
+  assert.ok(constants.get("CH_FRONT_MARKER") < 64);
 });
 
 test("UP and DOWN move once per neutral release and wrap at both bounds", () => {
@@ -69,6 +106,15 @@ test("UP and DOWN move once per neutral release and wrap at both bounds", () => 
     routine("move_selection_down"),
     /cpx frontend_selection[\s\S]+lda #\$00[\s\S]+sta frontend_selection[\s\S]+inc frontend_selection/,
   );
+});
+
+test("an idle main menu has no path to gameplay without a gated FIRE event", () => {
+  assert.doesNotMatch(routine("frontend_loop"), /start_gameplay|main_loop/);
+  assert.match(
+    routine("handle_main_menu_input"),
+    /lda TRIG0\s+bne @done[\s\S]+lda frontend_selection\s+bne[\s\S]+jmp start_gameplay/,
+  );
+  assert.doesNotMatch(routine("render_frontend_state"), /start_gameplay|main_loop/);
 });
 
 test("frontend text records explicitly test the byte returned by the reader", () => {
@@ -129,54 +175,104 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
 });
 
 test("TOP SCORES renders exactly ten default rows and returns only on FIRE", () => {
-  assert.match(source, /top_score_row_template:[\s\S]+CH_DASH,CH_DASH,CH_DASH/);
+  assert.match(
+    source,
+    /top_score_row_template:[\s\S]+CH_FRONT_DASH,CH_FRONT_DASH,CH_FRONT_DASH/,
+  );
   assert.match(routine("draw_top_score_rows"), /cpx #10\s+bne @row/);
   assert.match(routine("draw_top_score_rows"), /cpx #\$09\s+beq @ten/);
   assert.match(routine("handle_top_scores_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
   assert.doesNotMatch(source, /jsr SIOV|initials_entry|save_high_scores/i);
 });
 
-test("main-menu highlight is exact Kawasaki green and follows selection", () => {
+test("ANTIC 6 attributes route the selected marker and full label to $D8", () => {
   const defaultState = readStartMenuRuntimeState(source, 0);
   const movedState = readStartMenuRuntimeState(source, 1);
-  const { constants, frontendHardwareState } = defaultState.graphics;
+  const { constants, mainMenuHardwareState } = defaultState.graphics;
   const screenAddress = constants.get("SCREEN");
   const highlight = constants.get("KAWASAKI_GREEN");
 
-  assert.equal(highlight, 0xec);
-  assert.equal(frontendHardwareState.get("COLPF3"), highlight);
+  assert.equal(highlight, 0xd8);
+  assert.equal(mainMenuHardwareState.get("COLPF3"), highlight);
   assert.equal(defaultState.selection, 0);
 
   const labelCodes = (state, selection) => {
     const marker = state.graphics.markerAddresses[selection] - screenAddress;
     return [...state.screen.subarray(marker + 2, marker + 12)].filter(Boolean);
   };
-  assert.ok(labelCodes(defaultState, 0).every((code) => (code & 0x80) !== 0));
-  assert.ok(labelCodes(defaultState, 1).every((code) => (code & 0x80) === 0));
-  assert.ok(labelCodes(movedState, 0).every((code) => (code & 0x80) === 0));
-  assert.ok(labelCodes(movedState, 1).every((code) => (code & 0x80) !== 0));
+  assert.ok(labelCodes(defaultState, 0).every((code) => (code & 0xc0) === 0xc0));
+  assert.ok(labelCodes(defaultState, 1).every((code) => (code & 0xc0) === 0x00));
+  assert.ok(labelCodes(movedState, 0).every((code) => (code & 0xc0) === 0x00));
+  assert.ok(labelCodes(movedState, 1).every((code) => (code & 0xc0) === 0xc0));
 
-  const rowColors = (state, row, column, width) => {
+  const recordColors = (state, record) => {
     const colors = new Set();
     const sourceWidth = 320;
-    for (let y = row * 8; y < row * 8 + 8; y += 1) {
-      for (let x = column * 8; x < (column + width) * 8; x += 1) {
+    const cellWidth = record.mode === 6 || record.mode === 7 ? 16 : 8;
+    const height = record.mode === 7 ? 16 : 8;
+    for (let y = record.y; y < record.y + height; y += 1) {
+      for (
+        let x = record.column * cellWidth;
+        x < (record.column + record.text.length) * cellWidth;
+        x += 1
+      ) {
         const color = state.registerPixels[y * sourceWidth + x];
-        if (color !== 0) {
-          colors.add(color);
-        }
+        colors.add(color);
       }
     }
     return colors;
   };
-  assert.deepEqual(rowColors(defaultState, 9, 15, 10), new Set([0xec]));
-  assert.deepEqual(rowColors(defaultState, 11, 16, 7), new Set([0x0e]));
-  assert.deepEqual(rowColors(movedState, 9, 15, 10), new Set([0x0e]));
-  assert.deepEqual(rowColors(movedState, 11, 16, 7), new Set([0xec]));
+  const menuRecords = defaultState.graphics.mainMenuRecords.filter(
+    ({ mode }) => mode === 6,
+  );
+  assert.deepEqual(recordColors(defaultState, menuRecords[0]), new Set([0x00, 0xd8]));
+  assert.deepEqual(recordColors(defaultState, menuRecords[1]), new Set([0x00, 0x0e]));
+  assert.deepEqual(recordColors(movedState, menuRecords[0]), new Set([0x00, 0x0e]));
+  assert.deepEqual(recordColors(movedState, menuRecords[1]), new Set([0x00, 0xd8]));
+
+  const defaultMarker = defaultState.graphics.markerAddresses[0] - screenAddress;
+  assert.equal(
+    defaultState.screen[defaultMarker],
+    constants.get("CH_FRONT_MARKER") | constants.get("ANTIC67_COLOR_PF3"),
+  );
+  assert.equal(defaultState.screen[defaultMarker] & 0xc0, 0xc0);
+
+  const selectedRecord = menuRecords[0];
+  let blackPixels = 0;
+  for (let y = selectedRecord.y; y < selectedRecord.y + 8; y += 1) {
+    for (let x = selectedRecord.column * 16; x < 19 * 16; x += 1) {
+      blackPixels += defaultState.registerPixels[y * 320 + x] === 0 ? 1 : 0;
+    }
+  }
+  assert.ok(blackPixels > 0, "selected ANTIC 6 row must retain black glyph backgrounds");
+
+  const updateBytes = readXexBytes(labels.get("update_frontend_marker"), 96);
+  const toggleBytes = readXexBytes(labels.get("toggle_main_menu_highlight"), 32);
+  assert.notEqual(updateBytes.indexOf(Buffer.from([0x09, 0xc0])), -1);
+  assert.notEqual(toggleBytes.indexOf(Buffer.from([0x49, 0xc0])), -1);
 
   assert.match(routine("handle_main_menu_input"), /jsr toggle_main_menu_highlight[\s\S]+jmp move_selection_up/);
   assert.match(routine("handle_main_menu_input"), /jsr toggle_main_menu_highlight[\s\S]+jmp move_selection_down/);
   assert.match(routine("toggle_main_menu_highlight"), /eor #MAIN_MENU_HIGHLIGHT_XOR/);
+});
+
+test("main-menu studio credit is removed while loader studio source remains", () => {
+  const frontend = readFrontendGraphicsSource(source);
+  assert.equal(
+    frontend.mainMenuRecords.some(({ text }) => text.includes("SETECH")),
+    false,
+  );
+  const loader = JSON.parse(
+    fs.readFileSync(
+      path.join(rootDirectory, "assets", "graphics", "loader-bitmap.json"),
+      "utf8",
+    ),
+  );
+  assert.ok(
+    loader.elements.some(
+      ({ name, text }) => name === "studio" && text === "SETECH GAME STUDIO",
+    ),
+  );
 });
 
 test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => {
@@ -194,7 +290,7 @@ test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => 
   assert.doesNotMatch(source, /jmp \(DOSVEC\)|jsr SIOV/);
 });
 
-test("frontend data reuses unused charset bytes without crossing RAM ranges", () => {
+test("frontend charset and transient loader tail stay in their bounded ranges", () => {
   const charsetStart = labels.get("charset_data");
   const frontendStart = labels.get("frontend_charset_data");
   const frontendEnd = labels.get("frontend_charset_data_end");
@@ -206,6 +302,139 @@ test("frontend data reuses unused charset bytes without crossing RAM ranges", ()
   const zeroPage = /ZEROPAGE\s+([0-9A-F]+)\s+([0-9A-F]+)\s+([0-9A-F]+)/i.exec(map);
   assert.ok(rodata);
   assert.ok(zeroPage);
-  assert.ok(Number.parseInt(rodata[2], 16) < 0x3b00);
+  assert.ok(Number.parseInt(rodata[2], 16) < 0x3e00);
   assert.ok(Number.parseInt(zeroPage[2], 16) < 0x0100);
+  assert.ok(labels.get("draw_main_menu_hangar") < charsetStart);
+  assert.ok(labels.get("frontend_glyph_rows") >= frontendStart);
+  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_packbits"));
+  assert.ok(labels.get("loader_bitmap_packbits") < 0x3c00);
+  assert.ok(labels.get("loader_display_list") >= 0x3c00);
+  assert.ok(labels.get("loader_display_list") < 0x3e00);
+
+  const constants = readFrontendGraphicsSource(source).constants;
+  assert.equal(constants.get("SCREEN"), 0x4000);
+  assert.equal(constants.get("CHARSET"), 0x4400);
+  assert.equal(constants.get("FRONTEND_CHARSET"), 0x4800);
+  assert.equal(constants.get("FRONTEND_CHARSET") - constants.get("CHARSET"), 0x400);
+  assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_frontend_charset/);
+});
+
+test("mixed display list, screen offsets, title, menu, and hint are bounded", () => {
+  const state = readStartMenuRuntimeState(source);
+  const { constants, mainMenuLayout } = state.graphics;
+  assert.equal(mainMenuLayout.screenBytes, constants.get("MAIN_MENU_SCREEN_BYTES"));
+  assert.equal(mainMenuLayout.screenBytes, 820);
+  assert.equal(
+    mainMenuLayout.rows.reduce((height, row) => height + row.height, 0),
+    192,
+  );
+  assert.deepEqual(
+    mainMenuLayout.rows.map(({ mode }) => mode),
+    [7,4,4,4,6,4,6,4,6,4,6,4,4,4,4,4,4,4,4,4,4,2,4],
+  );
+  assert.deepEqual(
+    mainMenuLayout.rows.filter(({ dli }) => dli).map(({ index }) => index),
+    [20],
+  );
+
+  const title = state.graphics.mainMenuRecords.find(({ text }) => text === "DARK FIGHTER");
+  assert.deepEqual([title.mode, title.column, title.text.length], [7, 4, 12]);
+  const menuRecords = state.graphics.mainMenuRecords.filter(({ mode }) => mode === 6);
+  assert.equal(menuRecords.length, 4);
+  for (const record of menuRecords) {
+    assert.equal(record.column, 9);
+    assert.ok(record.column + record.text.length <= 20);
+  }
+  const hint = state.graphics.mainMenuRecords.find(({ mode }) => mode === 2);
+  assert.deepEqual(
+    [hint.text, hint.column, hint.text.length],
+    ["UP/DOWN MOVE  FIRE SELECT", 7, 25],
+  );
+  const visibleColors = (record, cellWidth, height) => {
+    const colors = new Set();
+    for (let y = record.y; y < record.y + height; y += 1) {
+      for (
+        let x = record.column * cellWidth;
+        x < (record.column + record.text.length) * cellWidth;
+        x += 1
+      ) {
+        colors.add(state.registerPixels[y * 320 + x]);
+      }
+    }
+    return colors;
+  };
+  assert.deepEqual(visibleColors(title, 16, 16), new Set([0x00, 0x0e]));
+  assert.deepEqual(visibleColors(hint, 8, 8), new Set([0x00, 0x0e]));
+
+  for (const layer of ["OUTER", "MID", "INNER", "BAY"]) {
+    assert.ok(constants.get(`MAIN_MENU_HANGAR_${layer}_LAST`) < 21);
+    for (const edge of ["TOP", "BOTTOM"]) {
+      const screenOffset = constants.get(`MAIN_MENU_HANGAR_${layer}_${edge}_OFFSET`);
+      const row = mainMenuLayout.rows.find((candidate) => candidate.screenOffset === screenOffset);
+      assert.equal(row.mode, 4);
+    }
+  }
+  for (let index = 0; index < 7; index += 1) {
+    const offset = constants.get(`MAIN_MENU_STAR_${index}`);
+    const row = mainMenuLayout.rows.find(
+      (candidate) => offset >= candidate.screenOffset &&
+        offset < candidate.screenOffset + candidate.columns,
+    );
+    assert.equal(row.mode, 4);
+  }
+
+  const assembledDisplayList = readXexBytes(
+    labels.get("main_menu_display_list"),
+    state.graphics.mainMenuDisplayList.length,
+  );
+  assert.deepEqual(assembledDisplayList, Buffer.from(state.graphics.mainMenuDisplayList));
+
+  const textDisplayList = readXexBytes(labels.get("frontend_text_display_list"), 32);
+  assert.equal(textDisplayList[3] & 0x0f, 2);
+  assert.ok([...textDisplayList.subarray(6, 29)].every((opcode) => opcode === 2));
+
+  const hintDli = readXexBytes(labels.get("frontend_hint_dli"), 32);
+  assert.notEqual(
+    hintDli.indexOf(Buffer.from([
+      0xa9,0x0e,0x8d,0x17,0xd0,
+      0xa9,0x00,0x8d,0x18,0xd0,
+    ])),
+    -1,
+  );
+});
+
+test("menu PMG craft is bounded, main-menu-only, and gameplay setup is restored", () => {
+  const state = readStartMenuRuntimeState(source);
+  const { constants, mainMenuHardwareState, hardwareState } = state.graphics;
+  const left = (mainMenuHardwareState.get("HPOSP0") - 48) * 2;
+  const width = 8 * 8;
+  const top = constants.get("MAIN_MENU_PLAYER_Y") - 32;
+  const height = 16 * constants.get("MAIN_MENU_PLAYER_VERTICAL_SCALE");
+  const markerLeft = 7 * 16;
+  assert.ok(left >= 0 && left + width <= markerLeft);
+  assert.ok(top >= 48 && top + height <= 136);
+  assert.equal(mainMenuHardwareState.get("SIZEP0"), 3);
+  assert.equal(mainMenuHardwareState.get("SIZEP3"), 3);
+  assert.equal(constants.get("MAIN_MENU_PLAYER_VERTICAL_SCALE"), 2);
+  assert.match(
+    routine("draw_main_menu_scene"),
+    /sta PLAYER3\+1,y[\s\S]+iny\s+iny\s+inx/,
+  );
+
+  const frontendEntry = routine("enter_frontend_state");
+  assert.match(frontendEntry, /sta GRACTL[\s\S]+sta NMIEN[\s\S]+jsr select_frontend_display/);
+  assert.match(frontendEntry, /cpx #STATE_MAIN_MENU[\s\S]+lda #\$02[\s\S]+sta GRACTL[\s\S]+sta NMIEN/);
+  assert.equal(hardwareState.get("SIZEP0"), 1);
+  assert.equal(hardwareState.get("SIZEP3"), 1);
+  assert.equal(hardwareState.get("COLPF2"), 0x28);
+  assert.equal(hardwareState.get("COLPF3"), 0x46);
+  assert.match(routine("start_gameplay"), /jsr clear_pmg/);
+  assert.match(
+    routine("start_gameplay"),
+    /sta NMIEN[\s\S]+lda #<display_list[\s\S]+sta DLISTL[\s\S]+lda #>CHARSET[\s\S]+sta CHBASE/,
+  );
+  assert.match(
+    routine("select_frontend_display"),
+    /cmp #STATE_MAIN_MENU[\s\S]+main_menu_display_list[\s\S]+frontend_text_display_list/,
+  );
 });

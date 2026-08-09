@@ -3,6 +3,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import {
+  anticERegisterForBitmapPixel,
   anticFRegisterForBitmapBit,
   compileLoaderBitmap,
   loadLoaderBitmapDefinition,
@@ -78,7 +79,14 @@ function normalizeExpression(expression, constants) {
 }
 
 function evaluateExpression(expression, constants) {
-  const normalized = normalizeExpression(expression.trim(), constants);
+  const trimmed = expression.trim();
+  if (trimmed.startsWith("<")) {
+    return evaluateExpression(trimmed.slice(1), constants) & 0xff;
+  }
+  if (trimmed.startsWith(">")) {
+    return (evaluateExpression(trimmed.slice(1), constants) >>> 8) & 0xff;
+  }
+  const normalized = normalizeExpression(trimmed, constants);
   const value = Function(`"use strict"; return (${normalized});`)();
   if (!Number.isInteger(value)) {
     throw new Error(`Non-integer ca65 expression in preview source: ${expression}`);
@@ -313,10 +321,49 @@ export function readGameGraphicsSource(source) {
     extractRoutine(source, "start_gameplay"),
     constants,
   );
-  gameplayHardwareState.set(
-    "COLPF3",
-    requireValue(gameplayEntryState, "COLPF3"),
+  for (const register of ["COLPF2", "COLPF3", "SIZEP0", "SIZEP3"]) {
+    gameplayHardwareState.set(
+      register,
+      requireValue(gameplayEntryState, register),
+    );
+  }
+
+  const baseCharset = extractLabeledData(
+    source,
+    "charset_data",
+    constants,
+    "frontend_charset_data",
   );
+  requireLength("base charset", baseCharset, 59 * CHARACTER_HEIGHT);
+  const charset = new Uint8Array(1024);
+  charset.set(baseCharset);
+
+  const mainMenuHardwareState = new Map(frontendHardwareState);
+  const mainMenuPaletteState = extractConstantStores(
+    extractRoutine(source, "set_main_menu_palette"),
+    constants,
+  );
+  for (const register of ["COLBK", "COLPF0", "COLPF1", "COLPF2", "COLPF3"]) {
+    mainMenuHardwareState.set(
+      register,
+      requireValue(mainMenuPaletteState, register),
+    );
+  }
+  const menuSceneState = extractConstantStores(
+    extractRoutine(source, "draw_main_menu_scene"),
+    constants,
+  );
+  for (const register of ["HPOSP0", "HPOSP2", "HPOSP3", "SIZEP0", "SIZEP3"]) {
+    mainMenuHardwareState.set(register, requireValue(menuSceneState, register));
+  }
+  const frontendHintHardwareState = new Map(mainMenuHardwareState);
+  const hintDliState = extractConstantStores(
+    extractRoutine(source, "frontend_hint_dli"),
+    constants,
+  );
+  for (const register of ["COLPF1", "COLPF2"]) {
+    frontendHintHardwareState.set(register, requireValue(hintDliState, register));
+  }
 
   const graphics = {
     constants,
@@ -328,10 +375,12 @@ export function readGameGraphicsSource(source) {
     corridorRowOffsets: extractLabeledData(source, "corridor_row_offsets", constants),
     corridorLeftTiles: extractLabeledData(source, "corridor_left_tiles", constants),
     corridorRightTiles: extractLabeledData(source, "corridor_right_tiles", constants),
-    charset: extractLabeledData(source, "charset_data", constants, "display_list"),
+    charset,
     initialState,
     hardwareState: gameplayHardwareState,
     frontendHardwareState,
+    mainMenuHardwareState,
+    frontendHintHardwareState,
   };
 
   requireLength("player_shape", graphics.playerShape, requireValue(constants, "PLAYER_H"));
@@ -357,7 +406,52 @@ export function readGameGraphicsSource(source) {
   return graphics;
 }
 
-function decodeFrontendScreen(bytes, screenAddress) {
+function decodeMainMenuDisplayList(bytes, screenAddress) {
+  const rows = [];
+  let offset = 0;
+  let screenOffset = 0;
+  let y = 0;
+
+  while (offset < bytes.length && y < SOURCE_HEIGHT) {
+    const opcode = bytes[offset];
+    offset += 1;
+    const mode = opcode & 0x0f;
+    if (mode === 0) {
+      continue;
+    }
+    if (![2, 4, 6, 7].includes(mode)) {
+      throw new Error(`Unsupported main-menu ANTIC mode ${mode}`);
+    }
+    if (opcode & 0x40) {
+      if (offset + 2 > bytes.length) {
+        throw new Error("Truncated main-menu LMS instruction");
+      }
+      const address = bytes[offset] | (bytes[offset + 1] << 8);
+      screenOffset = address - screenAddress;
+      offset += 2;
+    }
+    const columns = mode === 6 || mode === 7 ? 20 : 40;
+    const height = mode === 7 ? 16 : 8;
+    rows.push({
+      index: rows.length,
+      mode,
+      columns,
+      height,
+      y,
+      screenOffset,
+      dli: (opcode & 0x80) !== 0,
+    });
+    screenOffset += columns;
+    y += height;
+  }
+
+  if (y !== SOURCE_HEIGHT || screenOffset > 1024) {
+    throw new Error("Main-menu display list does not describe a bounded 320x192 screen");
+  }
+  return { rows, screenBytes: screenOffset };
+}
+
+function decodeFrontendScreen(bytes, screenAddress, layout) {
   const records = [];
   let offset = 0;
 
@@ -380,15 +474,25 @@ function decodeFrontendScreen(bytes, screenAddress) {
     const screenOffset = address - screenAddress;
     if (
       screenOffset < 0 ||
-      screenOffset >= SCREEN_COLUMNS * SCREEN_ROWS ||
-      screenOffset + textBytes.length > SCREEN_COLUMNS * SCREEN_ROWS
+      screenOffset >= 1024 ||
+      screenOffset + textBytes.length > 1024
     ) {
       throw new Error("Frontend screen record lies outside display memory");
     }
+    const displayRow = layout?.rows.find(
+      (row) => screenOffset >= row.screenOffset &&
+        screenOffset + textBytes.length <= row.screenOffset + row.columns,
+    );
+    if (layout && !displayRow) {
+      throw new Error("Frontend screen record crosses a mixed-mode row boundary");
+    }
     records.push({
       address,
-      row: Math.floor(screenOffset / SCREEN_COLUMNS),
-      column: screenOffset % SCREEN_COLUMNS,
+      screenOffset,
+      row: displayRow?.index,
+      y: displayRow?.y,
+      mode: displayRow?.mode,
+      column: displayRow ? screenOffset - displayRow.screenOffset : undefined,
       text: String.fromCharCode(...textBytes),
       textBytes: Uint8Array.from(textBytes),
     });
@@ -403,6 +507,40 @@ function decodeFrontendScreen(bytes, screenAddress) {
 export function readFrontendGraphicsSource(source) {
   const graphics = readGameGraphicsSource(source);
   const screenAddress = requireValue(graphics.constants, "SCREEN");
+  const mainMenuDisplayList = extractLabeledData(
+    source,
+    "main_menu_display_list",
+    graphics.constants,
+    "main_menu_display_list_jvb",
+  );
+  const mainMenuLayout = decodeMainMenuDisplayList(
+    mainMenuDisplayList,
+    screenAddress,
+  );
+  const glyphRows = extractLabeledData(
+    source,
+    "frontend_glyph_rows",
+    graphics.constants,
+    "frontend_glyph_rows_end",
+  );
+  requireLength(
+    "frontend 6x7 glyph rows",
+    glyphRows,
+    requireValue(graphics.constants, "FRONTEND_GLYPH_COUNT") * 7,
+  );
+  const frontendCharset = new Uint8Array(1024);
+  const firstGlyph = requireValue(graphics.constants, "CH_FRONT_ZERO");
+  for (let glyph = 0; glyph < glyphRows.length / 7; glyph += 1) {
+    frontendCharset.set(
+      glyphRows.subarray(glyph * 7, glyph * 7 + 7),
+      (firstGlyph + glyph) * CHARACTER_HEIGHT,
+    );
+  }
+  const graphicsBase = requireValue(graphics.constants, "FRONTEND_GRAPHICS_BASE");
+  frontendCharset.set(
+    graphics.charset.subarray(0, 16 * CHARACTER_HEIGHT),
+    graphicsBase * CHARACTER_HEIGHT,
+  );
   const markerBytes = extractLabeledData(
     source,
     "frontend_marker_positions",
@@ -417,9 +555,13 @@ export function readFrontendGraphicsSource(source) {
 
   return {
     ...graphics,
+    frontendCharset,
+    mainMenuDisplayList,
+    mainMenuLayout,
     mainMenuRecords: decodeFrontendScreen(
       extractLabeledData(source, "main_menu_screen_data", graphics.constants),
       screenAddress,
+      mainMenuLayout,
     ),
     markerAddresses,
     defaultSelection: requireValue(
@@ -485,17 +627,78 @@ function createCanonicalScreen(graphics) {
   return screen;
 }
 
+function encodeFrontendAscii(byte, constants) {
+  if (byte === 0x20) return requireValue(constants, "CH_FRONT_SPACE");
+  if (byte >= 0x30 && byte <= 0x39) {
+    return requireValue(constants, "CH_FRONT_ZERO") + byte - 0x30;
+  }
+  if (byte >= 0x41 && byte <= 0x5a) {
+    return requireValue(constants, "CH_FRONT_A") + byte - 0x41;
+  }
+  const punctuation = new Map([
+    [0x2d, "CH_FRONT_DASH"],
+    [0x2e, "CH_FRONT_DOT"],
+    [0x2f, "CH_FRONT_SLASH"],
+    [0x3a, "CH_FRONT_COLON"],
+    [0x3f, "CH_FRONT_QUESTION"],
+  ]);
+  return requireValue(
+    constants,
+    punctuation.get(byte) ?? "CH_FRONT_QUESTION",
+  );
+}
+
 function createStartMenuScreen(graphics, selection) {
-  const screen = new Uint8Array(SCREEN_COLUMNS * SCREEN_ROWS);
+  const screen = new Uint8Array(1024);
   const screenAddress = requireValue(graphics.constants, "SCREEN");
-  screen.fill(requireValue(graphics.constants, "CH_SPACE"));
+  screen.fill(requireValue(graphics.constants, "CH_FRONT_SPACE"));
 
   for (const record of graphics.mainMenuRecords) {
     const destination = record.address - screenAddress;
     for (let index = 0; index < record.textBytes.length; index += 1) {
-      screen[destination + index] = (record.textBytes[index] - 0x20) & 0xff;
+      screen[destination + index] = encodeFrontendAscii(
+        record.textBytes[index],
+        graphics.constants,
+      );
     }
   }
+
+  const hangarLayers = [
+    ["OUTER", "CH_FRONT_PANEL_SOLID"],
+    ["MID", "CH_FRONT_PANEL_FRAME"],
+    ["INNER", "CH_FRONT_PANEL_TRUSS"],
+    ["BAY", "CH_FRONT_PANEL_EDGE"],
+  ];
+  for (const [layer, tileName] of hangarLayers) {
+    const top = requireValue(graphics.constants, `MAIN_MENU_HANGAR_${layer}_TOP_OFFSET`);
+    const bottom = requireValue(graphics.constants, `MAIN_MENU_HANGAR_${layer}_BOTTOM_OFFSET`);
+    const last = requireValue(graphics.constants, `MAIN_MENU_HANGAR_${layer}_LAST`);
+    const tile = requireValue(graphics.constants, tileName);
+    screen.fill(tile, top, top + last + 1);
+    screen.fill(tile, bottom, bottom + last + 1);
+  }
+  const frame = requireValue(graphics.constants, "CH_FRONT_PANEL_FRAME");
+  for (const offset of [
+    requireValue(graphics.constants, "MAIN_MENU_SCENE_11_OFFSET") + 5,
+    requireValue(graphics.constants, "MAIN_MENU_SCENE_13_OFFSET") + 2,
+    requireValue(graphics.constants, "MAIN_MENU_SCENE_15_OFFSET") + 2,
+    requireValue(graphics.constants, "MAIN_MENU_HANGAR_BAY_BOTTOM_OFFSET") + 5,
+  ]) {
+    screen[offset] = frame;
+  }
+  const dimStar = requireValue(graphics.constants, "CH_FRONT_DOT_GRAPHIC");
+  const brightStar = requireValue(graphics.constants, "CH_FRONT_STAR");
+  for (const index of [0, 2, 4, 6]) {
+    screen[requireValue(graphics.constants, `MAIN_MENU_STAR_${index}`)] = dimStar;
+  }
+  for (const index of [1, 3, 5]) {
+    screen[requireValue(graphics.constants, `MAIN_MENU_STAR_${index}`)] = brightStar;
+  }
+  screen.fill(
+    requireValue(graphics.constants, "CH_FRONT_SEPARATOR"),
+    requireValue(graphics.constants, "MAIN_MENU_DIVIDER_OFFSET"),
+    requireValue(graphics.constants, "MAIN_MENU_DIVIDER_OFFSET") + 40,
+  );
 
   if (!Number.isInteger(selection) || selection < 0 || selection >= 4) {
     throw new Error("Main-menu selection must be an index from 0 through 3");
@@ -505,7 +708,9 @@ function createStartMenuScreen(graphics, selection) {
   if (markerOffset < 0 || markerOffset >= screen.length) {
     throw new Error("Default menu marker lies outside display memory");
   }
-  screen[markerOffset] = requireValue(graphics.constants, "CH_MENU_MARKER");
+  screen[markerOffset] =
+    requireValue(graphics.constants, "CH_FRONT_MARKER") |
+    requireValue(graphics.constants, "ANTIC67_COLOR_PF3");
   const highlightXor = requireValue(
     graphics.constants,
     "MAIN_MENU_HIGHLIGHT_XOR",
@@ -559,6 +764,78 @@ function drawAnticScreen(colorRegisters, screen, graphics, colorRegistersForRow)
     }
   }
 
+  return pixels;
+}
+
+function drawMixedMainMenuScreen(screen, graphics) {
+  const pixels = new Uint8Array(SOURCE_WIDTH * SOURCE_HEIGHT);
+  let registers = graphics.mainMenuHardwareState;
+  pixels.fill(requireValue(registers, "COLBK"));
+
+  for (const row of graphics.mainMenuLayout.rows) {
+    const background = requireValue(registers, "COLBK");
+    for (let character = 0; character < row.columns; character += 1) {
+      const screenCode = screen[row.screenOffset + character];
+      if (row.mode === 2) {
+        const characterIndex = screenCode & 0x7f;
+        const inverse = (screenCode & 0x80) !== 0;
+        for (let line = 0; line < 8; line += 1) {
+          const pattern = graphics.frontendCharset[characterIndex * 8 + line];
+          for (let bit = 0; bit < 8; bit += 1) {
+            const bitmapBit = ((pattern >>> (7 - bit)) & 1) ^ Number(inverse);
+            pixels[(row.y + line) * SOURCE_WIDTH + character * 8 + bit] =
+              anticFRegisterForBitmapBit(registers, bitmapBit);
+          }
+        }
+      } else if (row.mode === 4) {
+        const characterIndex = screenCode & 0x7f;
+        const playfieldColors = [
+          background,
+          requireValue(registers, "COLPF0"),
+          requireValue(registers, "COLPF1"),
+        ];
+        const thirdColor = requireValue(
+          registers,
+          screenCode & 0x80 ? "COLPF3" : "COLPF2",
+        );
+        for (let line = 0; line < 8; line += 1) {
+          const pattern = graphics.frontendCharset[characterIndex * 8 + line];
+          for (let pixel = 0; pixel < 4; pixel += 1) {
+            const pixelValue = (pattern >>> (6 - pixel * 2)) & 3;
+            const color = pixelValue === 3 ? thirdColor : playfieldColors[pixelValue];
+            const x = character * 8 + pixel * 2;
+            const output = (row.y + line) * SOURCE_WIDTH + x;
+            pixels[output] = color;
+            pixels[output + 1] = color;
+          }
+        }
+      } else {
+        const characterIndex = screenCode & 0x3f;
+        const colorBank = screenCode >>> 6;
+        const foreground = requireValue(
+          registers,
+          ["COLPF0", "COLPF1", "COLPF2", "COLPF3"][colorBank],
+        );
+        const verticalScale = row.mode === 7 ? 2 : 1;
+        for (let line = 0; line < 8; line += 1) {
+          const pattern = graphics.frontendCharset[characterIndex * 8 + line];
+          for (let scaleY = 0; scaleY < verticalScale; scaleY += 1) {
+            const y = row.y + line * verticalScale + scaleY;
+            for (let bit = 0; bit < 8; bit += 1) {
+              const color = pattern & (0x80 >>> bit) ? foreground : background;
+              const x = character * 16 + bit * 2;
+              const output = y * SOURCE_WIDTH + x;
+              pixels[output] = color;
+              pixels[output + 1] = color;
+            }
+          }
+        }
+      }
+    }
+    if (row.dli) {
+      registers = graphics.frontendHintHardwareState;
+    }
+  }
   return pixels;
 }
 
@@ -644,6 +921,44 @@ function overlayCanonicalPmg(pixels, graphics) {
     playerY,
     requireValue(hardwareState, "SIZEP0"),
     requireValue(hardwareState, "COLPM0"),
+  );
+}
+
+function overlayStartMenuPmg(pixels, graphics) {
+  const { constants, mainMenuHardwareState } = graphics;
+  const verticalScale = requireValue(constants, "MAIN_MENU_PLAYER_VERTICAL_SCALE");
+  const expandVertically = (shape) => Uint8Array.from(
+    [...shape].flatMap((value) => Array(verticalScale).fill(value)),
+  );
+  const playerX = requireValue(mainMenuHardwareState, "HPOSP0");
+  const playerY = requireValue(constants, "MAIN_MENU_PLAYER_Y");
+
+  drawPlayer(
+    pixels,
+    expandVertically(graphics.playerEngineShape),
+    playerX,
+    playerY,
+    requireValue(mainMenuHardwareState, "SIZEP3"),
+    requireValue(mainMenuHardwareState, "COLPM3"),
+  );
+  drawPlayer(
+    pixels,
+    Uint8Array.of(
+      requireValue(constants, "MAIN_MENU_RED_LIGHT_BITS"),
+      requireValue(constants, "MAIN_MENU_RED_LIGHT_BITS"),
+    ),
+    requireValue(mainMenuHardwareState, "HPOSP2"),
+    requireValue(constants, "MAIN_MENU_RED_LIGHT_Y"),
+    requireValue(mainMenuHardwareState, "SIZEP2"),
+    requireValue(mainMenuHardwareState, "COLPM2"),
+  );
+  drawPlayer(
+    pixels,
+    expandVertically(graphics.playerShape),
+    playerX,
+    playerY,
+    requireValue(mainMenuHardwareState, "SIZEP0"),
+    requireValue(mainMenuHardwareState, "COLPM0"),
   );
 }
 
@@ -767,11 +1082,8 @@ export function readStartMenuRuntimeState(source, selection) {
   const graphics = readFrontendGraphicsSource(source);
   const effectiveSelection = selection ?? graphics.defaultSelection;
   const screen = createStartMenuScreen(graphics, effectiveSelection);
-  const registerPixels = drawAnticScreen(
-    graphics.frontendHardwareState,
-    screen,
-    graphics,
-  );
+  const registerPixels = drawMixedMainMenuScreen(screen, graphics);
+  overlayStartMenuPmg(registerPixels, graphics);
   return { graphics, screen, registerPixels, selection: effectiveSelection };
 }
 
@@ -780,7 +1092,7 @@ export function createStartMenuPreview(source) {
   return encodePng(scaleAndConvertToRgb(registerPixels));
 }
 
-export function createLoaderPreview(loaderDefinition) {
+export function readLoaderRuntimeState(loaderDefinition) {
   const loaderAsset = compileLoaderBitmap(loaderDefinition);
   const memory = new Uint8Array(0x10000);
   const firstPartBytes =
@@ -813,15 +1125,33 @@ export function createLoaderPreview(loaderDefinition) {
       byteColumn += 1
     ) {
       const value = memory[sourceAddress + byteColumn];
-      for (let bit = 0; bit < 8; bit += 1) {
-        registerPixels[y * SOURCE_WIDTH + byteColumn * 8 + bit] =
-          anticFRegisterForBitmapBit(
+      if (zone.displayMode === "ANTIC F") {
+        for (let bit = 0; bit < 8; bit += 1) {
+          registerPixels[y * SOURCE_WIDTH + byteColumn * 8 + bit] =
+            anticFRegisterForBitmapBit(
+              zone.values,
+              value & (0x80 >>> bit),
+            );
+        }
+      } else {
+        for (let pixel = 0; pixel < 4; pixel += 1) {
+          const bitmapPixel = (value >> (6 - pixel * 2)) & 3;
+          const registerValue = anticERegisterForBitmapPixel(
             zone.values,
-            value & (0x80 >>> bit),
+            bitmapPixel,
           );
+          const x = byteColumn * 8 + pixel * 2;
+          registerPixels[y * SOURCE_WIDTH + x] = registerValue;
+          registerPixels[y * SOURCE_WIDTH + x + 1] = registerValue;
+        }
       }
     }
   }
+  return { loaderAsset, registerPixels };
+}
+
+export function createLoaderPreview(loaderDefinition) {
+  const { registerPixels } = readLoaderRuntimeState(loaderDefinition);
   return encodePng(scaleAndConvertToRgb(registerPixels));
 }
 

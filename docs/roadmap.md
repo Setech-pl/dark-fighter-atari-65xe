@@ -29,7 +29,7 @@ pamięci wymaga w tym samym change'u aktualizacji `docs/memory-map.md`.
 Pojemność ATR, limit boot payloadu, resident RAM, pamięć przejściowa loadera,
 PMG, pamięć obrazu, charset i zero page mają być raportowane osobno.
 
-## 1. Zaakceptowany vertical slice i loader ANTIC F — ukończone
+## 1. Zaakceptowany vertical slice i bitmapowy loader — ukończone
 
 ### Zakres
 
@@ -37,8 +37,8 @@ PMG, pamięć obrazu, charset i zero page mają być raportowane osobno.
 - samowystarczalne XEX i bootowalny ATR;
 - techniczny gameplay ANTIC 4 z joystickiem, FIRE, jednym przeciwnikiem,
   kolizją, wynikiem, przewijaniem i POKEY;
-- zaakceptowany loader ANTIC F 320×192, PackBits, dwa LMS, dwa DLI i dokładnie
-  250 pełnych ramek PAL;
+- loader ANTIC F 320 px z footerem ANTIC E 160 px, PackBits, dwa LMS, dwa DLI
+  i dokładnie 250 pełnych ramek PAL;
 - czyste przejście z loadera do wspólnego ekranu ANTIC 4 bez kosztu loadera
   w gameplayowej pętli lub VBI.
 
@@ -80,6 +80,9 @@ over, fale, sektory capital ships, debris, repair drone, broadside i boss.
 - dziesięciowierszowa domyślna tabela wyników bez zapisu i inicjałów;
 - bezpieczne Atari-specific EXIT pozostające na ekranie do RESET;
 - jedna ścieżka resetu uruchamiająca istniejący vertical slice;
+- mieszany playfield: ANTIC 7 dla tytułu, ANTIC 6 dla opcji, ANTIC 4 dla
+  hangaru i gwiazd oraz ANTIC 2 dla kontrolnego hintu;
+- statyczny Viper po lewej, pionowe menu po prawej i zielony akcent `$D8`;
 - deterministyczny `build/previews/start-menu.png`.
 
 ### Zależności
@@ -95,20 +98,24 @@ Kamień 1, zaakceptowany loader i istniejąca infrastruktura ANTIC 4.
 - SOUND domyślnie jest ON, wybór trwa w RAM, a OFF wycisza wszystkie kanały;
 - TOP SCORES ma dokładnie dziesięć wierszy i wraca przez FIRE;
 - EXIT domyślnie wybiera NO, a YES nie skacze do DOS-u;
-- 34 testy, build, preview i verify przechodzą; zaakceptowane preview loadera
-  oraz gameplayu pozostają bez zmian.
+- testy kontraktowe, build, preview i verify przechodzą; gameplay preview
+  pozostaje byte-for-byte zgodny z zaakceptowanym obrazem.
 
 ### Dowody pamięci i wydajności
 
-Względem kamienia 1: kod `+677 B`, dane `+10 B`, zero page `+7 B`, payload
-`+687 B` i boot sectors `49 → 54`; XEX rośnie o 687 B, ATR pozostaje 92 176 B.
-Frontend przechowuje 5 B trwałego stanu i 2-bajtowy tymczasowy wskaźnik w ZP.
-233 B tekstów/tabel zajmuje dawniej zerowe, niewyświetlane sloty wewnątrz
-istniejącego 1 KB charsetu; ekran 1 KB i PMG nie otrzymują nowych rezerwacji.
-Po oczekiwaniu ramki idle frontend wykonuje około 30 cykli pracy logicznej,
-nawigacja mniej niż około 300, a konserwatywne wejście na najcięższy ekran
-poniżej około 11 000 cykli. VBI/DLI bez zmian; menu ma zero aktywnych obiektów
-gameplayu.
+Po mieszanym polishu bieżący kod ma 2579 B, RODATA 4902 B, zero page 34 B,
+payload 7481 B, 59 boot sectors i XEX 7493 B; ATR pozostaje 92 176 B.
+Względem wcześniejszego kandydata ANTIC 4 kod rośnie o 279 B, RODATA o 63 B,
+a payload o 342 B; ZP pozostaje bez zmian. Powstaje osobny frontend charset
+1 KB pod `$4800-$4BFF`, odzyskiwany po loaderze; ekran 1 KB i PMG nie zmieniają
+rezerwacji. Main menu wykorzystuje 820 B ekranu, a sub-screeny 960 B.
+
+Main menu ma trzy widoczne warstwy PMG (P0/P2/P3); player DMA pozostaje
+ograniczone jak wcześniej. Cała scena jest rysowana tylko przy wejściu i przy
+wyłączonym DMA. Pojedynczy DLI po dividerze ma konserwatywną granicę około
+160 cykli wraz z `WSYNC`, a przywrócenie głównej palety po obrazie dodaje około
+55 cykli w idle ramce. Nie ma DLI per opcja ani dekoracji liczonych per-frame.
+Ekrany podrzędne wyłączają PMG i DLI; gameplay nie otrzymuje kosztu frontendu.
 
 ### Wykluczenia
 
