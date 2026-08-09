@@ -153,10 +153,39 @@ opcjonalnym testem, nie równoległym wymaganiem.
 PNG nie ustala rozdzielczości, liczby PMG ani zagęszczenia obiektów. Te wartości
 są adaptowane do ANTIC/GTIA, budżetu PMG i jednej ramki PAL.
 
+## Main menu i frontend
+
+`assets/graphics/mainmenu.png` jest zatwierdzoną referencją wyłącznie dla
+kompozycji, proporcji, atmosfery i hierarchii koloru. Atari menu nie skaluje,
+nie trasuje i nie osadza tego PNG. Nie przejmuje z niego `BSG 75`, insygniów,
+typografii, dokładnej sylwetki statku ani geometrii hangaru.
+
+Bieżąca, oryginalna interpretacja miesza tryby znakowe według ich mocnych
+stron:
+
+- wyśrodkowanego `DARK FIGHTER` w 20-kolumnowym ANTIC 7, z czystym fontem
+  6×7 i podwojoną wysokością;
+- kątowych, stalowo-niebieskich warstw hangaru po lewej;
+- istniejącego autorskiego `player_shape` z bursztynowym
+  `player_engine_shape` jako statycznego, dwuwarstwowego PMG w hangarze;
+- czterech czytelnych opcji ANTIC 6 ustawionych pionowo po prawej;
+- kilku deterministycznych gwiazd i dużych czarnych przerw;
+- nasyconego akcentu `$D8` dla markera i całego aktywnego napisu;
+- oszczędnego czerwonego światła identyfikacyjnego bez oznaczeń BSG.
+- neutralnego, białego hintu `UP/DOWN MOVE  FIRE SELECT` w ANTIC 2.
+
+`SETECH GAME STUDIO` nie występuje w main menu; pozostaje częścią loadera.
+Wiersze ANTIC 4 zachowują hangar, gwiazdy i dekoracje, a czarne odstępy
+porządkują title, scenę, menu oraz hint bez dekoracyjnego przeliczania per-frame.
+
+Menu główne może czasowo używać P0, P2 i P3, ponieważ nie wykonuje gameplayu.
+Ekrany podrzędne wyłączają PMG, a wejście do gameplayu czyści cały obszar i
+odtwarza zaakceptowane rozmiary oraz paletę obiektów.
+
 ## Zaakceptowany loader
 
-Loader jest zamkniętym wizualnym i technicznym checkpointem. Używa
-monochromatycznej bitmapy ANTIC F 320×192 z:
+Loader zachowuje zaakceptowaną geometrię i używa bitmapy mieszanej: ANTIC F
+320 px dla tytułu i statku oraz ANTIC E 160 px dla podpisu studia, z:
 
 - czarnym tłem;
 - kremowym tytułem;
@@ -168,7 +197,7 @@ monochromatycznej bitmapy ANTIC F 320×192 z:
 
 Atari-native source znajduje się w `assets/graphics/loader-bitmap.json`,
 a `assets/graphics/loader.png` pozostaje wysokorozdzielczą referencją
-kompozycji. Monochromatyczny playfield świadomie oddaje półtony ditheringiem,
+kompozycji. Strefy statku świadomie oddają półtony ditheringiem,
 panelami, żebrami i czarnymi szczelinami. Loader nie ma wspieranego wariantu
 ANTIC 4 i nie jest modyfikowany podczas prac nad gameplayem.
 

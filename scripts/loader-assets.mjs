@@ -5,6 +5,10 @@ const BITMAP_HEIGHT = 192;
 const BITMAP_BYTES_PER_ROW = 40;
 const BITMAP_BYTES = BITMAP_BYTES_PER_ROW * BITMAP_HEIGHT;
 const COLOR_REGISTERS = ["COLBK", "COLPF1", "COLPF2"];
+const ANTIC_MODE_NUMBERS = new Map([
+  ["ANTIC E", 0x0e],
+  ["ANTIC F", 0x0f],
+]);
 
 function assertInteger(value, name, minimum, maximum) {
   if (!Number.isInteger(value) || value < minimum || value > maximum) {
@@ -36,6 +40,19 @@ export function anticFRegisterForBitmapBit(registers, bitmapBit) {
     throw new Error("ANTIC F mapping requires COLPF1 and COLPF2 byte values");
   }
   return bitmapBit ? (colpf2 & 0xf0) | (colpf1 & 0x0e) : colpf2;
+}
+
+// ANTIC E maps each two-bit bitmap pixel directly to a playfield register.
+// The mixed-mode loader uses only 0 (COLBK) and 2 (COLPF1), so COLPF0 does not
+// need to be changed or represented in the loader palette source.
+export function anticERegisterForBitmapPixel(registers, bitmapPixel) {
+  assertInteger(bitmapPixel, "ANTIC E bitmap pixel", 0, 3);
+  const register = ["COLBK", "COLPF0", "COLPF1", "COLPF2"][bitmapPixel];
+  const value = registers.get(register);
+  if (!Number.isInteger(value)) {
+    throw new Error(`ANTIC E pixel ${bitmapPixel} requires ${register}`);
+  }
+  return value;
 }
 
 function validatePattern(pattern, name) {
@@ -143,15 +160,30 @@ export function validateLoaderBitmapDefinition(definition) {
       );
     }
     const foreground = parseByte(zone.foreground, `${zone.name}.foreground`);
-    const effectiveForeground = anticFRegisterForBitmapBit(values, 1);
+    const modeNumber = ANTIC_MODE_NUMBERS.get(zone.displayMode);
+    if (!Number.isInteger(modeNumber)) {
+      throw new Error(`${zone.name}.displayMode must be ANTIC E or ANTIC F`);
+    }
+    assertInteger(
+      zone.foregroundPixel,
+      `${zone.name}.foregroundPixel`,
+      1,
+      zone.displayMode === "ANTIC E" ? 3 : 1,
+    );
+    const effectiveForeground = zone.displayMode === "ANTIC F"
+      ? anticFRegisterForBitmapBit(values, zone.foregroundPixel)
+      : anticERegisterForBitmapPixel(values, zone.foregroundPixel);
     if (effectiveForeground !== foreground) {
       throw new Error(
-        `${zone.name} ANTIC F registers do not produce its foreground`,
+        `${zone.name} ${zone.displayMode} registers do not produce its foreground`,
       );
     }
-    if ((values.get("COLPF2") & 0x0f) !== 0 || values.get("COLBK") !== 0) {
+    if (
+      values.get("COLBK") !== 0 ||
+      (zone.displayMode === "ANTIC F" && (values.get("COLPF2") & 0x0f) !== 0)
+    ) {
       throw new Error(
-        `${zone.name} must use zero-luminance playfield and border backgrounds`,
+        `${zone.name} must use the mode-appropriate black background`,
       );
     }
     nextLine = zone.endLine + 1;
@@ -399,7 +431,7 @@ function drawElement(pixels, definition, element) {
   }
 }
 
-export function encodeLoaderBitmapPixels(pixels) {
+export function encodeLoaderBitmapPixels(pixels, paletteZones = undefined) {
   if (
     !(pixels instanceof Uint8Array) ||
     pixels.length !== BITMAP_WIDTH * BITMAP_HEIGHT
@@ -408,15 +440,29 @@ export function encodeLoaderBitmapPixels(pixels) {
   }
   const bytes = new Uint8Array(BITMAP_BYTES);
   for (let y = 0; y < BITMAP_HEIGHT; y += 1) {
+    const zone = paletteZones?.find(
+      ({ startLine, endLine }) => y >= startLine && y <= endLine,
+    );
+    const displayMode = zone?.displayMode ?? "ANTIC F";
     for (
       let byteColumn = 0;
       byteColumn < BITMAP_BYTES_PER_ROW;
       byteColumn += 1
     ) {
       let value = 0;
-      for (let bit = 0; bit < 8; bit += 1) {
-        value |=
-          (pixels[y * BITMAP_WIDTH + byteColumn * 8 + bit] & 1) << (7 - bit);
+      if (displayMode === "ANTIC F") {
+        for (let bit = 0; bit < 8; bit += 1) {
+          value |=
+            (pixels[y * BITMAP_WIDTH + byteColumn * 8 + bit] & 1) << (7 - bit);
+        }
+      } else if (displayMode === "ANTIC E") {
+        for (let pixel = 0; pixel < 4; pixel += 1) {
+          const sourceOffset = y * BITMAP_WIDTH + byteColumn * 8 + pixel * 2;
+          const isForeground = pixels[sourceOffset] | pixels[sourceOffset + 1];
+          value |= (isForeground ? zone.foregroundPixel : 0) << (6 - pixel * 2);
+        }
+      } else {
+        throw new Error(`Unsupported loader display mode: ${displayMode}`);
       }
       bytes[y * BITMAP_BYTES_PER_ROW + byteColumn] = value;
     }
@@ -502,17 +548,9 @@ export function compileLoaderBitmap(definition) {
   for (const element of definition.elements) {
     drawElement(pixels, definition, element);
   }
-  const bitmapBytes = encodeLoaderBitmapPixels(pixels);
-  const packedBitmap = packLoaderPackBits(bitmapBytes);
-  if (
-    !Buffer.from(unpackLoaderPackBits(packedBitmap))
-      .equals(Buffer.from(bitmapBytes))
-  ) {
-    throw new Error("Loader bitmap PackBits round trip failed");
-  }
-
   const paletteZones = definition.paletteZones.map((zone) => ({
     ...zone,
+    modeNumber: ANTIC_MODE_NUMBERS.get(zone.displayMode),
     foregroundValue: parseByte(zone.foreground, `${zone.name}.foreground`),
     values: new Map(
       COLOR_REGISTERS.map((register) => [
@@ -521,6 +559,15 @@ export function compileLoaderBitmap(definition) {
       ]),
     ),
   }));
+  const bitmapBytes = encodeLoaderBitmapPixels(pixels, paletteZones);
+  const packedBitmap = packLoaderPackBits(bitmapBytes);
+  if (
+    !Buffer.from(unpackLoaderPackBits(packedBitmap))
+      .equals(Buffer.from(bitmapBytes))
+  ) {
+    throw new Error("Loader bitmap PackBits round trip failed");
+  }
+
   return {
     width: BITMAP_WIDTH,
     height: BITMAP_HEIGHT,
@@ -539,6 +586,24 @@ export function compileLoaderBitmap(definition) {
     durationFrames: definition.timing.palFrames,
     landmarks: definition.landmarks,
   };
+}
+
+export function loaderBitmapPixelValueAt(compiled, x, y) {
+  assertInteger(x, "loader bitmap x", 0, BITMAP_WIDTH - 1);
+  assertInteger(y, "loader bitmap y", 0, BITMAP_HEIGHT - 1);
+  const zone = compiled.paletteZones.find(
+    ({ startLine, endLine }) => y >= startLine && y <= endLine,
+  );
+  if (!zone) {
+    throw new Error(`Loader bitmap line ${y} has no palette zone`);
+  }
+  const value = compiled.bitmapBytes[
+    y * BITMAP_BYTES_PER_ROW + Math.floor(x / 8)
+  ];
+  if (zone.displayMode === "ANTIC F") {
+    return (value >> (7 - (x & 7))) & 1;
+  }
+  return (value >> (6 - Math.floor((x & 7) / 2) * 2)) & 3;
 }
 
 function byteLines(bytes) {
@@ -562,9 +627,12 @@ export function createLoaderDisplayListBytes(
 ) {
   const bytes = [0x70, 0x70, 0x70];
   for (let line = 0; line < BITMAP_HEIGHT; line += 1) {
+    const zone = compiled.paletteZones.find(
+      ({ startLine, endLine }) => line >= startLine && line <= endLine,
+    );
     const hasLms = line === 0 || line === compiled.secondLmsLine;
     const hasDli = compiled.dliLines.includes(line);
-    bytes.push(0x0f | (hasLms ? 0x40 : 0) | (hasDli ? 0x80 : 0));
+    bytes.push(zone.modeNumber | (hasLms ? 0x40 : 0) | (hasDli ? 0x80 : 0));
     if (hasLms) {
       const address =
         line === 0 ? compiled.bitmapAddress : compiled.secondLmsAddress;
@@ -597,6 +665,7 @@ export function renderLoaderCa65Include(compiled) {
     lines.push(
       `${prefix}_START_LINE = ${zone.startLine}`,
       `${prefix}_END_LINE = ${zone.endLine}`,
+      `${prefix}_ANTIC_MODE = $${zone.modeNumber.toString(16).toUpperCase()}`,
       `${prefix}_FOREGROUND = $${zone.foregroundValue.toString(16).padStart(2, "0").toUpperCase()}`,
     );
     for (const register of COLOR_REGISTERS) {
@@ -611,9 +680,12 @@ export function renderLoaderCa65Include(compiled) {
   lines.push(...byteLines(compiled.packedBitmap));
   lines.push("", "loader_display_list:", "    .byte $70,$70,$70");
   for (let line = 0; line < BITMAP_HEIGHT; line += 1) {
+    const zone = compiled.paletteZones.find(
+      ({ startLine, endLine }) => line >= startLine && line <= endLine,
+    );
     const hasLms = line === 0 || line === compiled.secondLmsLine;
     const opcode =
-      0x0f |
+      zone.modeNumber |
       (hasLms ? 0x40 : 0) |
       (compiled.dliLines.includes(line) ? 0x80 : 0);
     const opcodeText = `$${opcode.toString(16).padStart(2, "0").toUpperCase()}`;

@@ -43,14 +43,16 @@ uruchamia dźwięk i krótką zmianę tła.
 2. Rozwija 3370-bajtowy PackBits do 7680-bajtowej bitmapy
    `$4010-$5E0F`.
 3. Instaluje `loader_dli`, synchronizuje początek ramki i włącza DLI oraz
-   playfield DMA ANTIC F.
+   mieszany playfield DMA: ANTIC F dla tytułu i statku, ANTIC E dla footera.
 4. Wyświetla dokładnie 250 kompletnych ramek PAL bez odczytu joysticka i FIRE.
-5. Wyłącza NMI i DMA, czyści `$3800-$3FFF`, kopiuje wspólny charset i
-   przygotowuje ekran ANTIC 4.
-6. Renderuje main menu i przed widoczną częścią świeżej ramki włącza ANTIC 4
-   bez PMG. DLI pozostaje wyłączone.
+5. Wyłącza NMI i DMA, czyści `$3800-$3FFF`, kopiuje gameplay charset oraz
+   buduje osobny frontend charset `$4800-$4BFF`.
+6. Renderuje main menu i jego statyczne warstwy P0/P2/P3 przy wyłączonym DMA,
+   a przed widoczną częścią świeżej ramki włącza mieszany playfield oraz
+   player DMA. Jedno DLI po dolnym dividerze ustawia neutralną paletę hintu.
 
-Loader jest prawdziwą bitmapą 320×192, 1 bit na piksel, 40 B na linię.
+Loader ma 192 linie po 40 B: linie 0–163 są bitmapą ANTIC F 320 px, a linie
+164–191 bitmapą ANTIC E 160 px z wartościami 0/2 mapowanymi na `COLBK/COLPF1`.
 Pierwsze LMS wskazuje `$4010`; drugie, po 102 liniach, wskazuje `$5000`.
 Dwa DLI zmieniają kolory po liniach 39 i 163. Udokumentowana górna granica
 jednego wywołania DLI z oczekiwaniem `WSYNC` wynosi około 160 cykli. Loader
@@ -66,11 +68,18 @@ ramkę czeka przez `VCOUNT`, pobiera joystick portu 1 i FIRE, a następnie
 wykonuje najwyżej jedno zdarzenie po pełnym neutralnym puszczeniu wejścia.
 
 Menu, opcje, tabela wyników, potwierdzenie i ekran końcowy współdzielą
-`$4000-$43FF` oraz charset `$4400-$47FF`; PMG pozostaje wyłączone. Statyczne
-tabele tekstowe zajmują 233 bajty dawniej zerowego wypełnienia niewyświetlanych
-slotów charsetu 59 i wyżej, więc rozmiar oraz rezerwacja 1 KB charsetu nie
-zmieniły się. `TOP SCORES` generuje dziesięć wierszy domyślnych przy wejściu,
-bez SIO, zapisu ATR, inicjałów lub trwałego formatu.
+`$4000-$43FF` i osobny frontend charset `$4800-$4BFF`. Gameplay zachowuje
+charset `$4400-$47FF`. Tylko main menu włącza P0/P2/P3:
+P0 rysuje jasny kadłub, P3 bursztynowy silnik, a P2 dwa czerwone światła.
+Warstwy są zapisane raz przy wyłączonym DMA, a pozostałe ekrany wyłączają PMG.
+Main menu ma 820 B jawnie wyliczonych wierszy o szerokości 20 lub 40 B:
+ANTIC 7 dla tytułu, ANTIC 6 dla opcji, ANTIC 4 dla hangaru/dekoracji oraz
+ANTIC 2 dla dolnego hintu. Sub-screeny używają jednolitego ANTIC 2.
+Frontend charset przechowuje 42 zwarte glify 6×7 oraz kopie 16 istniejących
+glifów strukturalnych ANTIC 4. `frontend_hint_dli` działa raz na ramkę main
+menu; po widocznym obszarze pętla przywraca paletę główną. Nie ma DLI per opcja.
+`TOP SCORES` generuje dziesięć wierszy domyślnych przy wejściu, bez SIO,
+zapisu ATR, inicjałów lub trwałego formatu.
 
 `START GAME` jest jedyną bieżącą ścieżką wejścia do gameplayu. Wyłącza DMA
 i PMG, wycisza POKEY, czyści PMG oraz ekran, inicjalizuje istniejący stan,
@@ -86,8 +95,10 @@ na kolejne ramki aż do RESET.
 
 ### Obraz i PMG
 
-- Frontend i gameplay używają 40×24 znaków ANTIC 4, ekranu `$4000-$43FF`
-  i własnego charsetu `$4400-$47FF`.
+- Gameplay używa 40×24 ANTIC 4 z ekranem `$4000-$43FF` i charsetem
+  `$4400-$47FF`. Frontend używa tego samego bufora z własnym charsetem
+  `$4800-$4BFF`; mieszany main menu ma wiersze 20- i 40-bajtowe, a sub-screeny
+  40-kolumnowy ANTIC 2.
 - Tło przewija 21 wierszy i generuje jeden wiersz raz na cztery ramki.
   Istniejące przybliżenie pesymistyczne tej rzadkiej ścieżki to około 19 000
   cykli wobec około 35 500 cykli ramki PAL. Pełny najgorszy koszt całej pętli
@@ -96,6 +107,9 @@ na kolejne ramki aż do RESET.
 - Player 1 to obecny korpus przeciwnika, Player 2 czerwony skaner.
 - Missile 0 to pojedynczy pocisk gracza.
 - Loader nie używa PMG.
+- Main menu czasowo używa P0 i P3 dla powiększonego istniejącego Vipera oraz
+  P2 dla światła identyfikacyjnego. `START GAME` czyści PMG, przywraca
+  `SIZEP0/SIZEP3=$01`, `COLPF2=$28` i `COLPF3=$46` przed gameplayem.
 
 ### Stan, losowość i audio
 
@@ -118,20 +132,20 @@ przedstawiane jako wolne miejsce w innej.
 | Kategoria | Potwierdzony stan bieżący | Bramka dla przyszłych zmian |
 | --- | --- | --- |
 | 1. Pojemność ATR | Standardowy ATR ma 92 176 B pliku: 16 B nagłówka i 92 160 B danych, czyli 720 sektorów po 128 B. Duża część obrazu jest pusta. | Wolne sektory nie zwiększają resident RAM i nie uzasadniają same w sobie modułów ładowanych podczas gry. |
-| 2. Boot payload i sektory startowe | Payload ma 6880 B i zajmuje 54 sektory. Pierwsze 6 B to nagłówek boot, a liczba sektorów mieści się w jednym bajcie. Bieżący linker ma ostrzejszy limit `$2000-$3AFF`, czyli 6912 B przed aktywnym PMG. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granicę linkera. |
-| 3. Resident gameplay RAM | Początkowo payload leży pod `$2000-$3ADF`; ekran, charset i PMG mają osobne zakresy. Kod kończy się na `$27F8`, a trwałe dane frontendu leżą przed loader-only strumieniem; map nadal nie modeluje automatycznie czasu życia każdego zakresu. | Następny kamień milowy ma zmierzyć rzeczywiście trwałe dane i przygotować budżet, bez zakładania, że każdy nieadresowany bajt jest bezpieczny. |
-| 4. Pamięć przejściowa loadera | Surowa bitmapa zajmuje `$4010-$5E0F`. Bieżący strumień PackBits ma 3370 B pod `$2CEC-$3A15`, a loader display list leży pod `$3A16-$3ADF`; jej końcowe bajty wchodzą w padding `$3800-$3AFF`. Dekompressor używa istniejących wskaźników i liczników zero page. | Koszt i zakresy loadera raportować jako transient, nie jako stały gameplay asset. |
-| 5. Pamięć odzyskiwalna po przejściu | Gameplay nie adresuje pozostałości bitmapy `$4800-$5E0F`. `$5E10-$BFFF` jest obecnie nieprzydzielone. Padding `$3800-$3AFF` jest czyszczony razem z PMG i nie może przechowywać danych trwałych bez zmiany inicjalizacji. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma jeszcze allocatora ani overlayu. |
+| 2. Boot payload i sektory startowe | Payload ma 7481 B i zajmuje 59 sektorów. Pierwsze 6 B to nagłówek boot. Linker dopuszcza `$2000-$3DFF`, lecz bieżący XEX kończy się pod `$3D38`; ATR dopełnia ostatni sektor 71 zerami. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granicę linkera. |
+| 3. Resident gameplay RAM | Kod ma 2579 B pod `$2000-$2A12`, a potrzebne po loaderze RODATA kończą się przed strumieniem PackBits pod `$2F45`. Ekran, oba charsety i PMG mają osobne zakresy; map nadal nie modeluje automatycznie czasu życia każdego zakresu. | Następny kamień milowy ma zmierzyć rzeczywiście trwałe dane i przygotować budżet, bez zakładania, że każdy nieadresowany bajt jest bezpieczny. |
+| 4. Pamięć przejściowa loadera | Surowa bitmapa zajmuje `$4010-$5E0F`. Strumień PackBits ma 3370 B pod `$2F45-$3C6E`, a loader display list leży pod `$3C6F-$3D38` w adresach późniejszych stron P0/P1, gdy PMG/DMA są wyłączone. | Koszt i zakresy loadera raportować jako transient, nie jako stały gameplay asset. |
+| 5. Pamięć odzyskiwalna po przejściu | Gameplay nie adresuje pozostałości bitmapy `$4800-$5E0F`. `$5E10-$BFFF` jest obecnie nieprzydzielone. `$3800-$3FFF` jest zerowane po loaderze, zanim otrzyma role PMG. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma jeszcze allocatora ani overlayu. |
 | 6. PMG | PMBASE `$3800`; aktywne dane: missiles `$3B00-$3BFF`, P0 `$3C00-$3CFF`, P1 `$3D00-$3DFF`, P2 `$3E00-$3EFF`, P3 `$3F00-$3FFF`. | Każda zmiana ról, multipleksowania lub trybu DMA wymaga limitu obiektów, kosztu i testu PAL/real hardware. |
-| 7. Display memory i charset | Wspólny ekran `$4000-$43FF`, charset `$4400-$47FF`; loader bitmap `$4010-$5E0F` istnieje tylko przed przebudową. Dane frontendu używają 233 B niewyświetlanych slotów wewnątrz niezmienionego 1 KB charsetu. | Capital hulls mają najpierw zużywać char-mode data. Charset pressure i koszty kopiowania muszą być mierzone. |
+| 7. Display memory i charset | Wspólny ekran `$4000-$43FF`; gameplay charset `$4400-$47FF`; frontend charset `$4800-$4BFF`, odzyskany po bitmapie loadera. Main menu używa pierwszych 820 B ekranu, jawnie dzielonych na wiersze 20/40 B; sub-screeny i gameplay mieszczą się w 960 B. | Capital hulls mają najpierw zużywać char-mode data. Charset pressure i koszty kopiowania muszą być mierzone. |
 | 8. Zero page | Linker raportuje 34 B pod `$0080-$00A1`; w zadeklarowanym regionie `$0080-$00FF` pozostają 94 nieprzydzielone bajty. | Każda funkcja podaje delta ZP; wolnych bajtów nie przydziela się bez audytu konfliktów i czasu życia. |
-| 9. Koszt widocznej ramki | Frontend po oczekiwaniu na ramkę wykonuje około 30 cykli pracy logicznej bez inputu; zdarzenie nawigacji pozostaje poniżej około 300 cykli. Jednorazowe wejście na ekran, wraz z wyczyszczeniem 1 KB, tekstem i najcięższą tabelą wyników, ma konserwatywne przybliżenie poniżej 11 000 cykli. Znana ścieżka scrollu gameplayu to około 19 000 cykli raz na cztery ramki; pełny worst case gameplayu nadal wymaga pomiaru. | Przed zwiększeniem liczby obiektów powstaje pomiar pełnej ramki i bramka 50 FPS PAL. |
-| 10. Jednorazowy setup/transition | Dekompresja, kopiowanie charsetu, renderowanie ekranów frontendu i reset gameplayu odbywają się przy wyłączonym DMA. Loader DLI działa tylko przez 250 ramek; frontend i gameplay nie dodają nowych DLI/VBI. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
+| 9. Koszt widocznej ramki | Idle frontend wykonuje dotychczasową ograniczoną obsługę inputu oraz do około 55 cykli przywrócenia palety main menu po obrazie. Jedyny menu DLI ma granicę około 160 cykli wraz z `WSYNC`; nie ma DLI per opcja ani dekoracji per-frame. Player DMA pozostaje ograniczone jak wcześniej. Znana ścieżka scrollu gameplayu to około 19 000 cykli raz na cztery ramki; pełny worst case nadal wymaga pomiaru. | Przed zwiększeniem liczby obiektów powstaje pomiar pełnej ramki i bramka 50 FPS PAL. |
+| 10. Jednorazowy setup/transition | Dekompresja, kopiowanie dwóch charsetów, renderowanie ekranów frontendu i reset gameplayu odbywają się przy wyłączonym DMA. Loader DLI działa tylko przez 250 ramek; pojedynczy frontend DLI działa tylko w main menu i znika w sub-screenach/gameplayu. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
 
-Linker map kończy bieżący payload na `$3ADF`. Zakres `$3AE0-$3AFF` ma 32 B
-i jest tylko konkretną, ciągłą luką przed aktywnym PMG. Nie jest „całą wolną
-pamięcią Atari”. Dokładne rezerwacje pozostają w `docs/memory-map.md`; ten
-dokument nie przydziela nowych zakresów.
+Linker map kończy bieżący payload na `$3D38`. Zakres `$3D39-$3D7F` ma 71 B,
+jest paddingiem ostatniego sektora ATR i znajduje się w stronie późniejszego
+Player 1. Nie jest „całą wolną pamięcią Atari” ani resident budżetem.
+Dokładne role czasowe pozostają w `docs/memory-map.md`.
 
 ## Docelowa architektura przyrostowa
 
@@ -272,7 +286,8 @@ może przypadkowo zmieniać profilu poziomu po dodaniu efektu graficznego.
 #### Loader-to-frontend i frontend-to-gameplay
 
 Przejście zachowuje zaakceptowane 250 ramek, wyłącza DLI/DMA, odzyskuje
-pamięć loader-only i dopiero potem włącza ANTIC 4 z main menu, bez PMG.
+pamięć loader-only i dopiero potem włącza mieszany ANTIC 7/6/4/2 z main menu,
+jednym dolnym DLI oraz statycznymi player PMG.
 `START GAME` osobno inicjalizuje wszystkie trwałe pule i włącza PMG. Przyszły
 reset gameplayu nie uruchamia ponownie loadera i nie zakłada dostępu do dysku.
 

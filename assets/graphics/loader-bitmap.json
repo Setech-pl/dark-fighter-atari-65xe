@@ -22,6 +22,8 @@
   "paletteZones": [
     {
       "name": "title",
+      "displayMode": "ANTIC F",
+      "foregroundPixel": 1,
       "startLine": 0,
       "endLine": 39,
       "foreground": "$1E",
@@ -33,6 +35,8 @@
     },
     {
       "name": "ship",
+      "displayMode": "ANTIC F",
+      "foregroundPixel": 1,
       "startLine": 40,
       "endLine": 163,
       "foreground": "$0A",
@@ -44,13 +48,15 @@
     },
     {
       "name": "studio",
+      "displayMode": "ANTIC E",
+      "foregroundPixel": 2,
       "startLine": 164,
       "endLine": 191,
-      "foreground": "$EC",
+      "foreground": "$D8",
       "registers": {
         "COLBK": "$00",
-        "COLPF1": "$EC",
-        "COLPF2": "$E0"
+        "COLPF1": "$D8",
+        "COLPF2": "$D0"
       }
     }
   ],

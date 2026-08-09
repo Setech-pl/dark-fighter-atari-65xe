@@ -168,9 +168,9 @@ async function build() {
   if (!Number.isInteger(startAddress) || !Number.isInteger(bootInitAddress)) {
     throw new Error("ld65 label file is missing exported start or boot_return labels");
   }
-  if (rawPayload.length > 0x1b00) {
+  if (rawPayload.length > 0x1e00) {
     throw new Error(
-      `Payload is ${rawPayload.length} bytes and crosses the active PMG boundary at $3B00`,
+      `Payload is ${rawPayload.length} bytes and crosses the player-2 boundary at $3E00`,
     );
   }
 
@@ -201,7 +201,7 @@ async function build() {
     bootSectors,
     payloadBytes: rawPayload.length,
     loaderScreen: {
-      mode: "ANTIC F",
+      mode: "mixed ANTIC F/E",
       source: "assets/graphics/loader-bitmap.json",
       sourceSha256: sha256(fs.readFileSync(loaderDefinitionPath)),
       referenceSha256: loaderDefinition.reference.sha256,

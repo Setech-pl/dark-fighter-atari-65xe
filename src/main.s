@@ -79,6 +79,7 @@ PLAYER2     = PMG_BASE + $0600
 PLAYER3     = PMG_BASE + $0700
 SCREEN      = $4000
 CHARSET     = $4400
+FRONTEND_CHARSET = $4800
 
 PLAYER_H    = 16
 ENEMY_H     = 12
@@ -98,7 +99,6 @@ CH_PANEL_FRAME = 6
 CH_PANEL_STRIPE = 7
 CH_SEPARATOR = 9
 CH_STAR     = 10
-CH_MENU_MARKER = 11
 CH_DASH     = 13
 CH_DOT      = 14
 CH_SLASH    = 15
@@ -106,9 +106,35 @@ CH_ZERO     = 16
 CH_COLON    = 26
 CH_QUESTION = 31
 
-KAWASAKI_GREEN = $EC
+KAWASAKI_GREEN = $D8
 GAMEPLAY_COLPF3 = $46
-MAIN_MENU_HIGHLIGHT_XOR = $C0
+
+; ANTIC 6/7 use bits 6-7 as a direct COLPF0-COLPF3 colour bank.
+ANTIC67_COLOR_PF0 = $00
+ANTIC67_COLOR_PF1 = $40
+ANTIC67_COLOR_PF2 = $80
+ANTIC67_COLOR_PF3 = $C0
+MAIN_MENU_HIGHLIGHT_XOR = ANTIC67_COLOR_PF3
+
+; Frontend high-resolution glyph indices, all below the ANTIC 6/7 limit 64.
+CH_FRONT_SPACE    = 0
+CH_FRONT_ZERO     = 1
+CH_FRONT_A        = 11
+CH_FRONT_DASH     = 37
+CH_FRONT_DOT      = 38
+CH_FRONT_SLASH    = 39
+CH_FRONT_COLON    = 40
+CH_FRONT_QUESTION = 41
+CH_FRONT_MARKER   = 42
+FRONTEND_GLYPH_COUNT = 42
+FRONTEND_GRAPHICS_BASE = 44
+CH_FRONT_PANEL_SOLID = FRONTEND_GRAPHICS_BASE + CH_PANEL_SOLID
+CH_FRONT_PANEL_EDGE = FRONTEND_GRAPHICS_BASE + CH_PANEL_EDGE
+CH_FRONT_PANEL_FRAME = FRONTEND_GRAPHICS_BASE + CH_PANEL_FRAME
+CH_FRONT_PANEL_TRUSS = FRONTEND_GRAPHICS_BASE + CH_PANEL_TRUSS
+CH_FRONT_SEPARATOR = FRONTEND_GRAPHICS_BASE + CH_SEPARATOR
+CH_FRONT_STAR = FRONTEND_GRAPHICS_BASE + CH_STAR
+CH_FRONT_DOT_GRAPHIC = FRONTEND_GRAPHICS_BASE + CH_DOT
 
 STATE_LOADER       = 0
 STATE_MAIN_MENU    = 1
@@ -119,6 +145,55 @@ STATE_EXITED       = 5
 STATE_GAMEPLAY     = 6
 
 FRONTEND_DEFAULT_SELECTION = 0
+
+MAIN_MENU_DMA = $3A
+MAIN_MENU_PLAYER_X = $48
+MAIN_MENU_PLAYER_Y = $68
+MAIN_MENU_PLAYER_SIZE = $03
+MAIN_MENU_PLAYER_VERTICAL_SCALE = 2
+MAIN_MENU_RED_LIGHT_X = $50
+MAIN_MENU_RED_LIGHT_Y = $78
+MAIN_MENU_RED_LIGHT_BITS = $81
+
+; Mixed-mode screen bytes are sequential but row widths are not uniform.
+; Mode 7 title: 20 B. Remaining rows: mode 6 uses 20 B; modes 2/4 use 40 B.
+MAIN_MENU_TITLE_OFFSET = 0
+MAIN_MENU_HANGAR_OUTER_TOP_OFFSET = 20
+MAIN_MENU_HANGAR_MID_TOP_OFFSET = 60
+MAIN_MENU_HANGAR_INNER_TOP_OFFSET = 100
+MAIN_MENU_OPTION_0_OFFSET = 140
+MAIN_MENU_HANGAR_BAY_TOP_OFFSET = 160
+MAIN_MENU_OPTION_1_OFFSET = 200
+MAIN_MENU_SCENE_7_OFFSET = 220
+MAIN_MENU_OPTION_2_OFFSET = 260
+MAIN_MENU_SCENE_9_OFFSET = 280
+MAIN_MENU_OPTION_3_OFFSET = 320
+MAIN_MENU_SCENE_11_OFFSET = 340
+MAIN_MENU_SCENE_12_OFFSET = 380
+MAIN_MENU_SCENE_13_OFFSET = 420
+MAIN_MENU_SCENE_14_OFFSET = 460
+MAIN_MENU_SCENE_15_OFFSET = 500
+MAIN_MENU_HANGAR_BAY_BOTTOM_OFFSET = 540
+MAIN_MENU_HANGAR_INNER_BOTTOM_OFFSET = 580
+MAIN_MENU_HANGAR_MID_BOTTOM_OFFSET = 620
+MAIN_MENU_HANGAR_OUTER_BOTTOM_OFFSET = 660
+MAIN_MENU_DIVIDER_OFFSET = 700
+MAIN_MENU_HINT_OFFSET = 740
+MAIN_MENU_BOTTOM_OFFSET = 780
+MAIN_MENU_SCREEN_BYTES = 820
+
+MAIN_MENU_HANGAR_OUTER_LAST = 20
+MAIN_MENU_HANGAR_MID_LAST = 16
+MAIN_MENU_HANGAR_INNER_LAST = 12
+MAIN_MENU_HANGAR_BAY_LAST = 8
+
+MAIN_MENU_STAR_0 = MAIN_MENU_HANGAR_OUTER_TOP_OFFSET+28
+MAIN_MENU_STAR_1 = MAIN_MENU_HANGAR_BAY_TOP_OFFSET+30
+MAIN_MENU_STAR_2 = MAIN_MENU_SCENE_7_OFFSET+28
+MAIN_MENU_STAR_3 = MAIN_MENU_SCENE_9_OFFSET+37
+MAIN_MENU_STAR_4 = MAIN_MENU_SCENE_12_OFFSET+30
+MAIN_MENU_STAR_5 = MAIN_MENU_SCENE_15_OFFSET+34
+MAIN_MENU_STAR_6 = MAIN_MENU_HANGAR_OUTER_BOTTOM_OFFSET+26
 
 .segment "ZEROPAGE"
 
@@ -196,10 +271,11 @@ start:
     jsr unpack_loader_bitmap
     jsr show_loader
 
-    ; Rebuild the shared ANTIC 4 frontend/gameplay display with DMA off.
-    ; This also reclaims loader-only payload bytes in PMG alignment padding.
+    ; Rebuild the gameplay and mixed-mode frontend displays with DMA off.
+    ; This also reclaims loader-only payload bytes before Player 2 PMG data.
     jsr clear_pmg
     jsr copy_charset
+    jsr copy_frontend_charset
     jsr clear_screen
 
     lda #<display_list
@@ -251,6 +327,11 @@ start:
 
 frontend_loop:
     jsr wait_frame
+    lda game_state
+    cmp #STATE_MAIN_MENU
+    bne :+
+    jsr set_main_menu_palette      ; restore after the hint-row DLI
+:
     lda STICK0
     and #$0F
     sta stick_value
@@ -426,9 +507,21 @@ enter_frontend_state:
     lda #$00
     sta frontend_input_armed
     sta DMACTL
+    sta GRACTL
+    sta NMIEN
+    jsr select_frontend_display
     jsr render_frontend_state
     jsr wait_frame_start
-    lda #$22                    ; ANTIC 4 playfield, PMG remains disabled
+    lda #$22                    ; normal playfield; sub-screens have no PMG
+    ldx game_state
+    cpx #STATE_MAIN_MENU
+    bne :+
+    lda #$02                    ; players only; no missile DMA or graphics
+    sta GRACTL
+    lda #$80                    ; one DLI switches the ANTIC 2 hint palette
+    sta NMIEN
+    lda #MAIN_MENU_DMA          ; mixed playfield plus single-line player DMA
+:
     sta DMACTL
     rts
 
@@ -438,7 +531,9 @@ enter_exited_state:
     lda #$00
     sta DMACTL
     sta GRACTL
+    sta NMIEN
     jsr silence_audio
+    jsr select_frontend_display
     jsr render_frontend_state
     jsr wait_frame_start
     lda #$22
@@ -446,6 +541,61 @@ enter_exited_state:
 @wait:
     jsr wait_frame
     jmp @wait
+
+select_frontend_display:
+    lda #>FRONTEND_CHARSET
+    sta CHBASE
+    lda game_state
+    cmp #STATE_MAIN_MENU
+    bne @text
+
+    lda #<main_menu_display_list
+    sta DLISTL
+    lda #>main_menu_display_list
+    sta DLISTH
+    lda #<frontend_hint_dli
+    sta VDSLST
+    lda #>frontend_hint_dli
+    sta VDSLST+1
+    jmp set_main_menu_palette
+
+@text:
+    lda #<frontend_text_display_list
+    sta DLISTL
+    lda #>frontend_text_display_list
+    sta DLISTH
+    lda #$0E                    ; ANTIC 2 neutral-white luminance
+    sta COLPF1
+    lda #$00                    ; ANTIC 2 black hue/background
+    sta COLPF2
+    sta COLBK
+    rts
+
+set_main_menu_palette:
+    lda #$0E                    ; ANTIC 6/7 bank 0: cold white
+    sta COLPF0
+    lda #$84                    ; ANTIC 4 worn steel-blue structures
+    sta COLPF1
+    lda #$28                    ; ANTIC 4 amber details
+    sta COLPF2
+    lda #KAWASAKI_GREEN        ; ANTIC 6/7 bank 3: active option
+    sta COLPF3
+    lda #$00
+    sta COLBK
+    rts
+
+; The divider's DLI changes only the following ANTIC 2 hint row. The main
+; frontend loop restores the scene palette after visible DMA on every frame.
+frontend_hint_dli:
+    pha
+    lda #$00
+    sta WSYNC
+    lda #$0E
+    sta COLPF1
+    lda #$00
+    sta COLPF2
+    pla
+    rti
 
 render_frontend_state:
     lda game_state
@@ -459,6 +609,11 @@ render_frontend_state:
     sta frontend_data_ptr+1
     jsr render_frontend_data
     lda game_state
+    cmp #STATE_MAIN_MENU
+    bne :+
+    jsr draw_main_menu_scene
+    jmp update_frontend_marker
+:
     cmp #STATE_OPTIONS
     bne :+
     jsr draw_sound_value
@@ -474,6 +629,94 @@ render_frontend_state:
 @done:
     rts
 
+; Static launch-bay composition. All work happens once with DMA disabled.
+draw_main_menu_scene:
+    jsr draw_main_menu_hangar
+
+    lda #CH_FRONT_PANEL_TRUSS
+    ldx #MAIN_MENU_HANGAR_INNER_LAST
+@inner:
+    sta SCREEN+MAIN_MENU_HANGAR_INNER_TOP_OFFSET,x
+    sta SCREEN+MAIN_MENU_HANGAR_INNER_BOTTOM_OFFSET,x
+    dex
+    bpl @inner
+
+    lda #CH_FRONT_PANEL_EDGE
+    ldx #MAIN_MENU_HANGAR_BAY_LAST
+@bay:
+    sta SCREEN+MAIN_MENU_HANGAR_BAY_TOP_OFFSET,x
+    sta SCREEN+MAIN_MENU_HANGAR_BAY_BOTTOM_OFFSET,x
+    dex
+    bpl @bay
+
+    lda #CH_FRONT_PANEL_FRAME
+    sta SCREEN+MAIN_MENU_SCENE_11_OFFSET+5
+    sta SCREEN+MAIN_MENU_SCENE_13_OFFSET+2
+    sta SCREEN+MAIN_MENU_SCENE_15_OFFSET+2
+    sta SCREEN+MAIN_MENU_HANGAR_BAY_BOTTOM_OFFSET+5
+
+    lda #CH_FRONT_DOT_GRAPHIC
+    sta SCREEN+MAIN_MENU_STAR_0
+    sta SCREEN+MAIN_MENU_STAR_2
+    sta SCREEN+MAIN_MENU_STAR_4
+    sta SCREEN+MAIN_MENU_STAR_6
+    lda #CH_FRONT_STAR
+    sta SCREEN+MAIN_MENU_STAR_1
+    sta SCREEN+MAIN_MENU_STAR_3
+    sta SCREEN+MAIN_MENU_STAR_5
+
+    lda #CH_FRONT_SEPARATOR
+    ldx #39
+@divider:
+    sta SCREEN+MAIN_MENU_DIVIDER_OFFSET,x
+    dex
+    bpl @divider
+
+    lda #MAIN_MENU_PLAYER_X
+    sta HPOSP0
+    sta HPOSP3
+    lda #MAIN_MENU_PLAYER_SIZE
+    sta SIZEP0
+    sta SIZEP3
+    lda #MAIN_MENU_RED_LIGHT_X
+    sta HPOSP2
+    lda #MAIN_MENU_RED_LIGHT_BITS
+    sta PLAYER2+MAIN_MENU_RED_LIGHT_Y
+    sta PLAYER2+MAIN_MENU_RED_LIGHT_Y+1
+
+    ldy #MAIN_MENU_PLAYER_Y
+    ldx #$00
+@craft:
+    lda player_shape,x
+    sta PLAYER0,y
+    sta PLAYER0+1,y
+    lda player_engine_shape,x
+    sta PLAYER3,y
+    sta PLAYER3+1,y
+    iny
+    iny
+    inx
+    cpx #PLAYER_H
+    bne @craft
+    rts
+
+draw_main_menu_hangar:
+    lda #CH_FRONT_PANEL_SOLID
+    ldx #MAIN_MENU_HANGAR_OUTER_LAST
+@outer:
+    sta SCREEN+MAIN_MENU_HANGAR_OUTER_TOP_OFFSET,x
+    sta SCREEN+MAIN_MENU_HANGAR_OUTER_BOTTOM_OFFSET,x
+    dex
+    bpl @outer
+    lda #CH_FRONT_PANEL_FRAME
+    ldx #MAIN_MENU_HANGAR_MID_LAST
+@middle:
+    sta SCREEN+MAIN_MENU_HANGAR_MID_TOP_OFFSET,x
+    sta SCREEN+MAIN_MENU_HANGAR_MID_BOTTOM_OFFSET,x
+    dex
+    bpl @middle
+    rts
+
 render_frontend_data:
     jsr clear_screen
 @record:
@@ -487,8 +730,7 @@ render_frontend_data:
     jsr read_frontend_data
     cmp #$00
     beq @record
-    sec
-    sbc #$20
+    jsr encode_frontend_character
     ldy #$00
     sta (dst_ptr),y
     inc dst_ptr
@@ -496,6 +738,52 @@ render_frontend_data:
     inc dst_ptr+1
     jmp @text
 @done:
+    rts
+
+; Maps the limited frontend ASCII contract to compact glyph indices 0-42.
+encode_frontend_character:
+    cmp #' '
+    bne :+
+    lda #CH_FRONT_SPACE
+    rts
+:
+    cmp #'0'
+    bcc @punctuation
+    cmp #'9'+1
+    bcs @letters
+    sec
+    sbc #'0'-CH_FRONT_ZERO
+    rts
+@letters:
+    cmp #'A'
+    bcc @punctuation
+    cmp #'Z'+1
+    bcs @punctuation
+    sec
+    sbc #'A'-CH_FRONT_A
+    rts
+@punctuation:
+    cmp #'-'
+    bne :+
+    lda #CH_FRONT_DASH
+    rts
+:
+    cmp #'.'
+    bne :+
+    lda #CH_FRONT_DOT
+    rts
+:
+    cmp #'/'
+    bne :+
+    lda #CH_FRONT_SLASH
+    rts
+:
+    cmp #':'
+    bne :+
+    lda #CH_FRONT_COLON
+    rts
+:
+    lda #CH_FRONT_QUESTION
     rts
 
 read_frontend_data:
@@ -533,7 +821,11 @@ update_frontend_marker:
     clc
     adc loader_dli_phase
     tax
-    lda #CH_MENU_MARKER
+    lda #CH_FRONT_MARKER
+    cpx #$04
+    bcs :+
+    ora #ANTIC67_COLOR_PF3
+:
     jsr draw_frontend_marker
     cpx #$04
     bcs @done
@@ -557,9 +849,9 @@ draw_frontend_marker:
     sta (dst_ptr),y
     rts
 
-; Main-menu labels use duplicate A-Z glyphs whose pixels select colour 3.
-; EOR is reversible, so navigation restores the old row before highlighting
-; the new one. The ten cells following each marker cover the longest label.
+; ANTIC 6/7 colour banks live in screen-code bits 6-7. EOR is reversible, so
+; navigation restores the old row before highlighting the new one. The ten
+; cells following each marker cover the longest label.
 toggle_main_menu_highlight:
     ldy #11
 @character:
@@ -576,13 +868,13 @@ toggle_main_menu_highlight:
 draw_sound_value:
     lda sound_enabled
     beq @off
-    lda #46                     ; screen code N
+    lda #CH_FRONT_A+13          ; N
     sta SCREEN+10*40+22
     lda #CH_SPACE
     sta SCREEN+10*40+23
     rts
 @off:
-    lda #38                     ; screen code F
+    lda #CH_FRONT_A+5           ; F
     sta SCREEN+10*40+22
     sta SCREEN+10*40+23
     rts
@@ -601,7 +893,7 @@ draw_top_score_rows:
     dey
     bpl @copy
 
-    lda #CH_ZERO
+    lda #CH_FRONT_ZERO
     ldy #$00
     sta (dst_ptr),y
     iny
@@ -609,15 +901,15 @@ draw_top_score_rows:
     beq @ten
     txa
     clc
-    adc #CH_ZERO+1
+    adc #CH_FRONT_ZERO+1
     sta (dst_ptr),y
     bne @next
 @ten:
-    lda #CH_ZERO+1
+    lda #CH_FRONT_ZERO+1
     dey
     sta (dst_ptr),y
     iny
-    lda #CH_ZERO
+    lda #CH_FRONT_ZERO
     sta (dst_ptr),y
 @next:
     clc
@@ -639,6 +931,7 @@ start_gameplay:
     lda #$00
     sta DMACTL
     sta GRACTL
+    sta NMIEN
     sta gameplay_fire_gate
     jsr silence_audio
     jsr clear_pmg
@@ -650,6 +943,18 @@ start_gameplay:
     jsr update_score_display
     sta HITCLR
 
+    lda #<display_list
+    sta DLISTL
+    lda #>display_list
+    sta DLISTH
+    lda #>CHARSET
+    sta CHBASE
+
+    lda #$01                   ; undo the menu-only wide PMG craft
+    sta SIZEP0
+    sta SIZEP3
+    lda #$28                   ; restore amber gameplay telemetry
+    sta COLPF2
     lda #GAMEPLAY_COLPF3       ; restore red structural accents for gameplay
     sta COLPF3
 
@@ -703,15 +1008,15 @@ wait_frame_start:
     beq @leave_zero
     rts
 
-; The loader uses a 320x192 ANTIC F bitmap. PMG remains disabled. Two DLIs
-; switch the high-resolution foreground at exact scanline boundaries.
+; The loader uses ANTIC F for lines 0-163 and ANTIC E for the studio footer.
+; PMG remains disabled. Two DLIs switch colours at exact scanline boundaries.
 show_loader:
     lda #<loader_display_list
     sta DLISTL
     lda #>loader_display_list
     sta DLISTH
 
-    lda #$00                    ; normal CTIA/GTIA interpretation of ANTIC F
+    lda #$00                    ; normal CTIA/GTIA bitmap interpretation
     sta PRIOR
     jsr set_loader_title_palette
 
@@ -904,6 +1209,64 @@ copy_charset:
     sta CHARSET+$300,x
     inx
     bne @loop
+    rts
+
+; Builds the frontend-only 1-bit charset after the loader has released $4800.
+; Glyph sources store seven visible rows; the pre-cleared eighth row preserves
+; separation. ANTIC 4 structural glyphs are copied from the gameplay charset.
+copy_frontend_charset:
+    lda #$00
+    ldx #$00
+@clear:
+    sta FRONTEND_CHARSET+$000,x
+    sta FRONTEND_CHARSET+$100,x
+    sta FRONTEND_CHARSET+$200,x
+    sta FRONTEND_CHARSET+$300,x
+    inx
+    bne @clear
+
+    lda #<frontend_glyph_rows
+    sta src_ptr
+    lda #>frontend_glyph_rows
+    sta src_ptr+1
+    lda #<(FRONTEND_CHARSET+CH_FRONT_ZERO*8)
+    sta dst_ptr
+    lda #>(FRONTEND_CHARSET+CH_FRONT_ZERO*8)
+    sta dst_ptr+1
+    ldx #FRONTEND_GLYPH_COUNT
+@glyph:
+    ldy #$00
+@glyph_row:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    iny
+    cpy #$07
+    bne @glyph_row
+
+    clc
+    lda src_ptr
+    adc #$07
+    sta src_ptr
+    bcc :+
+    inc src_ptr+1
+:
+    clc
+    lda dst_ptr
+    adc #$08
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
+    dex
+    bne @glyph
+
+    ldx #$00
+@graphics:
+    lda CHARSET,x
+    sta FRONTEND_CHARSET+FRONTEND_GRAPHICS_BASE*8,x
+    inx
+    cpx #16*8
+    bne @graphics
     rts
 
 clear_screen:
@@ -1621,24 +1984,72 @@ charset_data:
     .byte $41,$41,$14,$04,$04,$04,$04,$00 ; Y
     .byte $55,$01,$04,$04,$10,$40,$55,$00 ; Z
 
-; Frontend data occupies otherwise-unused character slots 59 and above. The
-; game never renders those screen codes, so the fixed 1 KB charset allocation
-; doubles as compact resident storage without reserving another RAM range.
+; Frontend sources occupy otherwise-unused gameplay charset slots 59-127.
+; Forty-two 6x7 glyphs are stored as seven rows each; the runtime builder adds
+; blank eighth rows and copies ANTIC 4 structural glyphs into indices 44-59.
 frontend_charset_data:
+frontend_glyph_rows:
+    ; 1-10: digits 0-9
+    .byte $78,$CC,$DC,$EC,$CC,$CC,$78
+    .byte $30,$70,$30,$30,$30,$30,$FC
+    .byte $78,$CC,$0C,$18,$30,$60,$FC
+    .byte $F8,$0C,$0C,$78,$0C,$0C,$F8
+    .byte $18,$38,$78,$D8,$FC,$18,$18
+    .byte $FC,$C0,$F8,$0C,$0C,$CC,$78
+    .byte $78,$C0,$C0,$F8,$CC,$CC,$78
+    .byte $FC,$0C,$18,$30,$60,$60,$60
+    .byte $78,$CC,$CC,$78,$CC,$CC,$78
+    .byte $78,$CC,$CC,$7C,$0C,$0C,$78
+    ; 11-36: clean 6x7 uppercase A-Z
+    .byte $78,$CC,$CC,$FC,$CC,$CC,$CC ; A
+    .byte $F8,$CC,$CC,$F8,$CC,$CC,$F8 ; B
+    .byte $78,$CC,$C0,$C0,$C0,$CC,$78 ; C
+    .byte $F8,$CC,$CC,$CC,$CC,$CC,$F8 ; D
+    .byte $FC,$C0,$C0,$F8,$C0,$C0,$FC ; E
+    .byte $FC,$C0,$C0,$F8,$C0,$C0,$C0 ; F
+    .byte $78,$CC,$C0,$DC,$CC,$CC,$78 ; G
+    .byte $CC,$CC,$CC,$FC,$CC,$CC,$CC ; H
+    .byte $FC,$30,$30,$30,$30,$30,$FC ; I
+    .byte $3C,$0C,$0C,$0C,$0C,$CC,$78 ; J
+    .byte $CC,$D8,$F0,$E0,$F0,$D8,$CC ; K
+    .byte $C0,$C0,$C0,$C0,$C0,$C0,$FC ; L
+    .byte $CC,$FC,$FC,$DC,$CC,$CC,$CC ; M
+    .byte $CC,$EC,$FC,$DC,$CC,$CC,$CC ; N
+    .byte $78,$CC,$CC,$CC,$CC,$CC,$78 ; O
+    .byte $F8,$CC,$CC,$F8,$C0,$C0,$C0 ; P
+    .byte $78,$CC,$CC,$CC,$DC,$D8,$7C ; Q
+    .byte $F8,$CC,$CC,$F8,$D8,$CC,$CC ; R
+    .byte $7C,$C0,$C0,$78,$0C,$0C,$F8 ; S
+    .byte $FC,$30,$30,$30,$30,$30,$30 ; T
+    .byte $CC,$CC,$CC,$CC,$CC,$CC,$78 ; U
+    .byte $CC,$CC,$CC,$CC,$CC,$78,$30 ; V
+    .byte $CC,$CC,$CC,$DC,$FC,$FC,$CC ; W
+    .byte $CC,$CC,$78,$30,$78,$CC,$CC ; X
+    .byte $CC,$CC,$78,$30,$30,$30,$30 ; Y
+    .byte $FC,$0C,$18,$30,$60,$C0,$FC ; Z
+    ; 37-42: dash, dot, slash, colon, question, marker
+    .byte $00,$00,$00,$FC,$00,$00,$00
+    .byte $00,$00,$00,$00,$00,$00,$30
+    .byte $0C,$18,$18,$30,$60,$60,$C0
+    .byte $00,$30,$30,$00,$30,$30,$00
+    .byte $78,$CC,$0C,$18,$30,$00,$30
+    .byte $80,$C0,$60,$30,$60,$C0,$80
+frontend_glyph_rows_end:
+
 ; Screen stream: screen address, zero-terminated ASCII; $FF ends a screen.
 main_menu_screen_data:
-    .word SCREEN+4*40+14
+    .word SCREEN+MAIN_MENU_TITLE_OFFSET+4
     .byte "DARK FIGHTER",0
-    .word SCREEN+9*40+15
+    .word SCREEN+MAIN_MENU_OPTION_0_OFFSET+9
     .byte "START GAME",0
-    .word SCREEN+11*40+16
+    .word SCREEN+MAIN_MENU_OPTION_1_OFFSET+9
     .byte "OPTIONS",0
-    .word SCREEN+13*40+15
+    .word SCREEN+MAIN_MENU_OPTION_2_OFFSET+9
     .byte "TOP SCORES",0
-    .word SCREEN+15*40+18
+    .word SCREEN+MAIN_MENU_OPTION_3_OFFSET+9
     .byte "EXIT",0
-    .word SCREEN+21*40+14
-    .byte "FIRE SELECT",0
+    .word SCREEN+MAIN_MENU_HINT_OFFSET+7
+    .byte "UP/DOWN MOVE  FIRE SELECT",0
     .byte $FF
 
 options_screen_data:
@@ -1673,63 +2084,64 @@ ended_screen_data:
     .byte "PRESS RESET TO RESTART",0
     .byte $FF
 
-; Screen addresses for main-menu rows, options rows, and exit choices.
+; Main-menu ANTIC 6 rows, then ANTIC 2 options and exit choices.
 frontend_marker_positions:
-    .word SCREEN+9*40+13, SCREEN+11*40+14
-    .word SCREEN+13*40+13, SCREEN+15*40+16
+    .word SCREEN+MAIN_MENU_OPTION_0_OFFSET+7
+    .word SCREEN+MAIN_MENU_OPTION_1_OFFSET+7
+    .word SCREEN+MAIN_MENU_OPTION_2_OFFSET+7
+    .word SCREEN+MAIN_MENU_OPTION_3_OFFSET+7
     .word SCREEN+10*40+12, SCREEN+14*40+16
     .word SCREEN+13*40+12, SCREEN+13*40+21
 
 top_score_row_template:
-    .byte CH_ZERO,CH_ZERO,CH_SPACE,CH_SPACE
-    .byte CH_DASH,CH_DASH,CH_DASH,CH_SPACE,CH_SPACE
-    .byte CH_ZERO,CH_ZERO,CH_ZERO,CH_ZERO,CH_ZERO,CH_ZERO
+    .byte CH_FRONT_ZERO,CH_FRONT_ZERO,CH_FRONT_SPACE,CH_FRONT_SPACE
+    .byte CH_FRONT_DASH,CH_FRONT_DASH,CH_FRONT_DASH,CH_FRONT_SPACE,CH_FRONT_SPACE
+    .byte CH_FRONT_ZERO,CH_FRONT_ZERO,CH_FRONT_ZERO
+    .byte CH_FRONT_ZERO,CH_FRONT_ZERO,CH_FRONT_ZERO
 frontend_charset_data_end:
 
-    .assert frontend_charset_data_end - frontend_charset_data = 233, error, "frontend charset data size changed"
-    .repeat 71
+    .assert frontend_glyph_rows_end - frontend_glyph_rows = FRONTEND_GLYPH_COUNT*7, error, "frontend glyph source size changed"
+    .assert frontend_charset_data_end - frontend_charset_data = 541, error, "frontend compact data size changed"
+    .repeat 11
         .byte $00
     .endrepeat
 
-green_menu_charset_data:
-    ; 97-122: uppercase A-Z using pixel value 3 for COLPF3 highlighting.
-    .byte $3C,$C3,$C3,$FF,$C3,$C3,$C3,$00 ; A
-    .byte $FC,$C3,$C3,$FC,$C3,$C3,$FC,$00 ; B
-    .byte $3F,$C0,$C0,$C0,$C0,$C0,$3F,$00 ; C
-    .byte $FC,$C3,$C3,$C3,$C3,$C3,$FC,$00 ; D
-    .byte $FF,$C0,$C0,$FC,$C0,$C0,$FF,$00 ; E
-    .byte $FF,$C0,$C0,$FC,$C0,$C0,$C0,$00 ; F
-    .byte $3F,$C0,$C0,$CF,$C3,$C3,$3F,$00 ; G
-    .byte $C3,$C3,$C3,$FF,$C3,$C3,$C3,$00 ; H
-    .byte $FF,$0C,$0C,$0C,$0C,$0C,$FF,$00 ; I
-    .byte $0F,$03,$03,$03,$03,$C3,$3C,$00 ; J
-    .byte $C3,$CC,$F0,$C0,$F0,$CC,$C3,$00 ; K
-    .byte $C0,$C0,$C0,$C0,$C0,$C0,$FF,$00 ; L
-    .byte $C3,$FF,$FF,$C3,$C3,$C3,$C3,$00 ; M
-    .byte $C3,$F3,$F3,$CF,$CF,$C3,$C3,$00 ; N
-    .byte $3C,$C3,$C3,$C3,$C3,$C3,$3C,$00 ; O
-    .byte $FC,$C3,$C3,$FC,$C0,$C0,$C0,$00 ; P
-    .byte $3C,$C3,$C3,$C3,$CF,$CC,$3F,$00 ; Q
-    .byte $FC,$C3,$C3,$FC,$CC,$C3,$C3,$00 ; R
-    .byte $3F,$C0,$C0,$3C,$03,$03,$FC,$00 ; S
-    .byte $FF,$0C,$0C,$0C,$0C,$0C,$0C,$00 ; T
-    .byte $C3,$C3,$C3,$C3,$C3,$C3,$3C,$00 ; U
-    .byte $C3,$C3,$C3,$C3,$C3,$3C,$0C,$00 ; V
-    .byte $C3,$C3,$C3,$FF,$FF,$FF,$C3,$00 ; W
-    .byte $C3,$C3,$3C,$0C,$3C,$C3,$C3,$00 ; X
-    .byte $C3,$C3,$3C,$0C,$0C,$0C,$0C,$00 ; Y
-    .byte $FF,$03,$0C,$0C,$30,$C0,$FF,$00 ; Z
-green_menu_charset_data_end:
+    .assert * - charset_data = $400, error, "gameplay charset image must remain 1024 bytes"
 
-    .repeat 40
-        .byte $00
+; Main menu: one 16-scanline ANTIC 7 title plus twenty-two 8-scanline rows.
+; Cumulative screen offsets are documented by MAIN_MENU_*_OFFSET constants.
+main_menu_display_list:
+    .byte $70,$70,$70
+    .byte $47,<SCREEN,>SCREEN      ; ANTIC 7 title, 20 B
+    .byte $04,$04,$04             ; upper ANTIC 4 hangar, 40 B each
+    .byte $06                     ; START GAME, 20 B
+    .byte $04                     ; ANTIC 4 bay, 40 B
+    .byte $06                     ; OPTIONS, 20 B
+    .byte $04                     ; ANTIC 4 scene, 40 B
+    .byte $06                     ; TOP SCORES, 20 B
+    .byte $04                     ; ANTIC 4 scene, 40 B
+    .byte $06                     ; EXIT, 20 B
+    .repeat 9
+        .byte $04                 ; lower ANTIC 4 scene, 40 B
     .endrepeat
+    .byte $84                     ; divider + DLI before neutral hint palette
+    .byte $02                     ; 40-column ANTIC 2 control hint
+    .byte $04                     ; black breathing-space row
+main_menu_display_list_jvb:
+    .byte $41
+    .word main_menu_display_list
 
-    .assert green_menu_charset_data - charset_data = 97*8, error, "green menu glyphs must start at character 97"
-    .assert green_menu_charset_data_end - green_menu_charset_data = 26*8, error, "green menu alphabet size changed"
+; Text-heavy sub-screens use the same readable 1-bit frontend charset.
+frontend_text_display_list:
+    .byte $70,$70,$70
+    .byte $42,<SCREEN,>SCREEN      ; ANTIC 2 + LMS
+    .repeat 23
+        .byte $02
+    .endrepeat
+    .byte $41
+    .word frontend_text_display_list
 
-    .assert * - charset_data = $400, error, "ANTIC 4 charset must be 1024 bytes"
-
+; Gameplay remains byte-for-byte compatible with the accepted ANTIC 4 view.
 display_list:
     .byte $70,$70,$70              ; 24 blank scan lines
     .byte $44,<SCREEN,>SCREEN      ; ANTIC 4 + LMS
@@ -1737,5 +2149,7 @@ display_list:
         .byte $04
     .endrepeat
     .byte $41,<display_list,>display_list
+
+    .assert MAIN_MENU_SCREEN_BYTES <= $400, error, "main-menu screen data exceeds shared buffer"
 
 .include "loader-screen.inc"

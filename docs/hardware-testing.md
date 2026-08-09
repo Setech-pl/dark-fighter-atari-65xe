@@ -25,11 +25,22 @@
 - menu nie uruchamia gameplayu samoczynnie;
 - `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` są czytelne i występują
   w tej kolejności, a domyślny marker wskazuje `START GAME`;
+- duży, czytelny `DARK FIGHTER` zajmuje górną część ekranu; kątowy hangar i
+  jasny Viper z bursztynowym silnikiem są po lewej, a czytelne opcje po prawej;
+- marker i cały aktywny napis mają ten sam nasycony zielony akcent `$D8`, bez
+  zielonego prostokąta tła; nie wpadają w żółć ani pomarańcz;
+- main menu nie zawiera `SETECH GAME STUDIO`; podpis pozostaje wyłącznie na
+  loaderze, gdzie ma jasnozielone litery na rzeczywiście czarnym tle;
+- biały hint `UP/DOWN MOVE  FIRE SELECT` pozostaje czytelny i nie barwi tła;
+- hangar, gwiazdy i myśliwiec są stabilne bez animacji, migotania i uszkodzeń
+  display listy; menu nie zawiera `BSG 75` ani skopiowanych insygniów;
 - pojedyncze wychylenie UP/DOWN przesuwa marker dokładnie raz, wybór zawija się
   między pierwszą i ostatnią pozycją, a trzymanie kierunku nie autorepeatuje;
 - FIRE wybiera dokładnie raz i wymaga puszczenia przed kolejną akcją;
 - `OPTIONS` pozwala zmienić `SOUND: ON/OFF` przez LEFT/RIGHT lub FIRE, `BACK`
   wraca do menu, a wybór pozostaje zachowany po ponownym wejściu;
+- myśliwiec z hangaru znika w `OPTIONS`, `TOP SCORES`, potwierdzeniu `EXIT`
+  oraz ekranie końcowym i wraca dopiero po ponownym wejściu do main menu;
 - przy SOUND OFF strzał, trafienie i tło silnika są niesłyszalne, kanały nie
   zostawiają zawieszonego tonu, a obraz i sterowanie zachowują timing;
 - `TOP SCORES` pokazuje dziesięć wierszy `01`–`10`; pierwszy FIRE po wejściu

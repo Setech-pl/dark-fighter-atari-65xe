@@ -6,12 +6,12 @@
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 54,
-  "payloadBytes": 6911,
+  "bootSectors": 59,
+  "payloadBytes": 7481,
   "loaderScreen": {
-    "mode": "ANTIC F",
+    "mode": "mixed ANTIC F/E",
     "source": "assets/graphics/loader-bitmap.json",
-    "sourceSha256": "fb211678ed56361530e2d81c4fd5085d36a4f253152c5597e565c289043a4f6b",
+    "sourceSha256": "c83b4d59818553807c91d69e1e93e0d79aafe583427e31693c33ba264062f9ac",
     "referenceSha256": "da740dc90db7b2822d73a8aa191c364e523cd0c65b669a2664b5923e83960036",
     "width": 320,
     "height": 192,
@@ -26,16 +26,16 @@
   },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 6911,
-      "sha256": "6adcfc522861cd5759102a085ba57d0c1cd57d927c31404274d3d27981a3605e"
+      "bytes": 7481,
+      "sha256": "a1b3278919b0ccbd18203341f79a643a124de97f32117d24238a2d8257de40fc"
     },
     "dark-fighter.xex": {
-      "bytes": 6923,
-      "sha256": "0ffb01addb84e0720305da87db774a1f721da4ca5c314d486034fa5a58633647"
+      "bytes": 7493,
+      "sha256": "f0f5a7fc860975cf71463cf8fbb32b1b609e4b821a14131fff690e555bd801dc"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "81fa247a6d9719bef7f1643ac0961f32d981343ffc114af6bbb81298a7139fd6"
+      "sha256": "c11ac3dca8627525bd8eea8a5a0484ac37325028e4e45a7a4334ff2e1829b1ae"
     }
   }
 }
