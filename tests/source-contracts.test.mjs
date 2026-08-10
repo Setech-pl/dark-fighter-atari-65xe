@@ -13,8 +13,12 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.match(source, /SCREEN\s*=\s*\$4000/);
   assert.match(source, /CHARSET\s*=\s*\$4400/);
   assert.match(source, /FRONTEND_CHARSET\s*=\s*\$4800/);
+  assert.match(source, /HUD_CHARSET\s*=\s*\$5000/);
   assert.match(source, /sta CHBASE/);
-  assert.match(source, /\.byte \$44,<SCREEN,>SCREEN\s+; ANTIC 4 \+ LMS/);
+  assert.match(source, /\.byte \$42,<SCREEN,>SCREEN\s+; ANTIC 2 HUD \+ LMS/);
+  assert.match(source, /\.byte \$82\s+; ANTIC 2 divider \+ DLI/);
+  assert.match(source, /\.repeat 21\s+\.byte \$04\s+\.endrepeat/);
+  assert.match(source, /\.byte \$84\s+; final ANTIC 4 row \+ DLI/);
   assert.match(source, /\.byte \$47,<SCREEN,>SCREEN\s+; ANTIC 7 title/);
   assert.match(source, /\.byte \$02\s+; 40-column ANTIC 2 control hint/);
   assert.match(source, /lda #\$3E\s+; normal playfield, single-line PMG DMA/);
@@ -26,7 +30,9 @@ test("accepted gameplay screen reference and its mapping decision are versioned"
   assert.ok(fs.existsSync(path.join(rootDirectory, "docs", "decisions", "ADR-002-gameplay-screen.md")));
 });
 
-test("linker allows loader-only PMG tail but protects Player 2", () => {
+test("linker allows loader-only PMG tail but protects screen memory", () => {
   const config = fs.readFileSync(path.join(rootDirectory, "cfg", "atari-boot.cfg"), "utf8");
-  assert.match(config, /MAIN: start = \$2000, size = \$1E00/);
+  assert.match(config, /MAIN:\s+start = \$2000, size = \$2000/);
+  assert.match(config, /BOOTTAIL:\s+start = \$4000/);
+  assert.match(config, /BROADSIDE_RAM:\s+start = \$5E10/);
 });

@@ -14,6 +14,10 @@ const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
+const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json")));
+const broadsideRuntime = fs.readFileSync(
+  path.join(rootDirectory, "build", "broadside-runtime.bin"),
+);
 const labels = new Map(
   fs
     .readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -32,6 +36,12 @@ function readXexBytes(address, length) {
     address - segment.start,
     address - segment.start + length,
   );
+}
+
+function readBroadsideRuntimeBytes(address, length) {
+  const offset = address - manifest.broadsideRuntime.runAddress;
+  assert.ok(offset >= 0 && offset + length <= broadsideRuntime.length);
+  return broadsideRuntime.subarray(offset, offset + length);
 }
 
 function routine(label) {
@@ -72,7 +82,7 @@ test("main menu labels are exact, ordered, and default to START GAME", () => {
     ["DARK FIGHTER", 4, 0],
   );
   assert.equal(frontend.defaultSelection, 0);
-  assert.equal(frontend.markerAddresses.length, 8);
+  assert.equal(frontend.markerAddresses.length, 9);
 });
 
 test("frontend uses distinct clean 6x7 glyphs within ANTIC 6/7 indices", () => {
@@ -172,6 +182,41 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
     /lda sound_enabled[\s\S]+jsr silence_audio\s+jmp @damage/,
     "SOUND OFF must preserve the gameplay damage-flash update",
   );
+});
+
+test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => {
+  const constants = readFrontendGraphicsSource(source).constants;
+  const difficultyAddress = constants.get("DIFFICULTY_SETTING");
+  assert.equal(difficultyAddress, 0x4e70);
+  assert.deepEqual(
+    [constants.get("DIFFICULTY_EASY"), constants.get("DIFFICULTY_MEDIUM"),
+      constants.get("DIFFICULTY_HARD"), constants.get("DIFFICULTY_DEFAULT")],
+    [0, 1, 2, 1],
+  );
+  assert.match(source, /options_screen_data:[\s\S]+"SOUND: OFF"[\s\S]+"DIFFICULTY: MEDIUM"[\s\S]+"BACK"/);
+  assert.match(routine("handle_options_input"), /jmp handle_options_input_resident/);
+  assert.match(routine("handle_options_input_resident"),
+    /ldx #\$02[\s\S]+beq @sound_row[\s\S]+beq @difficulty_row[\s\S]+jmp enter_main_menu/);
+  assert.match(routine("handle_options_input_resident"),
+    /and #\$04[\s\S]+select_previous_difficulty[\s\S]+and #\$08[\s\S]+select_next_difficulty/);
+  assert.match(routine("select_previous_difficulty"),
+    /lda DIFFICULTY_SETTING[\s\S]+lda #DIFFICULTY_HARD[\s\S]+sbc #\$01/);
+  assert.match(routine("select_next_difficulty"),
+    /cmp #DIFFICULTY_HARD[\s\S]+lda #DIFFICULTY_EASY[\s\S]+adc #\$01/);
+  assert.match(routine("set_difficulty"), /sta DIFFICULTY_SETTING[\s\S]+jmp draw_difficulty_value/);
+  assert.match(routine("render_frontend_state"),
+    /jsr draw_sound_value[\s\S]+jsr draw_difficulty_value[\s\S]+jmp update_frontend_marker/);
+
+  const startBytes = readXexBytes(labels.get("start"), 160);
+  assert.notEqual(startBytes.indexOf(Buffer.from([
+    0xa9, 0x01, 0x8d, difficultyAddress & 0xff, difficultyAddress >> 8,
+  ])), -1, "boot must store MEDIUM in persistent RAM");
+  const setBytes = readBroadsideRuntimeBytes(labels.get("set_difficulty"), 6);
+  assert.deepEqual([...setBytes.subarray(0, 3)], [
+    0x8d, difficultyAddress & 0xff, difficultyAddress >> 8,
+  ]);
+  assert.doesNotMatch(routine("enter_frontend_state"), /DIFFICULTY_SETTING/);
+  assert.doesNotMatch(routine("init_state"), /DIFFICULTY_SETTING/);
 });
 
 test("TOP SCORES renders exactly ten default rows and returns only on FIRE", () => {
@@ -292,30 +337,36 @@ test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => 
 
 test("frontend charset and transient loader tail stay in their bounded ranges", () => {
   const charsetStart = labels.get("charset_data");
-  const frontendStart = labels.get("frontend_charset_data");
-  const frontendEnd = labels.get("frontend_charset_data_end");
+  const hullGlyphStart = labels.get("capital_hull_glyphs");
+  const frontendStart = labels.get("frontend_glyph_source");
+  const frontendEnd = labels.get("frontend_glyph_rows_end");
+  const charsetEnd = labels.get("charset_data_end");
   assert.ok(Number.isInteger(charsetStart));
-  assert.ok(frontendStart >= charsetStart + 59 * 8);
-  assert.ok(frontendEnd <= charsetStart + 0x400);
+  assert.equal(hullGlyphStart, charsetStart + 59 * 8);
+  assert.ok(frontendStart > hullGlyphStart);
+  assert.ok(frontendEnd <= charsetEnd);
+  assert.equal(charsetEnd, charsetStart + 0x400);
 
   const rodata = /RODATA\s+([0-9A-F]+)\s+([0-9A-F]+)\s+([0-9A-F]+)/i.exec(map);
   const zeroPage = /ZEROPAGE\s+([0-9A-F]+)\s+([0-9A-F]+)\s+([0-9A-F]+)/i.exec(map);
   assert.ok(rodata);
   assert.ok(zeroPage);
-  assert.ok(Number.parseInt(rodata[2], 16) < 0x3e00);
+  assert.ok(Number.parseInt(rodata[2], 16) < 0x4000);
   assert.ok(Number.parseInt(zeroPage[2], 16) < 0x0100);
   assert.ok(labels.get("draw_main_menu_hangar") < charsetStart);
   assert.ok(labels.get("frontend_glyph_rows") >= frontendStart);
   assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_packbits"));
-  assert.ok(labels.get("loader_bitmap_packbits") < 0x3c00);
-  assert.ok(labels.get("loader_display_list") >= 0x3c00);
-  assert.ok(labels.get("loader_display_list") < 0x3e00);
+  assert.ok(labels.get("loader_bitmap_packbits") < labels.get("loader_display_list"));
+  assert.ok(labels.get("loader_display_list") < 0x4000);
 
   const constants = readFrontendGraphicsSource(source).constants;
   assert.equal(constants.get("SCREEN"), 0x4000);
   assert.equal(constants.get("CHARSET"), 0x4400);
   assert.equal(constants.get("FRONTEND_CHARSET"), 0x4800);
   assert.equal(constants.get("FRONTEND_CHARSET") - constants.get("CHARSET"), 0x400);
+  assert.equal(constants.get("CAPITAL_HULL_RUNTIME_ALLIED"), 0x4c00);
+  assert.equal(constants.get("CAPITAL_HULL_RUNTIME_ENEMY"), 0x4d20);
+  assert.equal(constants.get("CAPITAL_HULL_RUNTIME_END"), 0x4e40);
   assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_frontend_charset/);
 });
 
@@ -427,11 +478,15 @@ test("menu PMG craft is bounded, main-menu-only, and gameplay setup is restored"
   assert.equal(hardwareState.get("SIZEP0"), 1);
   assert.equal(hardwareState.get("SIZEP3"), 1);
   assert.equal(hardwareState.get("COLPF2"), 0x28);
-  assert.equal(hardwareState.get("COLPF3"), 0x46);
+  assert.equal(hardwareState.get("COLPF3"), 0x44);
   assert.match(routine("start_gameplay"), /jsr clear_pmg/);
   assert.match(
     routine("start_gameplay"),
-    /sta NMIEN[\s\S]+lda #<display_list[\s\S]+sta DLISTL[\s\S]+lda #>CHARSET[\s\S]+sta CHBASE/,
+    /sta NMIEN[\s\S]+lda #<display_list[\s\S]+sta DLISTL[\s\S]+lda #<gameplay_dli[\s\S]+lda #>HUD_CHARSET[\s\S]+sta CHBASE/,
+  );
+  assert.match(
+    routine("gameplay_dli"),
+    /lda #>CHARSET[\s\S]+sta CHBASE[\s\S]+lda #>HUD_CHARSET[\s\S]+sta CHBASE/,
   );
   assert.match(
     routine("select_frontend_display"),

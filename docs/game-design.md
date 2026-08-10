@@ -98,11 +98,21 @@ W sektorze bitwy:
 Kolizje burtowe mają wynikać z jednej spójnej symulacji, a nie z osobnych
 efektów dekoracyjnych dla każdej frakcji.
 
+Bieżący pierwszy sektor jest skończonym przelotem 240 wierszy na okręt od rufy
+do dziobu: `ENGINES 32`, `AFT 24`, `COMBAT 128`, `FORWARD 24`, `PROW 32`. Strony mają
+stałe przesunięcie treści o osiem wierszy, lecz wspólne tempo. Funkcjonalne
+baterie występują wyłącznie w combat, a jego ostatnie osiem wierszy nie
+rozpoczyna nowej salwy. Po zejściu terminalnych tips `DRAIN` pozwala dokończyć
+już aktywne warningi, flashes, M1–M3 i 24-ramkowe eksplozje kadłuba, po czym udostępnia `COMPLETE` przyszłemu
+encounter director. Nie dodaje jeszcze komunikatu, bonusu ani następnego
+sektora.
+
 **PLANNED**
 
-Kadłuby będą przede wszystkim tłem znakowym i mają używać powtarzalnych,
-przewijanych segmentów: normalnego pancerza, uszkodzonego pancerza, płonącego
-pancerza, baterii broni, błysku wylotowego i trafienia. PMG pozostaje przede
+Kadłuby są przede wszystkim tłem znakowym i używają powtarzalnych,
+przewijanych modułów: pancerza, prow, aft machinery, banków silników, baterii
+broni i błysku wylotowego. Uszkodzony/płonący pancerz pozostaje planowany.
+PMG pozostaje przede
 wszystkim dla ruchomych myśliwców, pocisków, akcentów oraz efektów, gdzie daje
 największą korzyść.
 
@@ -307,11 +317,22 @@ neutralnym puszczeniem, więc przytrzymany kierunek nie wykonuje autorepeatu,
 a FIRE nie przechodzi na następny ekran ani do pierwszego strzału w gameplayu.
 Gameplay i jego timery nie działają w stanach frontendu.
 
-`OPTIONS` zawiera wyłącznie `SOUND: ON/OFF` oraz `BACK`. Dźwięk jest domyślnie
-włączony po bootowaniu, wybór pozostaje w RAM podczas bieżącej sesji i nie musi
-przetrwać RESET ani wyłączenia zasilania. UP/DOWN wybiera wiersz, LEFT/RIGHT
-lub FIRE przełącza SOUND, a FIRE na `BACK` wraca do menu. OFF wycisza wszystkie
-kanały POKEY.
+`OPTIONS` zawiera `SOUND: ON/OFF`, `DIFFICULTY: EASY/MEDIUM/HARD` oraz `BACK`.
+Dźwięk jest domyślnie włączony, trudność domyślnie ma wartość `MEDIUM`, a oba
+ustawienia pozostają w RAM podczas sesji i nie muszą przetrwać RESET ani
+wyłączenia zasilania. UP/DOWN wybiera wiersz, LEFT/RIGHT zawija trudność między
+trzema wartościami, a FIRE na `BACK` wraca do menu. Trudności nie można
+zmieniać podczas aktywnego gameplayu. OFF wycisza wszystkie kanały POKEY.
+
+Trudność ustala pełnowierszowy ruch świata: `EASY` to dokładnie 20
+wierszy/160 scanlines na sekundę, `MEDIUM` 22,5/180, a `HARD` 25/200.
+Side hulls używają osobnego akumulatora z tymi samymi licznikami i mianownikiem
+40, więc poruszają się dokładnie o połowę wolniej: odpowiednio 10/80,
+11,25/90 i 12,5/100. `EASY` jest 80% prędkości `HARD`. Harmonogram broadside,
+25-ramkowy warning, prędkość pocisków, sterowanie i kolizje pozostają oparte
+na ramkach PAL i nie są skalowane przez ten wybór. `HARD` pozostawia
+zaakceptowaną prędkość świata, a tylko masa capital ships otrzymuje wolniejszy
+strumień wzdłużny.
 
 `TOP SCORES` pokazuje dziesięć ponumerowanych wierszy domyślnej tabeli
 `--- 000000`. FIRE wraca do menu. Tabela nie jest jeszcze połączona z wynikami

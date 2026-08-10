@@ -61,16 +61,18 @@ ich rozdzielenie i jasność są odwzorowane kształtem oraz ditheringiem.
 ## Pamięć i czas
 
 Surowa bitmapa zajmuje 7680 B pod `$4010-$5E0F`; bieżący strumień PackBits ma
-3370 B pod `$2F45-$3C6E`, a loader display list leży pod `$3C6F-$3D38`.
-Może przejściowo używać części stron P0/P1, ponieważ PMG i jego DMA są wtedy
-wyłączone. Build bezwzględnie odrzuca wejście w Player 2 od `$3E00`.
+3370 B pod `$31FD-$3F26`, a loader display list leży pod `$3F27-$3FF0`.
+Może przejściowo używać stron przyszłego PMG, ponieważ PMG i jego DMA są wtedy
+wyłączone. Build bezwzględnie odrzuca wejście w ekran od `$4000`.
 Rozwinięcie odbywa się przy wyłączonym DMA i kończy dokładnie pod `$5E0F`.
 
 Po loaderze program wyłącza DMA/DLI i zeruje całe `$3800-$3FFF`, zanim
 `$3B00-$3FFF` otrzyma role aktywnego PMG. Odzyskuje `$4000-$43FF` jako ekran,
 `$4400-$47FF` jako gameplay charset i `$4800-$4BFF` jako frontend charset.
-Gameplay display list nie wskazuje pozostałych bajtów `$4C00-$5E0F`. DLI
-loadera zostaje usunięte, więc loader dodaje 0 cykli do gameplay main loop/VBI.
+Po `START GAME` `$4C00-$4E3F` przechowuje rozwinięte mapy bocznych kadłubów;
+gameplay display list nadal nie wskazuje pozostałych bajtów `$4E40-$5E0F`.
+DLI loadera zostaje usunięte, więc loader dodaje 0 cykli do gameplay main
+loop/VBI.
 
 ## Konsekwencje
 

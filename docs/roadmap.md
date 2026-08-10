@@ -337,24 +337,49 @@ korytarza na liczbę obiektów oraz kolizje.
 Bez finalnych hull tiles capital ships, broadside, trafień kadłuba, weapon
 batteries, advanced enemies i mid-game disk access.
 
-## 9. Przewijane side-hull segments i przejścia visual
+## 9. Przewijane side-hull segments i przejścia visual — baza grafiki i danych gotowa do akceptacji
 
 ### Zakres
 
-- character-mode Battlestar segments po lewej;
-- character-mode Cylon capital-ship segments po prawej;
-- normal, damaged, burning, weapon, muzzle-flash i impact states jako
-  współdzielone lub komponowane segmenty;
-- przewijane wejście/wyjście zsynchronizowane z sector controller;
+- oryginalny character-mode `allied_line_hull` po lewej;
+- oryginalny character-mode `enemy_void_hull` po prawej;
+- 32-wierszowe, różne moduły źródłowe, kontury 5/6/7/8 komórek i układ nominalny
+  `8 + 24 + 8`;
+- siedem dużych, cyklicznych przejść inner-edge na każdą stronę, ze stałą
+  głębokością utrzymywaną przez 2–8 wierszy; lokalne cofnięcia o jedną
+  komórkę zwiększają profil bez równomiernego poszerzenia obu ścian;
+- allied plates o typowym rozmiarze 2–4 komórki × 3–6 wierszy oraz enemy slabs
+  bez powtarzalnej diagonalnej siatki;
+- po dwie kompletne baterie na stronę z rekordami muzzle position;
+- jawny routing ANTIC 4: allied armour przez `COLPF1=$84`, enemy armour przez
+  D7=1 i `COLPF3=$44`, z review identycznych pikseli także przy `$46`;
+- skończony ciąg `ENGINES/AFT/COMBAT/FORWARD/PROW = 32/24/128/24/32` z
+  osobnymi rodzinami obu stron; lewa strona prowadzi prawą o 8 wierszy bez
+  osobnego tempa;
+- muzzle flash i engine glow jako współdzielone/komponowane glify; damaged i
+  burning pozostają przyszłymi stanami;
+- final-art candidate: dwa ciągłe, wielokomórkowe rdzenie lewej rufy i dwa
+  szersze kanciaste rdzenie prawej, trzy fazy co 8 ramek bez checkerboardu;
+  oba prows używają odrębnych profili 8→1 z częściową krawędzią i terminal tip;
+- zwykły P1/P2 fighter ma 16 HPOS szerokości i jeden kontrakt `[80,176)` dla
+  spawn, steering i render clamp, więc nie nachodzi na side hull;
+- przewijane wejście, 22-wierszowy drain i jawny `COMPLETE` zsynchronizowane z
+  sector controller;
 - source assets i deterministyczna konwersja/podgląd.
 
 ### Zależności
 
-Kamień 8 i wynik testu układu korytarza.
+Baza wizualna działa w skończonym korytarzu vertical slice. Obecny controller
+udostępnia stan `COMPLETE`; późniejszy encounter director nadal musi zdecydować
+o zapowiedzi, bonusie i przejściu do następnego sektora.
 
 ### Kryteria akceptacji
 
 - strony i frakcje pozostają czytelne na realnym sygnale PAL;
+- owner akceptuje `gameplay-screen.png` i pełny `capital-hulls-strip.png`;
+- każda mapa ma 32 wiersze, nie jest lustrem drugiej i ma co najmniej dwie
+  kompletne baterie;
+- nominalne 24 komórki walki nie spadają poniżej 23 w aktualnym segmencie;
 - segmenty nie nadpisują HUD-u ani aktywnych PMG;
 - normal/damaged/burning różnią się bez polegania na pojedynczym niestabilnym
   kolorze;
@@ -365,27 +390,51 @@ Kamień 8 i wynik testu układu korytarza.
 
 Pełna karta dowodów oraz liczba znaków/tiles, charset pressure, rozmiar map
 segmentów, koszt przewijania najgorszej ramki, częstotliwość aktualizacji
-animacji i ewentualny koszt DLI. PMG pozostaje osobnym, jawnym budżetem.
+animacji i ewentualny koszt DLI. Bieżące źródło ma 31 glifów/248 B, 320 B
+pakowanych map, 32 B codebooków, 14 B metadanych, 8 B harmonogramu, 268 B
+modułów/sekwencji/masek, 128 B profili/granic prow oraz 576 B map runtime.
+Nie przechowuje surowej mapy
+240×16.
+Po korekcie pacingu world i hull używają osobnych bounded kopii: world event
+kosztuje konserwatywnie około 15 300 cykli i występuje 20/22,5/25 razy na
+sekundę, hull event około 11 600 cykli i występuje 10/11,25/12,5 razy na
+sekundę. PMG pozostaje bez zmian; dwa gameplay DLI należą wyłącznie do
+mieszanej warstwy HUD z kamienia 11.
 
 ### Wykluczenia
 
-Bez aktywnego broadside damage, crossfire, destructible batteries i bossa.
-Capital hulls nie są implementowane głównie jako PMG.
+Destructible batteries, boss, damage/burning decals, komunikat sector clear,
+bonus i wybór następnego sektora pozostają późniejszą pracą.
 
-## 10. Broadside, crossfire i trafienia kadłubów
+## 10. Broadside, crossfire i trafienia kadłubów — kandydat gameplay gotowy do akceptacji
 
 ### Zakres
 
-- capital-ship controller dla czasowych salw;
-- heavy projectile slots i czytelne linie ognia;
+- source-derived controller dla deterministycznych salw;
+- M0 pozostaje pociskiem gracza, a M1–M3 tworzą stałą pulę heavy projectile;
+- 25-ramkowe warningi compact/medium/hot przy rzeczywistych wylotach i
+  czytelne linie ognia;
 - wspólne collision/damage resolution dla Vipera, Cylon fighters
   i przeciwnego capital ship;
+- source-derived kontakt Vipera z nieregularną krawędzią obu kadłubów,
+  clamp P0/P3 oraz wspólny 25-ramkowy damage cooldown;
 - brak faction immunity;
-- impact states i możliwość zwabienia przeciwnika w ogień burtowy.
+- pięcioramkowe impact states, 20 punktów damage gracza i możliwość zwabienia
+  przeciwnika w ogień burtowy;
+- 3/4-scanline bitmapowy puls lecącego sluga w starej obwiedni i czteroramkowy
+  niekolizyjny flash przy realnym wylocie;
+- skończony 240-wierszowy sektor od banków silników do terminalnych bow tips,
+  z combat-only batteries, `DRAIN` i deterministycznym `COMPLETE`;
+- dwa 24-ramkowe, hull-attached czerwone impact overlays 3×3 oraz
+  deterministyczny POKEY channel-4 crack/rumble tylko dla trafienia przeciwnego kadłuba;
+- saturating hit counters obu kadłubów bez ich zniszczenia w tym kamieniu.
 
 ### Zależności
 
-Kamienie 8–9 oraz istniejący model obrażeń.
+Zaakceptowana przez ownera baza grafiki i muzzle metadata z kamienia 9.
+Bieżący vertical slice nie miał pełnego modelu obrażeń, dlatego ten kamień
+dodaje tylko minimalny licznik 100–0 i deterministyczny powrót do istniejącego
+menu. Sektor udostępnia czysty stan `COMPLETE` przyszłemu encounter director.
 
 ### Kryteria akceptacji
 
@@ -393,21 +442,92 @@ Kamienie 8–9 oraz istniejący model obrażeń.
 - wynik zależy od danych kolizji, nie od przypadkowej kolejności procedur;
 - ostrzeżenie pozostawia osiągalną reakcję;
 - cooldown/exclusion nie pozwala broadside zablokować jedynej drogi ucieczki;
-- trafienie przeciwnego kadłuba kończy pocisk i uruchamia właściwy impact
-  state.
+- trafienie przeciwnego kadłuba kończy pocisk, uruchamia dokładnie jeden duży
+  impact i dokładnie jeden SFX bez zmiany collision envelope;
+- `EASY/MEDIUM/HARD` przesuwają pełny wiersz dokładnie 8/9/10 razy na 20
+  ramek (160/180/200 scanlines/s); `HARD` zachowuje zaakceptowany szybki
+  kandydat, warning nie ma niewidocznej fazy, a gwiazdy nie wywołują kontaktu;
+- osobny hull stream wykonuje w długim oknie dokładnie połowę tych zdarzeń
+  (80/90/100 scanlines/s), bez zmiany ruchu świata, fighterów i pocisków;
+- segment zawiera po jednej funkcjonalnej baterii na stronę zamiast dwóch,
+  usunięte pozycje mają nieinteraktywną strukturę, a scheduler wybiera
+  najstarszy bezpieczny widoczny emplacement żądanej strony;
+- scheduler pracuje w ramkach PAL niezależnie od scrollu i nadal używa
+  odstępów 68/126/68/138. W pojedynczym skończonym sektorze realizuje
+  po cztery warningi i launchy na każdym poziomie trudności, po czym
+  `DRAIN` blokuje nowe źródła bez anulowania rozpoczętych efektów.
 
 ### Dowody pamięci i wydajności
 
-Pełna karta dowodów oraz limit heavy shots, koszt pełnej macierzy kolizji,
-koszt broadside warning/salvo, liczba jednoczesnych impact effects i osobny
-pomiar najgorszego zbiegu fali, debris oraz salwy.
+Limit wynosi trzy sloty; stan i scratch zajmują 48 B bez nowego zero page.
+Trudność zajmuje 1 B odzyskanego RAM, a tabela rates 3 B.
+Harmonogram ma 8 B, maski missile 6 B, tabele szerokości 6 B, offsety rekordów
+2 B, dwa rekordy wylotów 14 B, 6 B stawek world/hull, 3 B granic bezpiecznego
+warningu, a wygenerowane granice kontaktu 64 B. Runtime broadside wraz z
+procedurami HUD, sektora, eksplozji i POKEY zajmuje 4605 B w odzyskanym RAM,
+a jego 3749-bajtowy pakowany ogon daje payload 11 941 B. Rozdzielenie scrollu
+dodało 47 B resident state i 560 B payloadu względem kandydata 9834 B;
+eksplozje i audio dodały 27 B trwałego stanu. Detektor z
+clampem ma około 333 cykli, a konserwatywny worst case systemu broadside około
+1795–1820 cykli na ramkę. VBI ma delta 0; dwa gameplay DLI HUD-u dodają
+121 cykli ciał rutyn na ramkę bez `WSYNC` (konserwatywnie do 349).
+Rozdzielone bounded kopie kosztują około 15 300 cykli dla world eventu i
+około 12 050 dla hull eventu z lookupem modułu; konserwatywny wspólny worst
+case z trzema slotami, flashami, dwiema eksplozjami, POKEY, kolizją, profilem
+prow i clampem to około 32 950 cykli. Zero-page delta wynosi 0 B.
 
 ### Wykluczenia
 
-Bez destructible weapon batteries jako wymagania, advanced enemies, bossa,
-overlayów i ładowania sektorów z dysku.
+Bez guided rockets, permanent damage decals, destrukcji capital
+ship, komunikatu/bonusu zakończenia poziomu, destructible weapon batteries,
+advanced enemies, bossa, overlayów i ładowania sektorów z dysku.
 
-## 11. Zaawansowani enemies: Minelayer, Rammer, Heavy i Ace
+### Opcjonalny późniejszy pass różnorodności wizualnej kadłubów
+
+Po akceptacji mechaniki można osobno rozważyć więcej wymiennych sekcji,
+mniej oczywistą repetycję, dodatkowe plate breaks, maintenance bays i damaged
+bands, kolejne sylwetki emplacementów oraz lokalną aktywność impact/muzzle.
+Jest to opcjonalny polish, nie potwierdzony defekt mechaniki. Nie uzasadnia
+zmiany z ANTIC 4 wyłącznie dla dekoracji i nie jest częścią bieżącej korekty.
+
+## 11. Czytelny HUD ANTIC 2 i nowy font — kandydat gotowy do akceptacji
+
+### Zakres
+
+- dwa kompletne 40-kolumnowe wiersze HUD ANTIC 2 nad zachowanymi 22 wierszami
+  playfieldu ANTIC 4;
+- dedykowany 1024-bajtowy charset `$5000-$53FF`, budowany z czystych glifów
+  6×7 przy wyłączonym DMA;
+- tekstowe `SCORE`, `FUEL`, `ARM` i `LIFE` pozostają na bieżących pozycjach,
+  a dynamiczne score i zdrowie `100/080/060/040/020/000` są kodami znaków w
+  screen RAM; kanoniczne nazewnictwo `HULL` pozostaje późniejszą decyzją UI;
+- dwa ograniczone DLI przełączają `CHBASE=$50/$44` oraz paletę dokładnie na
+  granicach HUD/playfield.
+
+### Zależności
+
+Akceptacja timingu, damage i powrotu do menu z kamienia 10. Ten kamień nie
+zmienia playfieldu broadside, który pozostaje ANTIC 4.
+
+### Kryteria akceptacji
+
+- tekst jest czytelny na PAL CRT i nie zmienia geometrii 8+24+8;
+- trzy cyfry `LIFE` aktualizują się tylko po inicjalizacji lub damage;
+- gameplay palette, PMG i broadside pozostają bez regresji.
+
+### Dowody pamięci i wydajności
+
+Font zajmuje 1024 B odzyskanej pamięci, ale screen pozostaje 960 B. Korekta
+HUD/kadłubów zwiększa payload o 190 B względem kandydata 9644 B i relokowany
+runtime o 177 B. Dwa ciała DLI kosztują łącznie 121 cykli na ramkę bez
+oczekiwania `WSYNC`, konserwatywnie do 349 cykli z dwoma pełnymi waitami; VBI
+ma delta 0. Ostateczna stabilność granicy trybów wymaga Atari800 i 65XE PAL.
+
+### Wykluczenia
+
+Bez nowych weapons, enemies, debris, repair drone lub zmian salwy.
+
+## 12. Zaawansowani enemies: Minelayer, Rammer, Heavy i Ace
 
 ### Zakres
 
@@ -441,7 +561,7 @@ oraz koszt ich kolizji i telegraph effects.
 Bez wymogu czterech nowych pełnych sprite sets, bez nieograniczonych min,
 loadable mission packages i dodatkowych power-upów.
 
-## 12. Boss lub objective capital ship
+## 13. Boss lub objective capital ship
 
 ### Zakres
 
@@ -475,7 +595,7 @@ Bez spekulacyjnego managera overlayów, formatu mission packages, relokacji,
 save state i level-loader API. Destructible batteries poza potrzebą wybranego
 celu pozostają backlogiem.
 
-## 13. Audio, balans, long-duration i real-hardware release validation
+## 14. Audio, balans, long-duration i real-hardware release validation
 
 ### Zakres
 

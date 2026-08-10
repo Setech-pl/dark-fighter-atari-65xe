@@ -10,6 +10,12 @@ import {
   loadLoaderBitmapDefinition,
   renderLoaderCa65Include,
 } from "./loader-assets.mjs";
+import {
+  compileCapitalHulls,
+  loadCapitalHullsDefinition,
+  renderCapitalHullsCa65Include,
+} from "./capital-hulls.mjs";
+import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -18,6 +24,8 @@ const distDirectory = path.join(rootDirectory, "dist");
 const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
 const gameVersion = packageDefinition.version;
 const quiet = process.argv.includes("--quiet");
+const acceptedDifficultyPayloadBytes = 9644;
+const flagshipBroadsidePayloadLimit = 2560;
 
 function ensureDirectory(fsApi, directory) {
   const parts = directory.split("/").filter(Boolean);
@@ -110,12 +118,23 @@ async function build() {
   const loaderAsset = compileLoaderBitmap(loaderDefinition);
   const loaderInclude = Buffer.from(renderLoaderCa65Include(loaderAsset));
   writeFile(path.join(buildDirectory, "loader-screen.inc"), loaderInclude);
+  const capitalHullsDefinitionPath = path.join(
+    rootDirectory,
+    "assets",
+    "graphics",
+    "capital-hulls.json",
+  );
+  const capitalHullsDefinition = loadCapitalHullsDefinition(capitalHullsDefinitionPath);
+  const capitalHullsAsset = compileCapitalHulls(capitalHullsDefinition);
+  const capitalHullsInclude = Buffer.from(renderCapitalHullsCa65Include(capitalHullsAsset));
+  writeFile(path.join(buildDirectory, "capital-hulls.inc"), capitalHullsInclude);
 
   const assembled = await runWasmTool(
     "ca65",
     {
       "/project/src/main.s": source,
       "/project/build/loader-screen.inc": loaderInclude,
+      "/project/build/capital-hulls.inc": capitalHullsInclude,
     },
     [
       "--cpu",
@@ -157,20 +176,43 @@ async function build() {
     ],
   );
 
-  const rawPayload = Buffer.from(linked.outputs["/project/build/dark-fighter.bin"]);
+  const linkedPayload = Buffer.from(linked.outputs["/project/build/dark-fighter.bin"]);
   const mapFile = linked.outputs["/project/build/dark-fighter.map"];
   const labelFile = linked.outputs["/project/build/dark-fighter.lbl"];
   const labels = parseViceLabels(labelFile.toString("utf8"));
   const startAddress = labels.get("start");
   const bootInitAddress = labels.get("boot_return");
+  const broadsideLoadAddress = labels.get("__BROADSIDE_LOAD__");
+  const broadsideRunAddress = labels.get("__BROADSIDE_RUN__");
+  const broadsideRuntimeBytes = labels.get("__BROADSIDE_SIZE__");
   const loadAddress = 0x2000;
 
-  if (!Number.isInteger(startAddress) || !Number.isInteger(bootInitAddress)) {
-    throw new Error("ld65 label file is missing exported start or boot_return labels");
+  if (!Number.isInteger(startAddress) || !Number.isInteger(bootInitAddress) ||
+    !Number.isInteger(broadsideLoadAddress) || !Number.isInteger(broadsideRunAddress) ||
+    !Number.isInteger(broadsideRuntimeBytes)) {
+    throw new Error("ld65 label file is missing entry or broadside relocation labels");
   }
-  if (rawPayload.length > 0x1e00) {
+  if (broadsideLoadAddress !== 0x4000 || broadsideRunAddress !== 0x5e10 ||
+    broadsideRuntimeBytes > 0x1200) {
+    throw new Error("Broadside relocation lies outside its reviewed load/run ranges");
+  }
+  const broadsideRuntime = linkedPayload.subarray(
+    broadsideLoadAddress - loadAddress,
+    broadsideLoadAddress - loadAddress + broadsideRuntimeBytes,
+  );
+  const packedBroadsideRuntime = packBroadsideLzss(broadsideRuntime);
+  if (!unpackBroadsideLzss(packedBroadsideRuntime).equals(broadsideRuntime)) {
+    throw new Error("Broadside LZSS round trip failed");
+  }
+  const rawPayload = Buffer.concat([
+    linkedPayload.subarray(0, broadsideLoadAddress - loadAddress),
+    packedBroadsideRuntime,
+  ]);
+  if (rawPayload.length - acceptedDifficultyPayloadBytes > flagshipBroadsidePayloadLimit) {
     throw new Error(
-      `Payload is ${rawPayload.length} bytes and crosses the player-2 boundary at $3E00`,
+      `Flagship broadside payload delta is ` +
+      `${rawPayload.length - acceptedDifficultyPayloadBytes} bytes and exceeds ` +
+      `${flagshipBroadsidePayloadLimit} bytes`,
     );
   }
 
@@ -200,6 +242,14 @@ async function build() {
     bootInitAddress,
     bootSectors,
     payloadBytes: rawPayload.length,
+    broadsideRuntime: {
+      loadAddress: broadsideLoadAddress,
+      runAddress: broadsideRunAddress,
+      bytes: broadsideRuntimeBytes,
+      reservedBytes: 0x1200,
+      packedBytes: packedBroadsideRuntime.length,
+      compression: "LZ-10/5",
+    },
     loaderScreen: {
       mode: "mixed ANTIC F/E",
       source: "assets/graphics/loader-bitmap.json",
@@ -216,6 +266,55 @@ async function build() {
       dliCount: loaderAsset.dliLines.length,
       durationFrames: loaderAsset.durationFrames,
     },
+    capitalHulls: {
+      source: "assets/graphics/capital-hulls.json",
+      sourceSha256: sha256(fs.readFileSync(capitalHullsDefinitionPath)),
+      displayMode: capitalHullsDefinition.displayMode,
+      segmentRows: capitalHullsAsset.segmentRows,
+      glyphCount: capitalHullsAsset.glyphs.length,
+      glyphBytes: capitalHullsAsset.glyphBytes.length,
+      packedMapAndMetadataBytes: capitalHullsAsset.packedDataBytes,
+      runtimeMapBytes: capitalHullsAsset.runtimeMapBytes,
+      turretCount: capitalHullsAsset.turrets.length,
+      previewStartPhase: capitalHullsAsset.previewStartPhase,
+      contourTransitions: Object.fromEntries(capitalHullsAsset.contourTransitionCounts),
+      broadsideScheduleBytes: capitalHullsAsset.scheduleBytes.length,
+      flagshipSector: {
+        totalRows: capitalHullsAsset.sector.totalRows,
+        streamRows: capitalHullsAsset.sector.streamRows,
+        visibleRows: capitalHullsAsset.sector.visibleRows,
+        moduleRows: capitalHullsAsset.sector.moduleRows,
+        sidePhaseRows: capitalHullsAsset.sector.sidePhaseRows,
+        sectionRows: Object.fromEntries(capitalHullsAsset.sector.sections.map((section) => [
+          section.id,
+          section.rows,
+        ])),
+        moduleSourceBytes: [...capitalHullsAsset.sector.moduleSourceRowsBySide.values()]
+          .reduce((sum, bytes) => sum + bytes.length, 0),
+        moduleSequenceBytes: [...capitalHullsAsset.sector.moduleSequences.values()]
+          .reduce((sum, bytes) => sum + bytes.length, 0),
+        engineOverlayBytes: [...capitalHullsAsset.sector.engineOverlayMasks.values()]
+          .reduce((sum, bytes) => sum + bytes.length, 0),
+        prowOccupancyBytes: [...capitalHullsAsset.sector.prowOccupancyMasks.values()]
+          .reduce((sum, bytes) => sum + bytes.length, 0),
+        prowCollisionBytes: [...capitalHullsAsset.sector.prowCollisionBoundaries.values()]
+          .reduce((sum, bytes) => sum + bytes.length, 0),
+        engineAnimationFrames: capitalHullsAsset.sector.engineAnimationFrames,
+        engineAnimationBytes: [...capitalHullsAsset.sector.engineGlyphs.values()]
+          .reduce((sum, glyph) => sum + glyph.animationBytes.length * 8, 0),
+        launchFlashFrames: capitalHullsAsset.sector.launchFlashFrames,
+        capitalExplosion: {
+          durationFrames: capitalHullsAsset.broadside.capitalExplosion.durationFrames,
+          phaseFrames: capitalHullsAsset.broadside.capitalExplosion.phaseFrames,
+          footprint: [
+            capitalHullsAsset.broadside.capitalExplosion.width,
+            capitalHullsAsset.broadside.capitalExplosion.height,
+          ],
+          pokeyChannel: capitalHullsAsset.broadside.capitalExplosion.soundChannel,
+          soundFrames: capitalHullsAsset.broadside.capitalExplosion.soundFrequencyBytes.length,
+        },
+      },
+    },
     artifacts: {
       "dark-fighter-boot.bin": { bytes: rawPayload.length, sha256: sha256(rawPayload) },
       "dark-fighter.xex": { bytes: xex.length, sha256: sha256(xex) },
@@ -225,6 +324,8 @@ async function build() {
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
   writeFile(path.join(buildDirectory, "dark-fighter.bin"), rawPayload);
+  writeFile(path.join(buildDirectory, "broadside-runtime.bin"), broadsideRuntime);
+  writeFile(path.join(buildDirectory, "broadside-runtime-packed.bin"), packedBroadsideRuntime);
   writeFile(path.join(buildDirectory, "dark-fighter.map"), mapFile);
   writeFile(path.join(buildDirectory, "dark-fighter.lbl"), labelFile);
   writeFile(path.join(buildDirectory, "manifest.json"), manifestBytes);

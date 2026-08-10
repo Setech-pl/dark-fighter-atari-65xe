@@ -16,7 +16,18 @@ ekran gameplayu. Obecnie zawiera:
 
 - sterowanie joystickiem w porcie 1 i strzelanie pojedynczym FIRE;
 - jednego przeciwnika z czerwonym skanerem, sprzętowe PMG, kolizje i score;
-- przewijane tło ANTIC 4, własny charset, prosty HUD i efekty POKEY;
+- przewijany playfield ANTIC 4, czytelny dwuwierszowy HUD ANTIC 2 z osobnym
+  fontem oraz efekty POKEY;
+- oryginalne 32-wierszowe kadłuby boczne ANTIC 4 w układzie nominalnym
+  `8 + 24 + 8`, z jedną funkcjonalną, wielokomórkową baterią na stronę w
+  każdym segmencie i niezależnym, o połowę wolniejszym ruchem kadłubów;
+- deterministyczny crossfire broadside: 25-ramkowe rosnące ostrzeżenia przy
+  źródłowych wylotach, stała pula trzech ciężkich pocisków M1–M3, trafienia
+  gracza, przeciwnika i przeciwnego kadłuba, 24-ramkowe czerwone eksplozje
+  3×3 przy kadłubie oraz zsynchronizowany crack/rumble POKEY;
+- trzy dokładne ustawienia prędkości świata: `EASY` 20, `MEDIUM` 22,5 i
+  `HARD` 25 pełnych wierszy/s; niezależnie rzadszy harmonogram salw oraz
+  source-derived kontakt gracza z nieregularnymi krawędziami i turretami;
 - samowystarczalny XEX oraz bootowalny ATR dla emulatora i SIO2SD;
 - pięciosekundowy loader mieszający ANTIC F z footerem ANTIC E: bitmapę
   7680 B, Galactikę
@@ -24,7 +35,7 @@ ekran gameplayu. Obecnie zawiera:
   i dokładnie 250 pełnych ramek PAL;
 - czytelny, mieszany frontend ANTIC 7/6/4/2: duży tytuł, hangar i Viper po
   lewej, opcje po prawej oraz ekrany `OPTIONS`, `TOP SCORES`, potwierdzenie
-  `EXIT` i opcję `SOUND: ON/OFF`;
+  `EXIT`, `SOUND: ON/OFF` oraz sesyjny wybór `EASY/MEDIUM/HARD`;
 - czyste przejście z loadera do menu, a następnie przez `START GAME` do
   istniejącego gameplayu, bez kosztu loadera w gameplay main loop lub
   gameplay VBI.
@@ -39,7 +50,8 @@ z zawsze osiągalną trasą, wybór między zebraniem i zestrzeleniem repair dro
 proceduralne fale, kontrolowaną losowość oraz broadside crossfire bez faction
 immunity.
 
-Te systemy są **planowane i nie są jeszcze zaimplementowane**. Kanoniczne
+Poza wskazanym vertical slice te systemy są **planowane i nie są jeszcze
+zaimplementowane**. Kanoniczne
 decyzje i statusy znajdują się w
 [`docs/game-design.md`](docs/game-design.md), kolejność prac w
 [`docs/roadmap.md`](docs/roadmap.md), a stan obecny i docelowe granice systemów
@@ -89,9 +101,34 @@ dodatkowym resident RAM podczas gameplayu.
   `assets/graphics/loader-bitmap.json`;
 - `build/previews/start-menu.png` z tych samych danych menu, charsetu, PMG i
   palety, których używa program;
-- `build/previews/gameplay-screen.png` z kanonicznych danych `src/main.s`.
+- `build/previews/gameplay-screen.png` z kanonicznych danych `src/main.s` oraz
+  `assets/graphics/capital-hulls.json`;
+- `build/previews/capital-hulls-strip.png` z pełnego segmentu kadłubów,
+  glifów i metadanych `assets/graphics/capital-hulls.json`;
+- `build/previews/enemy-hull-colour-options.png` z identycznych danych prawego
+  kadłuba wyrenderowanych przez `COLPF3=$44` i `$46` do oceny ownera.
+- `build/previews/broadside-fire-sequence.png` jako sześcioklatkowy,
+  source-derived zapis warning, lotu oraz trafień broadside.
+- `build/previews/broadside-acceptance-sequence.png` jako dziesięcioklatkowy
+  zapis faz ładowania działa, launch, obu clampów, damage flash i zero health.
+- `build/previews/player-respawn-sequence.png` jako dziesięcioklatkowy zapis
+  bezpiecznego przejścia wierszy kadłubów przy wyśrodkowanym Viperze, realnych
+  kontaktów, śmierci, centralnego respawnu oraz granic 250-klatkowego blink/invulnerability.
+- `build/previews/broadside-cadence-sequence.png` jako source-derived oś czasu
+  1000 ramek, porównująca warningi, launch i ticki scrollu przed i po korekcie.
+- `build/previews/broadside-speed-sequence.png` jako pięć kolejnych ramek PAL
+  pokazujących dwa kroki świata, pierwszy oddzielny krok kadłubów, warning
+  pozostający przy wylocie i stały ruch pocisku.
+- `build/previews/difficulty-speed-comparison.png` jako dokładne porównanie
+  zdarzeń scrolla `EASY/MEDIUM/HARD` w tym samym 20-ramkowym oknie PAL.
+- `build/previews/flagship-sector-sequence.png` jako kolejność ENGINES, AFT,
+  COMBAT, FORWARD, PROW, terminalne bow tips, DRAIN i COMPLETE.
+- `build/previews/capital-hull-explosion-sequence.png` jako sześć faz dużej
+  eksplozji 3×3, wraz z `capital-explosion-pokey-trace.csv` zawierającym
+  24-ramkową obwiednię AUDF4/AUDC4 i końcowe wyciszenie.
 
-Wszystkie obrazy mają 640×384, są skalowane 2× nearest-neighbour i powstają bez
+Podstawowe obrazy mają 640×384, a pełny 32-wierszowy pas kadłubów 640×512.
+Wszystkie są skalowane całkowicie nearest-neighbour i powstają bez
 zewnętrznego narzędzia graficznego. Kolory RGB są stabilnym przybliżeniem
 rejestrów Atari PAL, więc mogą nieznacznie różnić się od konkretnego emulatora
 lub fizycznego odbiornika. Zaakceptowanego loader assetu nie należy zmieniać
