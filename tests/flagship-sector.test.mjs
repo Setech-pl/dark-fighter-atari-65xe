@@ -1,0 +1,603 @@
+import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  compileCapitalHulls,
+  loadCapitalHullsDefinition,
+} from "../scripts/capital-hulls.mjs";
+import {
+  BROADSIDE_STATES,
+  CAPITAL_SECTOR_STATES,
+  MISSILE_CLEAR_MASKS,
+  advanceHullMountedEffects,
+  advanceHullScroll,
+  advanceProjectile,
+  beginLaunchFlash,
+  beginCapitalExplosionSound,
+  beginCapitalHullExplosion,
+  beginWarning,
+  capitalExplosionVisual,
+  createBroadsideState,
+  createWorldScrollState,
+  heavyShellVisual,
+  hitOppositeHull,
+  missileWidth,
+  sectorRowForSide,
+  simulateBroadsideCadence,
+  tickLaunchFlashes,
+  tickCapitalExplosionSound,
+  tickCapitalHullExplosions,
+  updateMissileByte,
+  updateMissileSize,
+  updateSectorCompletion,
+} from "../scripts/broadside.mjs";
+import {
+  createFlagshipSectorSequencePreview,
+  createHeavyShellDetailSequencePreview,
+  createCapitalExplosionPokeyTrace,
+  createCapitalHullExplosionSequencePreview,
+  createEngineBankSequencePreview,
+  createEnemyFighterLimitsPreview,
+  inspectPng,
+  createProwSequencePreview,
+  readEngineBankSequenceRuntimeState,
+  readEnemyFighterLimitsRuntimeState,
+  readFlagshipSectorSequenceRuntimeState,
+  readHeavyShellDetailSequenceRuntimeState,
+  readCapitalHullExplosionSequenceRuntimeState,
+  readProwSequenceRuntimeState,
+} from "../scripts/preview.mjs";
+
+const testDirectory = path.dirname(fileURLToPath(import.meta.url));
+const rootDirectory = path.resolve(testDirectory, "..");
+const definitionPath = path.join(rootDirectory, "assets", "graphics", "capital-hulls.json");
+const sourcePath = path.join(rootDirectory, "src", "main.s");
+const source = fs.readFileSync(sourcePath, "utf8");
+const definition = loadCapitalHullsDefinition(definitionPath);
+const asset = compileCapitalHulls(definition);
+const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
+
+function decodeAntic4Byte(byte) {
+  return [6, 4, 2, 0].map((shift) => (byte >>> shift) & 0x03);
+}
+
+function connectedAreas(pixels, width, height) {
+  const visited = new Uint8Array(pixels.length);
+  const areas = [];
+  for (let start = 0; start < pixels.length; start += 1) {
+    if (visited[start] || pixels[start] === 0) continue;
+    let area = 0;
+    const pending = [start];
+    visited[start] = 1;
+    while (pending.length > 0) {
+      const index = pending.pop();
+      area += 1;
+      const x = index % width;
+      const y = Math.floor(index / width);
+      for (const next of [
+        x > 0 ? index - 1 : -1,
+        x + 1 < width ? index + 1 : -1,
+        y > 0 ? index - width : -1,
+        y + 1 < height ? index + width : -1,
+      ]) {
+        if (next >= 0 && !visited[next] && pixels[next] !== 0) {
+          visited[next] = 1;
+          pending.push(next);
+        }
+      }
+    }
+    areas.push(area);
+  }
+  return areas.sort((left, right) => right - left);
+}
+
+function engineEnergyPixels(side, frameIndex) {
+  const width = 8 * 4;
+  const height = asset.sector.moduleRows * 8;
+  const pixels = new Uint8Array(width * height);
+  const masks = asset.sector.engineOverlayMasks.get(side);
+  const frame = asset.sector.engineGlyphs.get(side).animationBytes[frameIndex];
+  for (let characterRow = 0; characterRow < masks.length; characterRow += 1) {
+    for (let characterColumn = 0; characterColumn < 8; characterColumn += 1) {
+      if ((masks[characterRow] & (1 << characterColumn)) === 0) continue;
+      for (let glyphRow = 0; glyphRow < 8; glyphRow += 1) {
+        const values = decodeAntic4Byte(frame[glyphRow]);
+        const rowStart = (characterRow * 8 + glyphRow) * width + characterColumn * 4;
+        pixels.set(values, rowStart);
+      }
+    }
+  }
+  return { pixels, width, height };
+}
+
+function popcount(byte) {
+  let count = 0;
+  for (let value = byte; value !== 0; value >>>= 1) count += value & 1;
+  return count;
+}
+
+function readLabels() {
+  const labels = new Map();
+  for (const line of fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+    .split(/\r?\n/)) {
+    const match = /^al ([0-9A-Fa-f]{6}) \.([A-Za-z_][A-Za-z0-9_]*)$/.exec(line);
+    if (match) labels.set(match[2], Number.parseInt(match[1], 16));
+  }
+  return labels;
+}
+
+test("finite flagship descriptors traverse engines through prow in exactly 240 compact rows", () => {
+  assert.deepEqual(
+    asset.sector.sections.map(({ id, rows, start, end, weaponEligible }) =>
+      [id, rows, start, end, weaponEligible]),
+    [
+      ["engines", 32, 0, 32, false],
+      ["aft", 24, 32, 56, false],
+      ["combat", 128, 56, 184, true],
+      ["forward", 24, 184, 208, false],
+      ["prow", 32, 208, 240, false],
+    ],
+  );
+  assert.equal(asset.sector.totalRows, 240);
+  assert.equal(asset.sector.moduleRows, 8);
+  assert.deepEqual([...asset.sector.moduleSequences.values()].map(({ length }) => length), [30, 30]);
+  assert.deepEqual([...asset.sector.moduleSourceRowsBySide.values()].map(({ length }) => length),
+    [96, 96]);
+  assert.ok(60 + 192 < 240 * 16,
+    "module sequences and source-row dictionaries stay far below a raw 240x16 map");
+  assert.equal(asset.sector.sections[2].weaponShutdownRows, 8);
+});
+
+test("both ships share one finite progression and retain an immutable eight-row phase", () => {
+  assert.equal(asset.sector.sidePhaseRows, 8);
+  assert.equal(asset.sector.streamRows, 248);
+  const seen = { allied: [], enemy: [] };
+  for (let streamRow = 0; streamRow < asset.sector.streamRows; streamRow += 1) {
+    for (const side of ["allied", "enemy"]) {
+      const sideRow = sectorRowForSide(asset, side, streamRow);
+      if (sideRow !== null) seen[side].push(sideRow);
+    }
+    const alliedRow = sectorRowForSide(asset, "allied", streamRow);
+    const enemyRow = sectorRowForSide(asset, "enemy", streamRow);
+    if (alliedRow !== null && enemyRow !== null) assert.equal(alliedRow - enemyRow, 8);
+  }
+  assert.deepEqual(seen.allied, Array.from({ length: 240 }, (_, row) => row));
+  assert.deepEqual(seen.enemy, Array.from({ length: 240 }, (_, row) => row));
+  const world = createWorldScrollState(asset, { difficulty: "hard" });
+  let frame = 0;
+  while (!world.hullDrained && frame < 2000) {
+    frame += 1;
+    advanceHullScroll(world, asset);
+  }
+  assert.equal(world.corridorPhase, 248);
+  assert.equal(world.drainRows, 22);
+  assert.equal(world.hullAdvances, 270);
+  assert.equal(frame, 1080);
+});
+
+test("assembled sector dictionaries, sequences, overlays, and animation match the source asset", () => {
+  const runtime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
+  const labels = readLabels();
+  const runAddress = labels.get("__BROADSIDE_RUN__");
+  const read = (label, length) => runtime.subarray(labels.get(label) - runAddress,
+    labels.get(label) - runAddress + length);
+  for (const side of ["allied", "enemy"]) {
+    assert.deepEqual(
+      read(`${side}_sector_module_sources`, asset.sector.moduleSourceRowsBySide.get(side).length),
+      Buffer.from(asset.sector.moduleSourceRowsBySide.get(side)),
+    );
+    assert.deepEqual(
+      read(`${side}_sector_sequence`, asset.sector.moduleSequences.get(side).length),
+      Buffer.from(asset.sector.moduleSequences.get(side)),
+    );
+    assert.deepEqual(
+      read(`${side}_engine_overlay_masks`, asset.sector.engineOverlayMasks.get(side).length),
+      Buffer.from(asset.sector.engineOverlayMasks.get(side)),
+    );
+    assert.deepEqual(
+      read(`${side}_prow_occupancy_masks`, asset.sector.prowOccupancyMasks.get(side).length),
+      Buffer.from(asset.sector.prowOccupancyMasks.get(side)),
+    );
+    assert.deepEqual(
+      read(`${side}_prow_collision_boundaries`,
+        asset.sector.prowCollisionBoundaries.get(side).length),
+      Buffer.from(asset.sector.prowCollisionBoundaries.get(side)),
+    );
+  }
+  const animations = ["allied", "enemy"].flatMap((side) =>
+    asset.sector.engineGlyphs.get(side).animationBytes.flatMap((frame) => [...frame]));
+  assert.deepEqual(read("engine_animation_frames", animations.length), Buffer.from(animations));
+});
+
+test("only reduced-density combat modules contain staggered functional cannons", () => {
+  const allied = asset.sector.cannonRowsBySide.get("allied");
+  const enemy = asset.sector.cannonRowsBySide.get("enemy");
+  assert.deepEqual(allied, [64, 96, 128, 160]);
+  assert.deepEqual(enemy, [68, 100, 132, 164]);
+  assert.equal(allied.some((row) => enemy.includes(row)), false);
+  for (const rows of [allied, enemy]) {
+    assert.equal(rows.length, 4);
+    assert.equal(rows.every((row) => row >= 56 && row < 176), true);
+    assert.equal(rows.every((row, index) => index === 0 || row - rows[index - 1] === 32), true);
+  }
+  for (let phase = 0; phase <= asset.sector.totalRows; phase += 1) {
+    for (const side of ["allied", "enemy"]) {
+      const visible = Array.from({ length: 22 }, (_, offset) => phase - 1 - offset)
+        .filter((leftRow) => leftRow >= 0)
+        .map((leftRow) => sectorRowForSide(asset, side, leftRow))
+        .filter((row) => asset.sector.cannonRowsBySide.get(side).includes(row));
+      assert.ok(visible.length <= 2, `${side} phase ${phase} exceeds the two-cannon limit`);
+    }
+  }
+});
+
+test("flagship keeps the accepted cadence, warning, speed, damage, and M0 ownership", () => {
+  assert.deepEqual([...asset.scheduleBytes], [1, 68, 0, 126, 1, 68, 0, 138]);
+  assert.equal(asset.broadside.warningFrames, 25);
+  assert.equal(asset.broadside.projectileSpeed, 2);
+  assert.equal(asset.broadside.playerDamage, 20);
+  assert.deepEqual(asset.broadside.worldScrollRates, { easy: 8, medium: 9, hard: 10 });
+  assert.deepEqual(asset.broadside.hullScrollRates, { easy: 8, medium: 9, hard: 10 });
+  assert.equal(asset.broadside.hullScrollRateDenominator, 40);
+  assert.equal(updateMissileByte(0xff, 1, false), 0xf3);
+  assert.equal(updateMissileSize(0x01, 1, 1) & 0x03, 0x01,
+    "changing M1 size preserves M0's pair");
+});
+
+test("heavy slugs pulse inside the accepted four-line collision envelope and clean exactly", () => {
+  const slot = {
+    state: BROADSIDE_STATES.FLYING,
+    missile: 2,
+    owner: "allied",
+    x: 100,
+    y: 120,
+  };
+  assert.deepEqual([0, 1, 2, 3].map((frame) => heavyShellVisual(slot, asset, frame).height),
+    [3, 3, 4, 4]);
+  assert.equal(missileWidth(heavyShellVisual(slot, asset, 0).size), 2);
+  assert.equal(Math.max(...[0, 1, 2, 3].map((frame) =>
+    heavyShellVisual(slot, asset, frame).height)), asset.broadside.flyingHeight);
+
+  const missileBytes = new Uint8Array(12).fill(0x03); // persistent M0 bits
+  const draw = (top, height) => {
+    for (let row = top; row < top + height; row += 1) {
+      missileBytes[row] = updateMissileByte(missileBytes[row], 2, true);
+    }
+  };
+  const erase = (top, height) => {
+    for (let row = top; row < top + height; row += 1) {
+      missileBytes[row] &= MISSILE_CLEAR_MASKS[2];
+    }
+  };
+  draw(4, 3);
+  erase(4, 3);
+  draw(3, 4);
+  erase(3, 4);
+  assert.equal(missileBytes.every((value) => value === 0x03), true,
+    "shape phase cleanup leaves M0 and no stale M2 pixels");
+
+  const slugRoutine = source.slice(
+    source.indexOf("draw_broadside_slug:"),
+    source.indexOf("draw_broadside_span:"),
+  );
+  assert.doesNotMatch(slugRoutine, /COLPM|COLPF|PRIOR/,
+    "bitmap-only pulse cannot flicker the shared fighter colours");
+});
+
+test("four-frame launch flash stays hull-attached while the launched shell is independent", () => {
+  const state = createBroadsideState(asset);
+  const alliedIndex = asset.turrets.findIndex(({ side }) => side === "allied");
+  const slot = beginWarning(state, asset, alliedIndex, 0, 5, "allied_turret_a:64");
+  for (let frame = 0; frame < 25; frame += 1) advanceProjectile(slot, asset, { frame });
+  assert.equal(slot.state, BROADSIDE_STATES.FLYING);
+  const flash = beginLaunchFlash(state, asset, 0);
+  assert.equal(flash.timer, 4);
+  const shellY = slot.y;
+  const flashY = flash.y;
+  advanceHullMountedEffects(state);
+  assert.equal(slot.y, shellY, "a launched shell no longer inherits hull scrolling");
+  assert.equal(flash.y, flashY + 8, "launch flash remains attached to its cannon row");
+  assert.deepEqual(Array.from({ length: 4 }, () => {
+    tickLaunchFlashes(state);
+    return flash.timer;
+  }), [3, 2, 1, 0]);
+  assert.equal(asset.sector.launchFlashFrames, 4);
+});
+
+test("engine banks are character-animated, non-weapon modules with no PMG allocation", () => {
+  for (const side of ["allied", "enemy"]) {
+    const engineGlyph = asset.sector.engineGlyphs.get(side);
+    assert.equal(engineGlyph.tags.includes("engine"), true);
+    assert.equal(engineGlyph.animationBytes.length, 3);
+    assert.ok(new Set(engineGlyph.animationBytes.map((frame) =>
+      Buffer.from(frame).toString("hex"))).size >= 2);
+    assert.equal(engineGlyph.animationBytes.every((frame) =>
+      [...frame].flatMap(decodeAntic4Byte).every((pixel) => pixel !== 0)), true,
+    `${side} core glyph contains no checkerboard holes`);
+    assert.equal(asset.sector.cannonRowsBySide.get(side).some((row) => row >= 208), false);
+    assert.ok(asset.sector.engineOverlayMasks.get(side).some((mask) => mask !== 0));
+  }
+  for (const [side, expectedApertures] of [["allied", 2], ["enemy", 2]]) {
+    for (let phase = 0; phase < 3; phase += 1) {
+      const grid = engineEnergyPixels(side, phase);
+      const areas = connectedAreas(grid.pixels, grid.width, grid.height);
+      assert.equal(areas.length, expectedApertures,
+        `${side} phase ${phase} must retain ${expectedApertures} separate contiguous cores`);
+      assert.equal(areas.every((area) => area >= 12 * 4 * 8), true,
+        `${side} phase ${phase} apertures must be capital-ship scale`);
+    }
+  }
+  assert.notDeepEqual(
+    asset.sector.engineOverlayMasks.get("allied"),
+    asset.sector.engineOverlayMasks.get("enemy"),
+    "the two engine banks use different macro layouts",
+  );
+  const routine = source.slice(
+    source.indexOf("update_engine_animation:"),
+    source.indexOf("update_sector_completion:"),
+  );
+  assert.match(routine, /sta CHARSET\+CAPITAL_HULL_ALLIED_ENGINE_GLYPH\*8,x/);
+  assert.match(routine, /sta CHARSET\+CAPITAL_HULL_ENEMY_ENGINE_GLYPH\*8,x/);
+  assert.doesNotMatch(routine, /PMG|PLAYER[0-3]|MISSILES|HPOS|COLPM|DLI|WSYNC/);
+  assert.equal(asset.sector.engineAnimationFrames, 8);
+});
+
+test("stern-first modules expand from exhaust into nozzles and finish in tapered bow tips", () => {
+  for (const side of ["allied", "enemy"]) {
+    const masks = [...asset.sector.engineOverlayMasks.get(side)];
+    assert.equal(popcount(masks.at(-1)), 0,
+      `${side} energy ends inside its housing before the AFT transition`);
+    assert.ok(popcount(masks[0]) < Math.max(...masks.map(popcount)),
+      `${side} plume expands into its nozzle mouths`);
+    const prowMasks = [...asset.sector.prowOccupancyMasks.get(side)];
+    const widths = prowMasks.map(popcount);
+    assert.deepEqual([widths[0], widths.at(-1)], [8, 1]);
+    assert.equal(widths.every((width, row) => row === 0 || width <= widths[row - 1]), true,
+      `${side} bow cannot widen toward its tip`);
+    assert.ok(new Set(widths).size >= 7, `${side} prow has a multi-tier taper`);
+    assert.ok(new Set(widths.slice(-12)).size >= 3,
+      `${side} has its strongest taper in the final twelve rows`);
+    assert.equal(asset.sector.cannonRowsBySide.get(side)
+      .every((row) => row >= 56 && row < 176), true);
+    const edge = asset.sector.prowEdgeGlyphs.get(side);
+    const edgeWidths = edge.pixels.map((row) => row.filter((pixel) => pixel !== 0).length);
+    assert.ok(Math.min(...edgeWidths) < 4 && Math.max(...edgeWidths) === 4,
+      `${side} terminal contour must use real partial ANTIC 4 pixels`);
+  }
+  assert.notDeepEqual(
+    asset.sector.prowOccupancyMasks.get("allied"),
+    asset.sector.prowOccupancyMasks.get("enemy"),
+    "left armoured wedge and right hostile spear remain structurally distinct",
+  );
+  assert.deepEqual(
+    [...asset.sector.prowCollisionBoundaries.get("allied")].slice(-2),
+    [56, 56],
+  );
+  assert.deepEqual(
+    [...asset.sector.prowCollisionBoundaries.get("enemy")].slice(-2),
+    [200, 200],
+  );
+});
+
+test("capital-hull hits create two independent attached red explosions and one sound trigger", () => {
+  const explosion = asset.broadside.capitalExplosion;
+  assert.deepEqual(
+    [explosion.durationFrames, explosion.phaseFrames, explosion.width,
+      explosion.height, explosion.phaseCount],
+    [24, 4, 3, 3, 6],
+  );
+  const visuals = [24, 20, 16, 12, 8, 4].map((timer) =>
+    capitalExplosionVisual(asset, timer));
+  assert.deepEqual(visuals.map(({ occupiedCells }) => occupiedCells), [1, 5, 8, 7, 4, 2]);
+  assert.equal(visuals.slice(2, 4).every(({ redCells, occupiedCells }) =>
+    redCells > occupiedCells / 2), true);
+
+  const state = createBroadsideState(asset);
+  const alliedShell = state.slots[0];
+  Object.assign(alliedShell, {
+    state: BROADSIDE_STATES.FLYING,
+    owner: "allied",
+    x: 176,
+    y: 112,
+  });
+  hitOppositeHull(state, alliedShell, asset, {
+    targetSide: "enemy",
+    screenRow: 10,
+    boundaryColumn: 176,
+    soundEnabled: true,
+  });
+  assert.equal(state.capitalExplosions[1].timer, 24);
+  assert.equal(state.capitalExplosions[1].triggerCount, 1);
+  assert.equal(state.capitalExplosionSound.triggerCount, 1);
+  assert.equal(state.capitalExplosionSound.timer, 24);
+
+  const enemyShell = state.slots[1];
+  Object.assign(enemyShell, {
+    state: BROADSIDE_STATES.FLYING,
+    owner: "enemy",
+    x: 80,
+    y: 136,
+  });
+  hitOppositeHull(state, enemyShell, asset, {
+    targetSide: "allied",
+    screenRow: 13,
+    boundaryColumn: 80,
+    soundEnabled: true,
+  });
+  assert.deepEqual(state.capitalExplosions.map(({ timer }) => timer), [24, 24]);
+  const beforeRows = state.capitalExplosions.map(({ screenRow }) => screenRow);
+  advanceHullMountedEffects(state);
+  assert.deepEqual(state.capitalExplosions.map(({ screenRow }) => screenRow),
+    beforeRows.map((row) => row + 1));
+  assert.equal(alliedShell.y, 112, "launched/impact PMG state never inherits hull movement");
+
+  for (let frame = 0; frame < 24; frame += 1) tickCapitalHullExplosions(state);
+  assert.deepEqual(state.capitalExplosions.map(({ timer }) => timer), [0, 0]);
+});
+
+test("POKEY channel-four crack and rumble is deterministic, decays, and obeys SOUND OFF", () => {
+  const state = createBroadsideState(asset);
+  assert.equal(beginCapitalExplosionSound(state, asset, true), true);
+  const frames = [];
+  for (let frame = 0; frame < 24; frame += 1) {
+    const sound = tickCapitalExplosionSound(state, asset, true);
+    frames.push([sound.frequency, sound.control, sound.control & 0x0f]);
+  }
+  assert.deepEqual(frames[0], [6, 0x8f, 15]);
+  assert.deepEqual(frames.at(-1), [255, 0x81, 1]);
+  assert.equal(state.capitalExplosionSound.timer, 0);
+  tickCapitalExplosionSound(state, asset, true);
+  assert.deepEqual(
+    [state.capitalExplosionSound.frequency, state.capitalExplosionSound.control,
+      state.capitalExplosionSound.audctl],
+    [0, 0, 0],
+  );
+  beginCapitalExplosionSound(state, asset, true);
+  assert.equal(beginCapitalExplosionSound(state, asset, false), false);
+  assert.deepEqual(
+    [state.capitalExplosionSound.timer, state.capitalExplosionSound.control],
+    [0, 0],
+  );
+  const trace = createCapitalExplosionPokeyTrace(definition).trim().split("\n");
+  assert.equal(trace.length, 26);
+  assert.equal(trace[1], "0,6,143,0,15");
+  assert.equal(trace.at(-1), "24,0,0,0,0");
+});
+
+test("assembled explosion tables, restoration, collision isolation, and sound ownership match source", () => {
+  const runtime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
+  const labels = readLabels();
+  const runAddress = labels.get("__BROADSIDE_RUN__");
+  const read = (label, length) => runtime.subarray(labels.get(label) - runAddress,
+    labels.get(label) - runAddress + length);
+  const explosion = asset.broadside.capitalExplosion;
+  assert.deepEqual(read("capital_explosion_phases", explosion.phaseBytes.length),
+    Buffer.from(explosion.phaseBytes));
+  assert.deepEqual(read("capital_explosion_sound_frequency", explosion.durationFrames),
+    Buffer.from(explosion.runtimeFrequencyBytes));
+  assert.deepEqual(read("capital_explosion_sound_control", explosion.durationFrames),
+    Buffer.from(explosion.runtimeControlBytes));
+  const effectRoutine = source.slice(
+    source.indexOf("begin_capital_hull_explosion:"),
+    source.indexOf("broadside_hits_opposite_hull:"),
+  );
+  assert.match(effectRoutine, /CAPITAL_EXPLOSION_BACKUP/);
+  assert.match(effectRoutine, /cmp #CAPITAL_HULL_GLYPH_BASE/);
+  assert.doesNotMatch(effectRoutine, /CORRIDOR_BOUNDARY|collision_boundaries|HITCLR|PMG|COLPM/);
+  const soundRoutine = source.slice(source.indexOf("play_capital_explosion_sound:"),
+    source.indexOf("tick_capital_explosions:"));
+  assert.match(soundRoutine, /sound_enabled[\s\S]+AUDCTL[\s\S]+CAPITAL_EXPLOSION_SOUND_TIMER/);
+  assert.doesNotMatch(soundRoutine, /COLPM|COLPF|SIZEM|PRIOR/);
+  assert.match(source, /AUDF4\s*= \$D206[\s\S]+AUDC4\s*= \$D207/);
+});
+
+test("drain blocks new warnings and reaches COMPLETE only after every attached effect", () => {
+  const cadenceAtEnd = simulateBroadsideCadence(asset, { frames: 2000, difficulty: "hard" });
+  const cadenceMuchLater = simulateBroadsideCadence(asset, { frames: 10000, difficulty: "hard" });
+  assert.equal(cadenceAtEnd.finalSectorState, CAPITAL_SECTOR_STATES.COMPLETE);
+  assert.equal(cadenceAtEnd.finalCorridorPhase, 248);
+  assert.equal(cadenceAtEnd.drainRows, 22);
+  assert.deepEqual(cadenceMuchLater.warningStarts, cadenceAtEnd.warningStarts,
+    "no cannon event is created after the engine section");
+
+  const world = createWorldScrollState(asset, {
+    difficulty: "hard",
+    initialSectorPhase: asset.sector.streamRows,
+  });
+  world.hullDrained = true;
+  world.drainRows = 22;
+  world.sectorState = CAPITAL_SECTOR_STATES.DRAIN;
+  const state = createBroadsideState(asset);
+  state.slots[0].state = BROADSIDE_STATES.FLYING;
+  state.launchFlashes[0].timer = 1;
+  assert.equal(updateSectorCompletion(world, state), CAPITAL_SECTOR_STATES.DRAIN);
+  state.slots[0].state = BROADSIDE_STATES.FREE;
+  assert.equal(updateSectorCompletion(world, state), CAPITAL_SECTOR_STATES.DRAIN);
+  state.launchFlashes[0].timer = 0;
+  state.capitalExplosions[0].timer = 1;
+  assert.equal(updateSectorCompletion(world, state), CAPITAL_SECTOR_STATES.DRAIN);
+  state.capitalExplosions[0].timer = 0;
+  assert.equal(updateSectorCompletion(world, state), CAPITAL_SECTOR_STATES.COMPLETE);
+
+  for (const [difficulty, completeFrame] of [
+    ["easy", 1350],
+    ["medium", 1200],
+    ["hard", 1080],
+  ]) {
+    assert.notEqual(
+      simulateBroadsideCadence(asset, { frames: completeFrame - 1, difficulty }).finalSectorState,
+      CAPITAL_SECTOR_STATES.COMPLETE,
+    );
+    assert.equal(
+      simulateBroadsideCadence(asset, { frames: completeFrame, difficulty }).finalSectorState,
+      CAPITAL_SECTOR_STATES.COMPLETE,
+    );
+  }
+});
+
+test("section and heavy-shell previews are deterministic source-derived evidence", () => {
+  const sectorState = readFlagshipSectorSequenceRuntimeState(source, definition);
+  assert.deepEqual(sectorState.panelDefinitions.map(({ state }) => state),
+    ["ENGINES", "AFT", "COMBAT", "FORWARD", "PROW", "PROW", "DRAIN", "COMPLETE"]);
+  const complete = sectorState.panelDefinitions.at(-1).screen;
+  for (let row = 2; row < 24; row += 1) {
+    assert.equal(complete.slice(row * 40, row * 40 + 8).every((code) => code === 0), true);
+    assert.equal(complete.slice(row * 40 + 32, row * 40 + 40).every((code) => code === 0), true);
+  }
+  const shellState = readHeavyShellDetailSequenceRuntimeState(source, definition);
+  assert.deepEqual(shellState.panelDefinitions.map(({ label }) => label), [
+    "ALLIED HOT WARNING  FRAME 24",
+    "ALLIED LAUNCH FLASH  FRAME 25",
+    "ALLIED SLUG COMPACT  FRAME 27",
+    "ALLIED SLUG FULL  FRAME 29",
+    "ENEMY LAUNCH FLASH  FRAME 25",
+    "HEAVY IMPACT  FIVE FRAME STATE",
+  ]);
+  const sectorPng = createFlagshipSectorSequencePreview(source, definition);
+  const shellPng = createHeavyShellDetailSequencePreview(source, definition);
+  const explosionState = readCapitalHullExplosionSequenceRuntimeState(source, definition);
+  const explosionPng = createCapitalHullExplosionSequencePreview(source, definition);
+  assert.deepEqual([inspectPng(sectorPng).width, inspectPng(sectorPng).height], [1920, 1272]);
+  assert.deepEqual([inspectPng(shellPng).width, inspectPng(shellPng).height], [1920, 848]);
+  assert.deepEqual(explosionState.panelDefinitions.map(({ explosion }) => explosion.phase),
+    [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual([inspectPng(explosionPng).width, inspectPng(explosionPng).height], [1920, 848]);
+  assert.equal(sha256(sectorPng), sha256(createFlagshipSectorSequencePreview(source, definition)));
+  assert.equal(sha256(shellPng), sha256(createHeavyShellDetailSequencePreview(source, definition)));
+  assert.equal(sha256(explosionPng),
+    sha256(createCapitalHullExplosionSequencePreview(source, definition)));
+});
+
+test("engine, prow, and fighter-limit review sheets render the actual final runtime data", () => {
+  const engineState = readEngineBankSequenceRuntimeState(source, definition);
+  assert.deepEqual(engineState.panelDefinitions.map(({ phase }) => phase),
+    [0, 1, 2, 0, 1, 2, 1, 1]);
+  const enginePng = createEngineBankSequencePreview(source, definition);
+  assert.deepEqual([inspectPng(enginePng).width, inspectPng(enginePng).height], [1920, 1272]);
+  assert.equal(sha256(enginePng), sha256(createEngineBankSequencePreview(source, definition)));
+
+  const prowState = readProwSequenceRuntimeState(source, definition);
+  assert.deepEqual(prowState.panelDefinitions.map(({ sectorPhase }) => sectorPhase),
+    [214, 222, 230, 240, 248, 249]);
+  assert.equal(prowState.panelDefinitions.at(-1).label, "BOTH TIPS THEN EMPTY");
+  const prowPng = createProwSequencePreview(source, definition);
+  assert.deepEqual([inspectPng(prowPng).width, inspectPng(prowPng).height], [1920, 848]);
+
+  const fighterState = readEnemyFighterLimitsRuntimeState(source, definition);
+  assert.deepEqual(
+    [fighterState.corridorLeft, fighterState.corridorRight, fighterState.visibleWidth],
+    [80, 176, 16],
+  );
+  assert.deepEqual(fighterState.envelopes, [
+    { origin: 80, left: 80, rightExclusive: 96 },
+    { origin: 160, left: 160, rightExclusive: 176 },
+  ]);
+  const fighterPng = createEnemyFighterLimitsPreview(source, definition);
+  assert.deepEqual([inspectPng(fighterPng).width, inspectPng(fighterPng).height], [1280, 424]);
+  assert.equal(sha256(fighterPng),
+    sha256(createEnemyFighterLimitsPreview(source, definition)));
+});

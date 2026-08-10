@@ -5,6 +5,8 @@ const ATR_MAGIC = 0x0296;
 const ATR_HEADER_SIZE = 16;
 const ATR_SECTOR_SIZE = 128;
 const ATR_SECTOR_COUNT = 720;
+const ACCEPTED_DIFFICULTY_PAYLOAD_BYTES = 9644;
+const FLAGSHIP_BROADSIDE_PAYLOAD_LIMIT = 2560;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -119,9 +121,18 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
   invariant(
-    boot.length <= 0x1e00,
-    "Linked payload overlaps player-2 data at $3E00",
+    boot.length - ACCEPTED_DIFFICULTY_PAYLOAD_BYTES <=
+      FLAGSHIP_BROADSIDE_PAYLOAD_LIMIT,
+    "Flagship broadside payload delta exceeds its 2560-byte review budget",
   );
+  invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
+    "Broadside relocation source must begin at $4000");
+  invariant(manifest.broadsideRuntime?.runAddress === 0x5e10,
+    "Broadside runtime must begin at reclaimed RAM $5E10");
+  invariant(manifest.broadsideRuntime?.bytes <= manifest.broadsideRuntime?.reservedBytes,
+    "Broadside runtime exceeds its reserved relocation block");
+  invariant(boot.length === 0x2000 + manifest.broadsideRuntime.packedBytes,
+    "Boot payload does not contain the packed broadside relocation tail");
 
   const parsedXex = parseXex(xex);
   invariant(parsedXex.segments.length === 2, "XEX must contain the payload and RUNAD segments");

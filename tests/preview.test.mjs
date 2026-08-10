@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  createCapitalHullsStripPreview,
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   createGameplayPreview,
@@ -12,10 +13,14 @@ import {
   readFrontendGraphicsSource,
   readGameGraphicsSource,
 } from "../scripts/preview.mjs";
+import { loadCapitalHullsDefinition } from "../scripts/capital-hulls.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
+const capitalHullsDefinition = loadCapitalHullsDefinition(
+  path.join(rootDirectory, "assets", "graphics", "capital-hulls.json"),
+);
 
 function replaceOnce(text, original, replacement) {
   const first = text.indexOf(original);
@@ -34,7 +39,7 @@ test("gameplay preview is a structurally valid RGB PNG", () => {
   assert.deepEqual(info.chunkTypes, ["IHDR", "IDAT", "IEND"]);
 });
 
-test("gameplay preview has the expected enlarged ANTIC 4 dimensions", () => {
+test("gameplay preview has the expected enlarged mixed-mode dimensions", () => {
   const info = inspectPng(createGameplayPreview(source));
   assert.equal(info.width, PREVIEW_WIDTH);
   assert.equal(info.height, PREVIEW_HEIGHT);
@@ -94,13 +99,16 @@ test("start-menu preview is deterministic, 640x384, and source-derived", () => {
 test("preview consumes the canonical charset, screen, PMG, and palette source", () => {
   const graphics = readGameGraphicsSource(source);
   assert.equal(graphics.charset.length, 1024);
-  assert.equal(graphics.corridorLeftTiles.length, 48);
+  assert.deepEqual(
+    [graphics.alliedHullRows.length, graphics.enemyHullRows.length],
+    [32, 32],
+  );
   assert.equal(graphics.playerShape.length, 16);
   assert.deepEqual(
     ["COLBK", "COLPF0", "COLPF1", "COLPF2", "COLPF3", "COLPM0", "COLPM1", "COLPM2", "COLPM3"].map(
       (name) => graphics.hardwareState.get(name),
     ),
-    [0x00, 0x0e, 0x84, 0x28, 0x46, 0x0e, 0x0c, 0x46, 0x28],
+    [0x00, 0x0e, 0x84, 0x28, 0x44, 0x0e, 0x0c, 0x46, 0x28],
   );
   assert.equal(graphics.frontendHardwareState.get("COLPF3"), 0xd8);
   assert.match(
@@ -113,13 +121,8 @@ test("preview consumes the canonical charset, screen, PMG, and palette source", 
   const variants = [
     replaceOnce(
       source,
-      ".byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA",
-      ".byte $A9,$AA,$AA,$AA,$AA,$AA,$AA,$AA",
-    ),
-    replaceOnce(
-      source,
-      ".byte CH_PANEL_SOLID, CH_PANEL_STRIPE|$80, CH_PANEL_SOLID, CH_PANEL_EDGE,   CH_PANEL_FRAME,  CH_PANEL_TRUSS",
-      ".byte CH_SPACE,       CH_PANEL_STRIPE|$80, CH_PANEL_SOLID, CH_PANEL_EDGE,   CH_PANEL_FRAME,  CH_PANEL_TRUSS",
+      ".byte $00,$00,$10,$54,$10,$00,$00,$00",
+      ".byte $00,$00,$00,$54,$10,$00,$00,$00",
     ),
     replaceOnce(
       source,
@@ -128,12 +131,24 @@ test("preview consumes the canonical charset, screen, PMG, and palette source", 
     ),
     replaceOnce(
       source,
-      "lda #$84                    ; worn steel-blue structures",
-      "lda #$C4                    ; worn steel-blue structures",
+      "GAMEPLAY_COLPF1 = $84",
+      "GAMEPLAY_COLPF1 = $C4",
     ),
   ];
 
   for (const variant of variants) {
     assert.notDeepEqual(createGameplayPreview(variant), canonical);
   }
+
+  const changedHulls = structuredClone(capitalHullsDefinition);
+  changedHulls.glyphs[0].pixels[0] = "1222";
+  assert.notDeepEqual(createGameplayPreview(source, changedHulls), canonical);
+});
+
+test("capital-hulls strip preview is deterministic and shows all 32 rows", () => {
+  const first = createCapitalHullsStripPreview(source, capitalHullsDefinition);
+  const second = createCapitalHullsStripPreview(source, capitalHullsDefinition);
+  assert.deepEqual(first, second);
+  const info = inspectPng(first);
+  assert.deepEqual([info.width, info.height], [640, 512]);
 });

@@ -6,8 +6,16 @@
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 59,
-  "payloadBytes": 7481,
+  "bootSectors": 94,
+  "payloadBytes": 11941,
+  "broadsideRuntime": {
+    "loadAddress": 16384,
+    "runAddress": 24080,
+    "bytes": 4605,
+    "reservedBytes": 4608,
+    "packedBytes": 3749,
+    "compression": "LZ-10/5"
+  },
   "loaderScreen": {
     "mode": "mixed ANTIC F/E",
     "source": "assets/graphics/loader-bitmap.json",
@@ -24,18 +32,67 @@
     "dliCount": 2,
     "durationFrames": 250
   },
+  "capitalHulls": {
+    "source": "assets/graphics/capital-hulls.json",
+    "sourceSha256": "9f1ec818f5e54964b8598563583ac10de69548935119fde050874f21d2d3c388",
+    "displayMode": "ANTIC 4",
+    "segmentRows": 32,
+    "glyphCount": 31,
+    "glyphBytes": 248,
+    "packedMapAndMetadataBytes": 945,
+    "runtimeMapBytes": 576,
+    "turretCount": 2,
+    "previewStartPhase": 0,
+    "contourTransitions": {
+      "allied": 7,
+      "enemy": 7
+    },
+    "broadsideScheduleBytes": 8,
+    "flagshipSector": {
+      "totalRows": 240,
+      "streamRows": 248,
+      "visibleRows": 22,
+      "moduleRows": 8,
+      "sidePhaseRows": 8,
+      "sectionRows": {
+        "engines": 32,
+        "aft": 24,
+        "combat": 128,
+        "forward": 24,
+        "prow": 32
+      },
+      "moduleSourceBytes": 192,
+      "moduleSequenceBytes": 60,
+      "engineOverlayBytes": 16,
+      "prowOccupancyBytes": 64,
+      "prowCollisionBytes": 64,
+      "engineAnimationFrames": 8,
+      "engineAnimationBytes": 48,
+      "launchFlashFrames": 4,
+      "capitalExplosion": {
+        "durationFrames": 24,
+        "phaseFrames": 4,
+        "footprint": [
+          3,
+          3
+        ],
+        "pokeyChannel": 4,
+        "soundFrames": 24
+      }
+    }
+  },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 7481,
-      "sha256": "a1b3278919b0ccbd18203341f79a643a124de97f32117d24238a2d8257de40fc"
+      "bytes": 11941,
+      "sha256": "9aa6f4ddbba987bb79482b11a451a2b9a5c4826030021e468d2648d8e95a6860"
     },
     "dark-fighter.xex": {
-      "bytes": 7493,
-      "sha256": "f0f5a7fc860975cf71463cf8fbb32b1b609e4b821a14131fff690e555bd801dc"
+      "bytes": 11953,
+      "sha256": "274bf9849fc5d8b0b7117b9323177ce413028e0ebd98527efdc2e3bec00e97b3"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "c11ac3dca8627525bd8eea8a5a0484ac37325028e4e45a7a4334ff2e1829b1ae"
+      "sha256": "f85fc9b911df3111718fba3ca1c4733e41d0738c3ef0ff1231b2dad05df6bf7f"
     }
   }
 }
