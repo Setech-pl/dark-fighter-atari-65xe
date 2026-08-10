@@ -13,6 +13,11 @@ import {
   loadCapitalHullsDefinition,
 } from "./capital-hulls.mjs";
 import {
+  buildCapitalHullsAntic2Charset,
+  compileCapitalHullsAntic2Prototype,
+  loadCapitalHullsAntic2Prototype,
+} from "./capital-hulls-antic2.mjs";
+import {
   BROADSIDE_STATES,
   capitalExplosionVisual,
   centeredSpanTop,
@@ -75,6 +80,24 @@ export const DEFAULT_ENEMY_HULL_COLOUR_OPTIONS_PREVIEW_PATH = path.join(
   "build",
   "previews",
   "enemy-hull-colour-options.png",
+);
+export const DEFAULT_BROADSIDE_ANTIC2_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "gameplay-broadside-antic2-prototype.png",
+);
+export const DEFAULT_CAPITAL_HULLS_ANTIC2_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "capital-hulls-antic2-strip.png",
+);
+export const DEFAULT_BROADSIDE_COMPARISON_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "broadside-mode-comparison.png",
 );
 export const DEFAULT_BROADSIDE_FIRE_SEQUENCE_PREVIEW_PATH = path.join(
   rootDirectory,
@@ -159,6 +182,12 @@ const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   "assets",
   "graphics",
   "capital-hulls.json",
+);
+const DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH = path.join(
+  rootDirectory,
+  "assets",
+  "graphics",
+  "capital-hulls-antic2-prototype.json",
 );
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -1527,6 +1556,22 @@ export function readCapitalHullsStripRuntimeState(
   return { graphics, hardwareState, screen, registerPixels, sourceHeight };
 }
 
+function createBroadsideAntic2Screen(graphics, prototype) {
+  const screen = createCanonicalScreen(graphics);
+  let phase = requireValue(graphics.initialState, "corridor_phase");
+  for (let characterRow = 2; characterRow < SCREEN_ROWS; characterRow += 1) {
+    const segmentRow = phase & (prototype.segmentRows - 1);
+    const rowStart = characterRow * SCREEN_COLUMNS;
+    screen.set(prototype.decodedMaps.get("allied")[segmentRow], rowStart);
+    screen.set(prototype.decodedMaps.get("enemy")[segmentRow], rowStart + 31);
+    for (let column = 8; column < 32; column += 1) {
+      screen[rowStart + column] &= 0x7f;
+    }
+    phase = (phase + 1) & 0xff;
+  }
+  return screen;
+}
+
 function drawAntic2Rows({
   pixels,
   pixelHeight,
@@ -1548,7 +1593,7 @@ function drawAntic2Rows({
       for (let characterLine = 0; characterLine < CHARACTER_HEIGHT; characterLine += 1) {
         const y = characterRow * CHARACTER_HEIGHT + characterLine;
         if (y < 0 || y >= pixelHeight) {
-          throw new Error("ANTIC 2 row lies outside its simulated playfield");
+          throw new Error("ANTIC 2 prototype row lies outside its simulated playfield");
         }
         const pattern = charset[characterIndex * CHARACTER_HEIGHT + characterLine];
         for (let bit = 0; bit < 8; bit += 1) {
@@ -1559,6 +1604,90 @@ function drawAntic2Rows({
       }
     }
   }
+}
+
+export function readBroadsideAntic2PrototypeState(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+  prototypeDefinition = loadCapitalHullsAntic2Prototype(
+    DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH,
+  ),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const prototype = compileCapitalHullsAntic2Prototype(
+    prototypeDefinition,
+    capitalHullsDefinition,
+  );
+  const charset = buildCapitalHullsAntic2Charset(graphics.charset, prototype);
+  const screen = createBroadsideAntic2Screen(graphics, prototype);
+
+  // Runtime already owns a dedicated ANTIC 2 HUD. The rejected spike changes
+  // only rows 2-23 to the optional monochrome playfield for comparison.
+  const registerPixels = drawGameplayMixedScreen(graphics.hardwareState, screen, graphics);
+  drawAntic2Rows({
+    pixels: registerPixels,
+    pixelHeight: SOURCE_HEIGHT,
+    screen,
+    charset,
+    registers: prototype.palette,
+    firstCharacterRow: 2,
+    characterRows: SCREEN_ROWS - 2,
+  });
+  overlayCanonicalPmg(registerPixels, graphics);
+  return { graphics, prototype, charset, screen, registerPixels };
+}
+
+export function createBroadsideAntic2PrototypePreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+  prototypeDefinition = loadCapitalHullsAntic2Prototype(
+    DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH,
+  ),
+) {
+  const { registerPixels } = readBroadsideAntic2PrototypeState(
+    source,
+    capitalHullsDefinition,
+    prototypeDefinition,
+  );
+  return encodePng(scaleAndConvertToRgb(registerPixels));
+}
+
+export function createCapitalHullsAntic2StripPreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+  prototypeDefinition = loadCapitalHullsAntic2Prototype(
+    DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH,
+  ),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const prototype = compileCapitalHullsAntic2Prototype(
+    prototypeDefinition,
+    capitalHullsDefinition,
+  );
+  const charset = buildCapitalHullsAntic2Charset(graphics.charset, prototype);
+  const screen = new Uint8Array(SCREEN_COLUMNS * prototype.segmentRows);
+  for (let row = 0; row < prototype.segmentRows; row += 1) {
+    const rowStart = row * SCREEN_COLUMNS;
+    screen.set(prototype.decodedMaps.get("allied")[row], rowStart);
+    screen.set(prototype.decodedMaps.get("enemy")[row], rowStart + 31);
+  }
+  const sourceHeight = prototype.segmentRows * CHARACTER_HEIGHT;
+  const registerPixels = new Uint8Array(SOURCE_WIDTH * sourceHeight);
+  registerPixels.fill(requireValue(prototype.palette, "COLBK"));
+  drawAntic2Rows({
+    pixels: registerPixels,
+    pixelHeight: sourceHeight,
+    screen,
+    charset,
+    registers: prototype.palette,
+    firstCharacterRow: 0,
+    characterRows: prototype.segmentRows,
+  });
+  return encodePng(
+    scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, sourceHeight),
+    PREVIEW_WIDTH,
+    sourceHeight * PREVIEW_SCALE,
+  );
 }
 
 function drawComparisonLabel(registerPixels, width, text, x, y, frontend) {
@@ -1604,6 +1733,42 @@ export function createEnemyHullColourOptionsPreview(
   const frontend = readFrontendGraphicsSource(source);
   drawComparisonLabel(registerPixels, comparisonWidth, "COLPF3 44 DARK", 104, 4, frontend);
   drawComparisonLabel(registerPixels, comparisonWidth, "COLPF3 46 BRIGHT", 412, 4, frontend);
+  return encodePng(
+    scaleAndConvertToRgb(registerPixels, comparisonWidth, comparisonHeight),
+    comparisonWidth * PREVIEW_SCALE,
+    comparisonHeight * PREVIEW_SCALE,
+  );
+}
+
+export function createBroadsideModeComparisonPreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+  prototypeDefinition = loadCapitalHullsAntic2Prototype(
+    DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH,
+  ),
+) {
+  const current = readGameplayRuntimeState(source, capitalHullsDefinition).registerPixels;
+  const proposed = readBroadsideAntic2PrototypeState(
+    source,
+    capitalHullsDefinition,
+    prototypeDefinition,
+  ).registerPixels;
+  const comparisonWidth = SOURCE_WIDTH * 2;
+  const labelHeight = 16;
+  const comparisonHeight = SOURCE_HEIGHT + labelHeight;
+  const registerPixels = new Uint8Array(comparisonWidth * comparisonHeight);
+
+  for (let y = 0; y < SOURCE_HEIGHT; y += 1) {
+    const destination = (y + labelHeight) * comparisonWidth;
+    registerPixels.set(current.subarray(y * SOURCE_WIDTH, (y + 1) * SOURCE_WIDTH), destination);
+    registerPixels.set(
+      proposed.subarray(y * SOURCE_WIDTH, (y + 1) * SOURCE_WIDTH),
+      destination + SOURCE_WIDTH,
+    );
+  }
+  const frontend = readFrontendGraphicsSource(source);
+  drawComparisonLabel(registerPixels, comparisonWidth, "CURRENT ANTIC 4", 100, 4, frontend);
+  drawComparisonLabel(registerPixels, comparisonWidth, "PROPOSED ANTIC 2", 416, 4, frontend);
   return encodePng(
     scaleAndConvertToRgb(registerPixels, comparisonWidth, comparisonHeight),
     comparisonWidth * PREVIEW_SCALE,
@@ -2922,6 +3087,63 @@ export function generateEnemyHullColourOptionsPreview({
   return { outputPath, bytes: png.length, ...inspectPng(png) };
 }
 
+export function generateBroadsideAntic2PrototypePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  capitalHullsDefinitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  prototypeDefinitionPath = DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH,
+  outputPath = DEFAULT_BROADSIDE_ANTIC2_PREVIEW_PATH,
+} = {}) {
+  const source = fs.readFileSync(sourcePath, "utf8");
+  const capitalHullsDefinition = loadCapitalHullsDefinition(capitalHullsDefinitionPath);
+  const prototypeDefinition = loadCapitalHullsAntic2Prototype(prototypeDefinitionPath);
+  const png = createBroadsideAntic2PrototypePreview(
+    source,
+    capitalHullsDefinition,
+    prototypeDefinition,
+  );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, png);
+  return { outputPath, bytes: png.length, ...inspectPng(png) };
+}
+
+export function generateCapitalHullsAntic2StripPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  capitalHullsDefinitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  prototypeDefinitionPath = DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH,
+  outputPath = DEFAULT_CAPITAL_HULLS_ANTIC2_PREVIEW_PATH,
+} = {}) {
+  const source = fs.readFileSync(sourcePath, "utf8");
+  const capitalHullsDefinition = loadCapitalHullsDefinition(capitalHullsDefinitionPath);
+  const prototypeDefinition = loadCapitalHullsAntic2Prototype(prototypeDefinitionPath);
+  const png = createCapitalHullsAntic2StripPreview(
+    source,
+    capitalHullsDefinition,
+    prototypeDefinition,
+  );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, png);
+  return { outputPath, bytes: png.length, ...inspectPng(png) };
+}
+
+export function generateBroadsideModeComparisonPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  capitalHullsDefinitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  prototypeDefinitionPath = DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH,
+  outputPath = DEFAULT_BROADSIDE_COMPARISON_PREVIEW_PATH,
+} = {}) {
+  const source = fs.readFileSync(sourcePath, "utf8");
+  const capitalHullsDefinition = loadCapitalHullsDefinition(capitalHullsDefinitionPath);
+  const prototypeDefinition = loadCapitalHullsAntic2Prototype(prototypeDefinitionPath);
+  const png = createBroadsideModeComparisonPreview(
+    source,
+    capitalHullsDefinition,
+    prototypeDefinition,
+  );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, png);
+  return { outputPath, bytes: png.length, ...inspectPng(png) };
+}
+
 export function generateBroadsideFireSequencePreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
@@ -3110,6 +3332,27 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`  PNG : ${path.relative(rootDirectory, enemyHullColoursResult.outputPath)}`);
     console.log(
       `  size: ${enemyHullColoursResult.width}x${enemyHullColoursResult.height}, ${enemyHullColoursResult.bytes} bytes`,
+    );
+
+    const broadsideAntic2Result = generateBroadsideAntic2PrototypePreview();
+    console.log(`ANTIC 2 broadside gameplay prototype generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, broadsideAntic2Result.outputPath)}`);
+    console.log(
+      `  size: ${broadsideAntic2Result.width}x${broadsideAntic2Result.height}, ${broadsideAntic2Result.bytes} bytes`,
+    );
+
+    const capitalHullsAntic2Result = generateCapitalHullsAntic2StripPreview();
+    console.log(`ANTIC 2 capital-hulls strip generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, capitalHullsAntic2Result.outputPath)}`);
+    console.log(
+      `  size: ${capitalHullsAntic2Result.width}x${capitalHullsAntic2Result.height}, ${capitalHullsAntic2Result.bytes} bytes`,
+    );
+
+    const comparisonResult = generateBroadsideModeComparisonPreview();
+    console.log(`Broadside mode comparison generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, comparisonResult.outputPath)}`);
+    console.log(
+      `  size: ${comparisonResult.width}x${comparisonResult.height}, ${comparisonResult.bytes} bytes`,
     );
 
     const broadsideFireResult = generateBroadsideFireSequencePreview();

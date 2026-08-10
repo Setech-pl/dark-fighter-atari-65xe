@@ -137,3 +137,21 @@ tablice profili PROW są deterministycznie generowane z tych
 samych map, depth i projekcji turretów co ekran. Detektor kontaktu P0/P3 nie
 alokuje osobnej collision map i nie czyta `P0PF/P3PF`; gwiazdy mogą ustawić
 playfield latch, ale nigdy nie trafiają do tablic granic kadłubów.
+
+## Odrzucony kandydat pełnego playfieldu ANTIC 2
+
+Owner wybrał ANTIC 4 dla playfieldu i pełnoekranowy ANTIC 2 nie będzie
+integrowany. Spike nie zmienia powyższej mapy playfieldu. Zakres
+`$5000-$53FF`, rozważany historycznie dla
+monochromatycznych kadłubów, jest teraz używany wyłącznie przez dedykowany
+font tekstowego HUD-u ANTIC 2. Nie powstaje drugi charset kadłubów ani
+transition całego playfieldu.
+
+Proponowany charset ma dokładnie 1024 B. Ekran `$4000-$43FF`, rozwinięte mapy
+`$4C00-$4E3F`, metadata baterii i PMG `$3800-$3FFF` mogą być współdzielone bez
+dodatkowych bajtów. Źródło prototypu zawiera 192 B glifów kadłubów i 16 B
+gwiazd, lecz nie jest linkowane. Hipotetyczna integracja potrzebowałaby
+jeszcze osobnej 32-bajtowej display list oraz krótkich procedur przygotowania,
+przejścia i jednego DLI palety. Bieżące 40 B fill przed `$4000` nie wystarczy na ten
+kod. Liczby pozostają evidence odrzuconego wariantu, a nie przyszłą rezerwacją
+lub planem przepakowania.

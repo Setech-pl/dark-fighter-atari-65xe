@@ -51,6 +51,15 @@ Editable source art and conversion metadata belong here. Every accepted asset sh
   pikselowym. Trzy dalsze glify oraz sześć
   faz 3×3 opisują 24-ramkową eksplozję kadłuba, a dwie 24-bajtowe tabele
   definiują source-derived `AUDF4/AUDC4` crack/rumble.
+- `capital-hulls-antic2-prototype.json` — wyłącznie źródłowy spike
+  320-pikselowego, jednobitowego playfieldu broadside. Definiuje 22 zamienniki
+  glifów 8×8 oraz dwa glify gwiazd, ale celowo nie duplikuje map ani metadanych
+  baterii: `scripts/capital-hulls-antic2.mjs` pobiera je z
+  `capital-hulls.json`, usuwa niepoprawny dla ANTIC 2 bit banku koloru i
+  buduje deterministyczny obraz proponowanego charsetu. Plik nie jest częścią
+  builda XEX/ATR i nie rezerwuje RAM. Owner wybrał ANTIC 4 do produkcji;
+  źródło i podglądy ANTIC 2 pozostają czasowo jako evidence porównania i mają
+  zostać usunięte dopiero po akceptacji nowego kandydata ANTIC 4.
 
 The gameplay reference is not copied pixel-for-pixel into video memory.
 Gameplay art is redrawn for a 160-color-clock ANTIC 4 playfield and
@@ -108,3 +117,12 @@ wszystkich trzech fazach oraz przejście housing→AFT;
 `capital-prow-sequence.png` pokazuje pełne zwężenie obu niejednakowych dziobów,
 a `enemy-fighter-corridor-limits.png` renderuje P1/P2 przy obu kanonicznych
 granicach HPOS bez nakładania choćby jednego piksela na side hull.
+
+Ten sam publiczny command tworzy trzy pliki eksperymentalne:
+`gameplay-broadside-antic2-prototype.png`, `capital-hulls-antic2-strip.png`
+oraz `broadside-mode-comparison.png`. Pierwsze dwa interpretują jednobitowe
+glify dokładnie jak ANTIC 2 (`COLPF2=$00` dla tła i neutralna luminancja
+`COLPF1=$0A` dla bitu 1), a gameplay prototype nakłada istniejące P0–P3 z
+definicji assembly. Porównanie zestawia ten wynik z bieżącym ANTIC 4; etykiety
+leżą poza symulowanymi ekranami Atari. Żaden z tych PNG nie jest malowany ani
+korygowany po renderze.

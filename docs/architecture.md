@@ -423,6 +423,121 @@ tym miejscu: 3749-bajtowy, przejściowy ogon zajmuje `$4000-$4EA4` do chwili
 rozpakowania. Nie jest to resident obraz ekranu ani „cała wolna pamięć Atari”.
 Dokładne role czasowe pozostają w `docs/memory-map.md`.
 
+## Odrzucony spike architektoniczny: osobny playfield broadside ANTIC 2
+
+Owner porównał oba rendery i podjął wiążącą decyzję: produkcyjny broadside
+pozostaje ANTIC 4. ANTIC 2 poprawiał cienkie linie, lecz odbierał scenie kolor,
+głębię i atmosferę. Ta sekcja zachowuje **niezintegrowany, odrzucony prototyp
+jako evidence**; nie jest roadmapą implementacji. Bieżący XEX i ATR zachowują
+ANTIC 4 dla całego playfieldu pod HUD-em; wyłącznie dwa górne wiersze HUD-u
+używają ANTIC 2.
+Edytowalne źródło `assets/graphics/capital-hulls-antic2-prototype.json` oraz
+renderer preview sprawdzają, czy chwilowa scena broadside zyskuje dostatecznie
+dużo czytelności przy przejściu na monochromatyczne 320 px.
+
+### Potwierdzone ograniczenie i proponowana organizacja
+
+Opcode display list ustala tryb ANTIC dla całej poziomej mode line. Nie można
+więc zbudować w jednym scanline układu `ANTIC 2 | ANTIC 4 | ANTIC 2`, a zmiana
+kolorów w połowie linii nie zmienia interpretacji bitów. Cycle-exact kernel
+poziomy nie jest proponowany: nie ma pomiaru potwierdzającego stabilne 50 FPS
+PAL ani real hardware.
+
+Proponowana osobna display list zachowuje 24 blank scanlines, potem HUD pod
+`$4000` jako `$44` (ANTIC 4 + LMS), divider pod `$4028` jako `$84` (ANTIC 4 +
+DLI), 22 wiersze `$02` (ANTIC 2) pod `$4050-$43BF` oraz JVB. Ma 32 B. ANTIC 2
+i ANTIC 4 pobierają tu po 40 screen bytes na wiersz i po osiem scanlines, więc
+całe obecne `$4000-$43FF`, 840-bajtowa kopia scrolla i faza 32-wierszowej mapy
+pozostałyby geometrycznie zgodne. Historyczny spike poprzedzał wybór trudności;
+produkcyjny ANTIC 4 używa teraz akumulatora 8/9/10 zdarzeń na 20 ramek PAL.
+
+`CHBASE` obowiązuje globalnie. Historyczny spike zakładał charset
+`$5000-$53FF`, który kopiowałby wszystkie 1024 B zaakceptowanego charsetu
+`$4400-$47FF`, a następnie
+podmieniałby 176 B indeksów 59–80 i 16 B indeksów gwiazdy/kropki. HUD zachowuje
+te same indeksy i bytes. Mapy 32×9 B i rekordy czterech wylotów pozostają
+źródłem prawdy; przy zapisie prawego kadłuba generator musi maskować
+`screenCode & $7F`, ponieważ bit 7 oznacza w ANTIC 2 inverse, a nie bank PF3.
+Ten historyczny adres jest obecnie zajęty przez produkcyjny font HUD i nie
+jest rezerwacją dla prototypu; ewentualny powrót do spike'u wymagałby nowego
+audytu wyrównanego zakresu.
+
+Playfield broadside jest uczciwie monochromatyczny: po dividerze pojedynczy
+DLI ustawia `COLPF1=$0A`, `COLPF2=$00`, `COLBK=$00`. Bit 0 daje prawdziwą
+czerń, a bit 1 neutralną stalową luminancję. Allied/enemy różnią się gęstością,
+konturem, płytami i wnękami, nie fałszywym kolorem. P0 pozostaje jasnym
+myśliwcem gracza, P3 bursztynowym silnikiem, P1 przeciwnikiem, P2 czerwonym
+skanerem, a M0 pociskiem gracza. Historyczny preview spike nie przydzielał
+M1–M3; bieżący runtime ANTIC 4 wykorzystuje je już w osobnym systemie opisanym
+powyżej.
+
+### Przygotowanie i atomowe przejścia
+
+Kopiowanie i patchowanie charsetu (około 10 495 cykli dla kopii 1 KB oraz
+około 2 700 cykli dla 192 B podmian) musi być wykonane wcześniej, poza VBI,
+przy wyłączonym DMA albo w rozłożonej fazie setupu. Widoczna zmiana może potem
+zmieścić się w jednym vertical blank bez wyłączania DMA, o ile scheduler
+gwarantuje wejście przed pierwszą widoczną linią i wszystkie dane są gotowe.
+
+Sekwencja wejścia do broadside:
+
+1. ustaw sector state na przygotowany broadside i `NMIEN=$00`;
+2. ustaw `DLISTL/H` na broadside display list i `CHBASE=$50`;
+3. ustaw `VDSLST` na ograniczony DLI palety;
+4. ustaw dla HUD zaakceptowane `COLPF0=$0E`, `COLPF1=$84`, `COLPF2=$28`,
+   `COLPF3=$44`, `COLBK=$00` oraz `PRIOR=$00`;
+5. zapisz `HITCLR`, następnie włącz tylko DLI przez `NMIEN=$80`.
+
+Sekwencja wyjścia do zwykłego lotu:
+
+1. ustaw `NMIEN=$00`;
+2. przywróć normalne `DLISTL/H`, `CHBASE=$44` i pełną paletę
+   `$0E/$84/$28/$44/$00`;
+3. potwierdź `PMBASE=$38`, `SIZEP0..3=$01`, `SIZEM=$54`, `PRIOR=$00` i
+   `GRACTL=$03`;
+4. przywróć normalny generator tła/interpretację kolizji, zapisz `HITCLR` i
+   pozostaw gameplay DLI wyłączone.
+
+Nie jest potrzebny OS call. Sam zestaw zapisów wejścia szacuje się na około
+82–90 cykli 6502, a restore na około 100–120 cykli; oba mieszczą się w VBI.
+DLI playfieldu używa tylko A, `WSYNC`, trzech zapisów koloru i RTI; jego
+konserwatywny worst case wraz z oczekiwaniem pozostaje poniżej około 160 cykli
+na ramkę broadside. Jeśli przyszły scheduler nie zagwarantuje wejścia w VBI,
+bezpiecznym fallbackiem jest jedna kompletna czarna ramka z `DMACTL=$00`, nie
+częściowo przełączona ramka.
+
+### Pamięć, CPU i kolizje
+
+Historycznie szacowany dodatkowy resident asset to 1024 B wyrównanego
+charsetu kadłubów. Screen,
+mapy, metadata, PMG i zero page mają delta 0 B. Linkowane źródło glifów miałoby
+192 B; osobna display list 32 B. Kod kopiowania, DLI i dwóch przejść nie jest
+jeszcze zaimplementowany, więc jego uczciwy próg planistyczny wynosi około
+225–275 B, dając przewidywany payload delta około 449–499 B. Rzeczywisty delta
+musiałby pochodzić z linker map ewentualnej przyszłej integracji. Spike ma
+payload delta 0 B i nie rezerwuje RAM; `$5000-$53FF` należy teraz wyłącznie do
+produkcyjnego HUD-u.
+
+Spike nie zmienia produkcyjnych, rozdzielonych kopii world/hull ani PMG.
+Historyczny szacunek pełnej wspólnej kopii 840 B został zastąpiony bounded
+ścieżkami 462 komórek środka i 336 komórek kadłubów. ANTIC 2
+i 4 pobierają tę samą liczbę bytes ekranu i glifów; dokładny
+rozkład DMA steals nadal wymaga pomiaru Atari 65XE PAL.
+
+Bieżąca logika odczytuje latch'e PMG–PMG dla pocisków i fighterów, natomiast
+kontakt gracza i trafienia capital hull rozstrzyga z wierszowej geometrii
+źródłowej; nie zależy od `P0PF/P3PF` ani od gwiazd. Pozostałaby więc bez zmiany.
+Sprzętowe latch'e PMG–playfield miałyby w ANTIC 2 inną semantykę pojedynczej
+płaszczyzny niż cztery role ANTIC 4. Przyszłe trafienia side hulls muszą użyć
+wierszowych bounds/masek i istniejących metadanych muzzle jako źródła prawdy,
+z `HITCLR` na obu przejściach, zamiast polegać na kolorowym banku znaku.
+
+Pełny ANTIC F 320×192 został odrzucony dla tego kierunku: wymaga 7680 B
+bitmapy zamiast 1024 B charsetu, nie współdzieli tanio obecnych map znakowych i
+komplikuje przewijanie. ANTIC 2 nie będzie integrowany. Jego source-derived
+previews pozostają tymczasowo w worktree wyłącznie do chwili akceptacji
+następnego kandydata ANTIC 4.
+
 ## Docelowa architektura przyrostowa
 
 ### Jeden resident gameplay program
