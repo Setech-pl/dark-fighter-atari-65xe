@@ -3,17 +3,18 @@
   "gameVersion": "0.1.1",
   "target": "Atari 65XE PAL / 64 KB",
   "toolchain": "romdev-toolchain-cc65@0.1.3",
+  "buildVariant": "release",
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 94,
-  "payloadBytes": 11941,
+  "bootSectors": 101,
+  "payloadBytes": 12906,
   "broadsideRuntime": {
     "loadAddress": 16384,
     "runAddress": 24080,
-    "bytes": 4605,
-    "reservedBytes": 4608,
-    "packedBytes": 3749,
+    "bytes": 5630,
+    "reservedBytes": 5632,
+    "packedBytes": 4714,
     "compression": "LZ-10/5"
   },
   "loaderScreen": {
@@ -27,14 +28,14 @@
     "bitmapAddress": 16400,
     "secondLmsLine": 102,
     "secondLmsAddress": 20480,
-    "packedBitmapBytes": 3370,
+    "packedBitmapBytes": 2027,
     "unpackedBitmapBytes": 7680,
     "dliCount": 2,
     "durationFrames": 250
   },
   "capitalHulls": {
     "source": "assets/graphics/capital-hulls.json",
-    "sourceSha256": "9f1ec818f5e54964b8598563583ac10de69548935119fde050874f21d2d3c388",
+    "sourceSha256": "a927aa73d9d444425cc52809e40ffc9ac3f26ee92327d02d24cfaa8198cb5bb4",
     "displayMode": "ANTIC 4",
     "segmentRows": 32,
     "glyphCount": 31,
@@ -51,7 +52,7 @@
     "flagshipSector": {
       "totalRows": 240,
       "streamRows": 248,
-      "visibleRows": 22,
+      "visibleRows": 23,
       "moduleRows": 8,
       "sidePhaseRows": 8,
       "sectionRows": {
@@ -81,18 +82,207 @@
       }
     }
   },
+  "enemyRoster": {
+    "source": "assets/graphics/enemy-roster.json",
+    "sourceSha256": "2172e3f523c4ed099566409452d76b1a372c6b51cbd890021ce41b3db399ee78",
+    "inventoryCount": 10,
+    "implementedCount": 3,
+    "releaseArchetype": "RAIDER",
+    "runtimeArtBytes": 57,
+    "descriptorBytes": 33,
+    "palette": {
+      "selectedId": "MEDIUM_STEEL_BLUE",
+      "releaseBodyValue": 132,
+      "artifactBodyValue": 132,
+      "scannerValue": 70
+    },
+    "weaponPolicy": {
+      "singlePulse": {
+        "renderer": "ANTIC4_GLYPH_POOL",
+        "poolSlots": 9,
+        "burstCount": 10,
+        "burstIntervalFrames": 4,
+        "postBurstFrames": [
+          60,
+          50,
+          40
+        ],
+        "speed": 5,
+        "height": 3,
+        "widthHpos": 2,
+        "damage": 10,
+        "lifetimeFrames": 96,
+        "colourRegister": "COLPF3",
+        "colourValue": 70
+      }
+    },
+    "projectileVisuals": {
+      "player": {
+        "widthHpos": 1,
+        "height": 2,
+        "coreRegister": "COLPF2",
+        "coreValue": 30
+      },
+      "raider": {
+        "widthHpos": 2,
+        "height": 3,
+        "register": "COLPF3",
+        "value": 70
+      },
+      "capital": {
+        "widthHpos": 8,
+        "height": 6,
+        "coreRegister": "COLPF0",
+        "coreValue": 14,
+        "colonialRegister": "COLPF2",
+        "colonialValue": 30,
+        "colonialAttribute": 0,
+        "cylonRegister": "COLPF3",
+        "cylonValue": 70,
+        "cylonAttribute": 128
+      }
+    },
+    "damagePolicy": {
+      "priority": [
+        "PLAYER_PROJECTILE",
+        "PLAYER_CONTACT",
+        "CAPITAL_CYLON",
+        "CAPITAL_COLONIAL",
+        "ENEMY_PROJECTILE",
+        "CLEANUP"
+      ],
+      "scoreAwarding": [
+        "PLAYER_PROJECTILE",
+        "PLAYER_CONTACT",
+        "CAPITAL_CYLON"
+      ]
+    },
+    "anchors": [
+      {
+        "id": "RAIDER",
+        "reference": "assets/graphics/Cylon Raider.png",
+        "height": 14,
+        "hardwareWidth": "DOUBLE",
+        "visibleWidth": 16,
+        "logicalBounds": [
+          80,
+          160
+        ],
+        "hposBounds": [
+          80,
+          160
+        ],
+        "frames": 3,
+        "releaseEnabled": true
+      },
+      {
+        "id": "TALON",
+        "reference": "assets/graphics/Talon Interceptor.png",
+        "height": 16,
+        "hardwareWidth": "NORMAL",
+        "visibleWidth": 6,
+        "logicalBounds": [
+          80,
+          170
+        ],
+        "hposBounds": [
+          79,
+          169
+        ],
+        "frames": 3,
+        "releaseEnabled": false
+      },
+      {
+        "id": "SCYTHE_BOMBER",
+        "reference": "assets/graphics/Scythe Bomber.png",
+        "height": 16,
+        "hardwareWidth": "DOUBLE",
+        "visibleWidth": 16,
+        "logicalBounds": [
+          80,
+          160
+        ],
+        "hposBounds": [
+          80,
+          160
+        ],
+        "frames": 3,
+        "releaseEnabled": false
+      }
+    ]
+  },
+  "fighterWeapons": {
+    "source": "assets/graphics/fighter-weapons.json",
+    "sourceSha256": "f83ef36d802f59993b800325f37af9ad9c719d5b1f49d34e472c381c72170c5d",
+    "viewport": {
+      "activeImageTop": 8,
+      "hudRows": 1,
+      "gameplayRows": 23,
+      "screenColumns": 40,
+      "leftHpos": 48,
+      "hudTop": 8,
+      "hudBottom": 16,
+      "gameplayTop": 16,
+      "gameplayBottom": 200
+    },
+    "poolSlots": {
+      "viper": 10,
+      "raider": 9,
+      "total": 19
+    },
+    "runtimeStateBytes": 202,
+    "sharedFighterExplosion": {
+      "frameCount": 6,
+      "frameDurationFrames": 4,
+      "totalFrames": 24,
+      "dimensions": [
+        8,
+        8
+      ],
+      "slots": 2,
+      "artBytes": 54
+    },
+    "viper": {
+      "poolSlots": 10,
+      "burstCount": 10,
+      "burstIntervalFrames": 3,
+      "postBurstFrames": 12,
+      "speedScanlines": 6,
+      "widthHpos": 1,
+      "heightScanlines": 2,
+      "colourRegister": "COLPF2",
+      "colourValue": 30
+    },
+    "raider": {
+      "poolSlots": 9,
+      "burstCount": 10,
+      "burstIntervalFrames": 4,
+      "postBurstFrames": [
+        60,
+        50,
+        40
+      ],
+      "speedScanlines": 5,
+      "widthHpos": 2,
+      "heightScanlines": 3,
+      "damage": 10,
+      "lifetimeFrames": 96,
+      "colourRegister": "COLPF3",
+      "colourValue": 70
+    }
+  },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 11941,
-      "sha256": "9aa6f4ddbba987bb79482b11a451a2b9a5c4826030021e468d2648d8e95a6860"
+      "bytes": 12906,
+      "sha256": "a0e355e90dbcd91dc08e75d9e59fbee4f9ce548c6e7aa4286002665684e1868e"
     },
     "dark-fighter.xex": {
-      "bytes": 11953,
-      "sha256": "274bf9849fc5d8b0b7117b9323177ce413028e0ebd98527efdc2e3bec00e97b3"
+      "bytes": 12918,
+      "sha256": "465866aef3c0ed68a2146895dd07913077dd4d8f1fbbd9a1bddd0791317a2cd9"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "f85fc9b911df3111718fba3ca1c4733e41d0738c3ef0ff1231b2dad05df6bf7f"
+      "sha256": "cad8f44b54b195de963d47616bcf30ea5f2ec0834e18e246d5057a7860660298"
     }
   }
 }

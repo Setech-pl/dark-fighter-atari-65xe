@@ -5,8 +5,8 @@ const ATR_MAGIC = 0x0296;
 const ATR_HEADER_SIZE = 16;
 const ATR_SECTOR_SIZE = 128;
 const ATR_SECTOR_COUNT = 720;
-const ACCEPTED_DIFFICULTY_PAYLOAD_BYTES = 9644;
-const FLAGSHIP_BROADSIDE_PAYLOAD_LIMIT = 2560;
+const ACCEPTED_BROADSIDE_PAYLOAD_BYTES = 11941;
+const ENEMY_ROSTER_PAYLOAD_LIMIT = 1024;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -121,9 +121,9 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
   invariant(
-    boot.length - ACCEPTED_DIFFICULTY_PAYLOAD_BYTES <=
-      FLAGSHIP_BROADSIDE_PAYLOAD_LIMIT,
-    "Flagship broadside payload delta exceeds its 2560-byte review budget",
+    boot.length - ACCEPTED_BROADSIDE_PAYLOAD_BYTES <=
+      ENEMY_ROSTER_PAYLOAD_LIMIT,
+    "Enemy-roster plus projectile-correction payload delta exceeds 1024 bytes",
   );
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
     "Broadside relocation source must begin at $4000");

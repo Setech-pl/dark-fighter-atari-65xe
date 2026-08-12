@@ -16,8 +16,8 @@ w `docs/roadmap.md`.
 
 Program przejmuje ekran i po starcie nie korzysta z usług DOS-u. XEX i ATR
 zawierają ten sam payload ładowany pod `$2000`. Pierwsze 8192 B pozostaje pod
-`$2000-$3FFF`; 3749-bajtowy pakowany ogon spod `$4000` jest przed loaderem
-rozwijany własnym ograniczonym dekoderem do `$5E10-$700C`. Dopiero potem
+`$2000-$3FFF`; 4714-bajtowy pakowany ogon spod `$4000` jest przed loaderem
+rozwijany własnym ograniczonym dekoderem do `$5E10-$740D`. Dopiero potem
 bitmapa loadera może nadpisać przejściowe źródło. XEX uruchamia etykietę `start`,
 a bootowalny ATR wczytuje kolejne sektory i dochodzi do `start` przez
 `DOSVEC`. Bieżący gameplay jest jednym resident programem; title loader jest
@@ -28,7 +28,7 @@ się sam; wybór `START GAME` przechodzi przez jedną procedurę resetu i dopier
 wtedy wchodzi do istniejącej głównej pętli:
 
 1. czeka na kolejną ramkę przez polling `VCOUNT`;
-2. odczytuje joystick i FIRE oraz aktualizuje M0;
+2. odczytuje joystick i FIRE oraz aktualizuje stałą pulę burst Vipera;
 3. aktualizuje pojedynczego przeciwnika;
 4. przechwytuje wszystkie potrzebne latch'e PMG, zachowuje kontrakt M0,
    aktualizuje trzy sloty broadside i dopiero potem zapisuje `HITCLR`;
@@ -47,7 +47,7 @@ przeciwnikiem tylko resetuje przeciwnika, uruchamia dźwięk i krótką zmianę 
 ### Zaakceptowany loader i przejście
 
 1. Kod wyłącza NMI, DMA, PMG i dźwięk.
-2. Rozwija 3370-bajtowy PackBits do 7680-bajtowej bitmapy
+2. Rozwija 2027-bajtowy LZ-10/5 do 7680-bajtowej bitmapy
    `$4010-$5E0F`.
 3. Instaluje `loader_dli`, synchronizuje początek ramki i włącza DLI oraz
    mieszany playfield DMA: ANTIC F dla tytułu i statku, ANTIC E dla footera.
@@ -110,8 +110,10 @@ wybór. Dzięki temu ustawienie trwa przez powroty do menu w jednej sesji.
 
 ### Obraz i PMG
 
-- Gameplay używa wspólnego ekranu `$4000-$43FF`: dwa górne wiersze to
-  40-kolumnowy ANTIC 2 HUD, a 22 wiersze poniżej pozostają ANTIC 4. HUD ma
+- Gameplay używa wspólnego ekranu `$4000-$43FF`: górny wiersz to
+  40-kolumnowy ANTIC 2 HUD, a 23 wiersze poniżej pozostają ANTIC 4. Ostatni
+  scanline każdego używanego glifu HUD tworzy jednoliniowy biały separator.
+  HUD ma
   dedykowany charset `$5000-$53FF`; playfield zachowuje charset
   `$4400-$47FF`. Frontend używa tego samego bufora z własnym charsetem
   `$4800-$4BFF`; mieszany main menu ma wiersze 20- i 40-bajtowe, a sub-screeny
@@ -135,9 +137,11 @@ wybór. Dzięki temu ustawienie trwa przez powroty do menu w jednej sesji.
   odcinek stałej głębokości trwa 2–8 wierszy. Dwa lokalne, kilkurzędowe
   cofnięcia o jedną komórkę zwiększają profil o około 12,5% szerokości
   nominalnego ośmiokolumnowego pasa, bez poszerzania całej ściany.
-  Allied glyphs używają D7=0, więc ich piksele `11` trafiają do bursztynowego
-  `COLPF2`; enemy glyphs używają D7=1, więc ich główne piksele `11` trafiają do
-  burgundowego `COLPF3=$44`. Piksele `10` nadal wybierają wspólny stalowy
+  Allied glyphs używają D7=0, ale ich pancerz jest zbudowany przede wszystkim
+  z pikseli `10`, które wybierają stalowy `COLPF1=$84`; `COLPF2=$1E` jest
+  zarezerwowany dla żółtego ognia Vipera/Colonial i nielicznych jasnych
+  punktów energii. Enemy glyphs używają D7=1, więc ich główne piksele `11`
+  trafiają do czerwonego `COLPF3=$46`. Piksele `10` nadal wybierają wspólny stalowy
   `COLPF1=$84`, a `00` czarne `COLBK=$00`.
 - `START GAME` jednorazowo rozwija mapy do `$4C00-$4E3F` (576 B) przy
   wyłączonym DMA. Koszt jest ograniczony do około 27 000 cykli setupu i nie
@@ -145,7 +149,12 @@ wybór. Dzięki temu ustawienie trwa przez powroty do menu w jednej sesji.
   więc zero page nie rośnie.
 - Player 0 to korpus Vipera, Player 3 jego pomarańczowy silnik.
 - Player 1 to obecny korpus przeciwnika, Player 2 czerwony skaner.
-- Missile 0 to pojedynczy pocisk gracza. M1–M3 tworzą stałą pulę broadside;
+- M0 pozostaje wyłącznie zarezerwowane dla broni gracza, ale szybki burst jest
+  renderowany przez niezależną pulę glifów ANTIC 4, aby uzyskać literalne
+  `COLPF2=$1E` bez recoloru P0. M1–M3 rezerwują stałą pulę broadside
+  dla warningów i impactów; po launchu capital slug jest
+  dwukomórkowym overlayem ANTIC 4 sterowanym nadal przez ten sam logiczny
+  slot; oba kody tła są zachowywane i odtwarzane;
   wszystkie cztery missiles współdzielą bajt każdego scanline pod `$3B00`.
   Maski M1/M2/M3 to `$0C/$30/$C0`, a maski czyszczące `$F3/$CF/$3F`, dzięki
   czemu rysowanie lub kasowanie jednego slotu nie zmienia pozostałych par
@@ -153,7 +162,7 @@ wybór. Dzięki temu ustawienie trwa przez powroty do menu w jednej sesji.
 - Loader nie używa PMG.
 - Main menu czasowo używa P0 i P3 dla powiększonego istniejącego Vipera oraz
   P2 dla światła identyfikacyjnego. `START GAME` czyści PMG, przywraca
-  `SIZEP0/SIZEP3=$01`, `COLPF2=$28` i `COLPF3=$44` przed gameplayem.
+  `SIZEP0/SIZEP3=$01`, `COLPF2=$1E` i `COLPF3=$46` przed gameplayem.
 
 ### Stan, losowość i audio
 
@@ -172,18 +181,23 @@ Nie ma jeszcze docelowego odtwarzacza ani budżetu audio.
 
 ### Broadside runtime, scheduling i damage
 
-M1, M2 i M3 dziedziczą istniejące `COLPM1=$0C`, `COLPM2=$46` i
-`COLPM3=$28`; żaden aktor PMG nie został przekolorowany. Każdy slot ma jawny
-stan `FREE/WARNING/FLYING/IMPACT`. Każda z dokładnie 25 ramek warningu jest
+M1, M2 i M3 dziedziczą `COLPM1=$84`, `COLPM2=$46` i `COLPM3=$28`; dlatego
+koloru lecącego capital sluga nie można bezpiecznie uzależnić od tych
+rejestrów. Każdy slot ma jawny stan
+`FREE/WARNING/FLYING/IMPACT`. Każda z dokładnie 25 ramek warningu jest
 widoczna: ramki 0–7 mają 2 scanlines i normalną szerokość, 8–16 mają 4
 scanlines i szerokość double, a 17–24 mają 6 scanlines i pulsują grupami po
 dwie ramki między double i quad. Efekt rośnie wyłącznie w stronę corridor,
 pozostaje przy przewijającym się wylocie i kończy się double-width bez skoku
-położenia do lecącego pocisku. Lecący slug pulsuje wyłącznie bitmapą missiles:
-dwie ramki mają 3 scanlines, następne dwie 4 scanlines. Zachowuje podwójną
-szerokość i dotychczasową czteroliniową obwiednię kolizji, przesuwa się poziomo
-o 2 jednostki HPOS na ramkę i nie homuje. Nie ma zapisu do `COLPM`, więc
-dzielone kolory P1–P3 nie migają. Impact ma 8 scanlines, miga przez 5 ramek i
+położenia do lecącego pocisku. Lecący slug nadpisuje dokładnie dwie sąsiednie
+komórki ANTIC 4 i pulsuje co dwie ramki między istniejącymi glifami lozenge.
+Ma 8 jednostek HPOS szerokości, 6 scanlines wysokości i 40 zajętych native
+pixeli; allied wybiera `COLPF2=$1E` (yellow-gold), a enemy D7=1 i
+`COLPF3=$46` (crimson). Przesuwa się logicznie o 2 HPOS na ramkę, nie homuje,
+a swept collision obejmuje pełne 8×6 i poprzednie/aktualne położenie. Overlay
+zapisuje i przywraca oba dokładne kody tła, nie używa `COLPM`, `SIZEM` ani DMA
+missiles, więc P0–P3, M0 i czerwony scanner nie migają. Impact nadal używa
+tego samego zarezerwowanego slotu M1–M3, ma 8 scanlines, miga przez 5 ramek i
 wraca do `FREE` bez osobnego PMG. Na launch powstaje czteroramkowy,
 niekolizyjny glif muzzle flash; do końca timera pozostaje przy źródłowym
 wierszu działa i jest przywracany z właściwego modułu kadłuba.
@@ -237,32 +251,108 @@ Oba prows schodzą przez siedem poziomów z 8 do 1 komórki; częściowe glify
 krawędzi rysują ukośny terminal tip, po którym generator wydaje wyłącznie
 pusty drain.
 
-Zwykły hostile fighter składa się z podwójnie szerokich P1/P2. Pełna
-obwiednia widoczna ma 16 HPOS, więc kanoniczne położenie origin wynosi
-`ENEMY_X_MIN=80` do `ENEMY_X_MAX=160` dla corridor `[80,176)`. Init, reset,
-oba kierunki steering i ostateczny `draw_enemy` używają tych samych wartości;
-renderer clampuje przed jednoczesnym zapisem HPOSP1/HPOSP2. Żaden zwykły
-spawn ani krok AI nie może więc wystawić piksela nad side hull, a ruch nadal
-odbija się naturalnie na obu granicach.
+Zwykły hostile fighter używa jednego wspólnego renderera P1/P2 i indeksowanego
+deskryptora archetypu. P1 niesie jednoramkowy mask body, P2 rzeczywisty
+czerwony scanner; trzy fazy skanera wybierają jeden z trzech bajtów co osiem
+ramek. Deskryptory przechowują wysokość, `SIZEP`, inset widocznego pierwszego
+bitu, szerokość, logical/HPOS limits, offsety body/accent, liczbę klatek, HP,
+BCD score, movement/weapon profile i flags. Nie ma osobnej ścieżki spawn,
+movement, erase ani collision dla każdego typu.
+
+Pass 1 linkuje trzy finalne maski: `RAIDER` 14 wierszy, double width i 16 HPOS;
+`TALON` 16 wierszy, normal width i 6 HPOS; `SCYTHE_BOMBER` 16 wierszy, double
+width i 16 HPOS. Ich logical bounds w corridor `[80,176)` wynoszą odpowiednio
+`80..160`, `80..170`, `80..160`, natomiast bajtowe HPOSP bounds uwzględniają
+inset Talona: `80..160`, `79..169`, `80..160`. Init, reset, oba kierunki
+steering i końcowy renderer czytają aktywny deskryptor. Normalny release flow
+ustawia wyłącznie `RAIDER`; Talon i Scythe występują tylko w kompilowanym
+osobno harnessie, a ID 3–9 nie mają pointerów ani danych runtime i są odrzucane.
+
+Kolizje fighterów używają wspólnych software envelopes: pocisk Vipera bada
+pełny swept odcinek sześciu scanlines ruchu, contact bada widoczne prostokąty, a capital
+shell porównuje poprzedni i bieżący poziomy zakres 8 HPOS z realną wysokością
+i szerokością aktywnego archetypu. Transparentne padding i per-type HPOS nie rozszerzają obwiedni. P1 ma teraz
+średnio-ciemny steel-blue `$84`, a P2 zachowuje czerwony `$46`; zmiana tych
+rejestrów zmienia także odpowiednio M1/M2, dlatego scanner pulsuje maską, nie
+kolorem. `$84` zastępuje niemal biały `$0C`, pozostawia Vipera `COLPM0=$0E`
+najjaśniejszym statkiem i nie zmniejsza capacity. M1 dziedziczy nowy chłodny
+kolor. Pociski fighterów nie używają żadnego missile: dziesięcioslotowa pula
+Vipera i dziewięcioslotowa pula Raidera zapisują przywracane kody ekranu oraz
+korzystają ze wspólnych, prekompilowanych glifów fazowych ANTIC 4.
+
+| Kontekst | P0 | P1 | P2 | P3 | M0 | M1–M3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Release/open-space | Viper body | Raider body `$84` | Raider scanner `$46` | Viper engine | M0 zarezerwowane, Viper burst w ANTIC 4 | M1–M3 wolne |
+| Compile-time enemy review | Viper body | wybrany anchor body | anchor scanner | Viper engine | Viper burst w ANTIC 4 | M1–M3 wolne |
+| Broadside | Viper body | aktywny Raider body | Raider scanner | Viper engine | Viper burst w ANTIC 4 | warning/impact M1–M3; oba fighter bursts i lecące capital slugs są niezależnymi overlayami ANTIC 4 |
+| Hull explosion | bez zmiany | bez zmiany | bez zmiany | bez zmiany | bez zmiany | bez zmiany; efekt char-mode + POKEY |
+
+`WEAPON_SINGLE_PULSE` pozostaje pierwszym ID profilu broni deskryptorowej, ale
+jego bieżąca polityka runtime emituje szybki burst. Tylko
+release `RAIDER` wybiera ID 1; Talon i Scythe wybierają `NONE`, a niewdrożone
+ID nie mają wpisu runtime. Burst ma dokładnie 10 zaakceptowanych strzałów co
+4 ramki PAL, po czym pauzuje 60/50/40 ramek dla EASY/MEDIUM/HARD. Odmowa
+alokacji nie zmniejsza licznika, a pauza zaczyna się dopiero po dziesiątym realnym
+strzale. Pocisk zaczyna
+się pod ostatnim zajętym wierszem bieżącej maski, na środku realnej obwiedni,
+ma 3 scanlines, szerokość 2 HPOS, damage 10, prędkość 5 scanlines na
+ramkę i limit życia 96 ramek. Swept software collision bada przedział od
+poprzedniego do nowego Y, zużywa pocisk po pierwszym kontakcie i przekazuje
+damage do wspólnej gate lifecycle/invulnerability.
+
+Release i każdy reuse zaczynają `enemy_y=GAMEPLAY_TOP-height`, czyli dla
+Raidera pod Y=2. Renderer tnie P1/P2 do `[16,200)`, więc żaden piksel body ani
+scanner nie trafia do HUD-u, a state burstu zaczyna dopiero po pełnym wejściu.
+Pierwszy strzał powstaje naturalnie w chwili kwalifikacji; nie jest wymuszany.
+
+Scheduler capital zachowuje własne M1–M3 i nie współdzieli ich już z Raiderem.
+Dziewięć stałych slotów Raidera pozwala na kilka widocznych strzałów podczas
+broadside bez wywłaszczenia lub zmiany typu aktywnego obiektu. Viper analogicznie
+ma dziesięć slotów, emituje 10 strzałów co 3 ramki, po czym pauzuje 12 ramek;
+prędkość wynosi 6 scanlines/rama. `DRAIN` i `COMPLETE` zatrzymują nowe moduły
+capital ship, ale nie wykonują teardown broni fighterów: kontroler Vipera i
+istniejące backing-aware sloty pracują dalej w każdym PAL frame. Świeże
+naciśnięcie FIRE oraz FIRE trzymany przez granicę sektora zachowują zwykły
+burst Vipera bez dodatkowej ciszy. Śmierć, respawn i rzeczywisty teardown
+gameplayu nadal czyszczą logiczny slot, backing i owner atomowo. P1/P2
+oznaczają zawsze jeden ordinary enemy, więc capacity pozostaje 1. Harness jest osobnym
+artefaktem kompilacyjnym pod `build/enemy-review`; normalny XEX nie zawiera
+jego dispatchu. Wejście do frontendu nadal czyści PMG, a `START GAME` ustawia
+rozmiary/kolory z deskryptora przed pokazaniem przeciwnika, bez stale accent.
 
 Nominalne 240 wierszy okrętu wynosi 24,0 s na `EASY`, 21,33 s na `MEDIUM` i
 19,2 s na `HARD`. Wspólny stream obejmuje dodatkowe 8 wierszy stałej fazy i
-22 wiersze zejścia. Bez przedłużających efektów osiąga `COMPLETE` dokładnie po
-27,0/24,0/21,6 s; `DRAIN` może poczekać dłużej wyłącznie na już uruchomiony
+23 wiersze zejścia odpowiadające pełnemu viewportowi. Bez przedłużających
+efektów osiąga `COMPLETE` po 27,1/24,1/21,68 s; `DRAIN` może poczekać dłużej
+wyłącznie na już uruchomiony
 efekt. Scheduler nie przyspiesza ani nie tworzy nowego źródła po
 sekcji prow. Stan jest gotowym kontraktem dla przyszłego encounter
 director, ale ten etap nie dodaje komunikatu, bonusu ani następnego sektora.
 
-Kolejność kolizji jest stała: najpierw capture `M0PL`, `P0PL` i `M1PL-M3PL`,
-potem dotychczasowe M0→fighter i P0→fighter, następnie heavy→P0/P3,
-allied-heavy→P1/P2, granica przeciwnego kadłuba, offscreen expiry i na końcu
-pojedynczy `HITCLR`. Następnie, po ewentualnym przewinięciu świata, osobny
+Kolejność kolizji jest stała: na początku ramki zerowany jest akumulator
+enemy damage, potem software Viper-projectile→fighter i Viper contact zgłaszają jawne źródła,
+każdy capital shell wybiera pierwszy obiekt na swept torze, następnie badana
+jest granica przeciwnego kadłuba i offscreen expiry. Jedno
+`resolve_enemy_damage` niszczy przeciwnika i przyznaje score najwyżej raz, po
+czym pojedynczy `HITCLR` czyści sprzętowe latch'e. Następnie, po ewentualnym przewinięciu świata, osobny
 detektor kontaktu gracza sprawdza źródłową geometrię kadłubów. Allied heavy
-resetuje hostile fighter bez score; enemy
-heavy ignoruje własny fighter. Trafienie kadłuba skanuje rzeczywisty zapisany
+niszczy hostile fighter bez score; enemy heavy może zniszczyć własny fighter
+i wtedy daje pełny score aktywnego archetypu. Gdy Cylon slug przecina fightera
+i Vipera, kierunek lotu rozstrzyga pierwszy obiekt i pocisk kończy się po jednym
+trafieniu. Trafienie kadłuba skanuje rzeczywisty zapisany
 wiersz ekranu od wnętrza corridor do pierwszego znaku z zakresu glifów hull,
 więc respektuje kontur i wyloty, a nie gwiazdy. Dwa liczniki trafień saturują
 na `$FF` i nie niszczą jeszcze capital ship.
+
+Enemy damage ma jawne źródła w kolejności kredytu
+`PLAYER_PROJECTILE`, `PLAYER_CONTACT`, `CAPITAL_CYLON`,
+`CAPITAL_COLONIAL`, `ENEMY_PROJECTILE`, `CLEANUP`. Wszystkie trafienia w jednej
+ramce są zgłaszane do 1-bajtowego saturującego damage i 1-bajtowego źródła;
+najniższy ID rozstrzyga remis. Dopiero wspólne `resolve_enemy_damage` odejmuje
+HP, przełącza living enemy w `EXPLODING` i czyta BCD score z deskryptora.
+Player projectile, player contact i Cylon capital friendly fire dostają pełną
+wartość archetypu (`RAIDER=10`), colonial capital i cleanup zero. Rozstrzygnięty
+obiekt nie może zostać zniszczony lub policzony drugi raz w tej samej ramce.
 
 Każde zaakceptowane trafienie przeciwnego kadłuba tworzy dokładnie jeden
 24-ramkowy overlay 3×3. Dwa niezależne sloty — po jednym na stronę — zapisują
@@ -313,13 +403,26 @@ może swobodnie używać własnego scratch. Pętla nadal bada najwyżej trzy wie
 a pełnosektorowa symulacja sprawdza każdy section, oba offsety i puste wiersze
 drain przy wyśrodkowanym graczu na wszystkich trudnościach.
 
-Licznik `LIFE` nadal oznacza zdrowie 0–100 i przechowuje pięć jednostek po 20
-punktów; nie został przemianowany na licznik statków. Osobny `PLAYER_LIVES`
-zaczyna od trzech całkowitych żyć. Każdy heavy shot obu stron jest groźny dla
+HUD rozdziela teraz `LIFE` od `HULL`: `PLAYER_LIVES` zaczyna od trzech
+całkowitych, grywalnych żyć i jest zmniejszany dokładnie raz przy wejściu w
+lethal lifecycle, natomiast `HULL` pokazuje kanoniczne `BROAD_PLAYER_HEALTH`.
+Health przechowuje dziesięć jednostek po 10 punktów, więc deterministyczna
+konwersja na procent jest dokładna: `units * 10`, bez zaokrąglania. Każdy heavy shot obu stron jest groźny dla
 P0/P3, ale jedna ramka może zastosować tylko jeden damage, a cooldown trwa 25
-ramek. Po zejściu do zera sterowanie i FIRE gracza są blokowane tylko przez
-100-klatkową fazę `PLAYER_DYING`; świat, enemy, scheduler i istniejące M1–M3
-nadal pracują. Lethal gate zmienia stan i odejmuje jedno życie tylko raz.
+ramek. Po zejściu do zera sterowanie i FIRE gracza są blokowane przez
+24-klatkową fazę `PLAYER_DYING`, która pokazuje wspólną eksplozję fightera;
+świat, enemy, scheduler i istniejące M1–M3 nadal pracują. Lethal gate zmienia
+stan i odejmuje jedno życie tylko raz.
+
+Viper i Raider używają jednego zestawu sześciu masek 8×8. Każda faza trwa
+cztery ramki: compact flash, cross, większy burst, maksimum, fragmenty i
+embers. Dwa stałe sloty zachowują niezależne centra, więc eksplozja Vipera i
+fightera mogą trwać równocześnie. Runtime usuwa normalny statek i scanner przy
+wejściu w `EXPLODING`, blokuje jego ruch, broń, kontakt i dalszy damage, a po
+24 ramkach czyści wszystkie bajty PMG. Maski korzystają z istniejących par
+P0/P3 albo P1/P2 bez zapisów `COLPM`, więc nie zmieniają kolorów innych
+obiektów. Respawn i licznik 250 klatek invulnerability zaczynają się dopiero
+po ostatniej klatce eksplozji.
 
 Jeśli życie pozostaje, atomowy respawn zapisuje
 `player_x=HPOSP0=HPOSP3=124` oraz `player_y=184`, przywraca 100 zdrowia i
@@ -327,22 +430,28 @@ wchodzi w `PLAYER_RESPAWN_INVULNERABLE`. Wspólna bramka ignoruje wtedy każdy
 damage przez dokładnie 250 aktualizacji PAL, ale joystick i M0 pozostają
 aktywne. P0/P3 są rysowane przez 8 klatek i czyszczone przez 8 klatek bez
 ruszania współrzędnych, kolorów ani pozostałych PMG. Przed ustawieniem
-`PLAYER_ALIVE` runtime czyści snapshoty `M0PL/P0PL/M1PL-M3PL` oraz `HITCLR` i
-wymusza widoczny sprite. Ostatnie życie używa dotychczasowego powrotu do menu
+`PLAYER_ALIVE` runtime zeruje robocze snapshoty kolizji programowych oraz
+`HITCLR` i wymusza widoczny sprite. Rejestry GTIA są pobierane przed wspólnym
+resolverem i czyszczone dopiero po zakończeniu jego pracy, ale kolorowe piksele
+ANTIC 4 nie są traktowane jako autorytatywna geometria kadłuba. Ostatnie życie
+używa dotychczasowego powrotu do menu
 jako terminalnego `PLAYER_GAME_OVER`; nie dodano osobnego ekranu.
 
 Stan i scratch puli zajmują 48 B pod `$4E40-$4E6F`, ustawienie trudności 1 B
-pod `$4E70`, a stan fazy hull, backing dwóch granicznych kolumn gwiazd i dwie
-flagi lifecycle zajmują 47 B pod `$4E71-$4E9F`. Trzy timery flash, stan sektora
-i licznik drain dodają 5 B pod `$4EA0-$4EA4`. Trzy izolowane bajty kontaktu
-oraz cztery bajty lifecycle/lives/invulnerability/blink zajmują `$4EA5-$4EAB`,
+pod `$4E70`, a stan fazy hull, backing 23 wierszy dwóch granicznych kolumn
+gwiazd i dwie flagi lifecycle zajmują 49 B pod `$4E71-$4EA1`. Trzy timery
+flash, stan sektora i licznik drain dodają 5 B pod `$4EA2-$4EA6`. Trzy
+izolowane bajty kontaktu oraz cztery bajty lifecycle/lives/invulnerability/blink
+zajmują `$4EA7-$4EAD`,
 bez delta zero page. Dwa timery/pointery/kolumny eksplozji, 18 B backing i
-timer audio dodają 27 B pod `$4EAC-$4EC6`. Timer i faza trzyfazowej animacji
-silników dodają 2 B pod `$4EC7-$4EC8`.
-Kod, tabele i relokowane dane zajmują 4605 B pod `$5E10-$700C`; blok linkera
-rezerwuje `$5E10-$700F` (4608 B). Obejmuje to 64 B granic kolizji oraz
+timer audio dodają 27 B pod `$4EAE-$4EC8`. Timer i faza trzyfazowej animacji
+silników dodają 2 B pod `$4EC9-$4ECA`.
+Aktywny indeks archetypu, cooldown/active flag oraz trzy bajty HP/pending
+damage/pending source zajmują 6 B pod `$4ECB-$4ED0`; zero page pozostaje bez zmian.
+Kod, tabele i relokowane dane zajmują 5630/5632 B pod `$5E10-$740D`; blok linkera
+rezerwuje dokładnie ten sam zakres. Obejmuje to 64 B granic kolizji oraz
 64 B profili occupancy i 64 B prow boundaries, a także procedury budowy fontu
-i przełączania HUD-u. Ogon jest zapisany w payloadzie jako 3749 B
+i przełączania HUD-u. Ogon jest zapisany w payloadzie jako 4714 B
 deterministycznego LZ-10/5. Sam bounded
 detektor z clampem kosztuje konserwatywnie do około 333 cykli; nie wykonuje
 pełnego skanu ekranu. Łączny koszt systemu po korekcie szacuje się na około
@@ -352,9 +461,10 @@ trzech aktywnych slotów. Jednoczesny heavy impact i clamp pozostaje poniżej
 około 1820 cykli. Zmiana tabeli schedulera nie zwiększa żadnej z tych ścieżek.
 Nowy dispatch akumulatora kosztuje około 26 cykli bez scrolla i 23 przed
 ścieżką scrolla, czyli konserwatywnie do 12 cykli więcej niż poprzedni timer.
-Po rozdzieleniu kopii world event przenosi 462 komórki środka, przesuwa 44 B
+Po odzyskaniu dodatkowego wiersza world event przenosi 484 komórki środka,
+przesuwa 46 B
 backingu, generuje gwiazdy i ponownie nakłada dwa źródłowe wyloty; hull event
-przenosi 336 komórek mas kadłubów, aktualizuje fazę, warningi oraz flagi
+przenosi 352 komórki mas kadłubów, aktualizuje fazę, warningi oraz flagi
 lifecycle. Konserwatywnie kosztują odpowiednio około 15 300 i 11 600 cykli
 przed generatorem sektorowym. Dwa bounded lookupy modułu, obsługa trzech
 flashów i okresowa 16-bajtowa animacja silników podnoszą najcięższą wspólną
@@ -363,12 +473,17 @@ dwóch krótkich dispatchy lifecycle i wspólnej damage gate. Pozostaje około
 5650 cykli zapasu bez dużego impactu. Jedna aktywna eksplozja dodaje
 konserwatywnie około 1250 cykli restore/recapture/render, dwie około 2450, a
 obsługa POKEY mniej niż 50. Najcięższa wspólna ścieżka z dwiema eksplozjami
-pozostaje poniżej około 32 950 cykli po doliczeniu profilu prow, trzyfazowej
-kopii glifów i końcowego fighter clampu, czyli zachowuje ponad 2550 cykli zapasu
-do ramki PAL ~35 500. Średnia częstość kosztownego hull eventu jest dokładnie
+kadłubów, ale bez wspólnej eksplozji fightera, pozostaje poniżej około 33 420
+cykli. Stacjonarny efekt zapisuje osiem scanlines wyłącznie na granicy
+czteroramkowej fazy i czyści je raz przy expiry, a nie co PAL frame. Surowy
+koszt zmiany obu slotów pozostaje poniżej około 1100 cykli; równoczesne stany
+`DYING/EXPLODING` pomijają co najmniej około 640 cykli zwykłego inputu,
+ruchu, sprite renderu, broni i kolizji. Konserwatywny wynik daje więc około
+33 380 cykli i około 2120
+cykli zapasu do ramki PAL ~35 500. Średnia częstość kosztownego hull eventu jest dokładnie
 połową częstości world eventu; VBI pozostaje bez zmian.
 VBI pozostaje bez zmian. Gameplay wykonuje dwa DLI na ramkę: pierwszy po
-drugim wierszu HUD-u przełącza `CHBASE=$44` i przywraca paletę ANTIC 4, drugi
+jedynym wierszu HUD-u przełącza `CHBASE=$44` i przywraca paletę ANTIC 4, drugi
 po ostatnim wierszu playfieldu przywraca `CHBASE=$50` oraz neutralne
 `COLPF1=$0E/COLPF2=$00` dla następnej ramki. Ciała mają odpowiednio około
 66 i 55 cykli wraz z wejściem NMI, bez czasu oczekiwania `WSYNC`; z dwoma
@@ -377,20 +492,26 @@ ramkę. Pełny pomiar na 65XE PAL pozostaje bramką hardware acceptance ownera.
 
 ### Gameplay HUD ANTIC 2
 
-Gameplay display list zachowuje 24 blank scanlines, po czym pobiera dwa
-40-bajtowe wiersze spod `$4000`: `$42` to ANTIC 2 z LMS, a `$82` to ANTIC 2 z
-DLI. Następne 21 opcodes `$04` i końcowy `$84` dają 22 wiersze ANTIC 4 oraz
-drugi DLI. Ekran nadal zużywa 24×40 = 960 B; zmiana trybu nie przesuwa żadnego
-wiersza playfieldu ani pól dynamicznych score/LIFE.
+Gameplay display list zaczyna aktywny obraz bez wewnętrznych blank instructions:
+pierwszy widoczny scanline HUD-u to 8. Pobiera jeden 40-bajtowy wiersz spod
+`$4000`: `$C2` to ANTIC 2 z LMS i DLI. Następne 22 opcodes `$04` i końcowy
+`$84` dają 23 wiersze ANTIC 4 oraz drugi DLI. Kanoniczne granice to
+`HUD_TOP=8`, `HUD_BOTTOM=16`, `GAMEPLAY_TOP=16`, `GAMEPLAY_BOTTOM=200`.
+Ostatni scanline glifów HUD jest pełnym białym separatorem; nie zajmuje drugiego
+40-bajtowego wiersza. Ekran nadal zużywa 24×40 = 960 B;
+PMG przeciwnika jest jawnie clipowane do gameplayu i nie może zapisać HUD-u.
 
 `start` po zakończeniu loadera i przy wyłączonym DMA zeruje dedykowany
 1-kilobajtowy charset `$5000-$53FF`, a następnie rozwija do standardowych
 indeksów screen-code cyfry 0–9 i litery A–Z z edytowalnego źródła 6×7.
-Ósmy scanline pozostaje pusty, zaś separator ma własny pełny dolny scanline.
+Ósmy scanline używanych glifów jest pełny i wspólnie tworzy separator.
 HUD przechowuje normalne kody znaków w screen RAM: wynik jest aktualizowany
-pod `$4006-$400A`, a trzy cyfry zdrowia pod `$4021-$4023`. Wartość pięciu
-jednostek damage skaluje się do `100/080/060/040/020/000` bez zmiany
-wewnętrznej mechaniki damage.
+pod `$4006-$400A`, cyfra `LIFE` pod `$4012`, a zmienne cyfry `HULL` pod
+`$401A-$401B`; końcowe zero i `%` pozostają statyczne pod `$401C-$401D`.
+Wartość dziesięciu jednostek health skaluje się dokładnie do
+`100/090/.../010/000` bez drugiego stanu zdrowia. `ARM` i `FUEL` były wyłącznie
+statycznymi placeholderami bez readers, writers ani efektu gameplay i zostały
+usunięte z HUD-u.
 
 Przed włączeniem DMA `start_gameplay` instaluje `$50` w `CHBASE`, neutralne
 `COLPF1=$0E`, `COLPF2=$00` i fazę DLI równą zero. DLI po dividerze instaluje
@@ -408,18 +529,18 @@ przedstawiane jako wolne miejsce w innej.
 | Kategoria | Potwierdzony stan bieżący | Bramka dla przyszłych zmian |
 | --- | --- | --- |
 | 1. Pojemność ATR | Standardowy ATR ma 92 176 B pliku: 16 B nagłówka i 92 160 B danych, czyli 720 sektorów po 128 B. Duża część obrazu jest pusta. | Wolne sektory nie zwiększają resident RAM i nie uzasadniają same w sobie modułów ładowanych podczas gry. |
-| 2. Boot payload i sektory startowe | Payload ma 11 941 B i zajmuje 94 sektory. Pierwsze 8192 B trafia pod `$2000-$3FFF`, a pakowany ogon 3749 B pod `$4000-$4EA4`; ostatni sektor ma 91 B paddingu. XEX ma 11 953 B wraz z headers/RUNAD. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granice czasowe relokacji. |
-| 3. Resident gameplay RAM | CODE ma 2914 B pod `$2000-$2B61`, RODATA 5213 B pod `$2B62-$3FBE`, mapy kadłubów 576 B pod `$4C00-$4E3F`, broadside state 48 B pod `$4E40-$4E6F`, difficulty 1 B pod `$4E70`, 47 B stanu rozdzielonego scrollu pod `$4E71-$4E9F`, 12 B flash/sector/contact/player lifecycle pod `$4EA0-$4EAB`, 27 B eksplozji/audio pod `$4EAC-$4EC6`, 2 B animacji silników pod `$4EC7-$4EC8`, HUD charset 1024 B pod `$5000-$53FF`, a relokowany runtime 4605 B pod `$5E10-$700C`. | Każda dalsza funkcja ma mierzyć rzeczywiście trwałe dane, bez zakładania, że każdy nieadresowany bajt jest bezpieczny. |
-| 4. Pamięć przejściowa loadera | Przed loaderem `$4000-$4EA4` zawiera pakowany broadside ogon; start rozwija go do `$5E10`. Potem surowa bitmapa zajmuje `$4010-$5E0F`. Strumień PackBits i display list mieszczą się w końcu głównego bloku `$2000-$3FFF`; PMG/DMA są wtedy wyłączone. | Koszt i zakresy obu rozpakowań raportować jako setup/transient, nie jako stały gameplay asset. |
-| 5. Pamięć odzyskiwalna po przejściu | `$3800-$3FFF` zostaje wyzerowane i przechodzi z loader-only payloadu na PMG. Frontend zajmuje `$4800-$4BFF`, mapy `$4C00-$4E3F`, state i scroll backing `$4E40-$4EC8`, HUD charset `$5000-$53FF`, `$5400-$5E0F` pozostaje wolne, a runtime broadside zajmuje `$5E10-$700C`. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma allocatora ani overlayu. |
-| 6. PMG | PMBASE `$3800`; missiles `$3B00-$3BFF`: M0 player shot, M1–M3 heavy pool. P0/P3 to Viper hull/engine, P1/P2 hostile hull/scanner. M1–M3 dziedziczą `$0C/$46/$28`; masked compositor zachowuje pozostałe pary bitów. | Każda zmiana ról, multipleksowania lub trybu DMA wymaga limitu obiektów, kosztu i testu PAL/real hardware. |
+| 2. Boot payload i sektory startowe | Payload ma 12 906 B i zajmuje 101 sektorów. Pierwsze 8192 B trafia pod `$2000-$3FFF`, a pakowany ogon 4714 B pod `$4000-$5269`; ostatni sektor ma 22 B paddingu. XEX ma 12 918 B wraz z headers/RUNAD. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granice czasowe relokacji. |
+| 3. Resident gameplay RAM | CODE/RODATA pozostają w `$2000-$3FFF`, mapy kadłubów 576 B pod `$4C00-$4E3F`, broadside state 48 B pod `$4E40-$4E6F`, difficulty 1 B pod `$4E70`, 49 B stanu rozdzielonego scrollu pod `$4E71-$4EA1`, 12 B flash/sector/contact/player lifecycle pod `$4EA2-$4EAD`, 27 B eksplozji/audio pod `$4EAE-$4EC8`, 2 B animacji silników pod `$4EC9-$4ECA`, archetyp/fire/HP/damage state pod `$4ECB-$4ED0`, HUD charset 1024 B pod `$5000-$53FF`, 202 B puli burst i dwóch slotów eksplozji pod `$5400-$54C9`, a relokowany runtime zajmuje 5630/5632 B pod `$5E10-$740D`. | Każda dalsza funkcja ma mierzyć rzeczywiście trwałe dane, bez zakładania, że każdy nieadresowany bajt jest bezpieczny. |
+| 4. Pamięć przejściowa loadera | Przed loaderem `$4000-$5269` zawiera pakowany broadside ogon; start rozwija go do `$5E10`. Potem surowa bitmapa zajmuje `$4010-$5E0F`. Strumień LZ-10/5 i display list mieszczą się w głównym bloku `$2000-$3FFF`; PMG/DMA są wtedy wyłączone. | Koszt i zakresy obu rozpakowań raportować jako setup/transient, nie jako stały gameplay asset. |
+| 5. Pamięć odzyskiwalna po przejściu | `$3800-$3FFF` zostaje wyzerowane i przechodzi z loader-only payloadu na PMG. Frontend zajmuje `$4800-$4BFF`, mapy `$4C00-$4E3F`, state i scroll backing `$4E40-$4ED0`, HUD charset `$5000-$53FF`, fighter projectile/explosion state `$5400-$54C9`, `$54CA-$5E0F` pozostaje wolne, a relokowany runtime zajmuje `$5E10-$740D`. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma allocatora ani overlayu. |
+| 6. PMG | PMBASE `$3800`; missiles `$3B00-$3BFF`: M0 pozostaje wyłącznie zarezerwowany dla player weapon, M1–M3 dla warning/impact broadside. P0/P3 to Viper hull/engine, P1/P2 hostile hull/scanner. Viper i Raider burst oraz lecące capital slugs używają przywracanych znaków ANTIC 4, więc nie przejmują missile ani `COLPM`. | Każda zmiana ról, multipleksowania lub trybu DMA wymaga limitu obiektów, kosztu i testu PAL/real hardware. |
 | 7. Display memory i charset | Wspólny ekran `$4000-$43FF`; gameplay charset `$4400-$47FF`; frontend charset `$4800-$4BFF`; HUD charset `$5000-$53FF`. Kadłuby i efekty zajmują 31 indeksów gameplay charset od 59 do 89; zwarty frontend source zasila jednorazowo dedykowany font HUD. Main menu używa 820 B ekranu, sub-screeny i gameplay 960 B. | Kolejne glify wymagają ponownego audytu indeksów i niewyświetlanych danych źródłowych; każdy runtime charset nadal ma dokładnie 1024 B. |
 | 8. Zero page | Linker raportuje 34 B pod `$0080-$00A1`; w zadeklarowanym regionie `$0080-$00FF` pozostają 94 nieprzydzielone bajty. | Każda funkcja podaje delta ZP; wolnych bajtów nie przydziela się bez audytu konfliktów i czasu życia. |
-| 9. Koszt widocznej ramki | World event kosztuje konserwatywnie około 15 300 cykli, hull event z generatorem modułu około 12 050, a ich zbieg z trzema slotami, flashami, kolizją, clampem i lifecycle dispatch około 29 850 wobec ~35 500 cykli PAL. Dwie równoczesne eksplozje, profile prow, trzyfazowa kopia i channel-4 SFX podnoszą konserwatywny combined bound do około 32 950. Dwa gameplay DLI dodają 121 cykli ciał rutyn na ramkę (konserwatywnie do 349 z pełnym `WSYNC`), VBI bez zmian. | Pełny pomiar emulator trace i real 65XE PAL pozostaje bramką akceptacji razem z najcięższą ramką wspólnego eventu. |
-| 10. Jednorazowy setup/transition | `start` rozwija 3749 B ogona do 4605 B przed loaderem oraz buduje 1024-bajtowy HUD charset w około 11,8 tys. cykli przy wyłączonym DMA. `START GAME` rozwija dwie mapy do 576 B w około 27 000 cykli, zeruje pulę i inicjalizuje state scroll/lifecycle/sector/contact/explosion oraz oba akumulatory, zachowując 1 B wybranej trudności. Loader DLI działa tylko przez 250 ramek; frontend i gameplay instalują własne ograniczone DLI. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
+| 9. Koszt widocznej ramki | World event pozostaje ograniczony do jednej kopii w ramce, hull event do jednej osobnej kopii, a obie pule fighter fire wykonują stały skan 19 slotów bez alokacji dynamicznej. W ramce wspólnego world+hull kroku restore granic i redraw wylotów wykonuje się raz po obu kopiach. Konserwatywny source bound wynosi około 33 380 cykli przy dwóch równoczesnych fighter explosions, czyli zachowuje około 2120 cykli do budżetu PAL ~35 500. Dwa gameplay DLI i VBI pozostają bez zmian. | Trace nie zastępuje pomiaru najcięższej kombinacji na realnym 65XE; hardware acceptance nadal musi objąć pełny burst, obie eksplozje i wspólną ramkę scrolla. |
+| 10. Jednorazowy setup/transition | `start` rozwija 4714 B ogona do 5630 B przed loaderem oraz buduje 1024-bajtowy HUD charset w około 11,8 tys. cykli przy wyłączonym DMA. `START GAME` rozwija dwie mapy do 576 B, buduje niekolidujące glify projectile phases, zeruje pule i inicjalizuje state scroll/lifecycle/sector/contact/explosion/enemy/fire/damage oraz oba akumulatory. Loader DLI działa tylko przez 250 ramek; frontend i gameplay instalują własne ograniczone DLI. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
 
 Główny blok linkera kończy RODATA pod `$3FFF`, ale payload nie kończy się w
-tym miejscu: 3749-bajtowy, przejściowy ogon zajmuje `$4000-$4EA4` do chwili
+tym miejscu: 4714-bajtowy, przejściowy ogon zajmuje `$4000-$5269` do chwili
 rozpakowania. Nie jest to resident obraz ekranu ani „cała wolna pamięć Atari”.
 Dokładne role czasowe pozostają w `docs/memory-map.md`.
 
@@ -429,7 +550,7 @@ Owner porównał oba rendery i podjął wiążącą decyzję: produkcyjny broads
 pozostaje ANTIC 4. ANTIC 2 poprawiał cienkie linie, lecz odbierał scenie kolor,
 głębię i atmosferę. Ta sekcja zachowuje **niezintegrowany, odrzucony prototyp
 jako evidence**; nie jest roadmapą implementacji. Bieżący XEX i ATR zachowują
-ANTIC 4 dla całego playfieldu pod HUD-em; wyłącznie dwa górne wiersze HUD-u
+ANTIC 4 dla całego playfieldu pod HUD-em; wyłącznie jeden górny wiersz HUD-u
 używają ANTIC 2.
 Edytowalne źródło `assets/graphics/capital-hulls-antic2-prototype.json` oraz
 renderer preview sprawdzają, czy chwilowa scena broadside zyskuje dostatecznie
@@ -467,7 +588,7 @@ DLI ustawia `COLPF1=$0A`, `COLPF2=$00`, `COLBK=$00`. Bit 0 daje prawdziwą
 czerń, a bit 1 neutralną stalową luminancję. Allied/enemy różnią się gęstością,
 konturem, płytami i wnękami, nie fałszywym kolorem. P0 pozostaje jasnym
 myśliwcem gracza, P3 bursztynowym silnikiem, P1 przeciwnikiem, P2 czerwonym
-skanerem, a M0 pociskiem gracza. Historyczny preview spike nie przydzielał
+skanerem, a M0 był ówczesnym pociskiem gracza. Historyczny preview spike nie przydzielał
 M1–M3; bieżący runtime ANTIC 4 wykorzystuje je już w osobnym systemie opisanym
 powyżej.
 
@@ -655,9 +776,9 @@ zestrzelenia (score, bez naprawy). Oba systemy podlegają exclusions directora.
 
 #### HUD
 
-HUD jest osobną, ograniczoną fazą zapisu display memory. Pokazuje co najmniej
-score i numeryczny `HULL nn%`; aktualizuje tylko pola, które się zmieniły.
-Obecne `FUEL` i `ARM` nie definiują docelowych mechanik.
+HUD jest osobną, ograniczoną fazą zapisu display memory. Pokazuje score,
+`LIFE n` z kanonicznego licznika grywalnych statków oraz `HULL nn%` z
+kanonicznego health; aktualizuje tylko trzy zmienne pozycje statusu.
 
 #### Scoring
 

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 const BITMAP_WIDTH = 320;
 const BITMAP_HEIGHT = 192;
@@ -560,12 +561,9 @@ export function compileLoaderBitmap(definition) {
     ),
   }));
   const bitmapBytes = encodeLoaderBitmapPixels(pixels, paletteZones);
-  const packedBitmap = packLoaderPackBits(bitmapBytes);
-  if (
-    !Buffer.from(unpackLoaderPackBits(packedBitmap))
-      .equals(Buffer.from(bitmapBytes))
-  ) {
-    throw new Error("Loader bitmap PackBits round trip failed");
+  const packedBitmap = packBroadsideLzss(bitmapBytes);
+  if (!unpackBroadsideLzss(packedBitmap).equals(Buffer.from(bitmapBytes))) {
+    throw new Error("Loader bitmap LZSS round trip failed");
   }
 
   return {
@@ -676,7 +674,7 @@ export function renderLoaderCa65Include(compiled) {
     }
   }
 
-  lines.push("", "loader_bitmap_packbits:");
+  lines.push("", "loader_bitmap_lzss:");
   lines.push(...byteLines(compiled.packedBitmap));
   lines.push("", "loader_display_list:", "    .byte $70,$70,$70");
   for (let line = 0; line < BITMAP_HEIGHT; line += 1) {

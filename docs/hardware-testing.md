@@ -54,7 +54,8 @@
   FIRE działa normalnie;
 - tytuł oraz gwiazdy są stabilne;
 - statek porusza się w czterech kierunkach i nie wychodzi poza ekran;
-- FIRE tworzy jasny pocisk;
+- przytrzymany FIRE tworzy żółty dziesięciostrzałowy burst co 3 ramki,
+  a starsze strzały nie dziedziczą późniejszego ruchu Vipera;
 - trafienie przeciwnika zwiększa wynik;
 - czerwony skaner porusza się po kadłubie przeciwnika;
 - kolizja statków daje czerwony błysk tła;
@@ -72,8 +73,9 @@
   zwykłe płyty, wnęki i żebra, nie jako nieaktywne działa;
 - pełny segment nie wygląda jak dawny ośmiowierszowy loop, strony nie są
   lustrzane, a statyczne kadłuby nie powodują migotania ani śmieci w PMG;
-- oba górne wiersze HUD-u są ostre i stabilne jako tekst ANTIC 2, divider nie
-  ma color leak, a pierwszy wiersz ANTIC 4 używa właściwego charsetu/palety;
+- górny wiersz HUD-u jest ostry i stabilny jako tekst ANTIC 2, jego biały
+  dolny scanline tworzy divider bez dodatkowego wiersza, a pierwszy z 23
+  wierszy ANTIC 4 używa właściwego charsetu/palety;
 - score i trzy cyfry `LIFE` aktualizują się bez uszkodzenia sąsiednich znaków;
 - warning pozostaje przy przewijającym się wylocie przez dokładnie 25 ramek;
   bez niewidocznej ramki rośnie kolejno jako compact 2-scanline, medium
@@ -96,12 +98,15 @@
   strony; warning nie rozpoczyna się, jeżeli emplacement nie zdąży zakończyć
   25 ramek i jednego wiersza marginesu przed opuszczeniem strefy ognia;
 - po warningu czteroramkowy flash pozostaje przy realnym wylocie, a lecący
-  slug pulsuje czytelnie między 3 i 4 scanlines bez poszerzenia hitboxu,
-  fighter-colour flickeru lub pozostawionych pikseli;
-- M1–M3 są rozróżnialne w swoich rzeczywistych kolorach, lecą poziomo po
-  zapowiedzianym torze i nie uszkadzają ani nie wymazują M0;
-- allied fire może zresetować hostile fighter bez dodania score, enemy fire
-  nie niszczy własnego fightera, a M0 nadal daje dotychczasowy wynik;
+  slug pulsuje czytelnie w dwukomórkowym 8×6 ANTIC 4 lozenge bez fighter-colour flickeru,
+  rozszerzenia poza testowany swept hitbox lub pozostawionych kodów ekranu;
+- allied shell jest yellow-gold `$1E`, Cylon shell crimson `$46`, oba są
+  znacznie cięższe niż żółty 1×2 Viper shot i czerwony 2×3 Raider pulse;
+- allied fire niszczy hostile fighter bez score, Cylon friendly fire niszczy
+  własnego fightera i daje pełne 10 punktów Raidera, a Viper projectile oraz contact
+  także dają pełną wartość deskryptora;
+- przy przecięciu fightera i Vipera ten sam Cylon shell zatrzymuje się na
+  pierwszym celu w kierunku lotu i nie może zadać dwóch trafień;
 - każdy ciężki pocisk trafia przeciwny kadłub na widocznej, zależnej od
   wiersza krawędzi i nie traktuje gwiazd jako kadłuba;
 - trafienie dowolnej strony broadside odejmuje graczowi 20 punktów, a cooldown
@@ -114,7 +119,7 @@
 - nieruchomy Viper przy `HPOSP0=HPOSP3=124`, `Y=184` przeżywa przejście obu
   banków engines, aft, combat, forward, prow i 22 pustych wierszy drain; sam
   wiersz kadłuba na tej samej wysokości nie jest kontaktem bez overlapu X;
-- `LIFE 000` rozpoczyna jedną 100-klatkową fazę zniszczenia i odejmuje tylko
+- `LIFE 000` rozpoczyna jedną 24-klatkową wspólną eksplozję fightera i odejmuje tylko
   jedno z trzech całkowitych żyć; jeśli życie pozostaje, Viper pojawia się
   atomowo w `X=124/Y=184`, a przy ostatnim życiu wraca istniejącą ścieżką do
   menu z aktywną bramką puszczenia FIRE;
@@ -147,6 +152,77 @@
   `AUDC4/AUDCTL`; po 24 ramkach ON kanał również dochodzi do ciszy bez stuck tone;
 - dźwięki nie zawieszają obrazu ani sterowania;
 - po pięciu minutach nie pojawiają się śmieci w grafice.
+
+## Harness rosteru przeciwników
+
+`npm run enemy:review` tworzy osobny
+`build/enemy-review/dark-fighter.xex` i ATR z kompilacyjnym harnessiem; nie
+modyfikuje release flow w `dist/`. Po wejściu do gameplayu harness cyklicznie
+pokazuje Raidera, Talona i Scythe Bombera w środku oraz przy obu granicach.
+
+- Raider czyta się jako szeroki crescent z wklęsłą krawędzią i czerwonym
+  scannerem, a nie dawny schematyczny znak;
+- Talon jest wyraźnie węższy, ma długi spine, krótki fin i dolny nos;
+- Scythe ma największą masę, szerokie wings, centralny fuselage i pods;
+- wszystkie trzy są zwrócone ku dolnej części ekranu/graczowi;
+- trzy fazy P2 zmieniają rozmiar/położenie czerwonego slit co osiem ramek bez
+  migania P1, M1 ani M2 kolorem;
+- przy szybkim przełączeniu typu stary body/scanner znika w całości;
+- Raider i Scythe mieszczą się w logical `80..160`, Talon w `80..170`; jego
+  HPOSP `79..169` kompensuje pierwszy pusty bit;
+- release XEX/ATR nadal pokazują wyłącznie Raidera i zachowują dotychczasowy
+  movement, kolizję, score i przejście przez broadside.
+
+Korekta palety i pierwszej broni dodaje osobne artefakty review:
+
+- `npm run enemy:palette:dark-navy` — `COLPM1=$82`;
+- `npm run enemy:palette:medium-steel-blue` — `COLPM1=$84`, release default;
+- `npm run enemy:palette:graphite-blue` — `COLPM1=$04`;
+- `npm run enemy:combat-review` — direct gameplay z rzeczywistym Raiderem,
+  profilem `WEAPON_SINGLE_PULSE` i pulą ANTIC 4.
+
+Każdy wariant trafia pod `build/enemy-*` i nie nadpisuje release `dist/`.
+Sprawdź na PAL: P1 body pozostaje czytelny na czerni i przy obu side hulls,
+P2 scanner jest czerwony, playfield pulse powstaje pod aktualną obwiednią
+Raidera, porusza się o 5 scanlines, odejmuje dokładnie 10, a podczas 250 ramek
+invulnerability jest zużywany bez damage. W broadside pule fighterów nie mogą
+zmienić właściciela M1–M3 ani nadpisać capital slotu.
+
+Test release musi czekać na naturalne pełne wejście bez ustawiania active flag:
+Raider startuje pod `enemy_y=GAMEPLAY_TOP-14`, pierwsze piksele są przycinane
+do Y=16, a następnie emituje 10 zaakceptowanych strzałów co 4 ramki. Pauza po
+burst wynosi 60/50/40. Zajęte M1–M3 nie blokują dziewięcioslotowej puli.
+`build/previews/raider-natural-fire-trace.csv` zapisuje burst state, shot index,
+timer, occupancy, wynik alokacji, X/Y i aktywne overlaye playfield.
+`build/previews/fighter-burst-runtime-trace.csv` zestawia oba kontrolery od
+`WAITING`, przez accepted allocation i niezależne poprzednie/bieżące Y, po
+dziesięciopunktowy Viper hit oraz źródła kolorów `$1E/$46`.
+
+Artefakty `projectile-visual-language.png` i
+`projectile-collision-scoring-sequence.png` muszą odpowiadać bieżącym runtime
+bytes. Pierwszy pokazuje cztery klasy na tej samej skali i osobny widok
+monochromatyczny, drugi: M0/contact score, colonial zero-score, Cylon
+friendly-fire score, spatial first-target oraz zero double score. Literalnie
+żółte Viper fire musi pochodzić z `COLPF2=$1E` w aktualnym framebufferze;
+P0 `$0E` i P3 `$28` nie mogą się zmienić. Przy trzymanym FIRE powinno być
+widoczne 10 strzałów co 3 ramki, z prędkością 6 i 12-ramkową pauzą.
+Capital slugs muszą w runtime zajmować dwa sąsiednie znaki ANTIC 4, czyli
+8 HPOS × 6 scanlines. W native capture ich długość pozioma musi być co najmniej
+dwukrotnością 2-HPOS Raider pulse; metadata bez obu zapisów screen RAM nie jest
+dowodem.
+
+`DRAIN` i `COMPLETE` nie są blokadą broni Vipera: oba backing-aware fighter
+pools zachowują własne lifecycle aż do kolizji, expiry, śmierci lub rzeczywistego
+teardown gameplayu. Sprawdź osobno świeże naciśnięcie w `DRAIN`/`COMPLETE`
+oraz FIRE trzymany przez całą granicę sektora: oba mają zachować niezmieniony
+dziesięciostrzałowy burst Vipera, bez ghost glyphs.
+
+Każde zniszczenie fightera ma pokazać te same sześć faz PMG 8×8 po cztery
+ramki. Raider podczas `EXPLODING` nie może się poruszać, strzelać ani ponownie
+punktować; inny enemy pozostaje aktywny. Śmierć Vipera najpierw pokazuje pełne
+24 ramki tej samej animacji, a dopiero potem centrum corridor i dokładnie 250
+ramek invulnerability. Zweryfikuj jednoczesną eksplozję Vipera i Raidera oraz
+brak zapisu w HUD scanlines.
 
 ## Raport błędu
 

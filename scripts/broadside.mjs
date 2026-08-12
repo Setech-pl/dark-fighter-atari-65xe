@@ -2,7 +2,7 @@ export const BROADSIDE_STATES = Object.freeze({ FREE: 0, WARNING: 1, FLYING: 2, 
 export const BROADSIDE_OWNERS = Object.freeze({ allied: 0, enemy: 1 });
 export const MISSILE_MASKS = Object.freeze([0x03, 0x0c, 0x30, 0xc0]);
 export const MISSILE_CLEAR_MASKS = Object.freeze([0xfc, 0xf3, 0xcf, 0x3f]);
-export const MISSILE_COLORS = Object.freeze([0x0e, 0x0c, 0x46, 0x28]);
+export const MISSILE_COLORS = Object.freeze([0x0e, 0x84, 0x46, 0x28]);
 export const BROADSIDE_SLOT_COUNT = 3;
 export const HULL_SCROLL_DIFFICULTIES = Object.freeze({
   easy: 0,
@@ -10,10 +10,10 @@ export const HULL_SCROLL_DIFFICULTIES = Object.freeze({
   hard: 2,
 });
 export const PMG_LEFT_EDGE = 48;
-export const PMG_SCREEN_TOP = 32;
-export const GAMEPLAY_FIRST_HULL_ROW = 2;
-export const GAMEPLAY_HULL_ROWS = 22;
-export const BROADSIDE_WARNING_Y_MAX = 215;
+export const PMG_SCREEN_TOP = 8;
+export const GAMEPLAY_FIRST_HULL_ROW = 1;
+export const GAMEPLAY_HULL_ROWS = 23;
+export const BROADSIDE_WARNING_Y_MAX = 191;
 export const CAPITAL_SECTOR_STATES = Object.freeze({
   ENGINES: 0,
   AFT: 1,
@@ -31,6 +31,7 @@ export const PLAYER_LIFECYCLE_STATES = Object.freeze({
 });
 export const PLAYER_RESPAWN_X = 124;
 export const PLAYER_RESPAWN_Y = 184;
+export const SHARED_FIGHTER_EXPLOSION_TOTAL = 24;
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -100,8 +101,10 @@ export function centeredSpanTop(centerY, height) {
   return centerY - Math.floor(height / 2);
 }
 
-export function muzzlePosition(turret, visibleScreenRow = 2 + turret.segmentRow) {
-  invariant(visibleScreenRow >= 2 && visibleScreenRow < 24, "Turret is outside gameplay rows");
+export function muzzlePosition(turret, visibleScreenRow = 1 + turret.segmentRow) {
+  invariant(visibleScreenRow >= GAMEPLAY_FIRST_HULL_ROW &&
+    visibleScreenRow < GAMEPLAY_FIRST_HULL_ROW + GAMEPLAY_HULL_ROWS,
+  "Turret is outside gameplay rows");
   return {
     x: PMG_LEFT_EDGE + turret.muzzleColumn * 4 + (turret.side === "allied" ? 4 : 0),
     y: PMG_SCREEN_TOP + visibleScreenRow * 8 + turret.muzzleScanlineOffset,
@@ -477,7 +480,12 @@ export function beginWarning(
   const turret = asset.turrets[turretIndex];
   invariant(turret, `Unknown source turret index ${turretIndex}`);
   invariant(state.slots[slotIndex].state === BROADSIDE_STATES.FREE, "Broadside slot is occupied");
-  invariant(visibleScreenRow >= 3 && visibleScreenRow <= 16, "Offscreen or unsafe turret may not warn");
+  const footprintRows = Object.values(turret?.footprint ?? {}).flat().map(([row]) => row);
+  const minimumRelativeRow = Math.min(...footprintRows) - turret.segmentRow;
+  const maximumRelativeRow = Math.max(...footprintRows) - turret.segmentRow;
+  invariant(visibleScreenRow + minimumRelativeRow >= GAMEPLAY_FIRST_HULL_ROW &&
+    visibleScreenRow + maximumRelativeRow < GAMEPLAY_FIRST_HULL_ROW + GAMEPLAY_HULL_ROWS,
+  "Offscreen or unsafe turret may not warn");
   const muzzle = muzzlePosition(turret, visibleScreenRow);
   for (const active of state.slots) {
     if (active.state !== BROADSIDE_STATES.FREE) {
@@ -521,17 +529,19 @@ export function advanceProjectile(slot, asset, { launchAllowed = true, frame = 0
 export function heavyShellVisual(slot, asset, frame) {
   invariant(slot.state === BROADSIDE_STATES.FLYING,
     "Heavy-shell visual requires a FLYING slot");
-  const height = ((frame >> 1) & 1) === 0
-    ? asset.broadside.flyingHeight - 1
-    : asset.broadside.flyingHeight;
+  const visual = asset.broadside.projectileVisuals.capital;
+  const faction = slot.owner === "allied" ? "colonial" : "cylon";
   return {
     x: slot.x,
     y: slot.y,
-    top: centeredSpanTop(slot.y, height),
-    height,
-    size: 1,
-    width: missileWidth(1),
-    color: MISSILE_COLORS[slot.missile],
+    top: centeredSpanTop(slot.y, visual.height),
+    height: visual.height,
+    width: visual.widthHpos,
+    occupiedPixels: visual.widthHpos * visual.height - 8,
+    phase: (frame >> 1) & 1,
+    renderer: "ANTIC4_PLAYFIELD_OVERLAY",
+    color: faction === "colonial" ? visual.colonialValue : visual.cylonValue,
+    attribute: faction === "colonial" ? visual.colonialAttribute : visual.cylonAttribute,
   };
 }
 
@@ -677,7 +687,8 @@ export function applyPlayerDamage(state, asset, damage, cooldownFrames, frame) {
   state.damageFrame = frame;
   if (state.health === 0) {
     state.playerLifecycle = PLAYER_LIFECYCLE_STATES.DYING;
-    state.deathTimer = asset.broadside.returnToMenuFrames;
+    state.deathTimer = SHARED_FIGHTER_EXPLOSION_TOTAL;
+    state.playerVisible = false;
     state.lives = Math.max(0, state.lives - 1);
   }
   return true;
@@ -698,9 +709,6 @@ export function advancePlayerLifecycle(state, asset) {
   if (state.playerLifecycle === PLAYER_LIFECYCLE_STATES.DYING) {
     if (state.deathTimer > 0) state.deathTimer -= 1;
     if (state.deathTimer > 0) {
-      if (state.deathTimer === asset.broadside.returnToMenuFrames - 6) {
-        state.playerVisible = false;
-      }
       return "dying";
     }
     if (state.lives === 0) {
@@ -736,7 +744,7 @@ export function advancePlayerLifecycle(state, asset) {
 }
 
 export function hitHostileFighter(state, slot, asset) {
-  if (slot.owner !== "allied") return false;
+  if (slot.owner !== "allied" && slot.owner !== "enemy") return false;
   beginImpact(slot, asset);
   return true;
 }
@@ -759,7 +767,9 @@ export function hitOppositeHull(state, slot, asset, context = {}) {
 export function projectileLeadingEdgeHitsHull(slot, asset, segmentRow) {
   const target = slot.owner === "allied" ? "enemy" : "allied";
   const boundary = hullBoundary(asset, target, segmentRow);
-  return slot.owner === "allied" ? slot.x + 2 >= boundary : slot.x <= boundary;
+  return slot.owner === "allied"
+    ? slot.x + asset.broadside.projectileVisuals.capital.widthHpos >= boundary
+    : slot.x <= boundary;
 }
 
 export function activeProjectileCount(state) {

@@ -14,8 +14,8 @@ import {
   loaderBitmapConstants,
   loaderBitmapPixelValueAt,
   renderLoaderCa65Include,
-  unpackLoaderPackBits,
 } from "../scripts/loader-assets.mjs";
+import { unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
 import { parseXex } from "../scripts/formats.mjs";
 import {
   PREVIEW_HEIGHT,
@@ -128,10 +128,10 @@ test("mixed-mode source is exactly 320x192 with 40 MSB-first bytes per row", () 
   assert.deepEqual([...encoded.subarray(0, 2)], [0x81, 0x80]);
 });
 
-test("PackBits round-trip is exact and ends at the bitmap boundary", () => {
-  const unpacked = unpackLoaderPackBits(compiled.packedBitmap);
+test("bounded LZSS round-trip is exact and ends at the bitmap boundary", () => {
+  const unpacked = unpackBroadsideLzss(compiled.packedBitmap);
   assert.equal(unpacked.length, 7680);
-  assert.deepEqual(unpacked, compiled.bitmapBytes);
+  assert.deepEqual(unpacked, Buffer.from(compiled.bitmapBytes));
   assert.equal(compiled.bitmapAddress, 0x4010);
   assert.equal(compiled.bitmapAddress + unpacked.length, 0x5e10);
 
@@ -328,7 +328,7 @@ test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
 
 test("XEX and ATR use the current packed bitmap source", () => {
   const labels = readLabels();
-  const packedAddress = labels.get("loader_bitmap_packbits");
+  const packedAddress = labels.get("loader_bitmap_lzss");
   assert.ok(Number.isInteger(packedAddress));
   assert.deepEqual(
     readXexBytes(packedAddress, compiled.packedBitmap.length),
@@ -366,7 +366,7 @@ test("loader-only tail may use PMG bytes but stays below screen memory", () => {
   assert.ok(mainEnd);
   assert.ok(Number.parseInt(mainEnd[1], 16) < 0x4000);
   const labels = readLabels();
-  assert.ok(labels.get("loader_bitmap_packbits") < labels.get("loader_display_list"));
+  assert.ok(labels.get("loader_bitmap_lzss") < labels.get("loader_display_list"));
   assert.ok(labels.get("loader_display_list") < 0x4000);
   assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_frontend_charset/);
   assert.equal(compiled.bitmapAddress, 0x4010);

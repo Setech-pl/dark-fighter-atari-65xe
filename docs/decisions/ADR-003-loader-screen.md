@@ -25,7 +25,7 @@ nie sugeruje oficjalnej afiliacji ani poparcia właścicieli marki.
   wzory ditheringu, pozycje, strefy palety i czas ekspozycji.
 - Host rasteruje źródło do dokładnie 7680 B: 1-bitowe bajty MSB-left dla
   ANTIC F i cztery 2-bitowe piksele na bajt dla ANTIC E. Następnie kompresuje
-  PackBits i z tych samych bajtów tworzy include ca65 oraz preview PNG 2×.
+  bounded LZ-10/5 i z tych samych bajtów tworzy include ca65 oraz preview PNG 2×.
 - Bitmapa zaczyna się pod `$4010`. Pierwsze 102 linie kończą się dokładnie pod
   `$4FFF`; drugie LMS wskazuje `$5000`, a linie 102–191 kończą się pod
   `$5E0F`. Dzięki temu żadna 40-bajtowa linia nie przecina granicy 4 KB.
@@ -60,8 +60,8 @@ ich rozdzielenie i jasność są odwzorowane kształtem oraz ditheringiem.
 
 ## Pamięć i czas
 
-Surowa bitmapa zajmuje 7680 B pod `$4010-$5E0F`; bieżący strumień PackBits ma
-3370 B pod `$31FD-$3F26`, a loader display list leży pod `$3F27-$3FF0`.
+Surowa bitmapa zajmuje 7680 B pod `$4010-$5E0F`; bieżący strumień LZ-10/5 ma
+2027 B pod `$370F-$3EF9`, a loader display list leży pod `$3EFA-$3FC3`.
 Może przejściowo używać stron przyszłego PMG, ponieważ PMG i jego DMA są wtedy
 wyłączone. Build bezwzględnie odrzuca wejście w ekran od `$4000`.
 Rozwinięcie odbywa się przy wyłączonym DMA i kończy dokładnie pod `$5E0F`.

@@ -174,9 +174,9 @@ test("both ships share one finite progression and retain an immutable eight-row 
     advanceHullScroll(world, asset);
   }
   assert.equal(world.corridorPhase, 248);
-  assert.equal(world.drainRows, 22);
-  assert.equal(world.hullAdvances, 270);
-  assert.equal(frame, 1080);
+  assert.equal(world.drainRows, 23);
+  assert.equal(world.hullAdvances, 271);
+  assert.equal(frame, 1084);
 });
 
 test("assembled sector dictionaries, sequences, overlays, and animation match the source asset", () => {
@@ -248,7 +248,7 @@ test("flagship keeps the accepted cadence, warning, speed, damage, and M0 owners
     "changing M1 size preserves M0's pair");
 });
 
-test("heavy slugs pulse inside the accepted four-line collision envelope and clean exactly", () => {
+test("heavy slugs use a two-cell six-line playfield lozenge and restore exact backing", () => {
   const slot = {
     state: BROADSIDE_STATES.FLYING,
     missile: 2,
@@ -257,35 +257,22 @@ test("heavy slugs pulse inside the accepted four-line collision envelope and cle
     y: 120,
   };
   assert.deepEqual([0, 1, 2, 3].map((frame) => heavyShellVisual(slot, asset, frame).height),
-    [3, 3, 4, 4]);
-  assert.equal(missileWidth(heavyShellVisual(slot, asset, 0).size), 2);
-  assert.equal(Math.max(...[0, 1, 2, 3].map((frame) =>
-    heavyShellVisual(slot, asset, frame).height)), asset.broadside.flyingHeight);
+    [6, 6, 6, 6]);
+  assert.deepEqual([0, 1, 2, 3].map((frame) => heavyShellVisual(slot, asset, frame).phase),
+    [0, 0, 1, 1]);
+  const visual = heavyShellVisual(slot, asset, 0);
+  assert.deepEqual([visual.width, visual.height, visual.occupiedPixels, visual.renderer],
+    [8, 6, 40, "ANTIC4_PLAYFIELD_OVERLAY"]);
+  assert.equal(visual.width >= asset.broadside.projectileVisuals.raider.widthHpos * 2, true);
 
-  const missileBytes = new Uint8Array(12).fill(0x03); // persistent M0 bits
-  const draw = (top, height) => {
-    for (let row = top; row < top + height; row += 1) {
-      missileBytes[row] = updateMissileByte(missileBytes[row], 2, true);
-    }
-  };
-  const erase = (top, height) => {
-    for (let row = top; row < top + height; row += 1) {
-      missileBytes[row] &= MISSILE_CLEAR_MASKS[2];
-    }
-  };
-  draw(4, 3);
-  erase(4, 3);
-  draw(3, 4);
-  erase(3, 4);
-  assert.equal(missileBytes.every((value) => value === 0x03), true,
-    "shape phase cleanup leaves M0 and no stale M2 pixels");
-
-  const slugRoutine = source.slice(
-    source.indexOf("draw_broadside_slug:"),
+  const overlayRoutine = source.slice(
+    source.indexOf("render_capital_shell_overlays:"),
     source.indexOf("draw_broadside_span:"),
   );
-  assert.doesNotMatch(slugRoutine, /COLPM|COLPF|PRIOR/,
-    "bitmap-only pulse cannot flicker the shared fighter colours");
+  assert.match(overlayRoutine,
+    /BROAD_PREV_H,x[\s\S]+sta BROAD_PREV_Y,x[\s\S]+iny[\s\S]+sta BROAD_COLLISION,x[\s\S]+sta \(dst_ptr\),y[\s\S]+iny[\s\S]+sta \(dst_ptr\),y/);
+  assert.doesNotMatch(overlayRoutine, /COLPM|COLPF|PRIOR|MISSILES/,
+    "playfield overlay cannot flicker shared PMG colours or consume M0-M3");
 });
 
 test("four-frame launch flash stays hull-attached while the launched shell is independent", () => {
@@ -500,7 +487,7 @@ test("drain blocks new warnings and reaches COMPLETE only after every attached e
   const cadenceMuchLater = simulateBroadsideCadence(asset, { frames: 10000, difficulty: "hard" });
   assert.equal(cadenceAtEnd.finalSectorState, CAPITAL_SECTOR_STATES.COMPLETE);
   assert.equal(cadenceAtEnd.finalCorridorPhase, 248);
-  assert.equal(cadenceAtEnd.drainRows, 22);
+  assert.equal(cadenceAtEnd.drainRows, 23);
   assert.deepEqual(cadenceMuchLater.warningStarts, cadenceAtEnd.warningStarts,
     "no cannon event is created after the engine section");
 
@@ -509,7 +496,7 @@ test("drain blocks new warnings and reaches COMPLETE only after every attached e
     initialSectorPhase: asset.sector.streamRows,
   });
   world.hullDrained = true;
-  world.drainRows = 22;
+  world.drainRows = 23;
   world.sectorState = CAPITAL_SECTOR_STATES.DRAIN;
   const state = createBroadsideState(asset);
   state.slots[0].state = BROADSIDE_STATES.FLYING;
@@ -524,9 +511,9 @@ test("drain blocks new warnings and reaches COMPLETE only after every attached e
   assert.equal(updateSectorCompletion(world, state), CAPITAL_SECTOR_STATES.COMPLETE);
 
   for (const [difficulty, completeFrame] of [
-    ["easy", 1350],
-    ["medium", 1200],
-    ["hard", 1080],
+    ["easy", 1355],
+    ["medium", 1205],
+    ["hard", 1084],
   ]) {
     assert.notEqual(
       simulateBroadsideCadence(asset, { frames: completeFrame - 1, difficulty }).finalSectorState,

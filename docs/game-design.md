@@ -53,6 +53,32 @@ Podstawowa pętla decyzji gracza brzmi: odczytaj zagrożenie, wybierz osiągaln�
 trasę, ustaw Vipera, zdecyduj czy unikać lub strzelać, a następnie reaguj na
 skutek bez przerywania ciągłego lotu.
 
+## Kontrakt rosteru przeciwników
+
+**PLANNED**
+
+| Stabilne ID | Rola | Tożsamość taktyczna | Rodzina broni |
+| --- | --- | --- | --- |
+| `RAIDER` | Standard fighter | Formation flight i czytelny zigzag attack | Single pulse |
+| `TALON` | Fast interceptor | Wąski, szybki diagonal pass | Fast needle bolt |
+| `SCYTHE_BOMBER` | Heavy bomber | Powolne lane denial i committed approach | Plasma bomb lub mine |
+| `TRIDENT_GUNSHIP` | Heavy gunship | Utrzymuje pozycję i naciska kilka lanes | Three-shot sequence lub fan |
+| `WRAITH_SCOUT` | Scout | Feint, blink lub rapid repositioning | Delayed aimed pulse |
+| `HUNTER` | Pursuit fighter | Przewiduje pozycję gracza i nurkuje | Aimed burst |
+| `LEECH_DRONE` | Swarm drone | Agresywnie domyka małą grupą | Contact attack lub short pulse |
+| `AEGIS_ESCORT` | Escort | Chroni high-value unit i zajmuje defensive space | Defensive/intercepting fire |
+| `CROWN_RAIDER` | Ace/elite | Feint, retreat i re-entry | Accurate multi-shot burst |
+| `HYDRA_CARRIER` | Missile carrier | Pozostaje w dystansie i odpala timed salvos | Slowly steering missiles |
+
+Pass 1 implementuje grafikę i wspólny renderer tylko dla pierwszych trzech
+ID. Jedynie `RAIDER` jest aktywny w bieżącym release flow i wybiera przez
+deskryptor `WEAPON_SINGLE_PULSE`: 10 damage, dziesięć strzałów co 4 ramki,
+prędkość 5 scanlines/rama i pauza 60/50/40 ramek PAL dla EASY/MEDIUM/HARD.
+Viper podczas trzymania FIRE emituje 10 żółtych strzałów co 3 ramki,
+z prędkością 6 i 12-ramkową pauzą. `TALON` i `SCYTHE_BOMBER` pozostają
+review-only z `WEAPON_NONE`. Tabela nie autoryzuje jeszcze AI, broni ani
+balansu pozostałych typów.
+
 ## Model sektorów
 
 **BINDING**
@@ -97,6 +123,15 @@ W sektorze bitwy:
 
 Kolizje burtowe mają wynikać z jednej spójnej symulacji, a nie z osobnych
 efektów dekoracyjnych dla każdej frakcji.
+
+Punkty za zniszczenie fightera wynikają z archetypu i jawnego źródła damage.
+Pocisk Vipera oraz rzeczywisty contact Vipera dają pełny score nawet, gdy ten
+sam contact rani lub zabija gracza. Colonial capital fire niszczy Cylon fighter
+bez punktów. Cylon capital fire może zniszczyć własny fighter przez friendly
+fire i wtedy daje graczowi pełny score archetypu; trafienie Vipera przez ten
+sam pocisk nie daje punktów. Cleanup/despawn/transition nigdy nie punktują.
+Nieśmiertelny lub nielethal hit nie punktuje, a jeden living→destroyed transition
+może przyznać wynik tylko raz.
 
 Bieżący pierwszy sektor jest skończonym przelotem 240 wierszy na okręt od rufy
 do dziobu: `ENGINES 32`, `AFT 24`, `COMBAT 128`, `FORWARD 24`, `PROW 32`. Strony mają
@@ -154,6 +189,10 @@ zdarzeń wymagają testów czytelności i czasu reakcji.
 
 - Viper ma stan kadłuba od 0% do 100%.
 - HUD pokazuje wartość liczbową, na przykład `HULL 80%`.
+- `LIFE` pokazuje wszystkie pozostałe grywalne Vipery, łącznie z aktualnie
+  aktywnym; gra z trzema życiami przechodzi `3 → 2 → 1 → 0 / Game Over`.
+- `HULL` jest wyprowadzany z kanonicznych dziesięciu jednostek health przez
+  dokładne `units × 10`; nie istnieje drugi licznik zdrowia ani zaokrąglanie.
 - Zwykły ogień przeciwnika i ciężkie pociski obniżają stan kadłuba.
 - Osiągnięcie 0% niszczy Vipera.
 - Duży odłamek niszczy Vipera natychmiast zamiast zadawać zwykłe obrażenia.

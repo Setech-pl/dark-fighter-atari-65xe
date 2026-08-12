@@ -16,7 +16,7 @@ ekran gameplayu. Obecnie zawiera:
 
 - sterowanie joystickiem w porcie 1 i strzelanie pojedynczym FIRE;
 - jednego przeciwnika z czerwonym skanerem, sprzętowe PMG, kolizje i score;
-- przewijany playfield ANTIC 4, czytelny dwuwierszowy HUD ANTIC 2 z osobnym
+- przewijany playfield ANTIC 4, czytelny kompaktowy HUD ANTIC 2 z osobnym
   fontem oraz efekty POKEY;
 - oryginalne 32-wierszowe kadłuby boczne ANTIC 4 w układzie nominalnym
   `8 + 24 + 8`, z jedną funkcjonalną, wielokomórkową baterią na stronę w

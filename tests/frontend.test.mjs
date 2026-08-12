@@ -175,7 +175,7 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   for (const register of ["AUDC1", "AUDC2", "AUDC3", "AUDC4", "AUDCTL"]) {
     assert.match(silence, new RegExp(`sta ${register}`));
   }
-  assert.match(routine("fire_bullet"), /lda sound_enabled\s+beq @done/);
+  assert.match(routine("allocate_viper_projectile"), /lda sound_enabled\s+beq @accepted/);
   assert.match(routine("play_hit_sound"), /lda sound_enabled\s+beq @done/);
   assert.match(
     routine("update_sound"),
@@ -355,8 +355,8 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
   assert.ok(Number.parseInt(zeroPage[2], 16) < 0x0100);
   assert.ok(labels.get("draw_main_menu_hangar") < charsetStart);
   assert.ok(labels.get("frontend_glyph_rows") >= frontendStart);
-  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_packbits"));
-  assert.ok(labels.get("loader_bitmap_packbits") < labels.get("loader_display_list"));
+  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_lzss"));
+  assert.ok(labels.get("loader_bitmap_lzss") < labels.get("loader_display_list"));
   assert.ok(labels.get("loader_display_list") < 0x4000);
 
   const constants = readFrontendGraphicsSource(source).constants;
@@ -477,8 +477,8 @@ test("menu PMG craft is bounded, main-menu-only, and gameplay setup is restored"
   assert.match(frontendEntry, /cpx #STATE_MAIN_MENU[\s\S]+lda #\$02[\s\S]+sta GRACTL[\s\S]+sta NMIEN/);
   assert.equal(hardwareState.get("SIZEP0"), 1);
   assert.equal(hardwareState.get("SIZEP3"), 1);
-  assert.equal(hardwareState.get("COLPF2"), 0x28);
-  assert.equal(hardwareState.get("COLPF3"), 0x44);
+  assert.equal(hardwareState.get("COLPF2"), 0x1e);
+  assert.equal(hardwareState.get("COLPF3"), 0x46);
   assert.match(routine("start_gameplay"), /jsr clear_pmg/);
   assert.match(
     routine("start_gameplay"),

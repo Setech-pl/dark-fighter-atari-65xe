@@ -40,7 +40,8 @@ char-mode oraz oszczędnego nakładania PMG, a nie z pojedynczych pikseli
 widocznych tylko na powiększonym PNG.
 
 Bieżące PMG są w całości zajęte przez Vipera z silnikiem oraz jednego wroga ze
-skanerem; Missile 0 jest pociskiem gracza. To potwierdzony stan vertical slice,
+skanerem; Missile 0 pozostaje wyłącznie zarezerwowany dla broni gracza, lecz
+bieżący żółty burst używa niezależnych glifów ANTIC 4. To potwierdzony stan vertical slice,
 nie obietnica dowolnej liczby wielokolorowych sprite'ów. Przyszłe użycie
 multipleksowania, nakładania players/missiles lub znakowych obiektów wymaga
 pomiaru VBI/DLI, kolizji i real hardware.
@@ -115,11 +116,26 @@ schodzą z 8 do 1 komórki, a ostatnia komórka ma rzeczywisty ukośny kontur
 zamiast płaskiego odcięcia. Stały offset +8 wierszy zapobiega lustrzanemu
 wejściu struktur, lecz obie strony pozostają jednym fizycznym strumieniem.
 
-Zwykły Cylon fighter P1/P2 jest podwójnej szerokości i ma 16 jednostek HPOS
-widocznej obwiedni. Jego wspólne granice to `80..160`: przy minimum zajmuje
-`[80,96)`, przy maksimum `[160,176)`, dokładnie wewnątrz corridor `[80,176)`.
-Spawn, steering i ostateczny zapis HPOSP1/HPOSP2 używają tych samych stałych;
-nie istnieje zwykła klatka lotu, w której fighter nachodzi na side hull.
+Pierwsza baza rosteru zastępuje schematycznego przeciwnika ręcznie poprawionym
+native Atari Raiderem: szeroki crescent, wklęsła dolna krawędź, osobny centralny
+korpus i czerwony slit skanera. `TALON` ma smukły 6-HPOS spine, krótki fin i
+ostry nos, a `SCYTHE_BOMBER` ciężką 16-HPOS masę skrzydeł, boczne pods i gruby
+fuselage. Wszystkie lecą dolnym nosem ku graczowi i pozostają rozpoznawalne w
+monochromatycznej masce; nie są palette aliases.
+
+P1/P2 pozwalają zachować prawdziwy czerwony scanner bez zmniejszania capacity.
+Niemal biały P1 `$0C` został zastąpiony medium steel-blue `$84`; Viper `$0E`
+pozostaje najjaśniejszym statkiem. Ten sam `COLPM1` barwi teraz M1 chłodnym
+steel-blue, co jest jawnym sprzętowym sprzężeniem. P2 `$46` niesie trzyfazowy
+czerwony scanner; Raider burst używa niezależnie `COLPF3=$46`, więc kolor nie
+jest globalnie pulsowany. Kandydaci `$82/$84/$04` są renderowani deterministyczną paletą
+Atari, a `$84` jest domyślnym kompromisem czytelności i masy.
+
+Obwiednia jest per-type. Raider i Scythe zajmują `[80,96)` przy lewej oraz
+`[160,176)` przy prawej granicy. Talon zajmuje tylko 6 HPOS i porusza się
+logicznie `80..170`; jego PMG byte origin `79..169` kompensuje pusty pierwszy
+bit. Spawn, steering, type change i zapis HPOSP1/HPOSP2 korzystają z jednego
+deskryptora, więc żadna klatka nie nachodzi na side hull.
 
 Dominująca płyta strony sojuszniczej zajmuje 2–4 komórki szerokości i 3–6
 wierszy wysokości. Staggered horizontal seams, czarne grooves i białe lips
@@ -166,17 +182,34 @@ kadłubów. Warning jest widoczny przez wszystkie 25 ramek: przez 8 ramek ma
 2 scanlines i normalną szerokość, przez 9 ramek 4 scanlines i double width,
 a przez ostatnie 8 ramek 6 scanlines oraz dwuramkowy puls double/quad. Rośnie
 od wylotu w stronę corridor i kończy się bez skoku względem przyszłego toru.
-Lecący slug pulsuje co dwie ramki między zwartą sylwetką 3 scanlines i pełną
-4 scanlines, zachowuje podwójną szerokość GTIA i przesuwa się o 2 jednostki
-HPOS na ramkę. Jego fizyczna obwiednia nie przekracza wcześniejszych 4 linii.
+Lecący slug pulsuje co dwie ramki między dwoma zwartymi lozenge glyphs w
+dwóch sąsiednich komórkach ANTIC 4. Zajmuje 8 HPOS × 6 scanlines i około 40
+native pixeli, czyli ma cztery razy większą długość osi lotu niż 2×3 Raider
+pulse i osiem razy większą niż jedno-HPOS Viper fire; przesuwa się logicznie o 2
+HPOS na ramkę. Allied używa
+yellow-gold `COLPF2=$1E`, enemy crimson `COLPF3=$46`, a collision obejmuje
+pełny widoczny 8×6 swept extent.
 Na launch czteroramkowy glif flash łączy realny wylot z pociskiem i pozostaje
 przy wolniejszym strumieniu kadłuba; sam slug natychmiast przechodzi na ruch
 ekranowy. Impact wykorzystuje ten sam slot, rozszerza wysokość
-do 8 scanlines i trwa 5 ramek. M1, M2 i M3 zachowują
-rzeczywiste odziedziczone kolory P1/P2/P3: odpowiednio chłodną biel, hostile
-red i amber. Nie powstaje sztuczny, jaśniejszy kolor tylko dla preview.
-Animacja nie zapisuje `COLPM`, dzięki czemu dzielone z M1–M3 warstwy fighterów
-nie zmieniają koloru.
+do 8 scanlines i trwa 5 ramek. Warning oraz impact zachowują
+rzeczywiste kolory M1–M3; stan `FLYING` zapisuje i przywraca oba znaki playfieldu,
+nie missile bitmapę. Dzięki temu animacja nie zapisuje `COLPM`, a P1–P3,
+scanner i silnik Vipera nie zmieniają koloru.
+
+Język fighter fire pozostaje krótszy: Raider pulse to nasycone czerwone
+`COLPF3=$46`, 2 HPOS × 3 scanlines, a Viper fire literalne żółte
+`COLPF2=$1E`, 1 HPOS × 2 scanlines. Obie bronie używają przywracanych kodów
+ekranu i prekompilowanych glifów fazowych; P0 pozostaje `$0E`, P3 `$28`, a
+P1/P2 `$84/$46`. Burst Vipera ma 10 strzałów co 3 ramki i prędkość 6
+scanlines/rama; Raider ma 8 strzałów co 4 ramki i prędkość 5. Capital slug
+pozostaje co najmniej czterokrotnie dłuższy w osi lotu.
+
+Wspólna fighter explosion korzysta z sześciu oryginalnych masek 8×8:
+zwarty flash, dwa etapy rozszerzenia, nieregularne maksimum, fragmenty i
+embers. Viper renderuje je istniejącą parą P0/P3, a ordinary enemy parą P1/P2;
+kolory pozostają przypisane do statków i nie są przełączane na czas efektu.
+Każdy obraz trwa cztery ramki i jest clipowany do gameplay viewportu.
 
 Trafienie przeciwnego capital hull uruchamia osobny, niekolizyjny overlay
 3×3 znaków. Przez 24 ramki przechodzi od białobursztynowego core przez
@@ -234,14 +267,12 @@ wzorcem kompozycji pierwszego gameplay screen: jednowierszowy HUD, czarna
 przestrzeń lotu, stalowo-granatowe struktury, jasny Viper, blade Cylon fighters
 i oszczędne weapon accents.
 
-Bieżący Atari vertical slice pokazuje techniczne napisy `SCORE`, `FUEL`, `ARM`
-i `LIFE` jako prawdziwy, monochromatyczny tekst ANTIC 2 z dedykowanego fontu
-6×7. Dwa górne wiersze są odseparowane od kolorowego ANTIC 4 playfieldu;
-dynamiczne score i trzy cyfry zdrowia pozostają kodami znaków, nie PMG ani
-bitmapowym ornamentem. Te tymczasowe etykiety nie zatwierdzają jeszcze
-mechanik paliwa i uzbrojenia. Docelowe nazewnictwo `HULL nn%` oraz układ
-pozostałych pól będą osobnym testem UI. Graficzny health bar pozostaje
-opcjonalnym testem, nie równoległym wymaganiem.
+Bieżący Atari vertical slice pokazuje `SCORE`, `LIFE` i `HULL` jako prawdziwy,
+monochromatyczny tekst ANTIC 2 z dedykowanego fontu 6×7. Jeden górny wiersz
+kończy się jednoliniowym separatorem i pozostawia 23 wiersze kolorowego ANTIC 4
+playfieldu. Dynamiczne score, całkowite życia i procent zdrowia pozostają
+kodami znaków, nie PMG ani bitmapowym ornamentem; niewyjaśnione placeholdery
+`ARM` i `FUEL` zostały usunięte.
 
 PNG nie ustala rozdzielczości, liczby PMG ani zagęszczenia obiektów. Te wartości
 są adaptowane do ANTIC/GTIA, budżetu PMG i jednej ramki PAL.

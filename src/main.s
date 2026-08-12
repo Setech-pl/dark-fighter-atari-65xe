@@ -123,9 +123,10 @@ BROAD_STATE_END             = BROAD_VISIBLE_SCROLLS+$01
 DIFFICULTY_SETTING          = BROAD_STATE_END        ; 1 B, persists across frontend states
 FRONTEND_PERSISTENT_END     = DIFFICULTY_SETTING+$01
 HULL_SCROLL_ACCUMULATOR     = FRONTEND_PERSISTENT_END
-CORRIDOR_BOUNDARY_LEFT      = HULL_SCROLL_ACCUMULATOR+$01 ; 22 B star backing
-CORRIDOR_BOUNDARY_RIGHT     = CORRIDOR_BOUNDARY_LEFT+$16  ; 22 B star backing
-BROAD_TURRET_FIRED          = CORRIDOR_BOUNDARY_RIGHT+$16 ; source turret count
+CORRIDOR_BOUNDARY_ROWS      = 23
+CORRIDOR_BOUNDARY_LEFT      = HULL_SCROLL_ACCUMULATOR+$01 ; 23 B star backing
+CORRIDOR_BOUNDARY_RIGHT     = CORRIDOR_BOUNDARY_LEFT+CORRIDOR_BOUNDARY_ROWS
+BROAD_TURRET_FIRED          = CORRIDOR_BOUNDARY_RIGHT+CORRIDOR_BOUNDARY_ROWS
 BROAD_FLASH_TIMER           = BROAD_TURRET_FIRED+CAPITAL_HULL_TURRET_COUNT ; 3 B
 CAPITAL_SECTOR_STATE        = BROAD_FLASH_TIMER+$03
 CAPITAL_SECTOR_DRAIN_ROWS   = CAPITAL_SECTOR_STATE+$01
@@ -144,18 +145,37 @@ CAPITAL_EXPLOSION_BACKUP    = CAPITAL_EXPLOSION_COLUMN+$02 ; 2 * 3 * 3 B
 CAPITAL_EXPLOSION_SOUND_TIMER = CAPITAL_EXPLOSION_BACKUP+$12
 ENGINE_ANIMATION_TIMER      = CAPITAL_EXPLOSION_SOUND_TIMER+$01
 ENGINE_ANIMATION_PHASE      = ENGINE_ANIMATION_TIMER+$01
-GAMEPLAY_RESIDENT_END       = ENGINE_ANIMATION_PHASE+$01
+ENEMY_ARCHETYPE             = ENGINE_ANIMATION_PHASE+$01
+ENEMY_STEERING_TIMER        = ENEMY_ARCHETYPE+$01
+ENEMY_ACTIVE                = ENEMY_STEERING_TIMER+$01
+ENEMY_HP                    = ENEMY_ACTIVE+$01
+ENEMY_PENDING_DAMAGE        = ENEMY_HP+$01
+ENEMY_PENDING_SOURCE        = ENEMY_PENDING_DAMAGE+$01
+GAMEPLAY_RESIDENT_END       = ENEMY_PENDING_SOURCE+$01
+
+.include "fighter-weapons.inc"
 
 BROAD_FREE    = 0
 BROAD_WARNING = 1
 BROAD_FLYING  = 2
 BROAD_IMPACT  = 3
+BROAD_RAIDER_PULSE = 4
 PLAYER_ALIVE                = 0
 PLAYER_DYING                = 1
 PLAYER_RESPAWN_INVULNERABLE = 2
 PLAYER_GAME_OVER            = 3
 OWNER_ALLIED  = 0
 OWNER_ENEMY   = 1
+OWNER_RAIDER  = 2
+DAMAGE_PLAYER_PROJECTILE = 0
+DAMAGE_PLAYER_CONTACT    = 1
+DAMAGE_CAPITAL_CYLON     = 2
+DAMAGE_CAPITAL_COLONIAL  = 3
+DAMAGE_ENEMY_PROJECTILE  = 4
+DAMAGE_CLEANUP           = 5
+FIGHTER_PROJECTILE_FREE   = 0
+FIGHTER_PROJECTILE_VIPER  = 1
+FIGHTER_PROJECTILE_RAIDER = 2
 DIFFICULTY_EASY   = 0
 DIFFICULTY_MEDIUM = 1
 DIFFICULTY_HARD   = 2
@@ -164,19 +184,32 @@ DIFFICULTY_DEFAULT = DIFFICULTY_MEDIUM
 MISSILE_M0_MASK = $03
 MISSILE_M0_CLEAR_MASK = $FC
 BROADSIDE_DOUBLE_SIZES = $54
-BROADSIDE_WARNING_Y_MAX = 215
-BROADSIDE_SCREEN_TOP = 32
-BROADSIDE_PLAYFIELD_TOP = 48
+BROADSIDE_WARNING_Y_MAX = GAMEPLAY_BOTTOM-9
+BROADSIDE_SCREEN_TOP = HUD_TOP
+BROADSIDE_PLAYFIELD_TOP = GAMEPLAY_TOP
+GAMEPLAY_FIRST_SCREEN_ROW = 1
+GAMEPLAY_SCREEN = SCREEN+GAMEPLAY_FIRST_SCREEN_ROW*40
+GAMEPLAY_SCREEN_END = SCREEN+24*40
 BROADSIDE_SLOT_COUNT = 3
+ENEMY_SLOT_COUNT = 1
+ENEMY_SLOT_INDEX = 0
+ENEMY_INACTIVE = 0
+ENEMY_ACTIVE_STATE = 1
+ENEMY_EXPLODING_STATE = 2
+FIGHTER_EXPLOSION_VIPER_SLOT = 0
+FIGHTER_EXPLOSION_ENEMY_SLOT = 1
+PLAYER_HEALTH_UNITS = 10
+CAPITAL_DAMAGE_UNITS = 2
+ENEMY_PULSE_DAMAGE_UNITS = 1
+ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = GAMEPLAY_BOTTOM
 
 PLAYER_H    = 16
 PLAYER_COLLISION_WIDTH = 8
 PLAYER_COLLISION_LAST_ROW = 14
-ENEMY_H     = 12
 PLAYER_X_MIN = 48
 PLAYER_X_MAX = 200
-PLAYER_Y_MIN = 64
-PLAYER_Y_MAX = 208
+PLAYER_Y_MIN = GAMEPLAY_TOP+16
+PLAYER_Y_MAX = GAMEPLAY_BOTTOM-PLAYER_H
 
 ; Atari screen-code values for the OS character set.
 CH_SPACE    = 0
@@ -184,7 +217,7 @@ CH_PANEL_SOLID = 1
 CH_PANEL_EDGE = 2
 CH_PANEL_RIVET = 3
 CH_PANEL_TRUSS = 4
-CH_PANEL_DAMAGE = 5
+CH_PERCENT  = 5
 CH_PANEL_FRAME = 6
 CH_PANEL_STRIPE = 7
 CH_SEPARATOR = 9
@@ -200,12 +233,36 @@ CH_QUESTION = 31
 KAWASAKI_GREEN = $D8
 GAMEPLAY_COLPF0 = $0E
 GAMEPLAY_COLPF1 = $84
-GAMEPLAY_COLPF2 = $28
-GAMEPLAY_COLPF3 = $44
+GAMEPLAY_COLPF2 = VIPER_PROJECTILE_COLOR
+GAMEPLAY_COLPF3 = RAIDER_PROJECTILE_COLOR
 HUD_COLPF1 = $0E
 HUD_COLPF2 = $00
+HUD_LIFE_DIGIT_OFFSET = 18
+HUD_HULL_HUNDREDS_OFFSET = 26
+HUD_HULL_TENS_OFFSET = 27
 
 .include "capital-hulls.inc"
+.include "enemy-roster.inc"
+
+.assert CORRIDOR_BOUNDARY_ROWS = CAPITAL_HULL_VISIBLE_ROWS, error, "boundary backing must cover every gameplay row"
+
+; Existing high-energy hull glyphs form a compact two-phase capital slug.
+; Playfield colour banks give the two capital factions independent colours
+; without changing the player/enemy colours coupled to COLPM0-COLPM3.
+CAPITAL_SHELL_PHASE0  = CAPITAL_HULL_GLYPH_BASE+18
+CAPITAL_SHELL_PHASE1  = CAPITAL_HULL_GLYPH_BASE+19
+
+.ifndef ENEMY_REVIEW_HARNESS
+ENEMY_REVIEW_HARNESS = 0
+.endif
+.ifndef ENEMY_COMBAT_REVIEW_HARNESS
+ENEMY_COMBAT_REVIEW_HARNESS = 0
+.endif
+.ifndef ENEMY_BODY_COLOR_OVERRIDE
+ENEMY_RUNTIME_BODY_COLOR = ENEMY_BODY_COLOR
+.else
+ENEMY_RUNTIME_BODY_COLOR = ENEMY_BODY_COLOR_OVERRIDE
+.endif
 
 ; ANTIC 6/7 use bits 6-7 as a direct COLPF0-COLPF3 colour bank.
 ANTIC67_COLOR_PF0 = $00
@@ -301,10 +358,10 @@ CORRIDOR_ENEMY_COLUMNS = 8
 CORRIDOR_LEFT_HPOS = PLAYER_X_MIN + CORRIDOR_CENTRAL_FIRST*4
 CORRIDOR_RIGHT_HPOS = PLAYER_X_MIN + CORRIDOR_CENTRAL_END*4
 PLAYER_RESPAWN_X = CORRIDOR_LEFT_HPOS + (CORRIDOR_RIGHT_HPOS-CORRIDOR_LEFT_HPOS-PLAYER_COLLISION_WIDTH)/2
-PLAYER_RESPAWN_Y = $B8
-ENEMY_VISIBLE_WIDTH = 16
+PLAYER_RESPAWN_Y = GAMEPLAY_BOTTOM-PLAYER_H
 ENEMY_X_MIN = CORRIDOR_LEFT_HPOS
-ENEMY_X_MAX = CORRIDOR_RIGHT_HPOS-ENEMY_VISIBLE_WIDTH
+ENEMY_X_MAX = CORRIDOR_RIGHT_HPOS-ENEMY_RELEASE_VISIBLE_WIDTH
+ENEMY_VISIBLE_WIDTH = ENEMY_RELEASE_VISIBLE_WIDTH
 ENEMY_X_RANGE = ENEMY_X_MAX-ENEMY_X_MIN
 ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 
@@ -313,12 +370,38 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 .assert PLAYER_RESPAWN_X = 124, error, "player respawn must center the eight-HPOS envelope in the 24-column corridor"
 .assert ENEMY_X_MIN = 80, error, "enemy left edge must begin at the central corridor"
 .assert ENEMY_X_MAX = 160, error, "double-width enemy must end before the enemy hull"
-.assert ENEMY_X_MAX+ENEMY_VISIBLE_WIDTH = CORRIDOR_RIGHT_HPOS, error, "enemy envelope must fit the corridor exactly"
+.assert ENEMY_X_MAX+ENEMY_RELEASE_VISIBLE_WIDTH = CORRIDOR_RIGHT_HPOS, error, "enemy envelope must fit the corridor exactly"
+.assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
+.assert HUD_BOTTOM = GAMEPLAY_TOP, error, "gameplay must begin immediately below the HUD"
+.assert GAMEPLAY_BOTTOM-GAMEPLAY_TOP = CAPITAL_HULL_VISIBLE_ROWS*8, error, "gameplay viewport height changed"
+.assert GAMEPLAY_SCREEN_ROWS = 23, error, "compact HUD must expose 23 gameplay rows"
+.assert GAMEPLAY_SCREEN+GAMEPLAY_SCREEN_ROWS*40 = GAMEPLAY_SCREEN_END, error, "gameplay must retain the 960-byte screen end"
+.assert PLAYER_RESPAWN_Y = 184, error, "respawn must retain its accepted hardware Y"
+.assert VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "Viper phase glyphs overlap capital hulls"
+.assert RAIDER_PROJECTILE_GLYPH_BASE >= CAPITAL_HULL_GLYPH_BASE+CAPITAL_HULL_GLYPH_COUNT, error, "Raider phase glyphs overlap capital hulls"
+.assert RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT <= 128, error, "Raider phase glyphs exceed the charset"
 .assert RESPAWN_INVULNERABLE_FRAMES = 250, error, "respawn invulnerability must be exactly five PAL seconds"
 .assert RESPAWN_BLINK_HALF_PERIOD_FRAMES = 8, error, "respawn blink must toggle every eight PAL frames"
 .assert BROADSIDE_WARNING_PULSE_FRAMES = 2, error, "warning pulse routine requires two-frame groups"
 .assert CAPITAL_HULL_CONTACT_DAMAGE = BROADSIDE_PLAYER_DAMAGE, error, "contact damage must use shared 20-point path"
 .assert CAPITAL_HULL_CONTACT_COOLDOWN = BROADSIDE_DAMAGE_COOLDOWN, error, "contact cooldown must use shared damage gate"
+.assert BROADSIDE_PLAYER_DAMAGE = 20, error, "capital and hull contact damage must remain 20"
+.assert ENEMY_SINGLE_PULSE_DAMAGE = 10, error, "Raider single-pulse damage must remain 10"
+.assert CAPITAL_DAMAGE_UNITS*10 = BROADSIDE_PLAYER_DAMAGE, error, "capital damage scale changed"
+.assert ENEMY_PULSE_DAMAGE_UNITS*10 = ENEMY_SINGLE_PULSE_DAMAGE, error, "pulse damage scale changed"
+.assert ENEMY_PULSE_POOL_SLOTS = RAIDER_PROJECTILE_SLOT_COUNT, error, "Raider pool definitions diverged"
+.assert ENEMY_PULSE_BURST_COUNT = RAIDER_BURST_COUNT, error, "Raider burst definitions diverged"
+.assert ENEMY_PULSE_BURST_INTERVAL = RAIDER_BURST_INTERVAL, error, "Raider interval definitions diverged"
+.assert ENEMY_PULSE_SPEED = RAIDER_PROJECTILE_SPEED, error, "Raider projectile speeds diverged"
+.assert ENEMY_PULSE_COLOR = RAIDER_PROJECTILE_COLOR, error, "Raider playfield colours diverged"
+.assert SHARED_FIGHTER_EXPLOSION_FRAME_COUNT = 6, error, "shared fighter explosion needs six phases"
+.assert SHARED_FIGHTER_EXPLOSION_FRAME_DURATION = 4, error, "fighter explosion phase must last four PAL frames"
+.assert SHARED_FIGHTER_EXPLOSION_TOTAL = 24, error, "fighter explosion must last exactly 24 PAL frames"
+.assert RAIDER_HORIZONTAL_ACCELERATION = 1, error, "Raider acceleration hot path assumes one HPOS unit"
+.assert RAIDER_MAX_HORIZONTAL_VELOCITY = 1, error, "Raider velocity state is bounded to -1/0/+1"
+.assert RAIDER_WEAVE_PERIOD_FRAMES = 32, error, "Raider weave hot path assumes a 32-frame period"
+.assert RAIDER_ATTACK_ACTIVE_TOP = GAMEPLAY_TOP, error, "Raider pursuit begins at the gameplay viewport"
+.assert RAIDER_ATTACK_ACTIVE_BOTTOM = GAMEPLAY_BOTTOM, error, "Raider pursuit ends at the gameplay viewport"
 
 .segment "ZEROPAGE"
 
@@ -326,7 +409,7 @@ player_x:           .res 1
 player_y:           .res 1
 enemy_x:            .res 1
 enemy_y:            .res 1
-enemy_direction:    .res 1
+enemy_velocity_x:   .res 1
 bullet_x:           .res 1
 bullet_y:           .res 1
 bullet_active:      .res 1
@@ -357,6 +440,31 @@ gameplay_fire_gate: .res 1
 ; Loader, frontend and gameplay never run concurrently, so their DLI phase
 ; state safely reuses the same zero-page byte.
 gameplay_dli_phase = loader_dli_phase
+
+.segment "PROJECTILES"
+
+FIGHTER_PROJECTILE_ACTIVE:        .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_X:             .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_Y:             .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_PREV_Y:        .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_LIFETIME:      .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_RENDERED:      .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_SCREEN_LO:     .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_SCREEN_HI:     .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_BACKUP_TOP:    .res FIGHTER_PROJECTILE_SLOT_COUNT
+FIGHTER_PROJECTILE_BACKUP_BOTTOM: .res FIGHTER_PROJECTILE_SLOT_COUNT
+VIPER_BURST_STATE:                .res 1
+VIPER_BURST_REMAINING:            .res 1
+VIPER_BURST_TIMER:                .res 1
+RAIDER_BURST_STATE:               .res 1
+RAIDER_BURST_REMAINING:           .res 1
+RAIDER_BURST_TIMER:               .res 1
+FIGHTER_EXPLOSION_TIMER:          .res SHARED_FIGHTER_EXPLOSION_SLOT_COUNT
+FIGHTER_EXPLOSION_X:              .res SHARED_FIGHTER_EXPLOSION_SLOT_COUNT
+FIGHTER_EXPLOSION_Y:              .res SHARED_FIGHTER_EXPLOSION_SLOT_COUNT
+FIGHTER_PROJECTILE_STATE_END:
+
+.assert FIGHTER_PROJECTILE_STATE_END-FIGHTER_PROJECTILE_ACTIVE = 202, error, "fighter projectile and explosion state budget changed"
 
 .segment "CODE"
 
@@ -433,9 +541,9 @@ start:
 
     lda #$0E                    ; cold white player hull
     sta COLPM0
-    lda #$0C                    ; pale enemy hull
+    lda #ENEMY_RUNTIME_BODY_COLOR ; reviewed medium steel-blue Cylon hull
     sta COLPM1
-    lda #$46                    ; hostile red scanner
+    lda #ENEMY_SCANNER_COLOR    ; hostile red scanner and M2 pulse
     sta COLPM2
     lda #$28                    ; amber engine plume
     sta COLPM3
@@ -455,8 +563,14 @@ start:
     sta sound_enabled           ; options default: SOUND ON
     lda #DIFFICULTY_DEFAULT
     sta DIFFICULTY_SETTING      ; options default: MEDIUM
+.if ENEMY_REVIEW_HARNESS
+    jmp start_gameplay          ; compile-time review artifact skips frontend input
+.elseif ENEMY_COMBAT_REVIEW_HARNESS
+    jmp start_gameplay          ; palette/combat review variants skip frontend input
+.else
     jsr enter_main_menu
     jmp frontend_loop
+.endif
 
 unpack_broadside_runtime:
 broadside_unpack_command:
@@ -1224,7 +1338,7 @@ start_gameplay:
     jsr draw_player
     jsr draw_enemy
     jsr update_score_display
-    jsr update_life_display
+    jsr update_hud_status
     sta HITCLR
 
     lda #<display_list
@@ -1270,6 +1384,8 @@ start_gameplay:
 main_loop:
     jsr wait_frame
     inc frame_counter
+    jsr erase_fighter_projectile_overlays
+    jsr tick_shared_fighter_explosions
     jsr tick_capital_explosions
     jsr tick_launch_flashes
     jsr update_engine_animation
@@ -1285,16 +1401,20 @@ main_loop:
     cmp #PLAYER_DYING
     beq @simulation
     jsr read_input
-    jsr update_bullet
 @simulation:
     jsr update_enemy
     lda #$00
     sta BROAD_DAMAGE_APPLIED
     jsr handle_collisions
+    jsr update_viper_weapon
+    jsr update_enemy_weapon
     jsr update_starfield
     jsr handle_player_hull_contact
     jsr render_launch_flashes
     jsr render_capital_explosions
+    jsr render_shared_fighter_explosions
+    jsr render_capital_shell_overlays
+    jsr render_fighter_projectile_overlays
     jsr update_sector_completion
     jsr update_sound
     jsr tick_respawn_invulnerability
@@ -1402,69 +1522,19 @@ loader_dli:
     pla
     rti
 
-; PackBits commands: 1..127 literal bytes, $81..$FF repeated byte counts,
-; and $00 terminator. The host compiler verifies an exact 7680-byte expansion.
+; The accepted loader pixels use the same bounded LZ-10/5 decoder as the
+; resident broadside block. Resetting both self-modified endpoints makes the
+; second decode independent of the already-expanded gameplay runtime.
 unpack_loader_bitmap:
-    lda #<loader_bitmap_packbits
-    sta src_ptr
-    lda #>loader_bitmap_packbits
-    sta src_ptr+1
+    lda #<loader_bitmap_lzss
+    sta broadside_read_source+1
+    lda #>loader_bitmap_lzss
+    sta broadside_read_source+2
     lda #<LOADER_BITMAP_ADDRESS
-    sta dst_ptr
+    sta broadside_destination+1
     lda #>LOADER_BITMAP_ADDRESS
-    sta dst_ptr+1
-
-@command:
-    ldy #$00
-    lda (src_ptr),y
-    beq @done
-    tax
-    jsr loader_advance_src
-    txa
-    bmi @repeat
-
-@literal:
-    ldy #$00
-    lda (src_ptr),y
-    sta (dst_ptr),y
-    jsr loader_advance_src
-    jsr loader_advance_dst
-    dex
-    bne @literal
-    jmp @command
-
-@repeat:
-    and #$7F
-    tax
-    ldy #$00
-    lda (src_ptr),y
-    sta loader_repeat_value
-    jsr loader_advance_src
-@repeat_byte:
-    ldy #$00
-    lda loader_repeat_value
-    sta (dst_ptr),y
-    jsr loader_advance_dst
-    dex
-    bne @repeat_byte
-    jmp @command
-
-@done:
-    rts
-
-loader_advance_src:
-    inc src_ptr
-    bne :+
-    inc src_ptr+1
-:
-    rts
-
-loader_advance_dst:
-    inc dst_ptr
-    bne :+
-    inc dst_ptr+1
-:
-    rts
+    sta broadside_destination+2
+    jmp broadside_unpack_command
 
 init_state:
     lda #PLAYER_RESPAWN_X
@@ -1474,11 +1544,18 @@ init_state:
 
     lda #ENEMY_SPAWN_X
     sta enemy_x
-    lda #$38
+    lda #ENEMY_RELEASE_ARCHETYPE
+    sta ENEMY_ARCHETYPE
+    ldx #ENEMY_RELEASE_ARCHETYPE
+    lda #(GAMEPLAY_TOP-ENEMY_RELEASE_FRAME_HEIGHT) ; progressive entry below HUD
     sta enemy_y
+    lda #ENEMY_ACTIVE_STATE
+    sta ENEMY_ACTIVE
+    lda enemy_hit_points,x
+    sta ENEMY_HP
 
-    lda #$01
-    sta enemy_direction
+    lda #$00
+    sta enemy_velocity_x
     lda #$A7
     sta rng_state
 
@@ -1491,12 +1568,16 @@ init_state:
     sta damage_timer
     sta score_bcd_lo
     sta score_bcd_hi
+    sta ENEMY_PENDING_DAMAGE
+    sta ENEMY_PENDING_SOURCE
     lda #$00                    ; finite flagship sector begins before its prows
     sta corridor_phase
 
     lda #$00
     sta scroll_accumulator
     sta HULL_SCROLL_ACCUMULATOR
+    jsr init_fighter_projectiles
+    jsr reset_enemy_fire_cooldown
     rts
 
 clear_pmg:
@@ -1698,8 +1779,17 @@ copy_hud_charset:
     ldx #26
     jsr copy_hud_glyphs
 
-    lda #$FF                    ; dedicated full-width divider glyph
-    sta HUD_CHARSET+CH_SEPARATOR*8+7
+    ; Percent is a dedicated native 6x7 glyph in otherwise unused character
+    ; 12. Copying its canonical bytes keeps preview and ANTIC output aligned.
+    ldx #$07
+@percent:
+    lda CHARSET+CH_PERCENT*8,x
+    sta HUD_CHARSET+CH_PERCENT*8,x
+    dex
+    bpl @percent
+    lda #$FF
+    sta HUD_CHARSET+CH_SPACE*8+7
+
     rts
 
 copy_hud_glyphs:
@@ -1711,6 +1801,8 @@ copy_hud_glyphs:
     iny
     cpy #$07
     bne @row
+    lda #$FF                    ; shared bottom scanline forms the separator
+    sta (dst_ptr),y
     clc
     lda src_ptr
     adc #$07
@@ -1729,10 +1821,11 @@ copy_hud_glyphs:
     bne @glyph
     rts
 
-; The DLI at the end of the second HUD row prepares ANTIC 4 before its first
-; visible scanline. The DLI on the final gameplay row restores the HUD font
-; and neutral monochrome palette during the following blank region. A is the
-; only modified register and is preserved; X and Y remain untouched.
+; Every used HUD glyph has a full-width white eighth scanline, so the compact
+; HUD itself supplies the separator without a second character row. The HUD
+; DLI waits through that line, then installs the ANTIC 4 charset/palette before
+; the first gameplay scanline. The final-row DLI restores the HUD state.
+; A is the only modified register and is preserved; X and Y remain untouched.
 gameplay_dli:
     pha
     lda #$00
@@ -1791,18 +1884,11 @@ init_screen:
     inx
     bne @title_loop
 @title_done:
-    lda #CH_SEPARATOR
-    ldx #39
-@divider:
-    sta SCREEN+40,x
-    dex
-    bpl @divider
-
-    lda #<(SCREEN+80)
+    lda #<GAMEPLAY_SCREEN
     sta dst_ptr
-    lda #>(SCREEN+80)
+    lda #>GAMEPLAY_SCREEN
     sta dst_ptr+1
-    lda #22
+    lda #GAMEPLAY_SCREEN_ROWS
     sta row_counter
     lda #$00
     sta BROAD_WORK_COUNT
@@ -1884,11 +1970,8 @@ read_input:
     sta gameplay_fire_gate
     rts
 @fire_ready:
-    lda TRIG0
-    bne @done
-    lda bullet_active
-    bne @done
-    jsr fire_bullet
+    ; The burst controller samples held FIRE after collision/movement updates.
+    ; Released shots never inherit later Viper motion.
 @done:
     rts
 
@@ -1930,260 +2013,1314 @@ draw_player_for_lifecycle:
 @hidden:
     rts
 
-fire_bullet:
+; P0/P3 and P1/P2 each form one fighter-class render pair. The two fixed
+; The adapters capture a stable PMG origin from each craft's established
+; collision centre. The radial mask never samples a moving live coordinate.
+begin_player_fighter_explosion:
+    jsr erase_player
+    lda player_x
+    sec
+    sbc #((SHARED_FIGHTER_EXPLOSION_WIDTH_BITS*2-PLAYER_COLLISION_WIDTH)/2)
+    sta FIGHTER_EXPLOSION_X+FIGHTER_EXPLOSION_VIPER_SLOT
+    lda player_y
+    clc
+    adc #((PLAYER_H-SHARED_FIGHTER_EXPLOSION_HEIGHT)/2)
+    sta FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_VIPER_SLOT
+    lda #SHARED_FIGHTER_EXPLOSION_TOTAL
+    sta FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_VIPER_SLOT
+    rts
+
+tick_shared_fighter_explosions:
+    ldx #(SHARED_FIGHTER_EXPLOSION_SLOT_COUNT-1)
+@slot:
+    lda FIGHTER_EXPLOSION_TIMER,x
+    beq @next
+    cmp #$01
+    bne @tick
+    jsr erase_shared_fighter_explosion_slot
+@tick:
+    dec FIGHTER_EXPLOSION_TIMER,x
+@next:
+    dex
+    bpl @slot
+    rts
+
+fire_bullet = allocate_viper_projectile
+update_bullet = update_fighter_projectiles
+
+erase_bullet:
+    jmp clear_viper_projectiles
+
+; Nineteen fixed playfield slots provide independent launch positions without
+; consuming M0 or the three capital-warning missiles. Shared precomputed phase
+; glyphs avoid rewriting 16 charset bytes for every active shot every frame;
+; each slot retains exact screen backing and a bounded swept-collision lifecycle.
+init_fighter_projectiles:
+    lda #$00
+    ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
+@state:
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    sta FIGHTER_PROJECTILE_X,x
+    sta FIGHTER_PROJECTILE_Y,x
+    sta FIGHTER_PROJECTILE_PREV_Y,x
+    sta FIGHTER_PROJECTILE_LIFETIME,x
+    sta FIGHTER_PROJECTILE_RENDERED,x
+    sta FIGHTER_PROJECTILE_SCREEN_LO,x
+    sta FIGHTER_PROJECTILE_SCREEN_HI,x
+    sta FIGHTER_PROJECTILE_BACKUP_TOP,x
+    sta FIGHTER_PROJECTILE_BACKUP_BOTTOM,x
+    dex
+    bpl @state
+    sta VIPER_BURST_STATE
+    sta VIPER_BURST_REMAINING
+    sta VIPER_BURST_TIMER
+    sta RAIDER_BURST_STATE
+    sta RAIDER_BURST_REMAINING
+    sta RAIDER_BURST_TIMER
+    sta bullet_active
+    ldx #(SHARED_FIGHTER_EXPLOSION_SLOT_COUNT-1)
+@explosion_state:
+    sta FIGHTER_EXPLOSION_TIMER,x
+    sta FIGHTER_EXPLOSION_X,x
+    sta FIGHTER_EXPLOSION_Y,x
+    dex
+    bpl @explosion_state
+    ldx #$00
+@viper_glyph_page:
+    lda viper_projectile_glyphs,x
+    sta CHARSET+VIPER_PROJECTILE_GLYPH_BASE*8,x
+    inx
+    bne @viper_glyph_page
+    ldx #$00
+@viper_glyph_tail:
+    lda viper_projectile_glyphs+$100,x
+    sta CHARSET+VIPER_PROJECTILE_GLYPH_BASE*8+$100,x
+    inx
+    cpx #32
+    bne @viper_glyph_tail
+    jmp build_raider_projectile_glyphs
+
+clear_fighter_projectiles:
+    jsr erase_fighter_projectile_overlays
+    lda #$00
+    ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
+@slot:
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    sta FIGHTER_PROJECTILE_RENDERED,x
+    dex
+    bpl @slot
+    sta VIPER_BURST_STATE
+    sta VIPER_BURST_REMAINING
+    sta VIPER_BURST_TIMER
+    sta RAIDER_BURST_STATE
+    sta RAIDER_BURST_REMAINING
+    sta RAIDER_BURST_TIMER
+    sta bullet_active
+    rts
+
+clear_viper_projectiles:
+    jsr erase_fighter_projectile_overlays
+    lda #$00
+    ldx #(VIPER_PROJECTILE_SLOT_COUNT-1)
+@slot:
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    sta FIGHTER_PROJECTILE_RENDERED,x
+    dex
+    bpl @slot
+    sta VIPER_BURST_STATE
+    sta VIPER_BURST_REMAINING
+    sta VIPER_BURST_TIMER
+    sta bullet_active
+    rts
+
+clear_raider_projectiles:
+    jsr erase_fighter_projectile_overlays
+    lda #$00
+    ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
+@slot:
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    sta FIGHTER_PROJECTILE_RENDERED,x
+    dex
+    cpx #(RAIDER_PROJECTILE_SLOT_BASE-1)
+    bne @slot
+    sta RAIDER_BURST_STATE
+    sta RAIDER_BURST_REMAINING
+    sta RAIDER_BURST_TIMER
+    rts
+
+erase_fighter_projectile_overlays:
+    ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
+@slot:
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    bne :+
+    jmp @next
+:
+    lda FIGHTER_PROJECTILE_RENDERED,x
+    beq @next
+    lda FIGHTER_PROJECTILE_SCREEN_LO,x
+    sta dst_ptr
+    lda FIGHTER_PROJECTILE_SCREEN_HI,x
+    sta dst_ptr+1
+    ldy #$00
+    lda FIGHTER_PROJECTILE_BACKUP_TOP,x
+    sta (dst_ptr),y
+    lda FIGHTER_PROJECTILE_Y,x
+    and #$07
+    sta row_counter
+    cpx #VIPER_PROJECTILE_SLOT_COUNT
+    bcc @viper_height
+    lda #RAIDER_PROJECTILE_HEIGHT
+    bne @height_ready
+@viper_height:
+    lda #VIPER_PROJECTILE_HEIGHT
+@height_ready:
+    clc
+    adc row_counter
+    cmp #$09
+    bcc @restored
+    ldy #40
+    lda FIGHTER_PROJECTILE_BACKUP_BOTTOM,x
+    sta (dst_ptr),y
+@restored:
+    lda #$00
+    sta FIGHTER_PROJECTILE_RENDERED,x
+@next:
+    dex
+    bpl @slot
+    rts
+
+update_fighter_projectiles:
+    ldx #$00
+@slot:
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    beq @next
+    dec FIGHTER_PROJECTILE_LIFETIME,x
+    beq @free
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    cmp #FIGHTER_PROJECTILE_VIPER
+    bne @raider
+    lda FIGHTER_PROJECTILE_Y,x
+    sta FIGHTER_PROJECTILE_PREV_Y,x
+    cmp #(GAMEPLAY_TOP+VIPER_PROJECTILE_SPEED)
+    bcc @free
+    sec
+    sbc #VIPER_PROJECTILE_SPEED
+    sta FIGHTER_PROJECTILE_Y,x
+    jsr move_projectile_screen_pointer_up
+    jsr viper_projectile_hits_enemy
+    bcc @next
+    lda #FIGHTER_PROJECTILE_FREE
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    lda #$01
+    ldy #DAMAGE_PLAYER_PROJECTILE
+    jsr queue_enemy_damage
+    jmp @next
+@raider:
+    lda FIGHTER_PROJECTILE_Y,x
+    sta FIGHTER_PROJECTILE_PREV_Y,x
+    clc
+    adc #RAIDER_PROJECTILE_SPEED
+    sta FIGHTER_PROJECTILE_Y,x
+    clc
+    adc #RAIDER_PROJECTILE_HEIGHT
+    cmp #(GAMEPLAY_BOTTOM+1)
+    bcs @free
+    jsr move_projectile_screen_pointer_down
+    jsr raider_projectile_hits_player
+    bcc @next
+    lda #FIGHTER_PROJECTILE_FREE
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    lda #ENEMY_PULSE_DAMAGE_UNITS
+    stx BROAD_WORK_SLOT
+    jsr apply_player_damage
+    ldx BROAD_WORK_SLOT
+    jmp @next
+@free:
+    lda #FIGHTER_PROJECTILE_FREE
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+@next:
+    inx
+    cpx #FIGHTER_PROJECTILE_SLOT_COUNT
+    bne @slot
+    jmp refresh_bullet_active
+
+move_projectile_screen_pointer_up:
+    lda FIGHTER_PROJECTILE_PREV_Y,x
+    and #$F8
+    sta loader_repeat_value
+    lda FIGHTER_PROJECTILE_Y,x
+    and #$F8
+    cmp loader_repeat_value
+    beq @done
+    sec
+    lda FIGHTER_PROJECTILE_SCREEN_LO,x
+    sbc #40
+    sta FIGHTER_PROJECTILE_SCREEN_LO,x
+    bcs @done
+    dec FIGHTER_PROJECTILE_SCREEN_HI,x
+@done:
+    rts
+
+move_projectile_screen_pointer_down:
+    lda FIGHTER_PROJECTILE_PREV_Y,x
+    and #$F8
+    sta loader_repeat_value
+    lda FIGHTER_PROJECTILE_Y,x
+    and #$F8
+    cmp loader_repeat_value
+    beq @done
+    clc
+    lda FIGHTER_PROJECTILE_SCREEN_LO,x
+    adc #40
+    sta FIGHTER_PROJECTILE_SCREEN_LO,x
+    bcc @done
+    inc FIGHTER_PROJECTILE_SCREEN_HI,x
+@done:
+    rts
+
+viper_projectile_hits_enemy:
+    lda ENEMY_ACTIVE
+    cmp #ENEMY_ACTIVE_STATE
+    bne @miss
+    lda FIGHTER_PROJECTILE_X,x
+    cmp enemy_x
+    bcc @miss
+    ldy ENEMY_ARCHETYPE
+    lda enemy_x
+    clc
+    adc enemy_visible_widths,y
+    cmp FIGHTER_PROJECTILE_X,x
+    bcc @miss
+    beq @miss
+    lda enemy_y
+    clc
+    adc enemy_frame_heights,y
+    cmp FIGHTER_PROJECTILE_Y,x
+    bcc @miss
+    beq @miss
+    lda FIGHTER_PROJECTILE_PREV_Y,x
+    clc
+    adc #(VIPER_PROJECTILE_HEIGHT-1)
+    cmp enemy_y
+    bcc @miss
+    sec
+    rts
+@miss:
+    clc
+    rts
+
+raider_projectile_hits_player:
+    lda FIGHTER_PROJECTILE_X,x
+    clc
+    adc #RAIDER_PROJECTILE_WIDTH_HPOS
+    cmp player_x
+    bcc @miss
+    beq @miss
     lda player_x
     clc
-    adc #$08
-    sta bullet_x
-    sta HPOSM0
+    adc #PLAYER_COLLISION_WIDTH
+    cmp FIGHTER_PROJECTILE_X,x
+    bcc @miss
+    beq @miss
+    lda FIGHTER_PROJECTILE_Y,x
+    clc
+    adc #(RAIDER_PROJECTILE_HEIGHT-1)
+    cmp player_y
+    bcc @miss
     lda player_y
+    clc
+    adc #PLAYER_COLLISION_LAST_ROW
+    cmp FIGHTER_PROJECTILE_PREV_Y,x
+    bcc @miss
     sec
-    sbc #$04
-    sta bullet_y
-    ldy bullet_y
-    lda MISSILES,y
-    and #MISSILE_M0_CLEAR_MASK
-    ora #MISSILE_M0_MASK
-    sta MISSILES,y
+    rts
+@miss:
+    clc
+    rts
+
+refresh_bullet_active:
+    lda #$00
+    sta bullet_active
+    ldx #$00
+@slot:
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    cmp #FIGHTER_PROJECTILE_VIPER
+    bne @next
     lda #$01
     sta bullet_active
+    rts
+@next:
+    inx
+    cpx #VIPER_PROJECTILE_SLOT_COUNT
+    bne @slot
+    rts
 
+update_viper_weapon:
+    lda PLAYER_LIFECYCLE
+    cmp #PLAYER_DYING
+    beq @released
+    cmp #PLAYER_GAME_OVER
+    beq @released
+    lda gameplay_fire_gate
+    beq @released
+    lda TRIG0
+    bne @released
+    lda VIPER_BURST_STATE
+    cmp #WEAPON_BURST_FIRING
+    beq @firing
+    cmp #WEAPON_BURST_POST
+    beq @post
+@begin:
+    lda #WEAPON_BURST_FIRING
+    sta VIPER_BURST_STATE
+    lda #VIPER_BURST_COUNT
+    sta VIPER_BURST_REMAINING
+    lda #$00
+    sta VIPER_BURST_TIMER
+@firing:
+    lda VIPER_BURST_TIMER
+    beq @emit
+    dec VIPER_BURST_TIMER
+    bne @done
+@emit:
+    jsr allocate_viper_projectile
+    bcc @done                   ; rejected allocation is retried, not counted
+    dec VIPER_BURST_REMAINING
+    beq @finish
+    lda #VIPER_BURST_INTERVAL
+    sta VIPER_BURST_TIMER
+    rts
+@finish:
+    lda #WEAPON_BURST_POST
+    sta VIPER_BURST_STATE
+    lda #VIPER_POST_BURST_PAUSE
+    sta VIPER_BURST_TIMER
+    rts
+@post:
+    dec VIPER_BURST_TIMER
+    bne @done
+    jmp @begin
+@released:
+    lda #WEAPON_BURST_WAITING
+    sta VIPER_BURST_STATE
+    lda #$00
+    sta VIPER_BURST_REMAINING
+    sta VIPER_BURST_TIMER
+@done:
+    rts
+
+allocate_viper_projectile:
+    ldx #$00
+@find:
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    beq @allocate
+    inx
+    cpx #VIPER_PROJECTILE_SLOT_COUNT
+    bne @find
+    clc
+    rts
+@allocate:
+    lda #FIGHTER_PROJECTILE_VIPER
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    lda player_x
+    clc
+    adc #(PLAYER_COLLISION_WIDTH/2)
+    sta FIGHTER_PROJECTILE_X,x
+    sta bullet_x
+    lda player_y
+    sec
+    sbc #VIPER_PROJECTILE_HEIGHT
+    sta FIGHTER_PROJECTILE_Y,x
+    sta FIGHTER_PROJECTILE_PREV_Y,x
+    sta bullet_y
+    lda #$FF
+    sta FIGHTER_PROJECTILE_LIFETIME,x
+    lda #$00
+    sta FIGHTER_PROJECTILE_RENDERED,x
+    jsr initialize_projectile_screen_pointer
+    lda #$01
+    sta bullet_active
     lda sound_enabled
-    beq @done
+    beq @accepted
     lda #$32
     sta AUDF1
     lda #$A8
     sta AUDC1
     lda #$07
     sta fire_timer
-@done:
-    rts
-
-update_bullet:
-    lda bullet_active
-    beq @done
-
-    ldy bullet_y
-    lda MISSILES,y
-    and #MISSILE_M0_CLEAR_MASK
-    sta MISSILES,y
-
-    lda bullet_y
-    cmp #$28
-    bcc @deactivate
+@accepted:
     sec
-    sbc #$04
-    sta bullet_y
+    rts
+
+update_enemy_weapon_runtime:
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_DRAIN
+    bne @player_state
+    jmp clear_raider_projectiles
+@player_state:
+    lda PLAYER_LIFECYCLE
+    cmp #PLAYER_DYING
+    beq @stop
+    cmp #PLAYER_GAME_OVER
+    beq @stop
+    lda ENEMY_ACTIVE
+    cmp #ENEMY_ACTIVE_STATE
+    bne @stop
+    ldx ENEMY_ARCHETYPE
+    lda enemy_weapon_profiles,x
+    cmp #ENEMY_WEAPON_SINGLE_PULSE
+    bne @stop
+    lda enemy_y
+    cmp #GAMEPLAY_TOP
+    bcc @stop
+    clc
+    adc enemy_frame_heights,x
+    cmp #(GAMEPLAY_BOTTOM+1)
+    bcs @stop
+    lda RAIDER_BURST_STATE
+    cmp #WEAPON_BURST_FIRING
+    beq @firing
+    cmp #WEAPON_BURST_POST
+    beq @post
+@begin:
+    lda #WEAPON_BURST_FIRING
+    sta RAIDER_BURST_STATE
+    lda #RAIDER_BURST_COUNT
+    sta RAIDER_BURST_REMAINING
+    lda #$00
+    sta RAIDER_BURST_TIMER
+@firing:
+    lda RAIDER_BURST_TIMER
+    beq @emit
+    dec RAIDER_BURST_TIMER
+    bne @done
+@emit:
+    jsr allocate_raider_projectile
+    bcc @done
+    dec RAIDER_BURST_REMAINING
+    beq @finish
+    lda #RAIDER_BURST_INTERVAL
+    sta RAIDER_BURST_TIMER
+    rts
+@finish:
+    lda #WEAPON_BURST_POST
+    sta RAIDER_BURST_STATE
+    ldx DIFFICULTY_SETTING
+    lda raider_post_burst_frames,x
+    sta RAIDER_BURST_TIMER
+    rts
+@post:
+    dec RAIDER_BURST_TIMER
+    bne @done
+    jmp @begin
+@stop:
+    lda #WEAPON_BURST_WAITING
+    sta RAIDER_BURST_STATE
+    lda #$00
+    sta RAIDER_BURST_REMAINING
+    sta RAIDER_BURST_TIMER
+@done:
+    rts
+
+allocate_raider_projectile:
+    ldx #RAIDER_PROJECTILE_SLOT_BASE
+@find:
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    beq @allocate
+    inx
+    cpx #FIGHTER_PROJECTILE_SLOT_COUNT
+    bne @find
+    clc
+    rts
+@allocate:
+    lda #FIGHTER_PROJECTILE_RAIDER
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+    stx BROAD_WORK_SLOT
+    ldy ENEMY_ARCHETYPE
+    lda enemy_visible_widths,y
+    lsr
+    clc
+    adc enemy_x
+    sec
+    sbc #(RAIDER_PROJECTILE_WIDTH_HPOS/2)
+    and #$FE                    ; two-pixel red core stays inside one ANTIC cell
+    ldx BROAD_WORK_SLOT
+    sta FIGHTER_PROJECTILE_X,x
+    lda enemy_y
+    ldy ENEMY_ARCHETYPE
+    clc
+    adc enemy_projectile_spawn_y_offsets,y
+    sta FIGHTER_PROJECTILE_Y,x
+    sta FIGHTER_PROJECTILE_PREV_Y,x
+    lda #RAIDER_PROJECTILE_LIFETIME
+    sta FIGHTER_PROJECTILE_LIFETIME,x
+    lda #$00
+    sta FIGHTER_PROJECTILE_RENDERED,x
+    jsr initialize_projectile_screen_pointer
+    sec
+    rts
+
+initialize_projectile_screen_pointer:
+    stx BROAD_WORK_SLOT
+    lda FIGHTER_PROJECTILE_Y,x
+    sec
+    sbc #GAMEPLAY_TOP
+    lsr
+    lsr
+    lsr
+    sta row_counter
+    lda #<GAMEPLAY_SCREEN
+    sta dst_ptr
+    lda #>GAMEPLAY_SCREEN
+    sta dst_ptr+1
+@row:
+    lda row_counter
+    beq @column
+    clc
+    lda dst_ptr
+    adc #40
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
+    dec row_counter
+    bne @row
+@column:
+    ldx BROAD_WORK_SLOT
+    lda FIGHTER_PROJECTILE_X,x
+    sec
+    sbc #GAMEPLAY_LEFT_HPOS
+    lsr
+    lsr
+    clc
+    adc dst_ptr
+    sta FIGHTER_PROJECTILE_SCREEN_LO,x
+    lda dst_ptr+1
+    adc #$00
+    sta FIGHTER_PROJECTILE_SCREEN_HI,x
+    rts
+
+render_fighter_projectile_overlays:
+    ldx #$00
+@slot:
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    bne :+
+    jmp @next
+:
+    stx BROAD_WORK_SLOT
+    lda FIGHTER_PROJECTILE_X,x
+    sec
+    sbc #GAMEPLAY_LEFT_HPOS
+    and #$03
+    sta loader_repeat_value
+    lda FIGHTER_PROJECTILE_Y,x
+    and #$07
+    sta row_counter
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    cmp #FIGHTER_PROJECTILE_VIPER
+    bne @raider_code
+    ldy loader_repeat_value
+    lda viper_projectile_group_offsets,y
+    sta src_ptr
+    clc
+    adc row_counter
+    adc #VIPER_PROJECTILE_GLYPH_BASE
+    sta loader_repeat_value
+    lda #$00
+    sta src_ptr+1
+    lda row_counter
+    cmp #$07
+    bne @code_ready
+    lda src_ptr
+    clc
+    adc #(VIPER_PROJECTILE_GLYPH_BASE+8)
+    sta src_ptr+1
+    bne @code_ready
+@raider_code:
+    lda loader_repeat_value
+    lsr
     tay
-    lda MISSILES,y
-    and #MISSILE_M0_CLEAR_MASK
-    ora #MISSILE_M0_MASK
-    sta MISSILES,y
-    rts
-
-@deactivate:
+    lda raider_projectile_group_offsets,y
+    sta src_ptr
+    clc
+    adc row_counter
+    adc #RAIDER_PROJECTILE_GLYPH_BASE
+    ora #$80
+    sta loader_repeat_value
     lda #$00
-    sta bullet_active
-@done:
-    rts
+    sta src_ptr+1
+    lda row_counter
+    cmp #$06
+    bcc @code_ready
+    sec
+    sbc #$06
+    clc
+    adc src_ptr
+    adc #(RAIDER_PROJECTILE_GLYPH_BASE+8)
+    ora #$80
+    sta src_ptr+1
+@code_ready:
 
-erase_bullet:
-    lda bullet_active
-    beq @done
-    ldy bullet_y
-    lda MISSILES,y
-    and #MISSILE_M0_CLEAR_MASK
-    sta MISSILES,y
-    lda #$00
-    sta bullet_active
-@done:
+    lda FIGHTER_PROJECTILE_SCREEN_LO,x
+    sta dst_ptr
+    lda FIGHTER_PROJECTILE_SCREEN_HI,x
+    sta dst_ptr+1
+    ldy #$00
+    lda (dst_ptr),y
+    sta FIGHTER_PROJECTILE_BACKUP_TOP,x
+    lda loader_repeat_value
+    sta (dst_ptr),y
+    lda src_ptr+1
+    beq @rendered
+    ldy #40
+    lda (dst_ptr),y
+    sta FIGHTER_PROJECTILE_BACKUP_BOTTOM,x
+    lda src_ptr+1
+    sta (dst_ptr),y
+@rendered:
+    lda #$01
+    sta FIGHTER_PROJECTILE_RENDERED,x
+    ldx BROAD_WORK_SLOT
+@next:
+    inx
+    cpx #FIGHTER_PROJECTILE_SLOT_COUNT
+    beq :+
+    jmp @slot
+:
     rts
 
 ; -----------------------------------------------------------------------------
 ; Enemy
 
+.segment "BROADSIDE"
+
+; The red pulse bank is a regular three-scanline shape at two horizontal
+; phases. Building its twenty glyphs once saves 160 resident source bytes while
+; producing the exact same charset bytes consumed by the release renderer.
+build_raider_projectile_glyphs:
+    lda #$00
+    ldx #$00
+@clear:
+    sta CHARSET+RAIDER_PROJECTILE_GLYPH_BASE*8,x
+    inx
+    cpx #(RAIDER_PROJECTILE_GLYPH_COUNT*8)
+    bne @clear
+    lda #<(CHARSET+RAIDER_PROJECTILE_GLYPH_BASE*8)
+    sta dst_ptr
+    lda #>(CHARSET+RAIDER_PROJECTILE_GLYPH_BASE*8)
+    sta dst_ptr+1
+    lda #$00
+    sta BROAD_WORK_SLOT
+@group:
+    ldy BROAD_WORK_SLOT
+    lda raider_projectile_group_masks,y
+    sta BROAD_WORK_VALUE
+    ldx #$00
+@glyph:
+    ldy raider_projectile_start_rows,x
+    lda raider_projectile_row_counts,x
+    sta row_counter
+@paint:
+    lda BROAD_WORK_VALUE
+    sta (dst_ptr),y
+    iny
+    dec row_counter
+    bne @paint
+    clc
+    lda dst_ptr
+    adc #$08
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
+    inx
+    cpx #$0A
+    bne @glyph
+    inc BROAD_WORK_SLOT
+    lda BROAD_WORK_SLOT
+    cmp #$02
+    bne @group
+    rts
+
+raider_projectile_group_masks:
+    .byte $F0,$0F
+raider_projectile_start_rows:
+    .byte 0,1,2,3,4,5,6,7,0,0
+raider_projectile_row_counts:
+    .byte 3,3,3,3,3,3,2,1,1,2
+
+begin_enemy_fighter_explosion:
+    ldx ENEMY_ARCHETYPE
+    lda enemy_x
+    sec
+    sbc enemy_visible_left_insets,x
+    sta FIGHTER_EXPLOSION_X+FIGHTER_EXPLOSION_ENEMY_SLOT
+    lda enemy_frame_heights,x
+    sec
+    sbc #SHARED_FIGHTER_EXPLOSION_HEIGHT
+    lsr
+    clc
+    adc enemy_y
+    sta FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_ENEMY_SLOT
+    lda #SHARED_FIGHTER_EXPLOSION_TOTAL
+    sta FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_ENEMY_SLOT
+    rts
+
+; Explosion PMG bytes are stationary and each visual phase is held for four
+; frames. Clear them once at expiry instead of restoring/redrawing every PAL
+; frame; the phase renderer overwrites all eight bytes on each phase boundary.
+erase_shared_fighter_explosion_slot:
+    lda #SHARED_FIGHTER_EXPLOSION_HEIGHT
+    sta loader_repeat_value
+    ldy FIGHTER_EXPLOSION_Y,x
+@row:
+    cpy #GAMEPLAY_TOP
+    bcc @advance
+    cpy #GAMEPLAY_BOTTOM
+    bcs @advance
+    lda #$00
+    cpx #FIGHTER_EXPLOSION_VIPER_SLOT
+    bne @enemy
+    sta PLAYER0,y
+    sta PLAYER3,y
+    jmp @advance
+@enemy:
+    sta PLAYER1,y
+    sta PLAYER2,y
+@advance:
+    iny
+    dec loader_repeat_value
+    bne @row
+    rts
+
+render_shared_fighter_explosions:
+    ldx #$00
+@slot:
+    lda FIGHTER_EXPLOSION_TIMER,x
+    beq @next
+    and #(SHARED_FIGHTER_EXPLOSION_FRAME_DURATION-1)
+    bne @next
+    stx BROAD_WORK_SLOT
+    lda #SHARED_FIGHTER_EXPLOSION_TOTAL
+    sec
+    sbc FIGHTER_EXPLOSION_TIMER,x
+    lsr
+    lsr
+    tay
+    lda shared_fighter_explosion_core_masks,y
+    sta BROAD_WORK_COUNT
+    tya
+    asl
+    asl
+    asl
+    tax
+    ldy BROAD_WORK_SLOT
+    lda FIGHTER_EXPLOSION_X,y
+    cpy #FIGHTER_EXPLOSION_VIPER_SLOT
+    bne @enemy_hpos
+    sta HPOSP0
+    sta HPOSP3
+    jmp @positioned
+@enemy_hpos:
+    sta HPOSP1
+    sta HPOSP2
+@positioned:
+    lda FIGHTER_EXPLOSION_Y,y
+    sta row_counter
+    lda #SHARED_FIGHTER_EXPLOSION_HEIGHT
+    sta BROAD_WORK_VALUE
+@row:
+    lda shared_fighter_explosion_masks,x
+    sta loader_repeat_value
+    ldy row_counter
+    cpy #GAMEPLAY_TOP
+    bcc @row_done
+    cpy #GAMEPLAY_BOTTOM
+    bcs @row_done
+    lda BROAD_WORK_SLOT
+    bne @enemy_row
+    lda loader_repeat_value
+    sta PLAYER3,y
+    and BROAD_WORK_COUNT
+    sta PLAYER0,y
+    jmp @row_done
+@enemy_row:
+    lda loader_repeat_value
+    sta PLAYER2,y
+    and BROAD_WORK_COUNT
+    sta PLAYER1,y
+@row_done:
+    inc row_counter
+    inx
+    dec BROAD_WORK_VALUE
+    bne @row
+    ldx BROAD_WORK_SLOT
+@next:
+    inx
+    cpx #SHARED_FIGHTER_EXPLOSION_SLOT_COUNT
+    bne @slot
+    rts
+
 update_enemy:
+.if ENEMY_REVIEW_HARNESS
+    jmp update_enemy_review_harness
+.endif
+    lda ENEMY_ACTIVE
+    cmp #ENEMY_EXPLODING_STATE
+    bne @active
+    lda FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_ENEMY_SLOT
+    beq @reset
+    rts
+@reset:
+    jmp reset_enemy
+@active:
+    cmp #ENEMY_ACTIVE_STATE
+    beq @live
+    rts
+@live:
     jsr erase_enemy
 
     inc enemy_y
     lda enemy_y
-    cmp #$E0
+    cmp #GAMEPLAY_BOTTOM
     bcc @horizontal
-    jsr reset_enemy
-    jmp draw_enemy
+    jmp reset_enemy
 
 @horizontal:
-    lda frame_counter
-    and #$03
-    bne @scanner
-
-    lda enemy_direction
-    beq @move_left
-@move_right:
-    lda enemy_x
-    cmp #ENEMY_X_MAX
-    bcs @turn_left
-    inc enemy_x
-    jmp @scanner
-@turn_left:
-    lda #ENEMY_X_MAX
-    sta enemy_x
-    lda #$00
-    sta enemy_direction
-    jmp @scanner
-@move_left:
-    lda enemy_x
-    cmp #ENEMY_X_MIN
-    bcc @turn_right
-    beq @turn_right
-    dec enemy_x
-    jmp @scanner
-@turn_right:
-    lda #ENEMY_X_MIN
-    sta enemy_x
-    lda #$01
-    sta enemy_direction
+    jsr update_raider_soft_pursuit
 
 @scanner:
-    inc scanner_phase
-    lda scanner_phase
-    and #$0F
-    sta scanner_phase
+    jsr update_enemy_animation
 
 draw_enemy:
     jsr clamp_enemy_x
+    ldx ENEMY_ARCHETYPE
+    lda enemy_size_modes,x
+    sta SIZEP1
+    sta SIZEP2
     lda enemy_x
+    sec
+    sbc enemy_visible_left_insets,x
     sta HPOSP1
     sta HPOSP2
+    lda enemy_frame_heights,x
+    sta row_counter
+    txa                           ; fixed 16-byte frame stride
+    asl
+    asl
+    asl
+    asl
+    tax
     ldy enemy_y
-    ldx #$00
 @body_loop:
-    lda enemy_shape,x
+    lda enemy_body_data,x
+    cpy #GAMEPLAY_TOP
+    bcc @body_next
+    cpy #GAMEPLAY_BOTTOM
+    bcs @body_done
     sta PLAYER1,y
+@body_next:
     iny
     inx
-    cpx #ENEMY_H
+    dec row_counter
     bne @body_loop
+@body_done:
 
+    ldx ENEMY_ARCHETYPE
     ldy enemy_y
-    iny
-    iny
-    iny
-    iny
-    iny
-    ldx scanner_phase
-    lda scanner_shape,x
+    tya
+    clc
+    adc enemy_accent_rows,x
+    tay
+    cpy #GAMEPLAY_TOP
+    bcc @accent_done
+    cpy #GAMEPLAY_BOTTOM
+    bcs @accent_done
+    lda scanner_phase
+    lsr
+    lsr
+    lsr
+    clc
+    adc enemy_accent_offsets,x
+    tax
+    lda enemy_accent_data,x
     sta PLAYER2,y
+@accent_done:
     rts
 
 erase_enemy:
+    ldx ENEMY_ARCHETYPE
+    lda enemy_frame_heights,x
+    tax
     ldy enemy_y
-    ldx #ENEMY_H
     lda #$00
 @loop:
+    cpy #GAMEPLAY_TOP
+    bcc @erase_next
+    cpy #GAMEPLAY_BOTTOM
+    bcs @erase_done
     sta PLAYER1,y
     sta PLAYER2,y
+@erase_next:
     iny
     dex
     bne @loop
+@erase_done:
     rts
 
 reset_enemy:
-    lda #$30
+    lda #ENEMY_INACTIVE
+    sta ENEMY_ACTIVE
+    ldx ENEMY_ARCHETYPE
+    lda #GAMEPLAY_TOP
+    sec
+    sbc enemy_frame_heights,x
     sta enemy_y
+    lda enemy_logical_x_maxs,x
+    sec
+    sbc #CORRIDOR_LEFT_HPOS
+    clc
+    adc #$01
+    sta row_counter
     jsr random_byte
     and #$7F
-    cmp #(ENEMY_X_RANGE+1)
+    cmp row_counter
     bcc :+
     eor #$7F
 :
+    ldx ENEMY_ARCHETYPE
     clc
-    adc #ENEMY_X_MIN
-    sta enemy_x
-    lda rng_state
-    and #$01
-    sta enemy_direction
-    rts
-
-; P1/P2 are double-width and share this sixteen-HPOS envelope. This final
-; renderer guard prevents stale or future scripted positions from exposing a
-; single fighter pixel over either eight-column capital-hull band.
-clamp_enemy_x:
-    lda enemy_x
-    cmp #ENEMY_X_MIN
-    bcs @right
-    lda #ENEMY_X_MIN
-    sta enemy_x
-    lda #$01
-    sta enemy_direction
-    rts
-@right:
-    cmp #(ENEMY_X_MAX+1)
-    bcc @done
-    lda #ENEMY_X_MAX
+    adc #CORRIDOR_LEFT_HPOS
     sta enemy_x
     lda #$00
-    sta enemy_direction
+    sta enemy_velocity_x
+    lda #ENEMY_ACTIVE_STATE
+    sta ENEMY_ACTIVE
+    ldx ENEMY_ARCHETYPE
+    lda enemy_hit_points,x
+    sta ENEMY_HP
+    jsr reset_enemy_fire_cooldown
+    jmp draw_enemy
+
+reset_enemy_fire_cooldown:
+    lda #WEAPON_BURST_WAITING
+    sta RAIDER_BURST_STATE
+    lda #$00
+    sta RAIDER_BURST_REMAINING
+    sta RAIDER_BURST_TIMER
+    rts
+
+update_enemy_weapon:
+    jmp update_enemy_weapon_runtime
+
+clear_raider_pulses:
+    jmp clear_raider_projectiles
+
+; The logical coordinate is the first visible HPOS unit, not necessarily the
+; PMG byte origin. Per-archetype insets and widths keep transparent padding
+; non-colliding and prevent every animation phase from entering a hull band.
+clamp_enemy_x:
+    ldx ENEMY_ARCHETYPE
+    lda enemy_x
+    cmp #CORRIDOR_LEFT_HPOS
+    bcs @right
+    lda #CORRIDOR_LEFT_HPOS
+    sta enemy_x
+    lda #$00
+    sta enemy_velocity_x
+    rts
+@right:
+    cmp enemy_logical_x_maxs,x
+    bcc @done
+    beq @done
+    lda enemy_logical_x_maxs,x
+    sta enemy_x
+    lda #$00
+    sta enemy_velocity_x
 @done:
     rts
+
+; The release Raider samples a Viper-centred target every eight PAL frames,
+; retaining a small deterministic weave. Signed velocity is bounded to
+; -1/0/+1 HPOS per frame. Reversal passes through zero for one sample period,
+; so the Raider reacts without mirroring the Viper's two-HPOS joystick motion.
+update_raider_soft_pursuit:
+    lda frame_counter
+    and #(RAIDER_TARGET_SAMPLE_INTERVAL-1)
+    bne @move
+
+    ; Signed target delta: Viper centre minus Raider centre, plus weave.
+    lda frame_counter
+    and #(RAIDER_WEAVE_PERIOD_FRAMES/2)
+    beq @weave_left
+    lda #RAIDER_WEAVE_AMPLITUDE
+    bne @have_weave
+@weave_left:
+    lda #($100-RAIDER_WEAVE_AMPLITUDE)
+@have_weave:
+    clc
+    adc player_x
+    sec
+    sbc enemy_x
+    sbc #((ENEMY_RELEASE_VISIBLE_WIDTH-PLAYER_COLLISION_WIDTH)/2)
+@classify:
+    cmp #(RAIDER_TARGET_DEAD_ZONE+1)
+    bcc @stop
+    cmp #$80
+    bcc @right
+    cmp #($100-RAIDER_TARGET_DEAD_ZONE)
+    bcs @stop
+@left:
+    lda enemy_velocity_x
+    cmp #$01
+    beq @stop
+    lda #$FF
+    bne @store
+@right:
+    lda enemy_velocity_x
+    bmi @stop
+    lda #$01
+    bne @store
+@stop:
+    lda #$00
+@store:
+    sta enemy_velocity_x
+@move:
+    lda enemy_velocity_x
+    beq @done
+    bmi @move_left
+    inc enemy_x
+    bne @clamp
+@move_left:
+    dec enemy_x
+@clamp:
+    jmp clamp_enemy_x
+@done:
+    rts
+
+update_enemy_animation:
+    inc scanner_phase
+    lda scanner_phase
+    cmp #ENEMY_ANIMATION_CYCLE_FRAMES
+    bcc @done
+    lda #$00
+    sta scanner_phase
+@done:
+    rts
+
+; Carry clear selects one of the three implemented anchors. Invalid and future
+; inventory IDs are rejected without touching the live renderer state.
+set_enemy_archetype:
+    cmp #ENEMY_IMPLEMENTED_COUNT
+    bcs @invalid
+    cmp ENEMY_ARCHETYPE
+    beq @valid
+    sta ENEMY_ARCHETYPE
+    lda #$00
+    sta scanner_phase
+@valid:
+    clc
+    rts
+@invalid:
+    sec
+    rts
+
+.if ENEMY_REVIEW_HARNESS
+; Compile-time-only deterministic review cycle. Normal release assembly omits
+; this routine and always spawns ENEMY_RELEASE_ARCHETYPE through init_state.
+update_enemy_review_harness:
+    jsr erase_enemy
+    lda #$78
+    sta enemy_y
+    lda frame_counter
+    cmp #80
+    bcc @raider
+    cmp #160
+    bcc @talon
+    cmp #240
+    bcc @bomber
+    and #$03                    ; rapid, safely erased type changes
+    cmp #ENEMY_IMPLEMENTED_COUNT
+    bcc @select
+@raider:
+    lda #ENEMY_ARCHETYPE_RAIDER
+    jmp @select
+@talon:
+    lda #ENEMY_ARCHETYPE_TALON
+    bne @select
+@bomber:
+    lda #ENEMY_ARCHETYPE_SCYTHE_BOMBER
+@select:
+    jsr set_enemy_archetype
+    jsr update_enemy_animation
+    lda frame_counter
+    and #$30
+    cmp #$10
+    beq @left
+    cmp #$20
+    beq @right
+    ldx ENEMY_ARCHETYPE
+    lda #CORRIDOR_LEFT_HPOS
+    clc
+    adc enemy_logical_x_maxs,x
+    lsr
+    jmp @position
+@left:
+    ldx ENEMY_ARCHETYPE
+    lda #CORRIDOR_LEFT_HPOS
+    bne @position
+@right:
+    ldx ENEMY_ARCHETYPE
+    lda enemy_logical_x_maxs,x
+@position:
+    sta enemy_x
+    jmp draw_enemy
+.endif
+
+.segment "CODE"
 
 ; -----------------------------------------------------------------------------
 ; Collision and score
 
+; Shared world-scroll tail lives in the main block because the relocated
+; BROADSIDE block is intentionally capped at $740F.  A coincident hull step
+; performs this work after both copies and bypasses this tail.
+restore_and_redraw_muzzles:
+    jsr restore_boundary_stars
+    jmp redraw_visible_muzzles
+
 handle_collisions:
-    lda M0PL
-    sta BROAD_M0_COLLISION
-    lda P0PL
-    sta BROAD_P0_COLLISION
-    ldx #$00
-@capture_heavy:
-    lda M1PL,x
-    sta BROAD_COLLISION,x
-    inx
-    cpx #BROADSIDE_SLOT_COUNT
-    bne @capture_heavy
+    lda #$00
+    sta ENEMY_PENDING_DAMAGE
+    lda #DAMAGE_CLEANUP
+    sta ENEMY_PENDING_SOURCE
 
-    lda bullet_active
-    beq @player_collision
-    lda BROAD_M0_COLLISION
-    and #$06                    ; missile 0 against players 1 or 2
-    beq @player_collision
-
-    jsr erase_bullet
-    jsr erase_enemy
-    jsr reset_enemy
-    jsr draw_enemy
-    jsr add_ten_points
-    jsr play_hit_sound
+    jsr update_fighter_projectiles
 
 @player_collision:
-    lda BROAD_P0_COLLISION
-    and #$06                    ; player 0 against enemy body/scanner
+    jsr player_contacts_enemy   ; logical collision remains active while blinking
     beq @heavy_projectiles
-    jsr erase_enemy
-    jsr reset_enemy
-    jsr draw_enemy
+    lda #$01
+    ldy #DAMAGE_PLAYER_CONTACT
+    jsr queue_enemy_damage
     ldx #$00
     jsr apply_broadside_player_damage
 
 @heavy_projectiles:
     jsr update_broadside
+    jsr resolve_enemy_damage
 @clear_latches:
     lda #$00
     sta HITCLR
     rts
 
-add_ten_points:
+; A carries a bounded damage amount and Y an explicit credit source. Multiple
+; hits in one PAL frame accumulate damage but retain the highest score-credit
+; priority (the lowest source value). Destruction is resolved exactly once.
+queue_enemy_damage:
+    pha
+    lda ENEMY_ACTIVE
+    cmp #ENEMY_ACTIVE_STATE
+    bne @inactive
+    pla
+    clc
+    adc ENEMY_PENDING_DAMAGE
+    bcc :+
+    lda #$FF
+:
+    sta ENEMY_PENDING_DAMAGE
+    tya
+    cmp ENEMY_PENDING_SOURCE
+    bcs @done
+    sta ENEMY_PENDING_SOURCE
+@done:
+    rts
+@inactive:
+    pla
+    rts
+
+resolve_enemy_damage:
+    lda ENEMY_PENDING_DAMAGE
+    beq @done
+    lda ENEMY_ACTIVE
+    cmp #ENEMY_ACTIVE_STATE
+    bne @done
+    lda ENEMY_HP
+    sec
+    sbc ENEMY_PENDING_DAMAGE
+    bcc @destroy
+    beq @destroy
+    sta ENEMY_HP
+    rts
+@destroy:
+    lda ENEMY_PENDING_SOURCE
+    pha
+    jsr erase_enemy
+    lda #ENEMY_EXPLODING_STATE
+    sta ENEMY_ACTIVE
+    lda #$00
+    sta enemy_velocity_x
+    sta HITCLR
+    jsr begin_enemy_fighter_explosion
+    jsr reset_enemy_fire_cooldown
+    pla
+    cmp #(DAMAGE_CAPITAL_CYLON+1)
+    bcs @no_score
+    jsr add_archetype_score
+@no_score:
+    jsr play_hit_sound
+@done:
+    rts
+
+; The score is descriptor data, not a Raider collision constant. A is the
+; already-arbitrated lethal source; all score-awarding sources share this path.
+add_archetype_score:
+    ldx ENEMY_ARCHETYPE
     sed
     clc
     lda score_bcd_lo
-    adc #$10
+    adc enemy_scores,x
     sta score_bcd_lo
     lda score_bcd_hi
     adc #$00
     sta score_bcd_hi
     cld
     jsr update_score_display
+    rts
+
+player_contacts_enemy:
+    lda ENEMY_ACTIVE
+    cmp #ENEMY_ACTIVE_STATE
+    bne @miss
+    lda player_x
+    clc
+    adc #PLAYER_COLLISION_WIDTH
+    cmp enemy_x
+    bcc @miss
+    beq @miss
+    ldx ENEMY_ARCHETYPE
+    lda enemy_x
+    clc
+    adc enemy_visible_widths,x
+    cmp player_x
+    bcc @miss
+    beq @miss
+    lda player_y
+    clc
+    adc #(PLAYER_COLLISION_LAST_ROW+1)
+    cmp enemy_y
+    bcc @miss
+    beq @miss
+    lda enemy_y
+    clc
+    adc enemy_frame_heights,x
+    cmp player_y
+    bcc @miss
+    beq @miss
+    lda #$01
+    rts
+@miss:
+    lda #$00
     rts
 
 update_score_display:
@@ -2247,7 +3384,16 @@ update_starfield:
     cmp #HULL_SCROLL_RATE_DENOMINATOR
     bcs @hull_scroll
     sta HULL_SCROLL_ACCUMULATOR
+    ; A world step leaves its boundary/muzzle finalization pending so that a
+    ; coincident hull step can perform it once after both copies.  With the
+    ; fixed-point accumulator, a post-subtraction world value is always less
+    ; than the active numerator; a non-step value is always at least it.
+    lda scroll_accumulator
+    cmp world_scroll_rates,x
+    bcc @finalize_world
     rts
+@finalize_world:
+    jmp restore_and_redraw_muzzles
 @hull_scroll:
     sbc #HULL_SCROLL_RATE_DENOMINATOR
     sta HULL_SCROLL_ACCUMULATOR
@@ -2255,7 +3401,7 @@ update_starfield:
 
 ; The 24-column star corridor keeps the accepted gameplay difficulty cadence.
 ; Only columns 9..30 live directly in screen memory. Columns 8 and 31 have a
-; 44-byte backing store because a slower hull-mounted muzzle may cover them.
+; 46-byte backing store because a slower hull-mounted muzzle may cover them.
 scroll_world_columns:
 
     lda #<(SCREEN+23*40)
@@ -2266,7 +3412,7 @@ scroll_world_columns:
     sta src_ptr
     lda #>(SCREEN+22*40)
     sta src_ptr+1
-    lda #21
+    lda #(GAMEPLAY_SCREEN_ROWS-1)
     sta row_counter
 
 @copy_row:
@@ -2304,9 +3450,9 @@ scroll_world_columns:
     dex
     bne @shift_boundaries
 
-    lda #<(SCREEN+80)
+    lda #<GAMEPLAY_SCREEN
     sta dst_ptr
-    lda #>(SCREEN+80)
+    lda #>GAMEPLAY_SCREEN
     sta dst_ptr+1
     jsr generate_starfield_row
     ldy #CORRIDOR_CENTRAL_FIRST
@@ -2315,8 +3461,6 @@ scroll_world_columns:
     ldy #(CORRIDOR_CENTRAL_END-1)
     lda (dst_ptr),y
     sta CORRIDOR_BOUNDARY_RIGHT
-    jsr restore_boundary_stars
-    jsr redraw_visible_muzzles
     rts
 
 ; The two eight-column hull masses advance from their own half-speed fixed-point
@@ -2338,7 +3482,7 @@ scroll_hull_columns:
     sta src_ptr
     lda #>(SCREEN+22*40)
     sta src_ptr+1
-    lda #21
+    lda #(GAMEPLAY_SCREEN_ROWS-1)
     sta row_counter
 @copy_hull_row:
     ldy #(CORRIDOR_ALLIED_COLUMNS-1)
@@ -2373,9 +3517,9 @@ scroll_hull_columns:
     bne @copy_hull_row
 
     jsr scroll_broadside_scene
-    lda #<(SCREEN+80)
+    lda #<GAMEPLAY_SCREEN
     sta dst_ptr
-    lda #>(SCREEN+80)
+    lda #>GAMEPLAY_SCREEN
     sta dst_ptr+1
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
@@ -2451,9 +3595,9 @@ update_sector_state:
 ; stream. Hull muzzle projections are added afterwards, never baked into this
 ; backing store.
 restore_boundary_stars:
-    lda #<(SCREEN+80)
+    lda #<GAMEPLAY_SCREEN
     sta dst_ptr
-    lda #>(SCREEN+80)
+    lda #>GAMEPLAY_SCREEN
     sta dst_ptr+1
     ldx #$00
 @restore_row:
@@ -2479,11 +3623,11 @@ restore_boundary_stars:
 ; boundary columns. Sector module lookup ensures non-combat rows never acquire
 ; a functional cannon even when they reuse combat armour primitives.
 redraw_visible_muzzles:
-    lda #<(SCREEN+80)
+    lda #<GAMEPLAY_SCREEN
     sta dst_ptr
-    lda #>(SCREEN+80)
+    lda #>GAMEPLAY_SCREEN
     sta dst_ptr+1
-    lda #$02
+    lda #GAMEPLAY_FIRST_SCREEN_ROW
     sta row_counter
 @muzzle_row:
     lda row_counter
@@ -2521,12 +3665,12 @@ redraw_visible_muzzles:
 :
     inc row_counter
     lda row_counter
-    cmp #24
+    cmp #(GAMEPLAY_FIRST_SCREEN_ROW+GAMEPLAY_SCREEN_ROWS)
     bne @muzzle_row
     rts
 
 ; A fired/reserved bit belongs to one source turret lifecycle. It is cleared
-; only after that turret's real muzzle has left all 22 visible hull rows, so a
+; only after that turret's real muzzle has left all 23 visible hull rows, so a
 ; later repeat of the 32-row segment may participate again.
 reset_exited_turret_lifecycles:
     ldx #$00
@@ -2540,9 +3684,9 @@ reset_exited_turret_lifecycles:
     sta BROAD_WORK_VALUE
     lda capital_hull_turrets+CAPITAL_TURRET_MUZZLE_COLUMN_OFFSET,y
     clc
-    adc #<(SCREEN+2*40)
+    adc #<GAMEPLAY_SCREEN
     sta dst_ptr
-    lda #>(SCREEN+2*40)
+    lda #>GAMEPLAY_SCREEN
     adc #$00
     sta dst_ptr+1
     lda #CAPITAL_HULL_VISIBLE_ROWS
@@ -2574,7 +3718,7 @@ reset_exited_turret_lifecycles:
 ; Generates one bounded 8+24+8 row. Static hull maps also contain one declared
 ; projection cell at columns 8/31, used only for turret muzzles. Stars inspect
 ; those boundary cells and therefore cannot overwrite a muzzle. This combined
-; path is used only for the initial 22 rows; visible scrolling uses the split
+; path is used only for the initial 23 rows; visible scrolling uses the split
 ; world and hull routines above.
 generate_corridor_row:
     lda #CH_SPACE
@@ -2996,12 +4140,28 @@ silence_audio:
 .segment "RODATA"
 
 hud_ascii:
-    .byte "SCORE 00000  FUEL 5  ARM 4  LIFE 100"
+    .byte "SCORE 00000  LIFE 3  HULL 100%"
     .byte $00
 
 frontend_screen_data:
     .word main_menu_screen_data, options_screen_data, top_scores_screen_data
     .word exit_screen_data, ended_screen_data
+
+raider_post_burst_frames:
+    .byte RAIDER_POST_BURST_EASY,RAIDER_POST_BURST_MEDIUM,RAIDER_POST_BURST_HARD
+viper_projectile_group_offsets:
+    .byte 0,9,18,27
+raider_projectile_group_offsets:
+    .byte 0,10
+viper_projectile_glyphs:
+    EMIT_VIPER_PROJECTILE_GLYPHS
+    .assert *-viper_projectile_glyphs = VIPER_PROJECTILE_GLYPH_COUNT*8, error, "Viper projectile glyph data changed"
+shared_fighter_explosion_masks:
+    EMIT_SHARED_FIGHTER_EXPLOSION_MASKS
+shared_fighter_explosion_core_masks:
+    EMIT_SHARED_FIGHTER_EXPLOSION_CORE_MASKS
+
+.segment "RODATA"
 
 player_shape:
     .byte %00011000
@@ -3034,24 +4194,6 @@ player_engine_shape:
     .byte %00011000
     .byte $00,$00
 
-enemy_shape:
-    .byte %10000001
-    .byte %11000011
-    .byte %11100111
-    .byte %01111110
-    .byte %00111100
-    .byte %01111110
-    .byte %11111111
-    .byte %01111110
-    .byte %11011011
-    .byte %11000011
-    .byte %10000001
-    .byte %10000001
-
-scanner_shape:
-    .byte $80,$40,$20,$10,$08,$04,$02,$01
-    .byte $01,$02,$04,$08,$10,$20,$40,$80
-
 ; ANTIC 4 character set. Each byte stores four two-bit pixels.
 ; Pixel values: 0=black, 1=white, 2=steel blue, 3=COLPF2 or COLPF3 when
 ; bit 7 of the screen code is set. The frontend sets COLPF3 to Kawasaki
@@ -3059,12 +4201,12 @@ scanner_shape:
 charset_data:
     ; 0: space
     .byte $00,$00,$00,$00,$00,$00,$00,$00
-    ; 1-8: structural tiles
+    ; 1-4: structural tiles; 5: HUD percent sign; 6-8: structural tiles
     .byte $AA,$AA,$AA,$AA,$AA,$AA,$AA,$AA
     .byte $A0,$80,$80,$80,$80,$80,$80,$A0
     .byte $AA,$82,$92,$82,$82,$92,$82,$AA
     .byte $82,$28,$28,$82,$82,$28,$28,$82
-    .byte $AA,$A0,$88,$02,$80,$22,$08,$AA
+    .byte $CC,$D8,$18,$30,$60,$6C,$CC,$FF
     .byte $AA,$82,$82,$82,$82,$82,$82,$AA
     .byte $30,$30,$30,$30,$30,$30,$30,$30
     .byte $AA,$A8,$A8,$AA,$AA,$8A,$8A,$AA
@@ -3264,6 +4406,18 @@ frontend_screen_records_end:
 enemy_hull_packed_map:
     EMIT_ENEMY_HULL_PACKED_MAP
 
+; Immutable PMG masks belong with the main read-only data. Keeping these six
+; bytes out of the relocation block leaves the HUD formatter inside the fixed
+; BROADSIDE_RAM boundary without consuming the protected finale arena.
+missile_masks:
+    .byte $0C,$30,$C0
+missile_clear_masks:
+    .byte $F3,$CF,$3F
+missile_double_size_bits:
+    .byte $04,$10,$40
+missile_quad_size_bits:
+    .byte $0C,$30,$C0
+
 .segment "BROADSIDE"
 
 ; This segment is loaded transiently at $4000 and copied to $5E10 before the
@@ -3322,14 +4476,6 @@ capital_explosion_phase_offsets:
 explosion_backup_offsets:
     .byte 0,9
 
-missile_masks:
-    .byte $0C,$30,$C0
-missile_clear_masks:
-    .byte $F3,$CF,$3F
-missile_double_size_bits:
-    .byte $04,$10,$40
-missile_quad_size_bits:
-    .byte $0C,$30,$C0
 turret_record_offsets:
     .byte $00,$07
 turret_warning_last_safe_rows:
@@ -3367,7 +4513,7 @@ init_broadside:
     sta PLAYER_CONTACT_RIGHT
     sta RESPAWN_INVULNERABLE_TIMER
     sta RESPAWN_BLINK_FRAME
-    ldx #(GAMEPLAY_RESIDENT_END-CAPITAL_EXPLOSION_TIMER)-1
+    ldx #(ENEMY_ARCHETYPE-CAPITAL_EXPLOSION_TIMER)-1
 @clear_explosion_state:
     sta CAPITAL_EXPLOSION_TIMER,x
     dex
@@ -3378,7 +4524,7 @@ init_broadside:
     sta PLAYER_LIVES
     lda #CAPITAL_HULL_STATE_ENGINES
     sta CAPITAL_SECTOR_STATE
-    lda #$05                    ; five 20-point units, directly deriving 100%
+    lda #PLAYER_HEALTH_UNITS    ; ten 10-point units, directly deriving 100%
     sta BROAD_PLAYER_HEALTH
     lda #BROADSIDE_INITIAL_DELAY
     sta BROAD_SCHEDULE_TIMER
@@ -3405,11 +4551,6 @@ update_player_death:
 @dying:
     dec BROAD_DEATH_TIMER
     lda BROAD_DEATH_TIMER
-    cmp #(BROADSIDE_RETURN_TO_MENU_FRAMES-6)
-    bne :+
-    jsr erase_player
-:
-    lda BROAD_DEATH_TIMER
     beq @finished
     clc
     rts
@@ -3428,13 +4569,14 @@ update_player_death:
 
 respawn_player:
     jsr erase_player
+    jsr clear_fighter_projectiles
     lda #PLAYER_RESPAWN_X
     sta player_x
     sta HPOSP0
     sta HPOSP3
     lda #PLAYER_RESPAWN_Y
     sta player_y
-    lda #$05
+    lda #PLAYER_HEALTH_UNITS
     sta BROAD_PLAYER_HEALTH
     lda #$00
     sta BROAD_DEATH_TIMER
@@ -3442,7 +4584,7 @@ respawn_player:
     sta BROAD_DAMAGE_APPLIED
     sta damage_timer
     sta RESPAWN_BLINK_FRAME
-    jsr update_life_display
+    jsr update_hud_status
     jsr clear_player_collision_latches
     lda #RESPAWN_INVULNERABLE_FRAMES
     sta RESPAWN_INVULNERABLE_TIMER
@@ -3471,11 +4613,6 @@ clear_player_collision_latches:
     sta BROAD_M0_COLLISION
     sta BROAD_P0_COLLISION
     sta BROAD_DAMAGE_APPLIED
-    ldx #(BROADSIDE_SLOT_COUNT-1)
-@heavy:
-    sta BROAD_COLLISION,x
-    dex
-    bpl @heavy
     sta HITCLR
     rts
 
@@ -3516,44 +4653,44 @@ update_broadside:
     jsr set_broadside_slot_double
     lda #CAPITAL_HULL_LAUNCH_FLASH_FRAMES
     sta BROAD_FLASH_TIMER,x
-    jsr draw_broadside_slug
     jmp @next
 @draw_warning:
     jsr render_broadside_warning
     jmp @next
 
 @flying:
-    lda BROAD_COLLISION,x
-    and #$09                    ; P0 hull or P3 engine layer
-    beq @fighter_collision
-    jsr begin_broadside_impact
-    jsr apply_broadside_player_damage
-    jmp @next
-@fighter_collision:
-    lda BROAD_OWNER,x
-    bne @move
-    lda BROAD_COLLISION,x
-    and #$06                    ; allied shell against P1/P2 hostile fighter
-    beq @move
-    jsr begin_broadside_impact
-    jsr erase_enemy
-    jsr reset_enemy
-    jsr draw_enemy
-    jsr play_hit_sound
-    jmp @next
-@move:
     lda BROAD_OWNER,x
     bne @move_left
     lda BROAD_X,x
     clc
     adc #BROADSIDE_PROJECTILE_SPEED
     sta BROAD_X,x
-    jmp @hull
+    jmp @targets
 @move_left:
     lda BROAD_X,x
     sec
     sbc #BROADSIDE_PROJECTILE_SPEED
     sta BROAD_X,x
+@targets:
+    jsr capital_shell_collision_flags
+    lda BROAD_COLLISION,x
+    and #$02                    ; first target is the ordinary Cylon fighter
+    beq @player_target
+    jsr begin_broadside_impact
+    lda BROAD_OWNER,x
+    eor #$01
+    ora #DAMAGE_CAPITAL_CYLON
+    tay
+    lda #CAPITAL_DAMAGE_UNITS
+    jsr queue_enemy_damage
+    jmp @next
+@player_target:
+    lda BROAD_COLLISION,x
+    and #$01                    ; Cylon shell reaches the Viper first
+    beq @hull
+    jsr begin_broadside_impact
+    jsr apply_broadside_player_damage
+    jmp @next
 @hull:
     jsr broadside_hits_opposite_hull
     bcc @offscreen
@@ -3568,7 +4705,6 @@ update_broadside:
     bcc @free
     cmp #208
     bcs @free
-    jsr draw_broadside_slug
     jmp @next
 @free:
     jsr free_broadside_slot
@@ -3648,12 +4784,12 @@ schedule_broadside:
     sta loader_repeat_value
     lda capital_hull_turrets+CAPITAL_TURRET_MUZZLE_COLUMN_OFFSET,y
     clc
-    adc #<(SCREEN+3*40)
+    adc #<(GAMEPLAY_SCREEN+40)
     sta dst_ptr
-    lda #>(SCREEN+3*40)
+    lda #>(GAMEPLAY_SCREEN+40)
     adc #$00
     sta dst_ptr+1
-    lda #$03
+    lda #(GAMEPLAY_FIRST_SCREEN_ROW+1)
     sta row_counter
     ldy #$00
 @visible:
@@ -3890,11 +5026,11 @@ scroll_broadside_scene:
     inc CAPITAL_EXPLOSION_ROW_HI,x
 :
     lda CAPITAL_EXPLOSION_ROW_HI,x
-    cmp #>(SCREEN+24*40)
+    cmp #>GAMEPLAY_SCREEN_END
     bcc @next_explosion
     bne @expire_explosion
     lda CAPITAL_EXPLOSION_ROW_LO,x
-    cmp #<(SCREEN+24*40)
+    cmp #<GAMEPLAY_SCREEN_END
     bcc @next_explosion
 @expire_explosion:
     lda #$00
@@ -4027,12 +5163,25 @@ update_sector_completion:
     lda CAPITAL_EXPLOSION_TIMER
     ora CAPITAL_EXPLOSION_TIMER+1
     bne @done
+    lda FIGHTER_EXPLOSION_TIMER
+    ora FIGHTER_EXPLOSION_TIMER+1
+    bne @done
     lda #CAPITAL_HULL_STATE_COMPLETE
     sta CAPITAL_SECTOR_STATE
+    ; Fighter fire remains ordinary gameplay state in ACTIVE, DRAIN and
+    ; COMPLETE. Collision, expiry, death/respawn, and actual gameplay teardown
+    ; own projectile release; a sector phase cannot reset the burst controller.
 @done:
     rts
 
 apply_broadside_player_damage:
+    lda #CAPITAL_DAMAGE_UNITS
+
+; A is damage in ten-point units. Capital shells and hull contact pass two;
+; the ordinary Raider pulse passes one. Every damage source retains the same
+; lifecycle, cooldown, one-event-per-frame, death and respawn gate.
+apply_player_damage:
+    sta BROAD_WORK_VALUE
     lda PLAYER_LIFECYCLE
     cmp #PLAYER_ALIVE
     bne @done
@@ -4046,47 +5195,62 @@ apply_broadside_player_damage:
     sta BROAD_DAMAGE_COOLDOWN
     lda BROAD_PLAYER_HEALTH
     beq @done
-    dec BROAD_PLAYER_HEALTH
+    sec
+    sbc BROAD_WORK_VALUE
+    bcs :+
+    lda #$00
+:
+    sta BROAD_PLAYER_HEALTH
     lda #$12
     sta damage_timer
     jsr play_hit_sound
-    jsr update_life_display
     lda BROAD_PLAYER_HEALTH
-    bne @done
+    bne @update_hud
     lda #PLAYER_DYING
     sta PLAYER_LIFECYCLE
     lda PLAYER_LIVES
     beq :+
     dec PLAYER_LIVES
 :
-    lda #BROADSIDE_RETURN_TO_MENU_FRAMES
+    lda #SHARED_FIGHTER_EXPLOSION_TOTAL
     sta BROAD_DEATH_TIMER
     jsr erase_bullet
+    jsr clear_raider_pulses
+    jsr begin_player_fighter_explosion
+@update_hud:
+    jmp update_hud_status
 @done:
     rts
 
 .segment "BROADSIDE"
-update_life_display:
-    lda #CH_ZERO
-    sta SCREEN+33
-    sta SCREEN+34
-    sta SCREEN+35
+; Only three dynamic HUD characters are touched: one LIFE digit and the
+; changing hundreds/tens positions of HULL. The percent sign and trailing
+; zero are static template characters because canonical health is stored in
+; exact ten-percent units. Values below 100 use a blank hundreds cell rather
+; than an ambiguous leading zero.
+update_hud_status:
+    lda PLAYER_LIVES
+    ora #CH_ZERO
+    sta SCREEN+HUD_LIFE_DIGIT_OFFSET
+
     lda BROAD_PLAYER_HEALTH
-    cmp #$05
+    cmp #PLAYER_HEALTH_UNITS
     bcc @under_one_hundred
+    lda #CH_ZERO
+    sta SCREEN+HUD_HULL_TENS_OFFSET
     lda #CH_ZERO+1
-    sta SCREEN+33
+    sta SCREEN+HUD_HULL_HUNDREDS_OFFSET
     rts
 @under_one_hundred:
     tax
-    lda life_tens_digits,x
-    clc
-    adc #CH_ZERO
-    sta SCREEN+34
+    lda #CH_SPACE
+    sta SCREEN+HUD_HULL_HUNDREDS_OFFSET
+    txa
+    beq @store_tens
+    ora #CH_ZERO
+@store_tens:
+    sta SCREEN+HUD_HULL_TENS_OFFSET
     rts
-
-life_tens_digits:
-    .byte 0,2,4,6,8
 
 .segment "BROADSIDE"
 
@@ -4310,6 +5474,203 @@ render_capital_explosion:
     ldx BROAD_WORK_SLOT
     rts
 
+; Returns one spatially first target flag in BROAD_COLLISION,x: bit 0 Viper,
+; bit 1 Cylon fighter. The swept rectangle includes the previous and current
+; positions and the full eight-HPOS by six-scanline visible playfield slug.
+capital_shell_collision_flags:
+    stx BROAD_WORK_SLOT
+    lda BROAD_X,x
+    sta src_ptr                  ; swept left edge
+    clc
+    adc #(CAPITAL_PROJECTILE_WIDTH_HPOS-1)
+    sta src_ptr+1                ; swept right edge (inclusive)
+    lda BROAD_OWNER,x
+    beq @allied_sweep
+    lda src_ptr+1
+    clc
+    adc #BROADSIDE_PROJECTILE_SPEED
+    sta src_ptr+1                ; enemy moved left: old right lies two beyond
+    jsr capital_shell_hits_enemy
+    bcc @enemy_player_only
+    jsr capital_shell_hits_player
+    bcc @fighter_first
+    ; For a left-moving shell, the target with the greatest right edge is hit
+    ; first. Equal edges deterministically credit the fighter.
+    ldy ENEMY_ARCHETYPE
+    lda enemy_x
+    clc
+    adc enemy_visible_widths,y
+    sta row_counter
+    lda player_x
+    clc
+    adc #PLAYER_COLLISION_WIDTH
+    cmp row_counter
+    bcc @fighter_result
+    beq @fighter_result
+    lda #$01
+    bne @store_result
+@fighter_result:
+@fighter_first:
+    lda #$02
+    bne @store_result
+@enemy_player_only:
+    jsr capital_shell_hits_player
+    bcc @zero_result
+    lda #$01
+    bne @store_result
+@allied_sweep:
+    lda src_ptr
+    sec
+    sbc #BROADSIDE_PROJECTILE_SPEED
+    sta src_ptr                  ; allied moved right: old left lies two before
+    jsr capital_shell_hits_enemy
+    bcc @zero_result
+    lda #$02
+    bne @store_result
+@zero_result:
+    lda #$00
+@store_result:
+    ldx BROAD_WORK_SLOT
+    sta BROAD_COLLISION,x
+    rts
+
+; Target helpers expand the target vertically by the shell half-height, then
+; share four exclusive rectangle comparisons. src_ptr contains shell L/R;
+; dst_ptr target L/R; frontend_data_ptr expanded target T/B.
+capital_shell_hits_target:
+    lda src_ptr+1
+    cmp dst_ptr
+    bcc @miss
+    lda dst_ptr+1
+    cmp src_ptr
+    bcc @miss
+    ldx BROAD_WORK_SLOT
+    lda BROAD_Y,x
+    cmp frontend_data_ptr
+    bcc @miss
+    cmp frontend_data_ptr+1
+    bcs @miss
+    sec
+    rts
+@miss:
+    clc
+    rts
+
+capital_shell_hits_enemy:
+    lda ENEMY_ACTIVE
+    cmp #ENEMY_ACTIVE_STATE
+    bne @miss
+    lda enemy_x
+    sta dst_ptr
+    ldy ENEMY_ARCHETYPE
+    clc
+    adc enemy_visible_widths,y
+    sec
+    sbc #$01
+    sta dst_ptr+1
+    lda enemy_y
+    sec
+    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    sta frontend_data_ptr
+    clc
+    lda frontend_data_ptr
+    adc enemy_frame_heights,y
+    adc #CAPITAL_PROJECTILE_VISIBLE_HEIGHT
+    sta frontend_data_ptr+1
+    jmp capital_shell_hits_target
+@miss:
+    clc
+    rts
+
+capital_shell_hits_player:
+    lda player_x
+    sta dst_ptr
+    clc
+    adc #(PLAYER_COLLISION_WIDTH-1)
+    sta dst_ptr+1
+    lda player_y
+    sec
+    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    sta frontend_data_ptr
+    clc
+    lda frontend_data_ptr
+    adc #(PLAYER_COLLISION_LAST_ROW+1+CAPITAL_PROJECTILE_VISIBLE_HEIGHT)
+    sta frontend_data_ptr+1
+    jmp capital_shell_hits_target
+
+; Keep this label adjacent to the shared test so disassembly and tests can
+; prove that both factions use archetype envelopes rather than GTIA colour.
+.if 0
+capital_shell_overlaps_enemy_obsolete:
+    ldx ENEMY_ARCHETYPE
+    lda enemy_x
+    clc
+    adc enemy_visible_widths,x
+    cmp BROAD_WORK_VALUE
+    bcc @miss
+    beq @miss
+    ldx BROAD_WORK_SLOT
+    lda BROAD_Y,x
+    clc
+    adc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    cmp enemy_y
+    bcc @miss
+    beq @miss
+    lda enemy_y
+    ldx ENEMY_ARCHETYPE
+    clc
+    adc enemy_frame_heights,x
+    ldx BROAD_WORK_SLOT
+    sta row_counter
+    lda BROAD_Y,x
+    sec
+    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    cmp row_counter
+    bcs @miss
+    sec
+    rts
+@miss:
+    ldx BROAD_WORK_SLOT
+    clc
+    rts
+capital_shell_overlaps_player_obsolete:
+    ldx BROAD_WORK_SLOT
+    lda BROAD_OWNER,x
+    cmp #OWNER_ENEMY
+    bne @miss
+    lda BROAD_WORK_COUNT
+    cmp player_x
+    bcc @miss
+    beq @miss
+    lda player_x
+    clc
+    adc #PLAYER_COLLISION_WIDTH
+    cmp BROAD_WORK_VALUE
+    bcc @miss
+    beq @miss
+    lda BROAD_Y,x
+    clc
+    adc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    cmp player_y
+    bcc @miss
+    beq @miss
+    lda player_y
+    clc
+    adc #(PLAYER_COLLISION_LAST_ROW+1)
+    sta row_counter
+    lda BROAD_Y,x
+    sec
+    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    cmp row_counter
+    bcs @miss
+    sec
+    rts
+@miss:
+    ldx BROAD_WORK_SLOT
+    clc
+    rts
+.endif
+
 broadside_hits_opposite_hull:
     stx BROAD_WORK_SLOT
     lda BROAD_Y,x
@@ -4319,7 +5680,7 @@ broadside_hits_opposite_hull:
     lsr
     lsr
     lsr
-    cmp #24
+    cmp #(GAMEPLAY_FIRST_SCREEN_ROW+GAMEPLAY_SCREEN_ROWS)
     bcs @miss
     ldx BROAD_WORK_SLOT
     lda BROAD_ROW_LO,x
@@ -4349,7 +5710,7 @@ broadside_hits_opposite_hull:
     sta BROAD_WORK_VALUE
     lda BROAD_X,x
     clc
-    adc #$02
+    adc #CAPITAL_PROJECTILE_WIDTH_HPOS
     cmp BROAD_WORK_VALUE
     bcs @hit
     bcc @miss
@@ -4391,7 +5752,7 @@ broadside_hits_opposite_hull:
 ; Carry is set for the initial approach or final drained blank rows.
 visible_hull_sector_row:
     sec
-    sbc #$02
+    sbc #GAMEPLAY_FIRST_SCREEN_ROW
     sta loader_repeat_value
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
@@ -4539,32 +5900,6 @@ handle_player_hull_contact:
     ldx #$00
     jmp apply_broadside_player_damage
 
-clear_broadside_pool:
-    jsr restore_capital_explosions
-    ldx #$00
-@slot:
-    jsr free_broadside_slot
-    inx
-    cpx #BROADSIDE_SLOT_COUNT
-    bne @slot
-    ldx #$00
-@flash:
-    lda BROAD_FLASH_TIMER,x
-    beq :+
-    jsr restore_launch_flash_cell
-    lda #$00
-    sta BROAD_FLASH_TIMER,x
-:
-    inx
-    cpx #BROADSIDE_SLOT_COUNT
-    bne @flash
-    lda #$00
-    sta CAPITAL_EXPLOSION_TIMER
-    sta CAPITAL_EXPLOSION_TIMER+1
-    sta CAPITAL_EXPLOSION_SOUND_TIMER
-    sta AUDC4
-    rts
-
 free_broadside_slot:
     jsr erase_broadside_slot
     lda #BROAD_FREE
@@ -4577,6 +5912,27 @@ erase_broadside_slot:
     stx BROAD_WORK_SLOT
     lda BROAD_PREV_H,x
     beq @done
+    lda BROAD_STATE,x
+    cmp #BROAD_FLYING
+    bne @missile_span
+    lda BROAD_ROW_LO,x
+    sta dst_ptr
+    lda BROAD_ROW_HI,x
+    sta dst_ptr+1
+    lda BROAD_PREV_H,x           ; stored as previous column + 1
+    sec
+    sbc #$01
+    tay
+    lda BROAD_PREV_Y,x
+    sta (dst_ptr),y
+    iny
+    lda BROAD_COLLISION,x
+    sta (dst_ptr),y
+    lda #$00
+    sta BROAD_PREV_H,x
+    rts
+@missile_span:
+    lda BROAD_PREV_H,x
     sta BROAD_WORK_COUNT
     ldy BROAD_PREV_Y,x
 @line:
@@ -4593,19 +5949,64 @@ erase_broadside_slot:
     ldx BROAD_WORK_SLOT
     rts
 
-; A two-frame 3/4-scanline pulse gives M1-M3 a compact reinforced-slug shape.
-; Double width and the four-line maximum are unchanged, so the accepted GTIA
-; collision envelope never grows. COLPM1-COLPM3 are not touched.
-draw_broadside_slug:
+; Capital shells are two-cell ANTIC 4 overlays using fixed runtime glyphs.
+; Their amber/crimson bodies avoid every COLPM coupling while preserving
+; P0-P3, M0, the Raider body/scanner, and simultaneous enemy capacity.
+.segment "CODE"
+render_capital_shell_overlays:
+    ldx #$00
+@capital:
+    lda BROAD_STATE,x
+    cmp #BROAD_FLYING
+    bne @next
+    jsr render_capital_shell_overlay
+@next:
+    inx
+    cpx #BROADSIDE_SLOT_COUNT
+    bne @capital
+    rts
+
+.segment "BROADSIDE"
+render_capital_shell_overlay:
+    lda BROAD_ROW_LO,x
+    sta dst_ptr
+    lda BROAD_ROW_HI,x
+    sta dst_ptr+1
+    lda BROAD_X,x
+    sec
+    sbc #48
+    lsr
+    lsr
+    tay
+    tya
+    clc
+    adc #$01
+    sta BROAD_PREV_H,x           ; nonzero previous screen column token
+    lda (dst_ptr),y
+    sta BROAD_PREV_Y,x
+    iny
+    lda (dst_ptr),y
+    sta BROAD_COLLISION,x        ; second backing byte; GTIA snapshots are unused
+    dey
     lda frame_counter
     lsr
     and #$01
-    beq @compact
-    lda #BROADSIDE_FLYING_HEIGHT
-    jmp draw_broadside_span
-@compact:
-    lda #(BROADSIDE_FLYING_HEIGHT-1)
-    jmp draw_broadside_span
+    clc
+    adc #CAPITAL_SHELL_PHASE0
+    pha
+    lda BROAD_OWNER,x
+    beq @colonial
+    pla
+    ora #CAPITAL_PROJECTILE_CYLON_ATTRIBUTE
+    bne @draw
+@colonial:
+    pla
+@draw:
+    sta (dst_ptr),y
+    iny
+    sta (dst_ptr),y
+    rts
+
 
 draw_broadside_span:
     pha
@@ -4635,6 +6036,7 @@ draw_broadside_span_at_hpos:
     ldx BROAD_WORK_SLOT
     rts
 
+.segment "CODE"
 set_broadside_slot_normal:
     lda SIZEM
     and missile_clear_masks,x
@@ -4648,6 +6050,7 @@ set_broadside_slot_double:
     sta SIZEM
     rts
 
+.segment "BROADSIDE"
 set_broadside_slot_quad:
     lda SIZEM
     and missile_clear_masks,x
@@ -4655,7 +6058,38 @@ set_broadside_slot_quad:
     sta SIZEM
     rts
 
-.assert * - __BROADSIDE_RUN__ <= $1200, error, "broadside runtime exceeds relocation block"
+enemy_frame_heights:
+    EMIT_ENEMY_FRAME_HEIGHTS
+enemy_size_modes:
+    EMIT_ENEMY_SIZE_MODES
+enemy_visible_left_insets:
+    EMIT_ENEMY_VISIBLE_LEFT_INSETS
+enemy_visible_widths:
+    EMIT_ENEMY_VISIBLE_WIDTHS
+enemy_logical_x_maxs:
+    EMIT_ENEMY_LOGICAL_X_MAXS
+enemy_accent_rows:
+    EMIT_ENEMY_ACCENT_ROWS
+enemy_accent_offsets:
+    EMIT_ENEMY_ACCENT_OFFSETS
+.segment "CODE"
+enemy_hit_points:
+    EMIT_ENEMY_HIT_POINTS
+enemy_scores:
+    EMIT_ENEMY_SCORES
+.segment "BROADSIDE"
+enemy_weapon_profiles:
+    EMIT_ENEMY_WEAPON_PROFILES
+enemy_projectile_spawn_y_offsets:
+    EMIT_ENEMY_PROJECTILE_SPAWN_Y_OFFSETS
+enemy_body_data:
+    EMIT_ENEMY_BODY_DATA
+enemy_accent_data:
+    EMIT_ENEMY_ACCENT_DATA
+enemy_runtime_data_end:
+
+.assert enemy_runtime_data_end - enemy_frame_heights = 84, error, "enemy roster broadside tables changed"
+.assert * - __BROADSIDE_RUN__ <= $1600, error, "broadside runtime exceeds relocation block"
 
 .segment "RODATA"
 
@@ -4692,14 +6126,12 @@ frontend_text_display_list:
     .byte $41
     .word frontend_text_display_list
 
-; The two-row HUD uses genuine 40-column ANTIC 2 text. A DLI after its divider
-; installs the gameplay charset/palette before 22 ANTIC 4 corridor rows; the
-; final-row DLI restores the dedicated HUD font for the next PAL frame.
+; One compact ANTIC 2 HUD row shares its empty eighth scanline with the raster
+; separator. Its DLI installs the gameplay charset/palette before 23 ANTIC 4
+; corridor rows; the final-row DLI restores the HUD font for the next PAL frame.
 display_list:
-    .byte $70,$70,$70              ; 24 blank scan lines
-    .byte $42,<SCREEN,>SCREEN      ; ANTIC 2 HUD + LMS
-    .byte $82                      ; ANTIC 2 divider + DLI
-    .repeat 21
+    .byte $C2,<SCREEN,>SCREEN      ; ANTIC 2 HUD + LMS + DLI
+    .repeat 22
         .byte $04
     .endrepeat
     .byte $84                      ; final ANTIC 4 row + DLI

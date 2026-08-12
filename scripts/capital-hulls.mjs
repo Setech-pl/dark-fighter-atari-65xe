@@ -187,7 +187,7 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
   invariant(source.moduleRows === 8, "Capital hull modules must contain eight character rows");
   invariant(Number.isInteger(source.sidePhaseRows) && source.sidePhaseRows >= 0 &&
     source.sidePhaseRows <= 16, "sector.sidePhaseRows must be a bounded row offset");
-  invariant(source.visibleRows === 22, "The gameplay broadside must retain 22 visible hull rows");
+  invariant(source.visibleRows === 23, "The compact gameplay viewport must expose 23 hull rows");
   invariant(Number.isInteger(source.previewSectorRow) && source.previewSectorRow >= source.visibleRows &&
     source.previewSectorRow < 240, "sector.previewSectorRow must expose a complete visible ship span");
   invariant(Number.isInteger(source.engineAnimationFrames) &&
@@ -736,6 +736,47 @@ export function compileCapitalHulls(definition) {
     respawnInvulnerableFrames: boundedWord("respawnInvulnerableFrames", 1),
     respawnBlinkHalfPeriodFrames: boundedByte("respawnBlinkHalfPeriodFrames", 1),
   };
+  const projectileVisuals = broadside.projectileVisuals;
+  invariant(projectileVisuals && typeof projectileVisuals === "object",
+    "Capital hull source must define projectile visual language");
+  const compileProjectileVisual = (name, expected) => {
+    const source = projectileVisuals[name];
+    invariant(source && typeof source === "object", `projectileVisuals.${name} is required`);
+    for (const [field, value] of Object.entries(expected)) {
+      invariant(source[field] === value,
+        `projectileVisuals.${name}.${field} must remain ${value}`);
+    }
+    return Object.freeze({ ...source });
+  };
+  broadsideTiming.projectileVisuals = Object.freeze({
+    player: compileProjectileVisual("player", {
+      widthHpos: 1,
+      height: 2,
+      coreRegister: "COLPF2",
+      coreValue: 0x1e,
+    }),
+    raider: compileProjectileVisual("raider", {
+      widthHpos: 2,
+      height: 3,
+      register: "COLPF3",
+      value: 0x46,
+    }),
+    capital: compileProjectileVisual("capital", {
+      widthHpos: 8,
+      height: 6,
+      coreRegister: "COLPF0",
+      coreValue: 0x0e,
+      colonialRegister: "COLPF2",
+      colonialValue: 0x1e,
+      colonialAttribute: 0,
+      cylonRegister: "COLPF3",
+      cylonValue: 0x46,
+      cylonAttribute: 0x80,
+    }),
+  });
+  invariant(broadsideTiming.projectileVisuals.capital.widthHpos >=
+    broadsideTiming.projectileVisuals.raider.widthHpos * 2,
+  "Capital projectile must be at least twice the fighter projectile length");
   const compileScrollRates = (name, denominator) => {
     const rates = broadside[name];
     invariant(rates && typeof rates === "object",
@@ -901,7 +942,7 @@ export function compileCapitalHulls(definition) {
         broadsideTiming.warningFrames * broadsideTiming.hullScrollRates[difficulty] /
           broadsideTiming.hullScrollRateDenominator,
       );
-      return 21 - warningAdvances;
+      return sector.visibleRows - 1 - warningAdvances;
     }),
   );
   const collisionBoundaries = new Map(SIDES.map((side) => [
@@ -1055,6 +1096,12 @@ export function renderCapitalHullsCa65Include(asset) {
     `BROADSIDE_PROJECTILE_SPEED = ${asset.broadside.projectileSpeed}`,
     `BROADSIDE_WARNING_HEIGHT = ${asset.broadside.warningHeight}`,
     `BROADSIDE_FLYING_HEIGHT = ${asset.broadside.flyingHeight}`,
+    `PLAYER_PROJECTILE_WIDTH_HPOS = ${asset.broadside.projectileVisuals.player.widthHpos}`,
+    `PLAYER_PROJECTILE_VISIBLE_HEIGHT = ${asset.broadside.projectileVisuals.player.height}`,
+    `CAPITAL_PROJECTILE_WIDTH_HPOS = ${asset.broadside.projectileVisuals.capital.widthHpos}`,
+    `CAPITAL_PROJECTILE_VISIBLE_HEIGHT = ${asset.broadside.projectileVisuals.capital.height}`,
+    `CAPITAL_PROJECTILE_COLONIAL_ATTRIBUTE = ${asset.broadside.projectileVisuals.capital.colonialAttribute}`,
+    `CAPITAL_PROJECTILE_CYLON_ATTRIBUTE = ${asset.broadside.projectileVisuals.capital.cylonAttribute}`,
     `BROADSIDE_IMPACT_HEIGHT = ${asset.broadside.impactHeight}`,
     `BROADSIDE_IMPACT_FRAMES = ${asset.broadside.impactFrames}`,
     `BROADSIDE_PLAYER_DAMAGE = ${asset.broadside.playerDamage}`,

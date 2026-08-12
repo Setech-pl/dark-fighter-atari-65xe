@@ -15,9 +15,8 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.match(source, /FRONTEND_CHARSET\s*=\s*\$4800/);
   assert.match(source, /HUD_CHARSET\s*=\s*\$5000/);
   assert.match(source, /sta CHBASE/);
-  assert.match(source, /\.byte \$42,<SCREEN,>SCREEN\s+; ANTIC 2 HUD \+ LMS/);
-  assert.match(source, /\.byte \$82\s+; ANTIC 2 divider \+ DLI/);
-  assert.match(source, /\.repeat 21\s+\.byte \$04\s+\.endrepeat/);
+  assert.match(source, /\.byte \$C2,<SCREEN,>SCREEN\s+; ANTIC 2 HUD \+ LMS \+ DLI/);
+  assert.match(source, /\.repeat 22\s+\.byte \$04\s+\.endrepeat/);
   assert.match(source, /\.byte \$84\s+; final ANTIC 4 row \+ DLI/);
   assert.match(source, /\.byte \$47,<SCREEN,>SCREEN\s+; ANTIC 7 title/);
   assert.match(source, /\.byte \$02\s+; 40-column ANTIC 2 control hint/);

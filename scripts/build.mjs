@@ -15,6 +15,16 @@ import {
   loadCapitalHullsDefinition,
   renderCapitalHullsCa65Include,
 } from "./capital-hulls.mjs";
+import {
+  compileEnemyRoster,
+  loadEnemyRosterDefinition,
+  renderEnemyRosterCa65Include,
+} from "./enemy-roster.mjs";
+import {
+  compileFighterWeapons,
+  loadFighterWeaponsDefinition,
+  renderFighterWeaponsCa65Include,
+} from "./fighter-weapons.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -24,8 +34,23 @@ const distDirectory = path.join(rootDirectory, "dist");
 const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
 const gameVersion = packageDefinition.version;
 const quiet = process.argv.includes("--quiet");
-const acceptedDifficultyPayloadBytes = 9644;
-const flagshipBroadsidePayloadLimit = 2560;
+const enemyReviewHarness = process.argv.includes("--enemy-review");
+const enemyCombatReviewHarness = process.argv.includes("--enemy-combat-review");
+const enemyPaletteArgument = process.argv.find((argument) => argument.startsWith("--enemy-palette="));
+const enemyPaletteSlug = enemyPaletteArgument?.slice("--enemy-palette=".length);
+const enemyPaletteIds = new Map([
+  ["dark-navy", "DARK_NAVY"],
+  ["medium-steel-blue", "MEDIUM_STEEL_BLUE"],
+  ["graphite-blue", "GRAPHITE_BLUE"],
+]);
+if (enemyPaletteSlug && !enemyPaletteIds.has(enemyPaletteSlug)) {
+  throw new Error(`Unknown enemy palette build ${enemyPaletteSlug}`);
+}
+const isReviewVariant = enemyReviewHarness || enemyCombatReviewHarness || Boolean(enemyPaletteSlug);
+const acceptedBroadsidePayloadBytes = 11941;
+// Pass 1 plus the focused projectile/scoring correction remains below 1 KiB
+// while preserving the protected finale arena and fixed resident regions.
+const enemyRosterPayloadLimit = 1024;
 
 function ensureDirectory(fsApi, directory) {
   const parts = directory.split("/").filter(Boolean);
@@ -128,6 +153,31 @@ async function build() {
   const capitalHullsAsset = compileCapitalHulls(capitalHullsDefinition);
   const capitalHullsInclude = Buffer.from(renderCapitalHullsCa65Include(capitalHullsAsset));
   writeFile(path.join(buildDirectory, "capital-hulls.inc"), capitalHullsInclude);
+  const enemyRosterDefinitionPath = path.join(
+    rootDirectory,
+    "assets",
+    "graphics",
+    "enemy-roster.json",
+  );
+  const enemyRosterDefinition = loadEnemyRosterDefinition(enemyRosterDefinitionPath);
+  const enemyRosterAsset = compileEnemyRoster(enemyRosterDefinition, rootDirectory);
+  const paletteCandidateId = enemyPaletteIds.get(enemyPaletteSlug);
+  const paletteCandidate = paletteCandidateId
+    ? enemyRosterAsset.runtime.colourPolicy.candidates.find(({ id }) => id === paletteCandidateId)
+    : null;
+  const enemyRosterInclude = Buffer.from(renderEnemyRosterCa65Include(enemyRosterAsset));
+  writeFile(path.join(buildDirectory, "enemy-roster.inc"), enemyRosterInclude);
+  const fighterWeaponsDefinitionPath = path.join(
+    rootDirectory, "assets", "graphics", "fighter-weapons.json",
+  );
+  const fighterWeaponsAsset = compileFighterWeapons(
+    loadFighterWeaponsDefinition(fighterWeaponsDefinitionPath),
+    enemyRosterAsset,
+  );
+  const fighterWeaponsInclude = Buffer.from(
+    renderFighterWeaponsCa65Include(fighterWeaponsAsset),
+  );
+  writeFile(path.join(buildDirectory, "fighter-weapons.inc"), fighterWeaponsInclude);
 
   const assembled = await runWasmTool(
     "ca65",
@@ -135,11 +185,18 @@ async function build() {
       "/project/src/main.s": source,
       "/project/build/loader-screen.inc": loaderInclude,
       "/project/build/capital-hulls.inc": capitalHullsInclude,
+      "/project/build/enemy-roster.inc": enemyRosterInclude,
+      "/project/build/fighter-weapons.inc": fighterWeaponsInclude,
     },
     [
       "--cpu",
       "6502",
       "-g",
+      ...(enemyReviewHarness ? ["-D", "ENEMY_REVIEW_HARNESS=1"] : []),
+      ...(enemyCombatReviewHarness || paletteCandidate
+        ? ["-D", "ENEMY_COMBAT_REVIEW_HARNESS=1"] : []),
+      ...(paletteCandidate
+        ? ["-D", `ENEMY_BODY_COLOR_OVERRIDE=${paletteCandidate.value}`] : []),
       "-I",
       "/project/build",
       "-o",
@@ -193,7 +250,7 @@ async function build() {
     throw new Error("ld65 label file is missing entry or broadside relocation labels");
   }
   if (broadsideLoadAddress !== 0x4000 || broadsideRunAddress !== 0x5e10 ||
-    broadsideRuntimeBytes > 0x1200) {
+    broadsideRuntimeBytes > 0x1600) {
     throw new Error("Broadside relocation lies outside its reviewed load/run ranges");
   }
   const broadsideRuntime = linkedPayload.subarray(
@@ -208,11 +265,12 @@ async function build() {
     linkedPayload.subarray(0, broadsideLoadAddress - loadAddress),
     packedBroadsideRuntime,
   ]);
-  if (rawPayload.length - acceptedDifficultyPayloadBytes > flagshipBroadsidePayloadLimit) {
+  if (!isReviewVariant &&
+    rawPayload.length - acceptedBroadsidePayloadBytes > enemyRosterPayloadLimit) {
     throw new Error(
-      `Flagship broadside payload delta is ` +
-      `${rawPayload.length - acceptedDifficultyPayloadBytes} bytes and exceeds ` +
-      `${flagshipBroadsidePayloadLimit} bytes`,
+      `Enemy-roster pass-1 payload delta is ` +
+      `${rawPayload.length - acceptedBroadsidePayloadBytes} bytes and exceeds ` +
+      `${enemyRosterPayloadLimit} bytes`,
     );
   }
 
@@ -237,6 +295,13 @@ async function build() {
     gameVersion,
     target: "Atari 65XE PAL / 64 KB",
     toolchain: "romdev-toolchain-cc65@0.1.3",
+    buildVariant: enemyReviewHarness
+      ? "enemy-review"
+      : enemyCombatReviewHarness
+        ? "enemy-combat-review"
+        : paletteCandidate
+          ? `enemy-palette-${enemyPaletteSlug}`
+          : "release",
     loadAddress,
     startAddress,
     bootInitAddress,
@@ -246,7 +311,7 @@ async function build() {
       loadAddress: broadsideLoadAddress,
       runAddress: broadsideRunAddress,
       bytes: broadsideRuntimeBytes,
-      reservedBytes: 0x1200,
+      reservedBytes: 0x1600,
       packedBytes: packedBroadsideRuntime.length,
       compression: "LZ-10/5",
     },
@@ -315,6 +380,69 @@ async function build() {
         },
       },
     },
+    enemyRoster: {
+      source: "assets/graphics/enemy-roster.json",
+      sourceSha256: sha256(fs.readFileSync(enemyRosterDefinitionPath)),
+      inventoryCount: enemyRosterAsset.inventory.length,
+      implementedCount: enemyRosterAsset.implemented.length,
+      releaseArchetype: enemyRosterAsset.runtime.releaseArchetype,
+      runtimeArtBytes: enemyRosterAsset.runtimeArtBytes,
+      descriptorBytes: enemyRosterAsset.descriptorBytes,
+      palette: {
+        selectedId: enemyRosterAsset.runtime.colourPolicy.selected,
+        releaseBodyValue: enemyRosterAsset.runtime.colourPolicy.bodyValue,
+        artifactBodyValue: paletteCandidate?.value ?? enemyRosterAsset.runtime.colourPolicy.bodyValue,
+        scannerValue: enemyRosterAsset.runtime.colourPolicy.accentValue,
+      },
+      weaponPolicy: enemyRosterAsset.runtime.weaponPolicy,
+      projectileVisuals: capitalHullsAsset.broadside.projectileVisuals,
+      damagePolicy: {
+        priority: [
+          "PLAYER_PROJECTILE",
+          "PLAYER_CONTACT",
+          "CAPITAL_CYLON",
+          "CAPITAL_COLONIAL",
+          "ENEMY_PROJECTILE",
+          "CLEANUP",
+        ],
+        scoreAwarding: ["PLAYER_PROJECTILE", "PLAYER_CONTACT", "CAPITAL_CYLON"],
+      },
+      anchors: enemyRosterAsset.implemented.map((archetype) => ({
+        id: archetype.id,
+        reference: archetype.reference,
+        height: archetype.height,
+        hardwareWidth: archetype.hardwareWidth,
+        visibleWidth: archetype.visibleWidth,
+        logicalBounds: archetype.logicalBounds,
+        hposBounds: archetype.hposBounds,
+        frames: archetype.frames,
+        releaseEnabled: archetype.releaseEnabled,
+      })),
+    },
+    fighterWeapons: {
+      source: "assets/graphics/fighter-weapons.json",
+      sourceSha256: sha256(fs.readFileSync(fighterWeaponsDefinitionPath)),
+      viewport: fighterWeaponsAsset.viewport,
+      dynamicGlyphBase: fighterWeaponsAsset.dynamicGlyphBase,
+      poolSlots: {
+        viper: fighterWeaponsAsset.viper.poolSlots,
+        raider: fighterWeaponsAsset.raider.poolSlots,
+        total: fighterWeaponsAsset.totalSlots,
+      },
+      runtimeStateBytes: fighterWeaponsAsset.stateBytes,
+      sharedFighterExplosion: {
+        frameCount: fighterWeaponsAsset.sharedFighterExplosion.frameCount,
+        frameDurationFrames: fighterWeaponsAsset.sharedFighterExplosion.frameDurationFrames,
+        totalFrames: fighterWeaponsAsset.sharedFighterExplosion.totalFrames,
+        dimensions: [fighterWeaponsAsset.sharedFighterExplosion.widthBits,
+          fighterWeaponsAsset.sharedFighterExplosion.heightScanlines],
+        slots: fighterWeaponsAsset.sharedFighterExplosion.slots,
+        artBytes: fighterWeaponsAsset.sharedFighterExplosion.outerBytes.length +
+          fighterWeaponsAsset.sharedFighterExplosion.coreMasks.length,
+      },
+      viper: fighterWeaponsAsset.viper,
+      raider: fighterWeaponsAsset.raider,
+    },
     artifacts: {
       "dark-fighter-boot.bin": { bytes: rawPayload.length, sha256: sha256(rawPayload) },
       "dark-fighter.xex": { bytes: xex.length, sha256: sha256(xex) },
@@ -329,12 +457,19 @@ async function build() {
   writeFile(path.join(buildDirectory, "dark-fighter.map"), mapFile);
   writeFile(path.join(buildDirectory, "dark-fighter.lbl"), labelFile);
   writeFile(path.join(buildDirectory, "manifest.json"), manifestBytes);
-  writeFile(path.join(distDirectory, "dark-fighter-boot.bin"), rawPayload);
-  writeFile(path.join(distDirectory, "dark-fighter.xex"), xex);
-  writeFile(path.join(distDirectory, "dark-fighter.atr"), atr);
-  writeFile(path.join(distDirectory, "dark-fighter-manifest.json"), manifestBytes);
+  const artifactDirectory = enemyReviewHarness
+    ? path.join(buildDirectory, "enemy-review")
+    : enemyCombatReviewHarness
+      ? path.join(buildDirectory, "enemy-combat-review")
+      : paletteCandidate
+        ? path.join(buildDirectory, `enemy-palette-${enemyPaletteSlug}`)
+        : distDirectory;
+  writeFile(path.join(artifactDirectory, "dark-fighter-boot.bin"), rawPayload);
+  writeFile(path.join(artifactDirectory, "dark-fighter.xex"), xex);
+  writeFile(path.join(artifactDirectory, "dark-fighter.atr"), atr);
+  writeFile(path.join(artifactDirectory, "dark-fighter-manifest.json"), manifestBytes);
 
-  validateBuildDirectory(rootDirectory);
+  if (!isReviewVariant) validateBuildDirectory(rootDirectory);
 
   if (!quiet) {
     console.log(`Dark Fighter ${gameVersion} built successfully`);
@@ -342,6 +477,16 @@ async function build() {
     console.log(`  entry   : $${startAddress.toString(16)}`);
     console.log(`  XEX     : ${xex.length} bytes`);
     console.log(`  ATR     : ${atr.length} bytes`);
+    if (enemyReviewHarness) {
+      console.log(`  variant : compile-time enemy review harness`);
+      console.log(`  output  : ${path.relative(rootDirectory, artifactDirectory)}`);
+    } else if (enemyCombatReviewHarness) {
+      console.log(`  variant : deterministic Raider combat review`);
+      console.log(`  output  : ${path.relative(rootDirectory, artifactDirectory)}`);
+    } else if (paletteCandidate) {
+      console.log(`  variant : enemy palette ${paletteCandidate.id} ($${paletteCandidate.value.toString(16).padStart(2, "0")})`);
+      console.log(`  output  : ${path.relative(rootDirectory, artifactDirectory)}`);
+    }
   }
 }
 

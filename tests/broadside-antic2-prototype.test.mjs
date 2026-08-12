@@ -187,8 +187,8 @@ test("prototype previews are deterministic, source-derived, and use exact intege
 });
 
 test("spike is preview-only and leaves the runtime broadside playfield in ANTIC 4", () => {
-  assert.match(source, /\.byte \$42,<SCREEN,>SCREEN\s+; ANTIC 2 HUD \+ LMS/);
-  assert.match(source, /\.repeat 21\s+\.byte \$04\s+\.endrepeat/);
+  assert.match(source, /\.byte \$C2,<SCREEN,>SCREEN\s+; ANTIC 2 HUD \+ LMS \+ DLI/);
+  assert.match(source, /\.repeat 22\s+\.byte \$04\s+\.endrepeat/);
   assert.match(source, /\.byte \$84\s+; final ANTIC 4 row \+ DLI/);
   assert.doesNotMatch(source, /broadside_display_list|BROADSID.*CHBASE/i);
   assert.doesNotMatch(buildSource, /capital-hulls-antic2|broadside-antic2/i);
