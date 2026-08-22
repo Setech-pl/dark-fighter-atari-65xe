@@ -55,12 +55,6 @@ function sha256(bytes) {
 }
 
 function readXexBytes(address, length) {
-  const segment = parseXex(xex).segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  if (segment) {
-    return segment.data.subarray(address - segment.start, address - segment.start + length);
-  }
   const runtime = manifest.broadsideRuntime;
   if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
     return broadsideRuntime.subarray(address - runtime.runAddress, address - runtime.runAddress + length);
@@ -68,6 +62,12 @@ function readXexBytes(address, length) {
   const starfield = manifest.starfieldRuntime;
   if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
     return starfieldRuntime.subarray(address - starfield.runAddress, address - starfield.runAddress + length);
+  }
+  const segment = parseXex(xex).segments.find(
+    ({ start, end }) => address >= start && address + length - 1 <= end,
+  );
+  if (segment) {
+    return segment.data.subarray(address - segment.start, address - segment.start + length);
   }
   assert.fail(`Resident image does not contain $${address.toString(16)}`);
 }

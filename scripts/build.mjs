@@ -30,6 +30,11 @@ import {
   loadStarfieldDefinition,
   renderStarfieldCa65Include,
 } from "./starfield.mjs";
+import {
+  compileMenuMusic,
+  loadMenuMusicDefinition,
+  renderMenuMusicCa65Include,
+} from "./menu-music.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -52,12 +57,11 @@ if (enemyPaletteSlug && !enemyPaletteIds.has(enemyPaletteSlug)) {
   throw new Error(`Unknown enemy palette build ${enemyPaletteSlug}`);
 }
 const isReviewVariant = enemyReviewHarness || enemyCombatReviewHarness || Boolean(enemyPaletteSlug);
-const acceptedBroadsidePayloadBytes = 11941;
-// Pass 1 plus the focused projectile/scoring correction remains below 1 KiB
-// while preserving the protected finale arena and fixed resident regions.
-const starfieldPassPayloadLimit = 2048;
+const acceptedGameOverPayloadBytes = 13865;
+// Menu music is a separate post-Game-Over feature with its own bounded payload.
+const menuMusicPayloadLimit = 1024;
 const starfieldStagingAddress = 0x7410;
-const starfieldStagingBytes = 0x400;
+const starfieldStagingBytes = 0x600;
 
 function ensureDirectory(fsApi, directory) {
   const parts = directory.split("/").filter(Boolean);
@@ -191,6 +195,12 @@ async function build() {
   const starfieldAsset = compileStarfield(loadStarfieldDefinition(starfieldDefinitionPath));
   const starfieldInclude = Buffer.from(renderStarfieldCa65Include(starfieldAsset));
   writeFile(path.join(buildDirectory, "starfield.inc"), starfieldInclude);
+  const menuMusicDefinitionPath = path.join(
+    rootDirectory, "assets", "music", "menu-theme.json",
+  );
+  const menuMusicAsset = compileMenuMusic(loadMenuMusicDefinition(menuMusicDefinitionPath));
+  const menuMusicInclude = Buffer.from(renderMenuMusicCa65Include(menuMusicAsset));
+  writeFile(path.join(buildDirectory, "menu-music.inc"), menuMusicInclude);
 
   const assembled = await runWasmTool(
     "ca65",
@@ -201,6 +211,7 @@ async function build() {
       "/project/build/enemy-roster.inc": enemyRosterInclude,
       "/project/build/fighter-weapons.inc": fighterWeaponsInclude,
       "/project/build/starfield.inc": starfieldInclude,
+      "/project/build/menu-music.inc": menuMusicInclude,
     },
     [
       "--cpu",
@@ -262,6 +273,10 @@ async function build() {
   const starfieldPackedSourceOperand = labels.get("starfield_packed_source");
   const starfieldPackedSizeOperand = labels.get("starfield_packed_size");
   const loaderPackedAddress = labels.get("loader_bitmap_lzss");
+  const musicPlayerStart = labels.get("music_player_start");
+  const musicPlayerEnd = labels.get("music_player_end");
+  const musicDataStart = labels.get("music_data_start");
+  const musicDataEnd = labels.get("music_data_end");
   const loadAddress = 0x2000;
 
   if (!Number.isInteger(startAddress) || !Number.isInteger(bootInitAddress) ||
@@ -269,7 +284,9 @@ async function build() {
     !Number.isInteger(broadsideRuntimeBytes) || !Number.isInteger(starfieldLoadAddress) ||
     !Number.isInteger(starfieldRunAddress) || !Number.isInteger(starfieldRuntimeBytes) ||
     !Number.isInteger(starfieldPackedSourceOperand) ||
-    !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(loaderPackedAddress)) {
+    !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(loaderPackedAddress) ||
+    !Number.isInteger(musicPlayerStart) || !Number.isInteger(musicPlayerEnd) ||
+    !Number.isInteger(musicDataStart) || !Number.isInteger(musicDataEnd)) {
     throw new Error("ld65 label file is missing entry or resident relocation labels");
   }
   if (broadsideLoadAddress !== 0x4000 || broadsideRunAddress !== 0x5e10 ||
@@ -328,11 +345,11 @@ async function build() {
     packedStarfieldRuntime,
   ]);
   if (!isReviewVariant &&
-    rawPayload.length - acceptedBroadsidePayloadBytes > starfieldPassPayloadLimit) {
+    rawPayload.length - acceptedGameOverPayloadBytes > menuMusicPayloadLimit) {
     throw new Error(
-      `Post-broadside feature payload delta is ` +
-      `${rawPayload.length - acceptedBroadsidePayloadBytes} bytes and exceeds ` +
-      `${starfieldPassPayloadLimit} bytes`,
+      `Menu-music feature payload delta is ` +
+      `${rawPayload.length - acceptedGameOverPayloadBytes} bytes and exceeds ` +
+      `${menuMusicPayloadLimit} bytes`,
     );
   }
 
@@ -541,6 +558,24 @@ async function build() {
       glyphBytes: starfieldAsset.glyphBytes.length,
       runtimeStateBytes: starfieldAsset.stateBytes,
       pmgBytes: 0,
+    },
+    menuMusic: {
+      source: "assets/music/menu-theme.json",
+      sourceSha256: sha256(fs.readFileSync(menuMusicDefinitionPath)),
+      title: menuMusicAsset.title,
+      originalComposition: menuMusicAsset.originalComposition,
+      targetFrameHz: menuMusicAsset.targetFrameHz,
+      framesPerRow: menuMusicAsset.framesPerRow,
+      rowsPerPattern: menuMusicAsset.rowsPerPattern,
+      patternCount: menuMusicAsset.patternNames.length,
+      sequencePatterns: menuMusicAsset.sequenceBytes.length,
+      loopFrames: menuMusicAsset.loopFrames,
+      loopSeconds: menuMusicAsset.loopSeconds,
+      channelAllocation: menuMusicAsset.channelAllocation,
+      channelMask: 0x0f,
+      runtimeCodeBytes: musicPlayerEnd - musicPlayerStart,
+      runtimeDataBytes: musicDataEnd - musicDataStart,
+      runtimeStateBytes: menuMusicAsset.stateBytes,
     },
     artifacts: {
       "dark-fighter-boot.bin": { bytes: rawPayload.length, sha256: sha256(rawPayload) },

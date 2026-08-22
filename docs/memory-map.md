@@ -10,10 +10,10 @@ loaderze nie są tym samym budżetem.
 | `$0080-$00A1` | 34 B zmiennych zero-page; bez zmian dla kadłubów |
 | `$0100-$01FF` | stos 6502 |
 | `$0200-$03FF` | obszar systemowy OS i wektory |
-| `$2000-$2F0F` | resident code, 3856 B |
-| `$2F10-$3FB9` | resident RODATA, 4266 B; includes charset source, hull/effect glyphs, frontend records including Game Over, packed maps, and loader LZ-10/5 source |
-| `$3705-$3EEF` | transient loader LZ-10/5 stream, 2027 B |
-| `$3EF0-$3FB9` | transient loader display list, 202 B |
+| `$2000-$2F2E` | resident code, 3887 B |
+| `$2F2F-$3FD8` | resident RODATA, 4266 B; includes charset source, hull/effect glyphs, frontend records including Game Over, packed maps, and loader LZ-10/5 source |
+| `$3724-$3F0E` | transient loader LZ-10/5 stream, 2027 B |
+| `$3F0F-$3FD8` | transient loader display list, 202 B |
 | `$4000-$524B` | on entry: 4684 B packed LZ-10/5 broadside/frontend/enemy runtime; expanded before the loader and then overwritten by bitmap/screen data |
 | `$4000-$43FF` | wspólny bufor ekranu gameplayu/frontendu, 1024 B; loader zaczyna bitmapę dopiero pod `$4010` |
 | `$4400-$47FF` | gameplay charset, dokładnie 1024 B |
@@ -46,19 +46,22 @@ loaderze nie są tym samym budżetem.
 | `$4ECF-$4ED0` | 2 B saturującego pending damage i priorytetowego damage source bieżącej ramki |
 | `$4ED1-$4ED6` | 6 B skalarnego stanu starfield: seed/RNG, fazy near `7/10` i far `7/20`, timer i indeks twinkle, dirty flag |
 | `$4ED7-$4ED8` | 2 B sesyjnego TOP SCORE w packed BCD; zerowany wyłącznie przy pełnym starcie programu |
-| `$4ED9-$4FFF` | obecnie nieprzydzielone po przejściu loadera |
+| `$4ED9-$4EDE` | 6 B menu-music state: active flag, PAL row timer, sequence/pattern indices, channel mask, and token scratch |
+| `$4EDF-$4FFF` | currently unassigned after the loader |
 | `$4010-$4FFF` | podczas loadera: pierwsze LMS, linie bitmapy 0–101, 4080 B; po przejściu zakres jest dzielony na ekran, charsety, mapy i wolny ogon opisane wyżej |
 | `$5000-$53FF` | dedykowany gameplay HUD charset, dokładnie 1024 B, budowany po loaderze |
 | `$5400-$54C9` | 202 B stałego stanu: 19 fighter projectiles, oba kontrolery burst oraz timer/X/Y dwóch wspólnych fighter explosions |
 | `$54CA-$5529` | 96 B czterech tablic 24 far stars: active/rendered, dokładny adres ekranu low/high i screen code |
 | `$552A-$5559` | obecnie nieprzydzielone po przejściu loadera |
-| `$555A-$59D3` | 1146 B relokowanego runtime starfield i współdzielonych procedur damage/score odzyskanych z BROADSIDE |
-| `$59D4-$5E0F` | obecnie nieprzydzielone po przejściu loadera |
+| `$555A-$59D3` | 1146 B relocated starfield runtime and shared damage/score procedures recovered from BROADSIDE |
+| `$59D4-$5AAB` | 216 B menu-music player code |
+| `$5AAC-$5CAC` | 513 B generated menu composition data |
+| `$5CAD-$5E0F` | 355 B currently unassigned after the loader |
 | `$5000-$5E0F` | podczas loadera: drugie LMS, ANTIC F linie 102–163 i ANTIC E linie 164–191, 3600 B; po przejściu dzielone na HUD charset i wolny ogon |
 | `$5E10-$73E9` | 5594 B relocated broadside/frontend/HUD/enemy runtime, including the bounded Game Over SCORE/TOP formatter |
 | `$73EA-$740F` | 38 B currently unassigned between resident broadside and transient staging |
-| `$7410-$780F` | przejściowy bufor stagingu starfield, maks. 1024 B; po rozpakowaniu ponownie wolny |
-| `$7810-$BFFF` | obecnie nieprzydzielone dla kolejnych resident systemów i assetów |
+| `$7410-$7A0F` | transient starfield/music staging buffer, maximum 1536 B; free again after unpacking |
+| `$7A10-$BFFF` | currently unassigned for later resident systems and assets |
 | `$C000-$FFFF` | ROM i sprzętowe rejestry I/O |
 
 PMG dla bazy `$3800`:
@@ -73,12 +76,12 @@ PMG dla bazy `$3800`:
 | `$3F00-$3FFF` | Player 3 — silnik gracza, `COLPM3=$28`; M3 dziedziczy ten kolor |
 
 Podczas loadera PMG i PMG DMA są wyłączone. Końcowa część strumienia
-LZ-10/5 and the loader display list temporarily occupy `$3800-$3FB9` and cannot be
+LZ-10/5 and the loader display list temporarily occupy `$3800-$3FD8` and cannot be
 użyta jako dodatkowy bufor. Pakowany strumień loadera leży pod
-`$3705-$3EEF`; the former starfield staging at `$3800-$3BBC` therefore overwrote its
+`$3724-$3F0E`; the former starfield staging at `$3800-$3BBC` therefore overwrote its
 końcową część przed dekodowaniem. Poprawiona sekwencja kopiuje pakowany
-starfield do oddzielnego bufora `$7410-$780F`; bieżące 989 B zajmuje
-`$7410-$77EC` i po 250 pełnych ramkach jest rozwijane do `$555A-$59D3`. Kod
+starfield/music tail to the separate `$7410-$7A0F` buffer; the current 1438 B
+occupies `$7410-$79AD` and expands after 250 complete frames to `$555A-$5CAC`. Code
 następnie wyłącza NMI i DMA oraz zeruje całe `$3800-$3FFF`; dopiero wtedy
 zakres otrzymuje role PMG.
 
@@ -118,12 +121,13 @@ między wierszami 20 B (ANTIC 7/6) i 40 B (ANTIC 4/2). Pozostałe ekrany używaj
 dolny scanline glifów HUD tworzy separator bez dodatkowego wiersza. Całość
 nadal ma 960 B. Wszystkie warianty mieszczą się w rezerwacji 1 KB.
 
-The current payload is 13,865 B: the fixed 8192 B block at `$2000-$3FFF`, a
-4684 B packed broadside tail, and a 989 B packed starfield tail. It occupies
-109 128-byte sectors with 87 B of final-sector padding. The XEX is 13,877 B
+The current payload is 14,314 B: the fixed 8192 B block at `$2000-$3FFF`, a
+4684 B packed broadside tail, and a 1438 B packed starfield/music tail. It occupies
+112 128-byte sectors with 22 B of final-sector padding. The XEX is 14,326 B
 including headers and RUNAD; the ATR remains the standard 92,176-byte image.
 
-Trudności nie dodają zero page: linker nadal raportuje 34 B `$0080-$00A1`.
+Menu music and difficulty do not add zero page: the linker still reports 34 B
+at `$0080-$00A1`.
 Dotychczasowy `$008A` pozostaje world akumulatorem, hull akumulator leży pod
 `$4E71`, a sesyjny wybór pod `$4E70`.
 Bezpośredni stan puli to dziewięć tablic po trzy bajty, sześć bajtów pointerów
@@ -158,8 +162,8 @@ oraz sześć masek jasnego core. Dwa równoczesne sloty wykorzystują 6 B pod
 PMG ani dynamicznej alokacji.
 
 The accepted compact-HUD checkpoint had a 12,906 B payload and 12,918 B XEX.
-The current candidate is 13,865 B and 13,877 B respectively; boot uses 109
-sectors with 87 B padding, while the ATR remains 92,176 B.
+The current candidate is 14,314 B and 14,326 B respectively; boot uses 112
+sectors with 22 B padding, while the ATR remains 92,176 B.
 Pula pod `$5400-$54C9` ma 202 B: dotychczasowe 196 B oraz po timerze, X i Y
 dla dwóch współdzielonych fighter explosions. Zero page pozostaje 34 B. Cztery tablice X/Y/
 lifetime i backing/pointery są stałe, bez alokacji dynamicznej.
@@ -195,9 +199,9 @@ slot zachowuje w istniejących `BROAD_PREV_Y/H` pierwszy kod i pozycję, a
 nieużywany po software-collision `BROAD_COLLISION` drugi kod dwóch sąsiednich
 komórek ANTIC 4. Dwa już istniejące glify (`base+18/+19`) dają 8×6 slug; D7 wybiera
 `COLPF2=$1E` dla Colonial albo `COLPF3=$46` dla Cylon. Relokowany runtime
-broadside occupies 5594/5632 B; relocated shared procedures remain in
-the separate 1146/2230 B starfield block. The packed tails are 4684 B
-i 989 B. `WARNING` i `IMPACT`
+broadside occupies 5594/5632 B; relocated shared procedures and menu music
+share the 1875/2230 B starfield block. The packed tails are 4684 B and 1438 B.
+`WARNING` i `IMPACT`
 korzystają z maskowych par M1–M3; M0 pozostaje wyłącznie zarezerwowane dla
 player weapon. Fighter fire używa 56 glifów fazowych: 36 dla Vipera jest
 kopiowanych, a 20 dla Raidera budowanych jednorazowo z kompaktowych masek.

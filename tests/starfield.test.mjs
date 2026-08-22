@@ -388,7 +388,7 @@ test("assembly erases overlays before scroll and renders them in stacking order"
 test("starfield relocation preserves broadside and protected finale memory", () => {
   assert.equal(manifest.starfieldRuntime.runAddress, 0x555a);
   assert.ok(manifest.starfieldRuntime.bytes <= manifest.starfieldRuntime.reservedBytes);
-  assert.ok(manifest.starfieldRuntime.packedBytes <= 0x400);
+  assert.ok(manifest.starfieldRuntime.packedBytes <= 0x600);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
   assert.ok(manifest.broadsideRuntime.bytes <= manifest.broadsideRuntime.reservedBytes);
   assert.ok(manifest.broadsideRuntime.runAddress + manifest.broadsideRuntime.bytes <= 0x7410);
@@ -413,7 +413,9 @@ test("starfield staging is disjoint from the packed loader and loader bitmap", (
   assert.equal(loaderEnd - loaderStart + 1, manifest.loaderScreen.packedBitmapBytes);
   assert.ok(loaderStart >= manifest.loadAddress);
   assert.ok(loaderEnd < manifest.broadsideRuntime.loadAddress);
-  assert.deepEqual([stagingStart, stagingEnd], [0x7410, 0x77ec]);
+  assert.equal(stagingStart, 0x7410);
+  assert.ok(stagingEnd < stagingStart + manifest.starfieldRuntime.stagingBytes);
+  assert.equal(stagingStart + manifest.starfieldRuntime.stagingBytes - 1, 0x7a0f);
   assert.equal(overlaps(stagingStart, stagingEnd, loaderStart, loaderEnd), false);
   assert.equal(overlaps(stagingStart, stagingEnd, bitmapStart, bitmapEnd), false);
   assert.ok(stagingStart >= manifest.broadsideRuntime.runAddress +

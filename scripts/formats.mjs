@@ -5,8 +5,8 @@ const ATR_MAGIC = 0x0296;
 const ATR_HEADER_SIZE = 16;
 const ATR_SECTOR_SIZE = 128;
 const ATR_SECTOR_COUNT = 720;
-const ACCEPTED_BROADSIDE_PAYLOAD_BYTES = 11941;
-const POST_BROADSIDE_FEATURE_PAYLOAD_LIMIT = 2048;
+const ACCEPTED_GAME_OVER_PAYLOAD_BYTES = 13865;
+const MENU_MUSIC_PAYLOAD_LIMIT = 1024;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -121,9 +121,8 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
   invariant(
-    boot.length - ACCEPTED_BROADSIDE_PAYLOAD_BYTES <=
-      POST_BROADSIDE_FEATURE_PAYLOAD_LIMIT,
-    "Post-broadside feature payload delta exceeds 2048 bytes",
+    boot.length - ACCEPTED_GAME_OVER_PAYLOAD_BYTES <= MENU_MUSIC_PAYLOAD_LIMIT,
+    "Menu-music feature payload delta exceeds 1024 bytes",
   );
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
     "Broadside relocation source must begin at $4000");

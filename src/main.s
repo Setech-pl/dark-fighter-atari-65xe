@@ -9,6 +9,7 @@
 .import __STARFIELD_RUN__
 
 .include "starfield.inc"
+.include "menu-music.inc"
 
 ; -----------------------------------------------------------------------------
 ; OS workspace and vectors
@@ -179,8 +180,15 @@ STARFIELD_STATE_END          = STAR_GENERATION_FLAGS+$01
 TOP_SCORE_BCD_LO             = STARFIELD_STATE_END
 TOP_SCORE_BCD_HI             = TOP_SCORE_BCD_LO+$01
 SESSION_SCORE_STATE_END      = TOP_SCORE_BCD_HI+$01
+MUSIC_ACTIVE                 = SESSION_SCORE_STATE_END
+MUSIC_ROW_TIMER              = MUSIC_ACTIVE+$01
+MUSIC_SEQUENCE_INDEX         = MUSIC_ROW_TIMER+$01
+MUSIC_PATTERN_ROW            = MUSIC_SEQUENCE_INDEX+$01
+MUSIC_CHANNEL_MASK           = MUSIC_PATTERN_ROW+$01
+MUSIC_TOKEN                  = MUSIC_CHANNEL_MASK+$01
+MUSIC_STATE_END              = MUSIC_TOKEN+$01
 
-.assert SESSION_SCORE_STATE_END <= $5000, error, "session score state exceeds reclaimed loader RAM"
+.assert MUSIC_STATE_END <= $5000, error, "session and music state exceed reclaimed loader RAM"
 
 .include "fighter-weapons.inc"
 
@@ -612,6 +620,7 @@ start:
     jsr silence_audio
     lda #$01
     sta sound_enabled           ; options default: SOUND ON
+    jsr music_init
     lda #DIFFICULTY_DEFAULT
     sta DIFFICULTY_SETTING      ; options default: MEDIUM
 .if ENEMY_REVIEW_HARNESS
@@ -759,6 +768,7 @@ frontend_loop:
     lda game_state
     cmp #STATE_MAIN_MENU
     bne :+
+    jsr music_tick
     jsr set_main_menu_palette      ; restore after the hint-row DLI
 :
     lda STICK0
@@ -991,6 +1001,13 @@ enter_game_over:
 
 enter_frontend_state:
     sta game_state
+    cmp #STATE_MAIN_MENU
+    beq @start_menu_music
+    jsr music_stop
+    jmp @music_ready
+@start_menu_music:
+    jsr music_start_menu
+@music_ready:
     lda #FRONTEND_DEFAULT_SELECTION
     sta frontend_selection
     lda #$00
@@ -1021,7 +1038,7 @@ enter_exited_state:
     sta DMACTL
     sta GRACTL
     sta NMIEN
-    jsr silence_audio
+    jsr music_stop
     jsr select_frontend_display
     jsr render_frontend_state
     jsr wait_frame_start
@@ -1448,7 +1465,7 @@ start_gameplay:
     sta GRACTL
     sta NMIEN
     sta gameplay_fire_gate
-    jsr silence_audio
+    jsr music_stop
     jsr clear_pmg
     jsr clear_screen
     jsr init_state
@@ -4090,6 +4107,138 @@ star_glyph_bytes:
     EMIT_STAR_GLYPHS
 
 .assert * - star_glyph_bytes = (STAR_NEAR_END-STAR_FAR_FIRST)*8, error, "star glyph byte count changed"
+
+; -----------------------------------------------------------------------------
+; Menu-only POKEY music. The fixed channel mask is explicit state so a future
+; gameplay score can reserve SFX channels without changing tick/stop semantics.
+
+music_player_start:
+music_init:
+    jmp music_stop
+
+music_start_menu:
+    jsr music_stop
+    lda sound_enabled
+    beq @done
+    lda #MUSIC_MENU_CHANNEL_MASK
+    sta MUSIC_CHANNEL_MASK
+    lda #$01
+    sta MUSIC_ACTIVE
+    sta MUSIC_ROW_TIMER          ; emit row zero on the next PAL frontend frame
+    jsr music_load_pattern
+@done:
+    rts
+
+music_stop:
+    lda #$00
+    ldx #(MUSIC_STATE_END-MUSIC_ACTIVE)-1
+@clear_state:
+    sta MUSIC_ACTIVE,x
+    dex
+    bpl @clear_state
+    jmp silence_audio
+
+; Called exactly once per frontend PAL frame while STATE_MAIN_MENU is active.
+; Most frames take the bounded timer-only path; one row is decoded every eight.
+music_tick:
+    lda MUSIC_ACTIVE
+    beq music_tick_done
+    dec MUSIC_ROW_TIMER
+    bne music_tick_done
+    lda #MUSIC_FRAMES_PER_ROW
+    sta MUSIC_ROW_TIMER
+    jsr music_render_row
+    inc MUSIC_PATTERN_ROW
+    lda MUSIC_PATTERN_ROW
+    cmp #MUSIC_PATTERN_ROWS
+    bcc music_tick_done
+    lda #$00
+    sta MUSIC_PATTERN_ROW
+    inc MUSIC_SEQUENCE_INDEX
+    lda MUSIC_SEQUENCE_INDEX
+    cmp #MUSIC_SEQUENCE_LENGTH
+    bcc music_load_pattern
+    lda #$00
+    sta MUSIC_SEQUENCE_INDEX
+music_load_pattern:
+    ldx MUSIC_SEQUENCE_INDEX
+    lda music_sequence,x
+    tax
+    lda music_pattern_lo,x
+    sta music_pattern_read+1
+    lda music_pattern_hi,x
+    sta music_pattern_read+2
+music_tick_done:
+    rts
+
+music_render_row:
+    ldy #$00
+    jsr music_read_token
+    ldx #$00
+    jsr music_apply_token
+    ldy #$01
+    jsr music_read_token
+    ldx #$02
+    jsr music_apply_token
+    ldy #$02
+    jsr music_read_token
+    ldx #$04
+    jsr music_apply_token
+    ldy #$03
+    jsr music_read_token
+    ldx #$06
+    jsr music_apply_token
+
+    clc
+    lda music_pattern_read+1
+    adc #$04
+    sta music_pattern_read+1
+    bcc :+
+    inc music_pattern_read+2
+:
+    rts
+
+music_read_token:
+music_pattern_read:
+    lda $FFFF,y                  ; self-modified to the current pattern row
+    rts
+
+; A is HOLD, REST, or an instrument:pitch token. X is the even POKEY register
+; offset (0/2/4/6), which also indexes the sparse channel-mask table.
+music_apply_token:
+    sta MUSIC_TOKEN
+    lda music_channel_masks,x
+    and MUSIC_CHANNEL_MASK
+    bne @owned
+@silence:
+    lda #$00
+    sta AUDC1,x
+    rts
+@owned:
+    lda MUSIC_TOKEN
+    beq @done                    ; HOLD keeps the current AUDF/AUDC pair
+    cmp #MUSIC_TOKEN_REST
+    beq @silence
+    pha
+    and #$0F
+    tay
+    lda music_frequency_table,y
+    sta AUDF1,x
+    pla
+    lsr
+    lsr
+    lsr
+    lsr
+    tay
+    lda music_control_table,y
+    sta AUDC1,x
+@done:
+    rts
+
+music_player_end:
+
+EMIT_MENU_MUSIC_DATA
+
 .assert * - __STARFIELD_RUN__ <= $08B6, error, "starfield runtime exceeds the pre-broadside gap"
 
 .segment "BROADSIDE"
@@ -4744,9 +4893,13 @@ update_sound:
 
 silence_audio:
     lda #$00
+    sta AUDF1
     sta AUDC1
+    sta AUDF2
     sta AUDC2
+    sta AUDF3
     sta AUDC3
+    sta AUDF4
     sta AUDC4
     sta AUDCTL
     sta CAPITAL_EXPLOSION_SOUND_TIMER

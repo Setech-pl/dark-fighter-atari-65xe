@@ -23,6 +23,10 @@
 - przejście do main menu jest automatyczne i nie pokazuje częściowo
   przebudowanego charsetu ani ekranu;
 - menu nie uruchamia gameplayu samoczynnie;
+- the loader remains silent; the original four-voice POKEY score starts only
+  when the main menu appears and loops without an audible gap after about 30.72 seconds;
+- the menu score reads as a low drone, heavy ritual drums, a restrained military
+  pulse, and a sparse minor/Dorian motif without reproducing an existing melody;
 - `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` są czytelne i występują
   w tej kolejności, a domyślny marker wskazuje `START GAME`;
 - duży, czytelny `DARK FIGHTER` zajmuje górną część ekranu; kątowy hangar i
@@ -44,6 +48,10 @@
   oraz ekranie końcowym i wraca dopiero po ponownym wejściu do main menu;
 - przy SOUND OFF strzał, trafienie i tło silnika są niesłyszalne, kanały nie
   zostawiają zawieszonego tonu, a obraz i sterowanie zachowują timing;
+- entering `OPTIONS`, `TOP SCORES`, `EXIT`, Game Over, or gameplay stops the
+  menu score immediately; returning from Game Over restarts it from the intro;
+- `START GAME` leaves no sustained menu tone, and joystick/FIRE response remains
+  one PAL-frame poll while the score is active;
 - `TOP SCORES` pokazuje dziesięć wierszy `01`–`10`; po zdobyciu punktów
   pierwszy wiersz pokazuje sesyjny TOP w tej samej postaci cyfr co SCORE;
   śmierć i respawn zachowują SCORE, a dopiero ponowny `START GAME` zeruje

@@ -7,8 +7,8 @@
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 109,
-  "payloadBytes": 13865,
+  "bootSectors": 112,
+  "payloadBytes": 14314,
   "broadsideRuntime": {
     "loadAddress": 16384,
     "runAddress": 24080,
@@ -20,11 +20,11 @@
   "starfieldRuntime": {
     "loadAddress": 22016,
     "runAddress": 21850,
-    "bytes": 1146,
+    "bytes": 1875,
     "reservedBytes": 2230,
-    "packedBytes": 989,
+    "packedBytes": 1438,
     "stagingAddress": 29712,
-    "stagingBytes": 1024,
+    "stagingBytes": 1536,
     "compression": "LZ-10/5"
   },
   "loaderScreen": {
@@ -352,18 +352,53 @@
     "runtimeStateBytes": 102,
     "pmgBytes": 0
   },
+  "menuMusic": {
+    "source": "assets/music/menu-theme.json",
+    "sourceSha256": "28ee31cbe1592c400358571dfa592606c2147887ebd3486778fab41efc61c4f9",
+    "title": "Fleet in Shadow",
+    "originalComposition": true,
+    "targetFrameHz": 50,
+    "framesPerRow": 8,
+    "rowsPerPattern": 16,
+    "patternCount": 7,
+    "sequencePatterns": 12,
+    "loopFrames": 1536,
+    "loopSeconds": 30.72,
+    "channelAllocation": [
+      {
+        "channel": 1,
+        "role": "low drone"
+      },
+      {
+        "channel": 2,
+        "role": "heavy ritual drum"
+      },
+      {
+        "channel": 3,
+        "role": "military pulse and metallic accent"
+      },
+      {
+        "channel": 4,
+        "role": "sparse Dorian motif"
+      }
+    ],
+    "channelMask": 15,
+    "runtimeCodeBytes": 216,
+    "runtimeDataBytes": 513,
+    "runtimeStateBytes": 6
+  },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 13865,
-      "sha256": "cadf1438de54dc7fee86f89f82671406c3b418360e4dfc49818be4eaadb21a24"
+      "bytes": 14314,
+      "sha256": "42d25de7ea403cd39962258a2c0f7b5344351ca7e913790b2a69c29b5f5cdd93"
     },
     "dark-fighter.xex": {
-      "bytes": 13877,
-      "sha256": "c4630ca4e40a0e8b80bfaeab412376bcbf90a0317aa977d755460ebca48cce1d"
+      "bytes": 14326,
+      "sha256": "b25a160fb20c5cf2ac5d043f78cd4ce2bd689cd62ec4e12a824a07199e749fd8"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "1fdfbb51377dd99fd5a67c905d012a2d7203a2ad3650cb6e145b4f88491332c7"
+      "sha256": "c5ef59b7f36b429bb1d05c7b14cd92911b440a8f8ad1799736f0ebb61f166f4e"
     }
   }
 }

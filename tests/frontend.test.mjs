@@ -154,7 +154,7 @@ test("menu actions use explicit transitions and one gameplay reset path", () => 
 
   const startGameplay = routine("start_gameplay");
   for (const resetCall of [
-    "silence_audio",
+    "music_stop",
     "clear_pmg",
     "clear_screen",
     "init_state",
@@ -173,7 +173,9 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   assert.match(routine("toggle_sound"), /eor #\$01\s+sta sound_enabled/);
   assert.match(routine("toggle_sound"), /jsr silence_audio/);
   const silence = routine("silence_audio");
-  for (const register of ["AUDC1", "AUDC2", "AUDC3", "AUDC4", "AUDCTL"]) {
+  for (const register of [
+    "AUDF1", "AUDC1", "AUDF2", "AUDC2", "AUDF3", "AUDC3", "AUDF4", "AUDC4", "AUDCTL",
+  ]) {
     assert.match(silence, new RegExp(`sta ${register}`));
   }
   assert.match(routine("allocate_viper_projectile"), /lda sound_enabled\s+beq @accepted/);
@@ -332,7 +334,7 @@ test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => 
     0,
   );
   const exited = routine("enter_exited_state");
-  assert.match(exited, /jsr silence_audio/);
+  assert.match(exited, /jsr music_stop/);
   assert.match(exited, /@wait:\s+jsr wait_frame\s+jmp @wait/);
   assert.match(source, /\.byte "DARK FIGHTER ENDED",0/);
   assert.match(source, /\.byte "PRESS RESET TO RESTART",0/);

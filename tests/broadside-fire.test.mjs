@@ -111,6 +111,20 @@ function routine(name, next) {
 }
 
 function xexBytesAt(address, length) {
+  const broadside = manifest.broadsideRuntime;
+  if (address >= broadside.runAddress && address + length <= broadside.runAddress + broadside.bytes) {
+    return broadsideRuntime.subarray(
+      address - broadside.runAddress,
+      address - broadside.runAddress + length,
+    );
+  }
+  const starfield = manifest.starfieldRuntime;
+  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
+    return starfieldRuntime.subarray(
+      address - starfield.runAddress,
+      address - starfield.runAddress + length,
+    );
+  }
   let offset = 0;
   while (offset < xex.length) {
     if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
@@ -124,20 +138,6 @@ function xexBytesAt(address, length) {
       return xex.subarray(offset + address - start, offset + address - start + length);
     }
     offset += bytes;
-  }
-  const runtime = manifest.broadsideRuntime;
-  if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
-    return broadsideRuntime.subarray(
-      address - runtime.runAddress,
-      address - runtime.runAddress + length,
-    );
-  }
-  const starfield = manifest.starfieldRuntime;
-  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
-    return starfieldRuntime.subarray(
-      address - starfield.runAddress,
-      address - starfield.runAddress + length,
-    );
   }
   assert.fail(`XEX address $${address.toString(16)} is not in a segment`);
 }
@@ -231,12 +231,12 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(packed), runtime);
   assert.deepEqual(packBroadsideLzss(runtime), packed);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
-  assert.ok(manifest.payloadBytes - 11941 <= 2048);
+  assert.ok(manifest.payloadBytes - 13865 <= 1024);
   const starRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
   const starPacked = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime-packed.bin"));
   assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
   assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
-  assert.ok(starPacked.length <= 0x400);
+  assert.ok(starPacked.length <= 0x600);
   assert.match(routine("start", "unpack_broadside_runtime"),
     /jsr unpack_broadside_runtime[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });

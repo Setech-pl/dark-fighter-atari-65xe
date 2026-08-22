@@ -308,7 +308,7 @@ test("enemy foundation stays inside the accepted payload and relocated-memory ga
     [manifest.enemyRoster.runtimeArtBytes, manifest.enemyRoster.descriptorBytes],
     [57, 33],
   );
-  assert.ok(manifest.payloadBytes - 11941 <= 2048);
+  assert.ok(manifest.payloadBytes - 13865 <= 1024);
   assert.ok(manifest.broadsideRuntime.bytes <= manifest.broadsideRuntime.reservedBytes);
   assert.equal(manifest.broadsideRuntime.reservedBytes, 0x1600);
   assert.equal(crypto.createHash("sha256").update(asset.bodyBytes).digest("hex").length, 64);
