@@ -39,6 +39,9 @@ ekran gameplayu. Obecnie zawiera:
 - czyste przejście z loadera do menu, a następnie przez `START GAME` do
   istniejącego gameplayu, bez kosztu loadera w gameplay main loop lub
   gameplay VBI.
+- a complete last-life Game Over lifecycle after the 24-frame Viper explosion,
+  with saturated `LIFE 0`, frozen gameplay, final `SCORE`, session `TOP SCORE`,
+  and release-gated `FIRE TO CONTINUE` back to the main menu.
 
 ## Docelowa gra
 

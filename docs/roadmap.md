@@ -177,6 +177,18 @@ nowych grafik, nowych pocisków, level loadera i overlayów.
 - rozdzielenie aktywnej gry od animacji/odliczania zniszczenia;
 - zachowanie startu oraz przejść maszyny stanów.
 
+### Implemented checkpoint — Game Over
+
+- terminal `PLAYER_GAME_OVER` is entered once after the existing 24-frame
+  death explosion, with `LIFE` saturated at zero;
+- the transition leaves the gameplay loop, stopping control, weapons, damage,
+  collision, spawning, world updates, and scoring;
+- the resident frontend charset renders `GAME OVER`, final `SCORE`, session
+  `TOP SCORE`, and `FIRE TO CONTINUE` without a bitmap allocation;
+- held FIRE is ignored until release, then a fresh press returns to main menu;
+- Game Over adds no state RAM and no steady-frame, VBI, or DLI work. The
+  one-time packed-BCD formatter costs approximately 216 cycles with DMA off.
+
 ### Zależności
 
 Kamienie 1–3 i zaakceptowany format player/entity state.
@@ -503,8 +515,8 @@ procedurami HUD, sektora, eksplozji, POKEY, fundamentem rosteru i pierwszym
 profilem Raider burst, korektą transition i wspólną fighter explosion zajmował
 w zaakceptowanym checkpointcie 5630/5632 B w odzyskanym RAM, a jego
 4714-bajtowy pakowany ogon dawał payload 12 906 B. Starfield candidate przenosi
-176 B wspólnych procedur z tego bloku bez zmiany ich zachowania. Bieżący speed
-pass z obsługą sesyjnego TOP zajmuje 5525/5632 B BROADSIDE oraz 1146/2230 B
+176 B wspólnych procedur z tego bloku bez zmiany ich zachowania. The current
+Game Over checkpoint occupies 5594/5632 B in BROADSIDE and 1146/2230 B in
 STARFIELD. Sam
 zaakceptowany broadside przed rosterem zajmował 4605/3749 B i
 payload 11 941 B. Rozdzielenie scrollu
@@ -575,7 +587,7 @@ ma delta 0. Ostateczna stabilność granicy trybów wymaga Atari800 i 65XE PAL.
 
 Bez nowych weapons, enemies, debris, repair drone lub zmian salwy.
 
-## 11A. Dwuwarstwowy PAL starfield — kandydat do testu ownera
+## 11A. Dwuwarstwowy PAL starfield — ukończone i zweryfikowane przez ownera
 
 ### Zakres
 
@@ -594,8 +606,9 @@ Bez nowych weapons, enemies, debris, repair drone lub zmian salwy.
 Starfield dodaje 48 B glyphów, 102 B własnego stanu oraz współdzieli blok bez
 zero page z obsługą TOP; 1146 B kodu/tabel leży pod `$555A-$59D3`, a 2 B
 sesyjnego TOP pod `$4ED7-$4ED8`. Część bloku odzyskuje 176 B z wcześniej
-prawie pełnego BROADSIDE. PMG delta wynosi 0. Pakowany ogon ma 989 B,
-payload 13 829 B, XEX 13 841 B, ATR 92 176 B. Bounded far pass skanuje
+prawie pełnego BROADSIDE. PMG delta wynosi 0. The accepted starfield checkpoint
+had a 989 B packed tail, 13,829 B payload, 13,841 B XEX, and 92,176 B ATR.
+Bounded far pass skanuje
 24 rekordy wyłącznie przy zdarzeniu warstwy, nie cały ekran co ramkę; source
 bound pozostawia około 1270 cykli do konserwatywnej ramki PAL 35 500.
 

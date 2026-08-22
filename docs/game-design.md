@@ -404,11 +404,20 @@ emulatorowego RESET. Bootowalny ATR nie ma uniwersalnego desktopu ani DOS-u,
 do którego można bezpiecznie wrócić, dlatego EXIT nie skacze do `DOSVEC` i nie
 wywołuje nieudokumentowanej procedury OS.
 
-Docelowa maszyna gameplayu nadal ma objąć aktywną grę, zniszczenie gracza,
-game over oraz restart. Wejście w każdy stan ma być jawne i deterministyczne;
-zniszczenie nie może być wyłącznie krótką zmianą koloru jak w bieżącym
-vertical slice. Powrót z gameplayu do menu zostanie połączony z tymi stanami,
-a nie dodany jako niezależny skrót w bieżącym milestone.
+The implemented player lifecycle is
+`ALIVE → DYING → RESPAWN_INVULNERABLE` or
+`ALIVE → DYING → GAME_OVER`. `DYING` retains the existing 24-frame fighter
+explosion. Lethal damage decrements `LIFE` once with a zero floor. When the
+last life is lost, the transition enters `GAME_OVER` exactly once after the
+final explosion frame and leaves the gameplay loop, so player control, both
+weapons, damage, collision, enemy spawning, world updates, and scoring stop.
+
+The text-mode Game Over screen uses the resident frontend charset and shows
+`GAME OVER`, the final six-column `SCORE`, the session `TOP SCORE`, and
+`FIRE TO CONTINUE`. Entry clears the frontend input gate. Held FIRE is ignored
+until the button is released; a later fresh press returns to the main menu.
+The final score remains intact on this screen and in the menu. Only a new
+`START GAME` resets `SCORE`; session `TOP` persists.
 
 **OPTIONAL BACKLOG**
 

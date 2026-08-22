@@ -803,7 +803,7 @@ test("impact and offscreen paths erase a slot, while zero health enters guarded 
   assert.match(routine("apply_broadside_player_damage", "update_hud_status"),
     /PLAYER_DYING[\s\S]+dec PLAYER_LIVES[\s\S]+SHARED_FIGHTER_EXPLOSION_TOTAL[\s\S]+jsr erase_bullet/);
   assert.match(routine("main_loop", "wait_frame"),
-    /jsr update_player_death[\s\S]+jsr clear_pmg[\s\S]+jsr enter_main_menu[\s\S]+jmp frontend_loop/);
+    /jsr update_player_death[\s\S]+jsr clear_pmg[\s\S]+jsr silence_audio[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop/);
 });
 
 test("death decrements one life and respawns atomically at canonical corridor center", () => {
@@ -926,7 +926,7 @@ test("expiry clears captured and hardware collision latches before restoring ALI
     0xac, 0x4e]));
 });
 
-test("last life reaches the existing menu game-over path without respawning", () => {
+test("last life reaches GAME OVER after the full death animation without respawning", () => {
   const state = createBroadsideState(asset);
   state.lives = 1;
   state.health = 20;

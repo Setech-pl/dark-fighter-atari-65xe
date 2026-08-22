@@ -58,7 +58,7 @@ function routine(label) {
   return lines.slice(start + 1, end).join("\n");
 }
 
-test("boot enters an explicit seven-state frontend/game state machine", () => {
+test("boot enters an explicit eight-state frontend/game state machine", () => {
   assert.match(source, /STATE_LOADER\s*=\s*0/);
   assert.match(source, /STATE_MAIN_MENU\s*=\s*1/);
   assert.match(source, /STATE_OPTIONS\s*=\s*2/);
@@ -66,6 +66,7 @@ test("boot enters an explicit seven-state frontend/game state machine", () => {
   assert.match(source, /STATE_EXIT_CONFIRM\s*=\s*4/);
   assert.match(source, /STATE_EXITED\s*=\s*5/);
   assert.match(source, /STATE_GAMEPLAY\s*=\s*6/);
+  assert.match(source, /STATE_GAME_OVER\s*=\s*7/);
   assert.match(source, /jsr show_loader[\s\S]+jsr enter_main_menu\s+jmp frontend_loop/);
 });
 
@@ -229,7 +230,8 @@ test("TOP SCORES renders ten rows with the session record first and returns only
   assert.match(routine("draw_top_score_rows"), /jmp draw_session_top_score/);
   assert.match(source,
     /draw_session_top_score:[\s\S]+TOP_SCORE_BCD_HI[\s\S]+TOP_SCORE_BCD_LO[\s\S]+CH_FRONT_ZERO/);
-  assert.match(routine("handle_top_scores_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
+  assert.match(routine("handle_top_scores_input"), /jmp handle_game_over_input/);
+  assert.match(routine("handle_game_over_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
   assert.doesNotMatch(source, /jsr SIOV|initials_entry|save_high_scores/i);
 });
 

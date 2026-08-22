@@ -330,6 +330,7 @@ STATE_TOP_SCORES   = 3
 STATE_EXIT_CONFIRM = 4
 STATE_EXITED       = 5
 STATE_GAMEPLAY     = 6
+STATE_GAME_OVER    = 7
 
 FRONTEND_DEFAULT_SELECTION = 0
 
@@ -368,6 +369,9 @@ MAIN_MENU_DIVIDER_OFFSET = 700
 MAIN_MENU_HINT_OFFSET = 740
 MAIN_MENU_BOTTOM_OFFSET = 780
 MAIN_MENU_SCREEN_BYTES = 820
+
+GAME_OVER_SCORE_DIGITS = SCREEN+9*40+22
+GAME_OVER_TOP_DIGITS   = SCREEN+12*40+24
 
 MAIN_MENU_HANGAR_OUTER_LAST = 20
 MAIN_MENU_HANGAR_MID_LAST = 16
@@ -787,6 +791,8 @@ dispatch_frontend_input:
     beq handle_top_scores_input
     cmp #STATE_EXIT_CONFIRM
     beq handle_exit_input
+    cmp #STATE_GAME_OVER
+    beq handle_game_over_input
     rts
 
 handle_main_menu_input:
@@ -871,6 +877,9 @@ handle_options_input_resident:
 .segment "CODE"
 
 handle_top_scores_input:
+    jmp handle_game_over_input
+
+handle_game_over_input:
     lda TRIG0
     bne @done
     jmp enter_main_menu
@@ -974,6 +983,11 @@ enter_top_scores:
 
 enter_exit_confirmation:
     lda #STATE_EXIT_CONFIRM
+    bne enter_frontend_state
+
+enter_game_over:
+    lda #STATE_GAME_OVER
+    bne enter_frontend_state
 
 enter_frontend_state:
     sta game_state
@@ -1098,6 +1112,10 @@ render_frontend_state:
     cmp #STATE_TOP_SCORES
     bne :+
     jmp draw_top_score_rows
+:
+    cmp #STATE_GAME_OVER
+    bne :+
+    jmp draw_game_over_scores
 :
     cmp #STATE_EXITED
     beq @done
@@ -1500,7 +1518,7 @@ main_loop:
     bcc @lifecycle_ready
     jsr clear_pmg
     jsr silence_audio
-    jsr enter_main_menu
+    jsr enter_game_over
     jmp frontend_loop
 @lifecycle_ready:
     lda PLAYER_LIFECYCLE
@@ -3465,6 +3483,57 @@ draw_top_score_bcd_byte:
     inx
     rts
 
+.segment "BROADSIDE"
+
+; The static Game Over record supplies two leading zeroes for each six-column
+; value. These two bounded formatters replace only the four live BCD digits.
+draw_game_over_scores:
+    ldx #$00
+    lda score_bcd_hi
+    jsr draw_game_over_score_bcd_byte
+    lda score_bcd_lo
+    jsr draw_game_over_score_bcd_byte
+
+    ldx #$00
+    lda TOP_SCORE_BCD_HI
+    jsr draw_game_over_top_bcd_byte
+    lda TOP_SCORE_BCD_LO
+draw_game_over_top_bcd_byte:
+    pha
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc #CH_FRONT_ZERO
+    sta GAME_OVER_TOP_DIGITS,x
+    inx
+    pla
+    and #$0F
+    clc
+    adc #CH_FRONT_ZERO
+    sta GAME_OVER_TOP_DIGITS,x
+    inx
+    rts
+
+draw_game_over_score_bcd_byte:
+    pha
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc #CH_FRONT_ZERO
+    sta GAME_OVER_SCORE_DIGITS,x
+    inx
+    pla
+    and #$0F
+    clc
+    adc #CH_FRONT_ZERO
+    sta GAME_OVER_SCORE_DIGITS,x
+    inx
+    rts
+
 .segment "STARFIELD"
 
 player_contacts_enemy:
@@ -4695,6 +4764,7 @@ hud_ascii:
 frontend_screen_data:
     .word main_menu_screen_data, options_screen_data, top_scores_screen_data
     .word exit_screen_data, ended_screen_data
+    .word ended_screen_data, game_over_screen_data ; gameplay is never rendered here
 
 raider_post_burst_frames:
     .byte RAIDER_POST_BURST_EASY,RAIDER_POST_BURST_MEDIUM,RAIDER_POST_BURST_HARD
@@ -4938,6 +5008,17 @@ ended_screen_data:
     .byte "PRESS RESET TO RESTART",0
     .byte $FF
 
+game_over_screen_data:
+    .word SCREEN+4*40+15
+    .byte "GAME OVER",0
+    .word SCREEN+9*40+14
+    .byte "SCORE 000000",0
+    .word SCREEN+12*40+12
+    .byte "TOP SCORE 000000",0
+    .word SCREEN+19*40+12
+    .byte "FIRE TO CONTINUE",0
+    .byte $FF
+
 ; Main-menu ANTIC 6 rows, then ANTIC 2 options and exit choices.
 frontend_marker_positions:
     .word SCREEN+MAIN_MENU_OPTION_0_OFFSET+7
@@ -4948,7 +5029,7 @@ frontend_marker_positions:
     .word SCREEN+13*40+12, SCREEN+13*40+21
 
 frontend_screen_records_end:
-    .assert frontend_screen_records_end - frontend_screen_records = 255, error, "frontend screen data size changed"
+    .assert frontend_screen_records_end - frontend_screen_records = 321, error, "frontend screen data size changed"
 
 ; Packed 32-row maps are expanded once to $4C00-$4E3F. Metadata remains
 ; resident and is the contract for broadside firing/collision in stage 2.

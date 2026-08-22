@@ -8,13 +8,13 @@
   "startAddress": 8222,
   "bootInitAddress": 8221,
   "bootSectors": 109,
-  "payloadBytes": 13829,
+  "payloadBytes": 13865,
   "broadsideRuntime": {
     "loadAddress": 16384,
     "runAddress": 24080,
-    "bytes": 5525,
+    "bytes": 5594,
     "reservedBytes": 5632,
-    "packedBytes": 4648,
+    "packedBytes": 4684,
     "compression": "LZ-10/5"
   },
   "starfieldRuntime": {
@@ -354,16 +354,16 @@
   },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 13829,
-      "sha256": "cdcdebf4349ed3b7109b0d141a154782c59f86213912e8ac5427ddc4f799d587"
+      "bytes": 13865,
+      "sha256": "cadf1438de54dc7fee86f89f82671406c3b418360e4dfc49818be4eaadb21a24"
     },
     "dark-fighter.xex": {
-      "bytes": 13841,
-      "sha256": "d9adabd8e6c9a9181d457d74f51cf74f5dde61511139183b0107301d5ffdb03b"
+      "bytes": 13877,
+      "sha256": "c4630ca4e40a0e8b80bfaeab412376bcbf90a0317aa977d755460ebca48cce1d"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "39807bf11b716373bbee374afc99ebadc20548e4935b664263cf124635e438b2"
+      "sha256": "1fdfbb51377dd99fd5a67c905d012a2d7203a2ad3650cb6e145b4f88491332c7"
     }
   }
 }

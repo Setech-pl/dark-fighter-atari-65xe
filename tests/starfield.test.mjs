@@ -410,7 +410,9 @@ test("starfield staging is disjoint from the packed loader and loader bitmap", (
 
   assert.ok(stagingConstant);
   assert.equal(Number.parseInt(stagingConstant[1], 16), stagingStart);
-  assert.deepEqual([loaderStart, loaderEnd], [0x36ab, 0x3e95]);
+  assert.equal(loaderEnd - loaderStart + 1, manifest.loaderScreen.packedBitmapBytes);
+  assert.ok(loaderStart >= manifest.loadAddress);
+  assert.ok(loaderEnd < manifest.broadsideRuntime.loadAddress);
   assert.deepEqual([stagingStart, stagingEnd], [0x7410, 0x77ec]);
   assert.equal(overlaps(stagingStart, stagingEnd, loaderStart, loaderEnd), false);
   assert.equal(overlaps(stagingStart, stagingEnd, bitmapStart, bitmapEnd), false);
