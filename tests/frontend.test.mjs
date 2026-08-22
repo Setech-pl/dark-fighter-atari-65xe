@@ -58,7 +58,7 @@ function routine(label) {
   return lines.slice(start + 1, end).join("\n");
 }
 
-test("boot enters an explicit eight-state frontend/game state machine", () => {
+test("boot enters an explicit ten-state frontend/game state machine", () => {
   assert.match(source, /STATE_LOADER\s*=\s*0/);
   assert.match(source, /STATE_MAIN_MENU\s*=\s*1/);
   assert.match(source, /STATE_OPTIONS\s*=\s*2/);
@@ -67,6 +67,8 @@ test("boot enters an explicit eight-state frontend/game state machine", () => {
   assert.match(source, /STATE_EXITED\s*=\s*5/);
   assert.match(source, /STATE_GAMEPLAY\s*=\s*6/);
   assert.match(source, /STATE_GAME_OVER\s*=\s*7/);
+  assert.match(source, /STATE_PAUSED\s*=\s*8/);
+  assert.match(source, /STATE_PAUSE_QUIT_CONFIRM\s*=\s*9/);
   assert.match(source, /jsr show_loader[\s\S]+jsr enter_main_menu\s+jmp frontend_loop/);
 });
 
@@ -83,7 +85,7 @@ test("main menu labels are exact, ordered, and default to START GAME", () => {
     ["DARK FIGHTER", 4, 0],
   );
   assert.equal(frontend.defaultSelection, 0);
-  assert.equal(frontend.markerAddresses.length, 9);
+  assert.equal(frontend.markerAddresses.length, 13);
 });
 
 test("frontend uses distinct clean 6x7 glyphs within ANTIC 6/7 indices", () => {
@@ -187,7 +189,7 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   );
 });
 
-test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => {
+test("OPTIONS persists GAME MUSIC and a MEDIUM-default difficulty", () => {
   const constants = readFrontendGraphicsSource(source).constants;
   const difficultyAddress = constants.get("DIFFICULTY_SETTING");
   assert.equal(difficultyAddress, 0x4e70);
@@ -196,10 +198,11 @@ test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => 
       constants.get("DIFFICULTY_HARD"), constants.get("DIFFICULTY_DEFAULT")],
     [0, 1, 2, 1],
   );
-  assert.match(source, /options_screen_data:[\s\S]+"SOUND: OFF"[\s\S]+"DIFFICULTY: MEDIUM"[\s\S]+"BACK"/);
+  assert.match(source,
+    /options_screen_data:[\s\S]+"SOUND: OFF"[\s\S]+"GAME MUSIC: OFF"[\s\S]+"DIFFICULTY: MEDIUM"[\s\S]+"BACK"/);
   assert.match(routine("handle_options_input"), /jmp handle_options_input_resident/);
   assert.match(routine("handle_options_input_resident"),
-    /ldx #\$02[\s\S]+beq @sound_row[\s\S]+beq @difficulty_row[\s\S]+jmp enter_main_menu/);
+    /ldx #\$03[\s\S]+beq @sound_row[\s\S]+beq @game_music_row[\s\S]+beq @difficulty_row[\s\S]+jmp enter_main_menu/);
   assert.match(routine("handle_options_input_resident"),
     /and #\$04[\s\S]+select_previous_difficulty[\s\S]+and #\$08[\s\S]+select_next_difficulty/);
   assert.match(routine("select_previous_difficulty"),
@@ -208,7 +211,7 @@ test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => 
     /cmp #DIFFICULTY_HARD[\s\S]+lda #DIFFICULTY_EASY[\s\S]+adc #\$01/);
   assert.match(routine("set_difficulty"), /sta DIFFICULTY_SETTING[\s\S]+jmp draw_difficulty_value/);
   assert.match(routine("render_frontend_state"),
-    /jsr draw_sound_value[\s\S]+jsr draw_difficulty_value[\s\S]+jmp update_frontend_marker/);
+    /jsr draw_sound_value[\s\S]+jsr draw_game_music_value[\s\S]+jsr draw_difficulty_value[\s\S]+jmp update_frontend_marker/);
 
   const startBytes = readXexBytes(labels.get("start"), 160);
   assert.notEqual(startBytes.indexOf(Buffer.from([

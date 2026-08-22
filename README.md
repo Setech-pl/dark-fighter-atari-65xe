@@ -42,6 +42,8 @@ ekran gameplayu. Obecnie zawiera:
 - a complete last-life Game Over lifecycle after the 24-frame Viper explosion,
   with saturated `LIFE 0`, frozen gameplay, final `SCORE`, session `TOP SCORE`,
   and release-gated `FIRE TO CONTINUE` back to the main menu.
+- a physical-OPTION pause lifecycle with frozen simulation, release-gated
+  `RESUME`, synchronized `GAME MUSIC: ON/OFF`, and confirmed `QUIT TO MENU`.
 
 ## Docelowa gra
 
@@ -151,6 +153,8 @@ XEX nie tworzy mapowania wejścia.
 6. Sprawdź nawigację menu, ekrany podrzędne i uruchomienie gry przez
    `START GAME`.
 7. Sprawdź ruch we wszystkich kierunkach oraz FIRE w gameplayu.
+8. Press physical `OPTION`, verify the PAUSED menu and frozen world, then test
+   quick resume, GAME MUSIC switching, and confirmed QUIT TO MENU.
 
 Emulator jest koniecznym, ale niewystarczającym testem. Procedura raportowania
 real hardware znajduje się w

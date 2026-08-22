@@ -985,7 +985,7 @@ export function readFrontendGraphicsSource(source) {
     "frontend_marker_positions",
     graphics.constants,
   );
-  requireLength("frontend_marker_positions", markerBytes, 18);
+  requireLength("frontend_marker_positions", markerBytes, 26);
 
   const markerAddresses = [];
   for (let offset = 0; offset < markerBytes.length; offset += 2) {

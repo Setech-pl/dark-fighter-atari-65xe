@@ -251,7 +251,7 @@ test("assembled ANTIC 2 HUD keeps independent live score, life, and hull fields"
 
   const startGameplay = readXexBytes(
     labels.get("start_gameplay"),
-    labels.get("main_loop") - labels.get("start_gameplay"),
+    labels.get("start_gameplay_end") - labels.get("start_gameplay"),
   );
   const jsr = (address) => Buffer.from([0x20, address & 0xff, address >>> 8]);
   assert.notEqual(startGameplay.indexOf(jsr(labels.get("update_score_display"))), -1);

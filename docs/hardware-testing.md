@@ -23,10 +23,12 @@
 - przejście do main menu jest automatyczne i nie pokazuje częściowo
   przebudowanego charsetu ani ekranu;
 - menu nie uruchamia gameplayu samoczynnie;
-- the loader remains silent; the original four-voice POKEY score starts only
-  when the main menu appears and loops without an audible gap after about 30.72 seconds;
-- the menu score reads as a low drone, heavy ritual drums, a restrained military
-  pulse, and a sparse minor/Dorian motif without reproducing an existing melody;
+- the loader remains silent; the clean cinematic four-voice POKEY score starts
+  only when the main menu appears and loops without an audible gap after about
+  30.72 seconds;
+- the menu score reads as a gated low drone, restrained ritual drums, short
+  metallic noise, and a clear minor/Dorian motif without continuous buzzing or
+  reproducing an existing melody;
 - `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` są czytelne i występują
   w tej kolejności, a domyślny marker wskazuje `START GAME`;
 - duży, czytelny `DARK FIGHTER` zajmuje górną część ekranu; kątowy hangar i
@@ -41,9 +43,10 @@
 - pojedyncze wychylenie UP/DOWN przesuwa marker dokładnie raz, wybór zawija się
   między pierwszą i ostatnią pozycją, a trzymanie kierunku nie autorepeatuje;
 - FIRE wybiera dokładnie raz i wymaga puszczenia przed kolejną akcją;
-- `OPTIONS` pozwala zmienić `SOUND: ON/OFF`, a na osobnym wierszu LEFT/RIGHT
-  zawija `DIFFICULTY` przez `EASY/MEDIUM/HARD`; domyślne `MEDIUM`, oba wybory
-  pozostają zachowane po wyjściu przez `BACK` i ponownym wejściu;
+- `OPTIONS` exposes separate `SOUND: ON/OFF` and `GAME MUSIC: ON/OFF` rows;
+  LEFT/RIGHT wraps `DIFFICULTY` through `EASY/MEDIUM/HARD`; GAME MUSIC defaults
+  ON, difficulty defaults MEDIUM, and all choices survive `BACK`, Game Over,
+  and another game during the same run;
 - myśliwiec z hangaru znika w `OPTIONS`, `TOP SCORES`, potwierdzeniu `EXIT`
   oraz ekranie końcowym i wraca dopiero po ponownym wejściu do main menu;
 - przy SOUND OFF strzał, trafienie i tło silnika są niesłyszalne, kanały nie
@@ -52,6 +55,34 @@
   menu score immediately; returning from Game Over restarts it from the intro;
 - `START GAME` leaves no sustained menu tone, and joystick/FIRE response remains
   one PAL-frame poll while the score is active;
+- with `GAME MUSIC: ON`, gameplay starts the original 30.72-second combat loop
+  from its beginning; its low ostinato and alarm arpeggio remain clearly below
+  the Viper-shot, hit, engine, and capital-explosion SFX;
+- Viper fire and hit effects preempt channels 1 and 2 for their complete
+  existing envelopes; music returns at the current song position without a
+  restart, while the channel-3 engine and channel-4 capital explosion remain
+  unchanged;
+- ordinary death mutes idle music voices without restarting transport, respawn
+  resumes in place, Game Over is silent, and the next main-menu entry restarts
+  the menu theme from its intro;
+- with `GAME MUSIC: OFF`, gameplay produces no score notes or residual tones,
+  but every SFX remains present at its original timing and volume; menu music
+  still works independently;
+- during gameplay, press and hold the physical `OPTION` key: `PAUSED` appears
+  exactly once with `RESUME`, `GAME MUSIC: ON/OFF`, and `QUIT TO MENU`; the held
+  key cannot immediately resume the game;
+- while PAUSED, verify that the Viper, both star layers, hulls, Raider, shells,
+  fighter projectiles, explosions, warning phases, death animation, respawn,
+  invulnerability blink, score, and all visible timers remain frozen;
+- release OPTION and press it again: the exact gameplay scene returns and the
+  current music position continues when GAME MUSIC is ON; holding FIRE on entry
+  must not activate the selected row until FIRE is released and pressed again;
+- toggle GAME MUSIC OFF in PAUSED: gameplay music stops immediately while shot,
+  hit, engine, and capital-explosion state remains intact; toggle ON and RESUME
+  to start gameplay music from its beginning;
+- select `QUIT TO MENU`: confirmation defaults to `NO`; NO returns to PAUSED,
+  while YES clears the active gameplay scene, skips Game Over, preserves TOP,
+  returns to the main menu, and restarts the menu theme from its beginning;
 - `TOP SCORES` pokazuje dziesięć wierszy `01`–`10`; po zdobyciu punktów
   pierwszy wiersz pokazuje sesyjny TOP w tej samej postaci cyfr co SCORE;
   śmierć i respawn zachowują SCORE, a dopiero ponowny `START GAME` zeruje

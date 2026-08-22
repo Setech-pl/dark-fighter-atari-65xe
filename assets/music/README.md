@@ -7,4 +7,13 @@ must not be edited by hand.
 
 The source stores POKEY frequency dividers, instrument control bytes, fixed
 16-row/four-channel patterns, and their order table. Timing is locked to one
-row every eight PAL frames at 50 Hz.
+row every eight PAL frames at 50 Hz. The owner-approved clean cinematic mix
+keeps the motif intact while using a low-volume gated drone, short noise gates,
+and a melody-forward balance that stays within a summed POKEY volume of 13.
+
+`gameplay-theme.json` is the editable source for the original gameplay theme
+“Contact Line”. It reuses the menu frequency table but has an independent,
+packed two-channel score: each byte stores one event nibble for channel 1 and
+one for channel 2. `0` is HOLD, `1` is REST, and `2` through `15` select a
+frequency. One row lasts six PAL frames. Channels 1 and 2 are always
+preemptible by the Viper-shot and hit SFX; channels 3 and 4 remain SFX-only.

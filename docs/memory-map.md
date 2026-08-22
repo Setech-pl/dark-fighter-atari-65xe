@@ -7,14 +7,14 @@ loaderze nie są tym samym budżetem.
 
 | Zakres | Przeznaczenie |
 | --- | --- |
-| `$0080-$00A1` | 34 B zmiennych zero-page; bez zmian dla kadłubów |
+| `$0080-$00A2` | 35 B zero-page variables; the added byte is the physical OPTION edge latch |
 | `$0100-$01FF` | stos 6502 |
 | `$0200-$03FF` | obszar systemowy OS i wektory |
-| `$2000-$2F2E` | resident code, 3887 B |
-| `$2F2F-$3FD8` | resident RODATA, 4266 B; includes charset source, hull/effect glyphs, frontend records including Game Over, packed maps, and loader LZ-10/5 source |
-| `$3724-$3F0E` | transient loader LZ-10/5 stream, 2027 B |
-| `$3F0F-$3FD8` | transient loader display list, 202 B |
-| `$4000-$524B` | on entry: 4684 B packed LZ-10/5 broadside/frontend/enemy runtime; expanded before the loader and then overwritten by bitmap/screen data |
+| `$2000-$2EEF` | resident code, 3824 B |
+| `$2EF0-$3FB7` | resident RODATA, 4296 B; includes charset source, hull/effect glyphs, frontend records including Game Over and the four-row options screen, packed maps, and loader LZ-10/5 source |
+| `$3703-$3EED` | transient loader LZ-10/5 stream, 2027 B |
+| `$3EEE-$3FB7` | transient loader display list, 202 B |
+| `$4000-$5553` | on entry: 5460 B packed LZ-10/5 broadside/frontend/enemy/pause runtime; expanded before the loader and then overwritten by bitmap/screen data |
 | `$4000-$43FF` | wspólny bufor ekranu gameplayu/frontendu, 1024 B; loader zaczyna bitmapę dopiero pod `$4010` |
 | `$4400-$47FF` | gameplay charset, dokładnie 1024 B |
 | `$4800-$4BFF` | frontend charset, dokładnie 1024 B, budowany po loaderze |
@@ -47,21 +47,25 @@ loaderze nie są tym samym budżetem.
 | `$4ED1-$4ED6` | 6 B skalarnego stanu starfield: seed/RNG, fazy near `7/10` i far `7/20`, timer i indeks twinkle, dirty flag |
 | `$4ED7-$4ED8` | 2 B sesyjnego TOP SCORE w packed BCD; zerowany wyłącznie przy pełnym starcie programu |
 | `$4ED9-$4EDE` | 6 B menu-music state: active flag, PAL row timer, sequence/pattern indices, channel mask, and token scratch |
-| `$4EDF-$4FFF` | currently unassigned after the loader |
+| `$4EDF-$4EE2` | 4 B cached gameplay-music AUDF/AUDC values for preemptible channels 1-2 |
+| `$4EE3` | 1 B persistent `GAME_MUSIC_ENABLED`, default ON and preserved between games during one run |
+| `$4EE4-$4FFF` | currently unassigned after the loader |
 | `$4010-$4FFF` | podczas loadera: pierwsze LMS, linie bitmapy 0–101, 4080 B; po przejściu zakres jest dzielony na ekran, charsety, mapy i wolny ogon opisane wyżej |
 | `$5000-$53FF` | dedykowany gameplay HUD charset, dokładnie 1024 B, budowany po loaderze |
 | `$5400-$54C9` | 202 B stałego stanu: 19 fighter projectiles, oba kontrolery burst oraz timer/X/Y dwóch wspólnych fighter explosions |
 | `$54CA-$5529` | 96 B czterech tablic 24 far stars: active/rendered, dokładny adres ekranu low/high i screen code |
-| `$552A-$5559` | obecnie nieprzydzielone po przejściu loadera |
-| `$555A-$59D3` | 1146 B relocated starfield runtime and shared damage/score procedures recovered from BROADSIDE |
-| `$59D4-$5AAB` | 216 B menu-music player code |
-| `$5AAC-$5CAC` | 513 B generated menu composition data |
-| `$5CAD-$5E0F` | 355 B currently unassigned after the loader |
+| `$552A-$554F` | 38 B relocated SOUND/GAME MUSIC option helpers |
+| `$5550-$59C9` | 1146 B relocated starfield runtime and shared damage/score procedures recovered from BROADSIDE |
+| `$59CA-$5AA1` | 216 B menu-music player code |
+| `$5AA2-$5B83` | 226 B specialized two-channel gameplay-music player code |
+| `$5B84-$5D84` | 513 B generated menu composition data |
+| `$5D85-$5E00` | 124 B generated packed gameplay composition data |
+| `$5E01-$5E0F` | 15 B currently unassigned after the loader |
 | `$5000-$5E0F` | podczas loadera: drugie LMS, ANTIC F linie 102–163 i ANTIC E linie 164–191, 3600 B; po przejściu dzielone na HUD charset i wolny ogon |
-| `$5E10-$73E9` | 5594 B relocated broadside/frontend/HUD/enemy runtime, including the bounded Game Over SCORE/TOP formatter |
-| `$73EA-$740F` | 38 B currently unassigned between resident broadside and transient staging |
-| `$7410-$7A0F` | transient starfield/music staging buffer, maximum 1536 B; free again after unpacking |
-| `$7A10-$BFFF` | currently unassigned for later resident systems and assets |
+| `$5E10-$7762` | 6483 B relocated broadside/frontend/HUD/enemy/pause runtime in a 6656 B reservation |
+| `$7763-$780F` | 173 B currently unassigned between resident runtime and staging |
+| `$7810-$7F0F` | 1792 B starfield/music staging buffer; after unpacking, `$7810-$7BCF` is reused as the 960 B PAUSED screen backup |
+| `$7F10-$BFFF` | currently unassigned for later resident systems and assets |
 | `$C000-$FFFF` | ROM i sprzętowe rejestry I/O |
 
 PMG dla bazy `$3800`:
@@ -76,12 +80,12 @@ PMG dla bazy `$3800`:
 | `$3F00-$3FFF` | Player 3 — silnik gracza, `COLPM3=$28`; M3 dziedziczy ten kolor |
 
 Podczas loadera PMG i PMG DMA są wyłączone. Końcowa część strumienia
-LZ-10/5 and the loader display list temporarily occupy `$3800-$3FD8` and cannot be
+LZ-10/5 and the loader display list temporarily occupy `$3800-$3FB7` and cannot be
 użyta jako dodatkowy bufor. Pakowany strumień loadera leży pod
-`$3724-$3F0E`; the former starfield staging at `$3800-$3BBC` therefore overwrote its
+`$3703-$3EED`; the former starfield staging at `$3800-$3BBC` therefore overwrote its
 końcową część przed dekodowaniem. Poprawiona sekwencja kopiuje pakowany
-starfield/music tail to the separate `$7410-$7A0F` buffer; the current 1438 B
-occupies `$7410-$79AD` and expands after 250 complete frames to `$555A-$5CAC`. Code
+starfield/music tail to the separate `$7810-$7F0F` buffer; the current 1779 B
+occupies `$7810-$7F02` and expands after 250 complete frames to `$552A-$5E00`. Code
 następnie wyłącza NMI i DMA oraz zeruje całe `$3800-$3FFF`; dopiero wtedy
 zakres otrzymuje role PMG.
 
@@ -92,8 +96,8 @@ charset `$4800-$4BFF`, a także dedykowany HUD charset `$5000-$53FF`.
 mapy side hulls do `$4C00-$4E3F`. Są to trwałe dane gameplayu, odzyskane z
 bitmapy loadera, a nie dodatkowa pamięć masowa ATR.
 
-Before unpacking the bitmap, `start` expands the packed `$4000-$524B` tail to
-`$5E10-$73E9` and preserves the second packed starfield tail at `$7410`.
+Before unpacking the bitmap, `start` expands the packed `$4000-$5553` tail to
+`$5E10-$7762` and preserves the second packed starfield tail at `$7810`.
 Dekoder jest własnym, bounded LZ-10/5 bez wywołań OS; oba wyniki
 pozostaje resident przez frontend i gameplay. Nakładanie zakresu źródłowego z
 późniejszą bitmapą loadera jest celowe i bezpieczne, ponieważ dekoder kończy
@@ -121,13 +125,13 @@ między wierszami 20 B (ANTIC 7/6) i 40 B (ANTIC 4/2). Pozostałe ekrany używaj
 dolny scanline glifów HUD tworzy separator bez dodatkowego wiersza. Całość
 nadal ma 960 B. Wszystkie warianty mieszczą się w rezerwacji 1 KB.
 
-The current payload is 14,314 B: the fixed 8192 B block at `$2000-$3FFF`, a
-4684 B packed broadside tail, and a 1438 B packed starfield/music tail. It occupies
-112 128-byte sectors with 22 B of final-sector padding. The XEX is 14,326 B
+The current payload is 15,431 B: the fixed 8192 B block at `$2000-$3FFF`, a
+5460 B packed broadside/pause tail, and a 1779 B packed starfield/music tail. It occupies
+121 128-byte sectors with 57 B of final-sector padding. The XEX is 15,443 B
 including headers and RUNAD; the ATR remains the standard 92,176-byte image.
 
-Menu music and difficulty do not add zero page: the linker still reports 34 B
-at `$0080-$00A1`.
+Menu music and difficulty do not add zero page. PAUSED adds one physical OPTION
+edge latch, so the linker reports 35 B at `$0080-$00A2`.
 Dotychczasowy `$008A` pozostaje world akumulatorem, hull akumulator leży pod
 `$4E71`, a sesyjny wybór pod `$4E70`.
 Bezpośredni stan puli to dziewięć tablic po trzy bajty, sześć bajtów pointerów
@@ -162,17 +166,17 @@ oraz sześć masek jasnego core. Dwa równoczesne sloty wykorzystują 6 B pod
 PMG ani dynamicznej alokacji.
 
 The accepted compact-HUD checkpoint had a 12,906 B payload and 12,918 B XEX.
-The current candidate is 14,314 B and 14,326 B respectively; boot uses 112
-sectors with 22 B padding, while the ATR remains 92,176 B.
+The current candidate is 15,431 B and 15,443 B respectively; boot uses 121
+sectors with 57 B padding, while the ATR remains 92,176 B.
 Pula pod `$5400-$54C9` ma 202 B: dotychczasowe 196 B oraz po timerze, X i Y
-dla dwóch współdzielonych fighter explosions. Zero page pozostaje 34 B. Cztery tablice X/Y/
+dla dwóch współdzielonych fighter explosions. Zero page now totals 35 B. Cztery tablice X/Y/
 lifetime i backing/pointery są stałe, bez alokacji dynamicznej.
 Skompaktowane resident tabele archetypów zajmują 84 B w końcu BROADSIDE plus
 6 B HP/score w głównym bloku; build-side descriptor report ma 33 B. Trzy nowe
 bajty stanu pod `$4ECE-$4ED0` oraz 2 B TOP SCORE pod `$4ED7-$4ED8` nie
 zwiększają zero page. Po jednorazowym
-rozpakowaniu `$7410-$BFFF` znów jest nieprzydzielonym obszarem przyszłego
-finale/BOSS; staging nie pozostawia tam danych wymaganych przez gameplay.
+rozpakowaniu `$7810-$7BCF` becomes a bounded PAUSED screen backup; `$7F10-$BFFF`
+remains unassigned for later resident systems and assets.
 
 Obie pule burst wykonują trzy ograniczone przebiegi po 19 slotach
 (erase/update/render), bez skanu ekranu i bez alokacji dynamicznej.
@@ -192,6 +196,20 @@ frame; `update_top_score` adds at most 48 cycles including `JSR`, only on a
 scoring frame. Death, respawn, and Game Over do not write SCORE or TOP. Game
 Over leaves the steady main loop and formats both values once in about 216
 cycles while DMA is disabled; it adds no normal-frame, VBI, or DLI work.
+With `GAME MUSIC` enabled, the guarded gameplay player adds 78 cycles on an
+ordinary non-row frame and a conservative maximum of 256 cycles when pattern
+advance coincides with the heaviest broadside frame. The resulting bound is
+34,499 cycles, leaving 1,001 cycles to the approximately 35,500-cycle PAL
+frame. Active SFX or player death skip music register restores and are cheaper;
+`GAME MUSIC: OFF` leaves `MUSIC_ACTIVE` clear, so the main loop performs no
+player call and no music POKEY write. The active-frame OPTION poll costs 13
+cycles; a held OPTION after resume returns to the frame wait without advancing
+the simulation.
+The packed gameplay score is fixed-width: one byte contains both channel
+events for one row. `GAME_MUSIC_EVENTS_PER_TICK_LIMIT=1` is asserted by the
+assembler and generated-data tests, so a row boundary performs exactly one
+event read and cannot enter an unbounded command-parser loop. This hard bound
+is already included in the 256-cycle worst-row estimate.
 Pomiar realnego 65XE pozostaje bramką sprzętową.
 
 Capital `FLYING` nie zapisuje już dziedziczonego koloru M1–M3: jeden logiczny
@@ -199,8 +217,9 @@ slot zachowuje w istniejących `BROAD_PREV_Y/H` pierwszy kod i pozycję, a
 nieużywany po software-collision `BROAD_COLLISION` drugi kod dwóch sąsiednich
 komórek ANTIC 4. Dwa już istniejące glify (`base+18/+19`) dają 8×6 slug; D7 wybiera
 `COLPF2=$1E` dla Colonial albo `COLPF3=$46` dla Cylon. Relokowany runtime
-broadside occupies 5594/5632 B; relocated shared procedures and menu music
-share the 1875/2230 B starfield block. The packed tails are 4684 B and 1438 B.
+broadside/pause runtime occupies 6483/6656 B; relocated shared procedures, frontend option
+helpers, and both music players share the 2263/2278 B starfield block. The
+packed tails are 5460 B and 1779 B.
 `WARNING` i `IMPACT`
 korzystają z maskowych par M1–M3; M0 pozostaje wyłącznie zarezerwowane dla
 player weapon. Fighter fire używa 56 glifów fazowych: 36 dla Vipera jest

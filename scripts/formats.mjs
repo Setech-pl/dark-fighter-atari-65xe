@@ -5,8 +5,8 @@ const ATR_MAGIC = 0x0296;
 const ATR_HEADER_SIZE = 16;
 const ATR_SECTOR_SIZE = 128;
 const ATR_SECTOR_COUNT = 720;
-const ACCEPTED_GAME_OVER_PAYLOAD_BYTES = 13865;
-const MENU_MUSIC_PAYLOAD_LIMIT = 1024;
+const ACCEPTED_MENU_MUSIC_PAYLOAD_BYTES = 14314;
+const GAMEPLAY_AUDIO_PAUSE_PAYLOAD_LIMIT = 1280;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -121,8 +121,8 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
   invariant(
-    boot.length - ACCEPTED_GAME_OVER_PAYLOAD_BYTES <= MENU_MUSIC_PAYLOAD_LIMIT,
-    "Menu-music feature payload delta exceeds 1024 bytes",
+    boot.length - ACCEPTED_MENU_MUSIC_PAYLOAD_BYTES <= GAMEPLAY_AUDIO_PAUSE_PAYLOAD_LIMIT,
+    "Gameplay-music and pause feature payload delta exceeds 1280 bytes",
   );
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
     "Broadside relocation source must begin at $4000");
@@ -130,8 +130,8 @@ export function validateBuildDirectory(rootDirectory) {
     "Broadside runtime must begin at reclaimed RAM $5E10");
   invariant(manifest.broadsideRuntime?.bytes <= manifest.broadsideRuntime?.reservedBytes,
     "Broadside runtime exceeds its reserved relocation block");
-  invariant(manifest.starfieldRuntime?.runAddress === 0x555a,
-    "Starfield runtime must begin in the reviewed pre-broadside gap $555A");
+  invariant(manifest.starfieldRuntime?.runAddress === 0x552a,
+    "Starfield runtime must begin in the reviewed pre-broadside gap $552A");
   invariant(manifest.starfieldRuntime?.bytes <= manifest.starfieldRuntime?.reservedBytes,
     "Starfield runtime exceeds its reserved relocation block");
   invariant(manifest.starfieldRuntime?.packedBytes <= manifest.starfieldRuntime?.stagingBytes,

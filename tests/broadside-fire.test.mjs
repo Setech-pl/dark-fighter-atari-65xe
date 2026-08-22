@@ -231,12 +231,12 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(packed), runtime);
   assert.deepEqual(packBroadsideLzss(runtime), packed);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
-  assert.ok(manifest.payloadBytes - 13865 <= 1024);
+  assert.ok(manifest.payloadBytes - 14314 <= 1280);
   const starRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
   const starPacked = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime-packed.bin"));
   assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
   assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
-  assert.ok(starPacked.length <= 0x600);
+  assert.ok(starPacked.length <= 0x700);
   assert.match(routine("start", "unpack_broadside_runtime"),
     /jsr unpack_broadside_runtime[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });
@@ -1100,7 +1100,7 @@ test("broadside state, charset, software collision, and fixed loops remain bound
   assert.equal(graphics.charset.length, 1024);
   assert.ok(graphics.constants.get("BROAD_STATE_END") - graphics.constants.get("BROAD_STATE_BASE") <= 64);
   assert.equal(labels.get("__BROADSIDE_RUN__"), 0x5e10);
-  assert.ok(labels.get("__BROADSIDE_SIZE__") <= 0x1600);
+  assert.ok(labels.get("__BROADSIDE_SIZE__") <= 0x1a00);
   const collisions = routine("handle_collisions", "update_score_display");
   assert.doesNotMatch(collisions, /lda M0PL|lda P0PL|lda M1PL/,
     "software envelopes, not star-contaminated GTIA latches, own collisions");

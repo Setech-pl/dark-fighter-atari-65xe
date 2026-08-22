@@ -7,24 +7,24 @@
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 112,
-  "payloadBytes": 14314,
+  "bootSectors": 121,
+  "payloadBytes": 15431,
   "broadsideRuntime": {
     "loadAddress": 16384,
     "runAddress": 24080,
-    "bytes": 5594,
-    "reservedBytes": 5632,
-    "packedBytes": 4684,
+    "bytes": 6483,
+    "reservedBytes": 6656,
+    "packedBytes": 5460,
     "compression": "LZ-10/5"
   },
   "starfieldRuntime": {
-    "loadAddress": 22016,
-    "runAddress": 21850,
-    "bytes": 1875,
-    "reservedBytes": 2230,
-    "packedBytes": 1438,
-    "stagingAddress": 29712,
-    "stagingBytes": 1536,
+    "loadAddress": 23040,
+    "runAddress": 21802,
+    "bytes": 2263,
+    "reservedBytes": 2278,
+    "packedBytes": 1779,
+    "stagingAddress": 30736,
+    "stagingBytes": 1792,
     "compression": "LZ-10/5"
   },
   "loaderScreen": {
@@ -354,7 +354,7 @@
   },
   "menuMusic": {
     "source": "assets/music/menu-theme.json",
-    "sourceSha256": "28ee31cbe1592c400358571dfa592606c2147887ebd3486778fab41efc61c4f9",
+    "sourceSha256": "3e76ee37ff3b6fbc22ba575e90f3cb55a14e7894eff3147731d5b06d0b07201c",
     "title": "Fleet in Shadow",
     "originalComposition": true,
     "targetFrameHz": 50,
@@ -387,18 +387,81 @@
     "runtimeDataBytes": 513,
     "runtimeStateBytes": 6
   },
+  "gameplayMusic": {
+    "source": "assets/music/gameplay-theme.json",
+    "sourceSha256": "be16b14386c1560e46fe4e736aa06de47e375900d9230c6349aa60fb2f35ae5c",
+    "title": "Contact Line",
+    "originalComposition": true,
+    "targetFrameHz": 50,
+    "framesPerRow": 6,
+    "rowsPerPattern": 16,
+    "patternCount": 6,
+    "sequencePatterns": 16,
+    "loopFrames": 1536,
+    "loopSeconds": 30.72,
+    "channelAllocation": [
+      {
+        "channel": 1,
+        "role": "low combat ostinato",
+        "control": 162,
+        "preemptedBy": "Viper shot"
+      },
+      {
+        "channel": 2,
+        "role": "alarm arpeggio",
+        "control": 163,
+        "preemptedBy": "hit effect"
+      }
+    ],
+    "reservedSfxChannels": [
+      {
+        "channel": 3,
+        "role": "engine bed"
+      },
+      {
+        "channel": 4,
+        "role": "capital-hull explosion"
+      }
+    ],
+    "channelMask": 3,
+    "audctlProfile": 0,
+    "runtimeCodeBytes": 226,
+    "runtimeDataBytes": 124,
+    "runtimeStateBytes": 5,
+    "eventsPerTickLimit": 1,
+    "normalFrameCycles": 78,
+    "worstRowFrameCycles": 256,
+    "pauseOptionPollCycles": 13,
+    "conservativeWorstFrameCycles": 34499,
+    "conservativePalHeadroomCycles": 1001
+  },
+  "pause": {
+    "inputRegister": 53279,
+    "optionMask": 4,
+    "screenBackupAddress": 30736,
+    "screenBackupBytes": 960,
+    "zeroPageStateBytes": 1,
+    "activeFramePollCycles": 13,
+    "simulationTicksWhilePaused": 0,
+    "menuRows": [
+      "RESUME",
+      "GAME MUSIC: ON/OFF",
+      "QUIT TO MENU"
+    ],
+    "quitConfirmationDefault": "NO"
+  },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 14314,
-      "sha256": "42d25de7ea403cd39962258a2c0f7b5344351ca7e913790b2a69c29b5f5cdd93"
+      "bytes": 15431,
+      "sha256": "27b7f8ac4a86374b4cdaac4fd9d7e0d429668403a5dcb2ce5cc4d749793981c6"
     },
     "dark-fighter.xex": {
-      "bytes": 14326,
-      "sha256": "b25a160fb20c5cf2ac5d043f78cd4ce2bd689cd62ec4e12a824a07199e749fd8"
+      "bytes": 15443,
+      "sha256": "587b0a9a29f59333ad9e33c61a8cdf8bdf3f012cc1abe886aac807aceb1acc05"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "c5ef59b7f36b429bb1d05c7b14cd92911b440a8f8ad1799736f0ebb61f166f4e"
+      "sha256": "490b7271b6ed95432a773c0e4c8e9f89c30ec1bcb8c58fcee9f5ea88cb0ffb20"
     }
   }
 }

@@ -10,6 +10,7 @@
 
 .include "starfield.inc"
 .include "menu-music.inc"
+.include "gameplay-music.inc"
 
 ; -----------------------------------------------------------------------------
 ; OS workspace and vectors
@@ -53,6 +54,7 @@ COLBK       = $D01A
 PRIOR       = $D01B
 GRACTL      = $D01D
 HITCLR      = $D01E
+CONSOL      = $D01F
 
 ; -----------------------------------------------------------------------------
 ; POKEY
@@ -84,7 +86,9 @@ NMIEN       = $D40E
 ; Reserved RAM
 
 PMG_BASE    = $3800
-STARFIELD_STAGING = $7410
+STARFIELD_STAGING = $7810
+PAUSE_SCREEN_BACKUP = STARFIELD_STAGING
+PAUSE_SCREEN_BYTES = $03C0
 MISSILES    = PMG_BASE + $0300
 PLAYER0     = PMG_BASE + $0400
 PLAYER1     = PMG_BASE + $0500
@@ -186,7 +190,13 @@ MUSIC_SEQUENCE_INDEX         = MUSIC_ROW_TIMER+$01
 MUSIC_PATTERN_ROW            = MUSIC_SEQUENCE_INDEX+$01
 MUSIC_CHANNEL_MASK           = MUSIC_PATTERN_ROW+$01
 MUSIC_TOKEN                  = MUSIC_CHANNEL_MASK+$01
-MUSIC_STATE_END              = MUSIC_TOKEN+$01
+GAME_MUSIC_CH1_FREQUENCY     = MUSIC_TOKEN+$01
+GAME_MUSIC_CH1_CONTROL       = GAME_MUSIC_CH1_FREQUENCY+$01
+GAME_MUSIC_CH2_FREQUENCY     = GAME_MUSIC_CH1_CONTROL+$01
+GAME_MUSIC_CH2_CONTROL       = GAME_MUSIC_CH2_FREQUENCY+$01
+MUSIC_TRANSIENT_STATE_END    = GAME_MUSIC_CH2_CONTROL+$01
+GAME_MUSIC_ENABLED           = MUSIC_TRANSIENT_STATE_END
+MUSIC_STATE_END              = GAME_MUSIC_ENABLED+$01
 
 .assert MUSIC_STATE_END <= $5000, error, "session and music state exceed reclaimed loader RAM"
 
@@ -217,6 +227,8 @@ DIFFICULTY_EASY   = 0
 DIFFICULTY_MEDIUM = 1
 DIFFICULTY_HARD   = 2
 DIFFICULTY_DEFAULT = DIFFICULTY_MEDIUM
+
+CONSOL_OPTION_MASK = $04
 
 MISSILE_M0_MASK = $03
 MISSILE_M0_CLEAR_MASK = $FC
@@ -339,6 +351,8 @@ STATE_EXIT_CONFIRM = 4
 STATE_EXITED       = 5
 STATE_GAMEPLAY     = 6
 STATE_GAME_OVER    = 7
+STATE_PAUSED       = 8
+STATE_PAUSE_QUIT_CONFIRM = 9
 
 FRONTEND_DEFAULT_SELECTION = 0
 
@@ -412,7 +426,7 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
 .assert GAMEPLAY_RESIDENT_END <= $4F00, error, "gameplay resident state exceeds reclaimed RAM"
 .assert STARFIELD_STATE_END <= $4F00, error, "starfield scalar state exceeds reclaimed RAM"
-.assert STAR_FAR_STATE_END <= $555A, error, "far-star records overlap relocated starfield code"
+.assert STAR_FAR_STATE_END <= $552A, error, "far-star records overlap relocated starfield code"
 .assert STAR_FAR_FIRST > CH_SPACE, error, "star codes must not alias blank space"
 .assert STAR_NEAR_END <= VIPER_PROJECTILE_GLYPH_BASE, error, "star glyphs overlap Viper projectile glyphs"
 .assert PLAYER_RESPAWN_X = 124, error, "player respawn must center the eight-HPOS envelope in the 24-column corridor"
@@ -488,6 +502,7 @@ frontend_selection: .res 1
 frontend_input_armed:.res 1
 sound_enabled:      .res 1
 gameplay_fire_gate: .res 1
+pause_option_latched:.res 1
 
 ; Loader, frontend and gameplay never run concurrently, so their DLI phase
 ; state safely reuses the same zero-page byte.
@@ -620,6 +635,7 @@ start:
     jsr silence_audio
     lda #$01
     sta sound_enabled           ; options default: SOUND ON
+    sta GAME_MUSIC_ENABLED      ; options default: GAME MUSIC ON
     jsr music_init
     lda #DIFFICULTY_DEFAULT
     sta DIFFICULTY_SETTING      ; options default: MEDIUM
@@ -843,7 +859,7 @@ handle_options_input:
 
 .segment "BROADSIDE"
 handle_options_input_resident:
-    ldx #$02
+    ldx #$03
     lda stick_value
     and #$01
     bne :+
@@ -857,6 +873,8 @@ handle_options_input_resident:
     lda frontend_selection
     beq @sound_row
     cmp #$01
+    beq @game_music_row
+    cmp #$02
     beq @difficulty_row
 @back_row:
     lda TRIG0
@@ -872,6 +890,18 @@ handle_options_input_resident:
     lda TRIG0
     bne :+
     jmp toggle_sound
+:
+    rts
+@game_music_row:
+    lda stick_value
+    and #$0C
+    cmp #$0C
+    beq :+
+    jmp toggle_game_music
+:
+    lda TRIG0
+    bne :+
+    jmp toggle_game_music
 :
     rts
 @difficulty_row:
@@ -944,6 +974,7 @@ move_selection_down:
     inc frontend_selection
     jmp update_frontend_marker
 
+.segment "STARFIELD"
 toggle_sound:
     lda sound_enabled
     eor #$01
@@ -952,6 +983,17 @@ toggle_sound:
     jsr silence_audio
 :
     jmp draw_sound_value
+
+.segment "CODE"
+toggle_game_music:
+    jsr toggle_game_music_setting
+    jmp draw_game_music_value
+
+toggle_game_music_setting:
+    lda GAME_MUSIC_ENABLED
+    eor #$01
+    sta GAME_MUSIC_ENABLED
+    rts
 
 .segment "BROADSIDE"
 select_previous_difficulty:
@@ -1123,6 +1165,7 @@ render_frontend_state:
     cmp #STATE_OPTIONS
     bne :+
     jsr draw_sound_value
+    jsr draw_game_music_value
     jsr draw_difficulty_value
     jmp update_frontend_marker
 :
@@ -1133,6 +1176,11 @@ render_frontend_state:
     cmp #STATE_GAME_OVER
     bne :+
     jmp draw_game_over_scores
+:
+    cmp #STATE_PAUSED
+    bne :+
+    jsr draw_game_music_value
+    jmp update_frontend_marker
 :
     cmp #STATE_EXITED
     beq @done
@@ -1313,11 +1361,18 @@ update_frontend_marker:
     cmp #STATE_MAIN_MENU
     beq @clear
     ldx #$04
-    ldy #$03
+    ldy #$04
     cmp #STATE_OPTIONS
     beq @clear
-    ldx #$07
+    ldx #$08
+    ldy #$02
     cmp #STATE_EXIT_CONFIRM
+    beq @clear
+    cmp #STATE_PAUSE_QUIT_CONFIRM
+    beq @clear
+    ldx #$0A
+    ldy #$03
+    cmp #STATE_PAUSED
     bne @done
 @clear:
     stx loader_dli_phase
@@ -1376,18 +1431,34 @@ toggle_main_menu_highlight:
     bne @character
     rts
 
+.segment "STARFIELD"
 draw_sound_value:
     lda sound_enabled
     beq @off
     lda #CH_FRONT_A+13          ; N
-    sta SCREEN+10*40+22
+    sta SCREEN+9*40+22
     lda #CH_SPACE
-    sta SCREEN+10*40+23
+    sta SCREEN+9*40+23
     rts
 @off:
     lda #CH_FRONT_A+5           ; F
-    sta SCREEN+10*40+22
-    sta SCREEN+10*40+23
+    sta SCREEN+9*40+22
+    sta SCREEN+9*40+23
+    rts
+
+.segment "CODE"
+draw_game_music_value:
+    lda GAME_MUSIC_ENABLED
+    beq @off
+    lda #CH_FRONT_A+13          ; N
+    sta SCREEN+12*40+25
+    lda #CH_SPACE
+    sta SCREEN+12*40+26
+    rts
+@off:
+    lda #CH_FRONT_A+5           ; F
+    sta SCREEN+12*40+25
+    sta SCREEN+12*40+26
     rts
 
 .segment "BROADSIDE"
@@ -1402,7 +1473,7 @@ draw_difficulty_value:
     ldy #$00
 @copy:
     lda difficulty_value_table,x
-    sta SCREEN+13*40+23,y
+    sta SCREEN+15*40+23,y
     inx
     iny
     cpy #$06
@@ -1465,6 +1536,7 @@ start_gameplay:
     sta GRACTL
     sta NMIEN
     sta gameplay_fire_gate
+    sta pause_option_latched
     jsr music_stop
     jsr clear_pmg
     jsr clear_screen
@@ -1514,6 +1586,7 @@ start_gameplay:
     lda #$22
     sta AUDC3
 @display:
+    jsr music_start_gameplay
     jsr wait_frame_start
     lda #$80                    ; two bounded DLIs switch HUD/gameplay CHBASE
     sta NMIEN
@@ -1521,9 +1594,19 @@ start_gameplay:
     sta GRACTL
     lda #$3E                    ; normal playfield, single-line PMG DMA
     sta DMACTL
+    jmp main_loop              ; BROADSIDE is non-contiguous: never fall through
+
+start_gameplay_end:
+.segment "BROADSIDE"
 
 main_loop:
     jsr wait_frame
+    lda #CONSOL_OPTION_MASK
+    bit CONSOL
+    beq @option_pressed
+    lda #$00
+    sta pause_option_latched
+@frame_active:
     inc frame_counter
     jsr erase_fighter_projectile_overlays
     jsr tick_shared_fighter_explosions
@@ -1560,9 +1643,367 @@ main_loop:
     jsr render_fighter_projectile_overlays
     jsr update_sector_completion
     jsr update_sound
+    lda MUSIC_ACTIVE
+    beq :+
+    jsr music_tick_gameplay
+:
     jsr tick_respawn_invulnerability
 
     jmp main_loop
+
+@option_pressed:
+    lda pause_option_latched
+    beq :+
+    jmp main_loop                ; debounce: no simulation until OPTION release
+:
+    inc pause_option_latched
+    jmp enter_pause
+
+; -----------------------------------------------------------------------------
+; Pause lifecycle. The gameplay screen is copied into the starfield stream's
+; released staging buffer, so the existing frontend charset and text renderer
+; can present pause states without advancing or rebuilding the world.
+
+enter_pause:
+    lda #$00
+    sta DMACTL
+    sta GRACTL
+    sta NMIEN
+    jsr pause_silence_audio
+    jsr backup_gameplay_screen
+    jmp show_pause_menu
+
+show_pause_menu:
+    lda #STATE_PAUSED
+    sta game_state
+    lda #$00
+    sta frontend_selection
+    sta frontend_input_armed
+    jmp render_pause_and_loop
+
+show_pause_quit_confirmation:
+    lda #STATE_PAUSE_QUIT_CONFIRM
+    sta game_state
+    lda #$00                    ; NO is always the safe default
+    sta frontend_selection
+    sta frontend_input_armed
+
+render_pause_and_loop:
+    lda #$00
+    sta DMACTL
+    jsr select_frontend_display
+    jsr render_frontend_state
+    jsr wait_frame_start
+    lda #$22                    ; text playfield only; PMG remains hidden
+    sta DMACTL
+
+pause_loop:
+    jsr wait_frame
+    jsr poll_pause_option_edge
+    bcc :+
+    jmp resume_gameplay
+:
+
+    lda STICK0
+    and #$0F
+    sta stick_value
+    cmp #$0F
+    bne @active_input
+    lda TRIG0
+    beq @active_input
+    lda #$01
+    sta frontend_input_armed
+    jmp pause_loop
+
+@active_input:
+    lda frontend_input_armed
+    beq pause_loop
+    lda #$00
+    sta frontend_input_armed
+    lda game_state
+    cmp #STATE_PAUSE_QUIT_CONFIRM
+    beq handle_pause_quit_input
+    jmp handle_pause_menu_input
+
+poll_pause_option_edge:
+    lda CONSOL
+    and #CONSOL_OPTION_MASK
+    beq @pressed
+    lda #$00
+    sta pause_option_latched
+    clc
+    rts
+@pressed:
+    lda pause_option_latched
+    bne @held
+    inc pause_option_latched
+    sec
+    rts
+@held:
+    clc
+    rts
+
+handle_pause_menu_input:
+    ldx #$02
+    lda stick_value
+    and #$01
+    bne :+
+    jsr move_selection_up
+    jmp pause_loop
+:
+    lda stick_value
+    and #$02
+    bne :+
+    jsr move_selection_down
+    jmp pause_loop
+:
+    lda TRIG0
+    bne pause_loop
+    lda frontend_selection
+    beq resume_gameplay
+    cmp #$01
+    beq toggle_pause_game_music
+    jmp show_pause_quit_confirmation
+
+handle_pause_quit_input:
+    lda stick_value
+    and #$01                    ; UP selects NO
+    beq @select_no
+    lda stick_value
+    and #$02                    ; DOWN selects YES
+    beq @select_yes
+    lda TRIG0
+    beq :+
+    jmp pause_loop
+:
+    lda frontend_selection
+    bne :+
+    jmp show_pause_menu
+:
+    jmp quit_gameplay_to_menu
+@select_no:
+    lda #$00
+    beq @set_selection
+@select_yes:
+    lda #$01
+@set_selection:
+    sta frontend_selection
+    jsr update_frontend_marker
+    jmp pause_loop
+
+toggle_pause_game_music:
+    jsr toggle_game_music_setting
+    lda GAME_MUSIC_ENABLED
+    bne @draw
+    jsr music_stop_gameplay
+@draw:
+    jsr draw_game_music_value
+    jmp pause_loop
+
+resume_gameplay:
+    lda #$00
+    sta DMACTL
+    sta GRACTL
+    sta NMIEN
+    jsr restore_gameplay_screen
+    lda #STATE_GAMEPLAY
+    sta game_state
+    lda #<display_list
+    sta DLISTL
+    lda #>display_list
+    sta DLISTH
+    lda #<gameplay_dli
+    sta VDSLST
+    lda #>gameplay_dli
+    sta VDSLST+1
+    lda #$00
+    sta gameplay_dli_phase
+    lda #>HUD_CHARSET
+    sta CHBASE
+    lda #HUD_COLPF1
+    sta COLPF1
+    lda #HUD_COLPF2
+    sta COLPF2
+    lda #GAMEPLAY_COLPF3
+    sta COLPF3
+    lda #$00
+    sta COLBK
+    sta HITCLR
+    jsr resume_gameplay_audio
+    jsr wait_frame_start
+    lda #$80
+    sta NMIEN
+    lda #$03
+    sta GRACTL
+    lda #$3E
+    sta DMACTL
+    jmp main_loop
+
+pause_silence_audio:
+    lda #$00
+    sta AUDF1
+    sta AUDC1
+    sta AUDF2
+    sta AUDC2
+    sta AUDF3
+    sta AUDC3
+    sta AUDF4
+    sta AUDC4
+    sta AUDCTL
+    rts
+
+resume_gameplay_audio:
+    lda sound_enabled
+    beq @done
+    lda #$68
+    sta AUDF3
+    lda #$22
+    sta AUDC3
+
+    lda fire_timer
+    beq @hit
+    sta loader_repeat_value
+    lda #$39                    ; $32 + (7 - remaining shot frames)
+    sec
+    sbc loader_repeat_value
+    sta AUDF1
+    lda #$A8
+    sta AUDC1
+@hit:
+    lda hit_timer
+    beq @capital
+    asl
+    sta loader_repeat_value
+    lda #$3C                    ; $20 + 2 * (14 - remaining hit frames)
+    sec
+    sbc loader_repeat_value
+    sta AUDF2
+    lda #$88
+    sta AUDC2
+@capital:
+    lda CAPITAL_EXPLOSION_SOUND_TIMER
+    beq @no_capital
+    cmp #CAPITAL_EXPLOSION_DURATION
+    beq @capital_control
+    tax
+    lda capital_explosion_sound_frequency,x
+    sta AUDF4
+    lda capital_explosion_sound_control,x
+    sta AUDC4
+@capital_control:
+    lda #CAPITAL_EXPLOSION_SOUND_AUDCTL
+    sta AUDCTL
+@no_capital:
+    lda GAME_MUSIC_ENABLED
+    beq @done
+    lda MUSIC_ACTIVE
+    bne @restore_music
+    jsr music_start_gameplay
+@restore_music:
+    jsr music_restore_gameplay_channels
+@done:
+    rts
+
+music_stop_gameplay:
+    lda #$00
+    ldx #(MUSIC_TRANSIENT_STATE_END-MUSIC_ACTIVE)-1
+@clear_state:
+    sta MUSIC_ACTIVE,x
+    dex
+    bpl @clear_state
+    lda fire_timer
+    bne @channel_2
+    lda #$00
+    sta AUDF1
+    sta AUDC1
+@channel_2:
+    lda hit_timer
+    bne @done
+    lda #$00
+    sta AUDF2
+    sta AUDC2
+@done:
+    rts
+
+quit_gameplay_to_menu:
+    jsr music_stop_gameplay
+    jsr init_fighter_projectiles
+    lda #$00
+    ldx #(BROAD_STATE_END-BROAD_STATE_BASE)-1
+@clear_broadside:
+    sta BROAD_STATE_BASE,x
+    dex
+    bpl @clear_broadside
+    ldx #(GAMEPLAY_RESIDENT_END-HULL_SCROLL_ACCUMULATOR)-1
+@clear_gameplay:
+    sta HULL_SCROLL_ACCUMULATOR,x
+    dex
+    bpl @clear_gameplay
+    ldx #(STAR_FAR_STATE_END-STAR_FAR_ACTIVE)-1
+@clear_far_stars:
+    sta STAR_FAR_ACTIVE,x
+    dex
+    bpl @clear_far_stars
+    ldx #(STARFIELD_STATE_END-STAR_RNG_STATE)-1
+@clear_starfield:
+    sta STAR_RNG_STATE,x
+    dex
+    bpl @clear_starfield
+    sta fire_timer
+    sta hit_timer
+    sta damage_timer
+    sta gameplay_fire_gate
+    sta HITCLR
+    jsr clear_pmg
+    jsr clear_screen
+    jsr enter_main_menu
+    jmp frontend_loop
+
+backup_gameplay_screen:
+    lda #<SCREEN
+    sta src_ptr
+    lda #>SCREEN
+    sta src_ptr+1
+    lda #<PAUSE_SCREEN_BACKUP
+    sta dst_ptr
+    lda #>PAUSE_SCREEN_BACKUP
+    sta dst_ptr+1
+    bne copy_pause_screen
+
+restore_gameplay_screen:
+    lda #<PAUSE_SCREEN_BACKUP
+    sta src_ptr
+    lda #>PAUSE_SCREEN_BACKUP
+    sta src_ptr+1
+    lda #<SCREEN
+    sta dst_ptr
+    lda #>SCREEN
+    sta dst_ptr+1
+
+copy_pause_screen:
+    ldx #$03
+    ldy #$00
+@page:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    iny
+    bne @page
+    inc src_ptr+1
+    inc dst_ptr+1
+    dex
+    bne @page
+    ldx #$C0
+@tail:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    iny
+    dex
+    bne @tail
+    rts
+
+.assert PAUSE_SCREEN_BYTES = $03C0, error, "pause backup must preserve the complete gameplay screen"
+
+.segment "CODE"
 
 ; -----------------------------------------------------------------------------
 ; Frame and initialization
@@ -4109,8 +4550,9 @@ star_glyph_bytes:
 .assert * - star_glyph_bytes = (STAR_NEAR_END-STAR_FAR_FIRST)*8, error, "star glyph byte count changed"
 
 ; -----------------------------------------------------------------------------
-; Menu-only POKEY music. The fixed channel mask is explicit state so a future
-; gameplay score can reserve SFX channels without changing tick/stop semantics.
+; Shared POKEY music transport. The menu owns all voices. Gameplay uses only
+; channels 1-2 and yields them immediately to their established SFX timers;
+; channels 3-4 remain exclusively owned by the engine and capital explosion.
 
 music_player_start:
 music_init:
@@ -4131,7 +4573,7 @@ music_start_menu:
 
 music_stop:
     lda #$00
-    ldx #(MUSIC_STATE_END-MUSIC_ACTIVE)-1
+    ldx #(MUSIC_TRANSIENT_STATE_END-MUSIC_ACTIVE)-1
 @clear_state:
     sta MUSIC_ACTIVE,x
     dex
@@ -4237,9 +4679,148 @@ music_apply_token:
 
 music_player_end:
 
-EMIT_MENU_MUSIC_DATA
+; Gameplay has a specialized two-channel renderer so its row-boundary path is
+; bounded below the remaining PAL worst-frame budget. Each packed score byte
+; holds a channel-1 event in its high nibble and channel-2 event in its low
+; nibble. HOLD is zero, REST is one, and notes 2-15 reuse the leading entries
+; of music_frequency_table. AUDCTL is never touched here.
 
-.assert * - __STARFIELD_RUN__ <= $08B6, error, "starfield runtime exceeds the pre-broadside gap"
+game_music_player_start:
+music_start_gameplay:
+    lda GAME_MUSIC_ENABLED
+    beq @done
+    lda sound_enabled
+    beq @done
+    lda #GAME_MUSIC_CHANNEL_MASK
+    sta MUSIC_CHANNEL_MASK
+    lda #$01
+    sta MUSIC_ACTIVE
+    sta MUSIC_ROW_TIMER
+    jsr game_music_load_pattern
+@done:
+    rts
+
+; Called only when MUSIC_ACTIVE is nonzero. The transport advances through
+; player death, but idle music voices are muted until respawn. Active shot/hit
+; timers suppress every music write to their channel, preserving the complete
+; existing SFX envelope. The cached note is restored after the timer expires.
+music_tick_gameplay:
+    .assert GAME_MUSIC_EVENTS_PER_TICK_LIMIT = 1, error, "gameplay music tick must remain one fixed-width event"
+    dec MUSIC_ROW_TIMER
+    bne @restore
+    lda #GAME_MUSIC_FRAMES_PER_ROW
+    sta MUSIC_ROW_TIMER
+    ldy MUSIC_PATTERN_ROW
+    jsr game_music_read_token
+    sta MUSIC_TOKEN
+
+    and #$0F
+    beq @channel_1
+    cmp #GAME_MUSIC_TOKEN_REST
+    beq @rest_2
+    sec
+    sbc #GAME_MUSIC_TOKEN_NOTE_BASE
+    tay
+    lda music_frequency_table,y
+    sta GAME_MUSIC_CH2_FREQUENCY
+    lda #GAME_MUSIC_CH2_AUDC
+    sta GAME_MUSIC_CH2_CONTROL
+    bne @channel_1
+@rest_2:
+    lda #$00
+    sta GAME_MUSIC_CH2_CONTROL
+
+@channel_1:
+    lda MUSIC_TOKEN
+    lsr
+    lsr
+    lsr
+    lsr
+    beq @advance
+    cmp #GAME_MUSIC_TOKEN_REST
+    beq @rest_1
+    sec
+    sbc #GAME_MUSIC_TOKEN_NOTE_BASE
+    tay
+    lda music_frequency_table,y
+    sta GAME_MUSIC_CH1_FREQUENCY
+    lda #GAME_MUSIC_CH1_AUDC
+    sta GAME_MUSIC_CH1_CONTROL
+    bne @advance
+@rest_1:
+    lda #$00
+    sta GAME_MUSIC_CH1_CONTROL
+
+@advance:
+    inc MUSIC_PATTERN_ROW
+    lda MUSIC_PATTERN_ROW
+    cmp #GAME_MUSIC_PATTERN_ROWS
+    bcc @restore
+    lda #$00
+    sta MUSIC_PATTERN_ROW
+    inc MUSIC_SEQUENCE_INDEX
+    lda MUSIC_SEQUENCE_INDEX
+    cmp #GAME_MUSIC_SEQUENCE_LENGTH
+    bcc :+
+    lda #$00
+    sta MUSIC_SEQUENCE_INDEX
+:
+    jsr game_music_load_pattern
+
+@restore:
+music_restore_gameplay_channels:
+    lda PLAYER_LIFECYCLE
+    cmp #PLAYER_DYING
+    beq @mute
+    lda fire_timer
+    bne :+
+    lda GAME_MUSIC_CH1_FREQUENCY
+    sta AUDF1
+    lda GAME_MUSIC_CH1_CONTROL
+    sta AUDC1
+:
+    lda hit_timer
+    bne @done
+    lda GAME_MUSIC_CH2_FREQUENCY
+    sta AUDF2
+    lda GAME_MUSIC_CH2_CONTROL
+    sta AUDC2
+@done:
+    rts
+
+@mute:
+    lda fire_timer
+    bne :+
+    lda #$00
+    sta AUDC1
+:
+    lda hit_timer
+    bne @done
+    lda #$00
+    sta AUDC2
+    rts
+
+game_music_read_token:
+game_music_pattern_read:
+    lda $FFFF,y
+    rts
+
+game_music_load_pattern:
+    ldx MUSIC_SEQUENCE_INDEX
+    lda game_music_sequence,x
+    tax
+    lda game_music_pattern_lo,x
+    sta game_music_pattern_read+1
+    lda game_music_pattern_hi,x
+    sta game_music_pattern_read+2
+    rts
+
+game_music_player_end:
+
+EMIT_MENU_MUSIC_DATA
+EMIT_GAMEPLAY_MUSIC_DATA
+
+.assert * - __STARFIELD_RUN__ <= $08E6, error, "starfield runtime exceeds the pre-broadside gap"
 
 .segment "BROADSIDE"
 
@@ -4918,6 +5499,7 @@ frontend_screen_data:
     .word main_menu_screen_data, options_screen_data, top_scores_screen_data
     .word exit_screen_data, ended_screen_data
     .word ended_screen_data, game_over_screen_data ; gameplay is never rendered here
+    .word pause_screen_data, pause_quit_screen_data
 
 raider_post_burst_frames:
     .byte RAIDER_POST_BURST_EASY,RAIDER_POST_BURST_MEDIUM,RAIDER_POST_BURST_HARD
@@ -5130,11 +5712,13 @@ main_menu_screen_data:
 options_screen_data:
     .word SCREEN+4*40+16
     .byte "OPTIONS",0
-    .word SCREEN+10*40+14
+    .word SCREEN+9*40+14
     .byte "SOUND: OFF",0
-    .word SCREEN+13*40+11
+    .word SCREEN+12*40+12
+    .byte "GAME MUSIC: OFF",0
+    .word SCREEN+15*40+11
     .byte "DIFFICULTY: MEDIUM",0
-    .word SCREEN+16*40+18
+    .word SCREEN+18*40+18
     .byte "BACK",0
     .byte $FF
 
@@ -5178,11 +5762,12 @@ frontend_marker_positions:
     .word SCREEN+MAIN_MENU_OPTION_1_OFFSET+7
     .word SCREEN+MAIN_MENU_OPTION_2_OFFSET+7
     .word SCREEN+MAIN_MENU_OPTION_3_OFFSET+7
-    .word SCREEN+10*40+12, SCREEN+13*40+9, SCREEN+16*40+16
+    .word SCREEN+9*40+12, SCREEN+12*40+10, SCREEN+15*40+9, SCREEN+18*40+16
     .word SCREEN+13*40+12, SCREEN+13*40+21
+    .word SCREEN+9*40+14, SCREEN+12*40+10, SCREEN+15*40+12
 
 frontend_screen_records_end:
-    .assert frontend_screen_records_end - frontend_screen_records = 321, error, "frontend screen data size changed"
+    .assert frontend_screen_records_end - frontend_screen_records = 347, error, "frontend screen data size changed"
 
 ; Packed 32-row maps are expanded once to $4C00-$4E3F. Metadata remains
 ; resident and is the contract for broadside firing/collision in stage 2.
@@ -5272,6 +5857,32 @@ difficulty_value_table:
     .byte CH_FRONT_A+4,CH_FRONT_A,CH_FRONT_A+18,CH_FRONT_A+24,CH_FRONT_SPACE,CH_FRONT_SPACE
     .byte CH_FRONT_A+12,CH_FRONT_A+4,CH_FRONT_A+3,CH_FRONT_A+8,CH_FRONT_A+20,CH_FRONT_A+12
     .byte CH_FRONT_A+7,CH_FRONT_A,CH_FRONT_A+17,CH_FRONT_A+3,CH_FRONT_SPACE,CH_FRONT_SPACE
+
+; Pause records stay in the relocated runtime block. They use the same compact
+; ASCII stream and frontend charset as the existing text screens.
+pause_screen_data:
+    .word SCREEN+4*40+17
+    .byte "PAUSED",0
+    .word SCREEN+9*40+16
+    .byte "RESUME",0
+    .word SCREEN+12*40+12
+    .byte "GAME MUSIC: OFF",0
+    .word SCREEN+15*40+14
+    .byte "QUIT TO MENU",0
+    .word SCREEN+20*40+13
+    .byte "OPTION RESUME",0
+    .byte $FF
+
+pause_quit_screen_data:
+    .word SCREEN+7*40+13
+    .byte "QUIT TO MENU?",0
+    .word SCREEN+13*40+14
+    .byte "NO",0
+    .word SCREEN+13*40+23
+    .byte "YES",0
+    .word SCREEN+19*40+14
+    .byte "FIRE SELECT",0
+    .byte $FF
 
 init_broadside:
     lda #$00
@@ -6872,7 +7483,7 @@ enemy_accent_data:
 enemy_runtime_data_end:
 
 .assert enemy_runtime_data_end - enemy_frame_heights = 84, error, "enemy roster broadside tables changed"
-.assert * - __BROADSIDE_RUN__ <= $1600, error, "broadside runtime exceeds relocation block"
+.assert * - __BROADSIDE_RUN__ <= $1A00, error, "broadside/runtime pause block exceeds relocation reservation"
 
 .segment "RODATA"
 

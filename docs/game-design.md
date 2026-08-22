@@ -369,12 +369,16 @@ neutralnym puszczeniem, więc przytrzymany kierunek nie wykonuje autorepeatu,
 a FIRE nie przechodzi na następny ekran ani do pierwszego strzału w gameplayu.
 Gameplay i jego timery nie działają w stanach frontendu.
 
-`OPTIONS` zawiera `SOUND: ON/OFF`, `DIFFICULTY: EASY/MEDIUM/HARD` oraz `BACK`.
-Dźwięk jest domyślnie włączony, trudność domyślnie ma wartość `MEDIUM`, a oba
-ustawienia pozostają w RAM podczas sesji i nie muszą przetrwać RESET ani
-wyłączenia zasilania. UP/DOWN wybiera wiersz, LEFT/RIGHT zawija trudność między
-trzema wartościami, a FIRE na `BACK` wraca do menu. Trudności nie można
-zmieniać podczas aktywnego gameplayu. OFF wycisza wszystkie kanały POKEY.
+`OPTIONS` contains `SOUND: ON/OFF`, `GAME MUSIC: ON/OFF`,
+`DIFFICULTY: EASY/MEDIUM/HARD`, and `BACK`. SOUND and GAME MUSIC default to ON,
+while difficulty defaults to `MEDIUM`. All three settings remain in RAM during
+the session and need not survive RESET or power-off. UP/DOWN selects a row;
+LEFT/RIGHT or FIRE toggles either audio row, LEFT/RIGHT wraps difficulty across
+its three values, and FIRE on `BACK` returns to the menu. Settings cannot be
+changed while the world is running. During `PAUSED`, the shared
+`GAME_MUSIC_ENABLED` value can be changed through `GAME MUSIC: ON/OFF`. SOUND
+OFF silences all POKEY output. GAME MUSIC OFF suppresses only the gameplay
+score; it does not affect the menu score or any SFX.
 
 Trudność ustala pełnowierszowy ruch capital hulls: `EASY` to dokładnie 20
 wierszy/160 scanlines na sekundę, `MEDIUM` 22,5/180, a `HARD` 25/200.
@@ -419,10 +423,26 @@ until the button is released; a later fresh press returns to the main menu.
 The final score remains intact on this screen and in the menu. Only a new
 `START GAME` resets `SCORE`; session `TOP` persists.
 
-**OPTIONAL BACKLOG**
+Physical Atari `OPTION` enters `PAUSED` before the next gameplay-frame mutation.
+The pause menu contains `RESUME`, `GAME MUSIC: ON/OFF`, and `QUIT TO MENU`.
+UP/DOWN changes the selected row, FIRE activates it, and a fresh OPTION press
+is a quick resume. OPTION and FIRE both require release before another action.
+No player input, world/star scroll, AI, spawn, projectile movement, collision,
+damage, score, gameplay animation, death, respawn, invulnerability, SFX timer,
+or music transport timer advances while paused.
 
-Pauza może zostać dodana w późniejszym kamieniu milowym. Nie blokuje pierwszej
-kompletnej wersji, jeżeli nadal nie jest zaimplementowana.
+Pause entry mutes gameplay audio while preserving its logical state. RESUME
+continues the current song position when GAME MUSIC remains ON. Switching ON
+to OFF clears gameplay music immediately without changing SFX; switching OFF
+to ON starts the song from row zero only after resume. The main OPTIONS screen
+and pause menu always display the same session value.
+
+`QUIT TO MENU` opens a `QUIT TO MENU?` confirmation with `NO` selected by
+default. NO returns to PAUSED. YES clears projectiles, enemies, effects,
+collision latches, and gameplay state, then returns directly to the main menu
+without Game Over. Main-menu music starts from its beginning. TOP remains
+unchanged; the abandoned SCORE need not be cleared by quit, but the next
+`START GAME` always resets SCORE to zero.
 
 ## Wymagany zakres pierwszej kompletnej wersji
 
