@@ -6,7 +6,7 @@ const ATR_HEADER_SIZE = 16;
 const ATR_SECTOR_SIZE = 128;
 const ATR_SECTOR_COUNT = 720;
 const ACCEPTED_BROADSIDE_PAYLOAD_BYTES = 11941;
-const ENEMY_ROSTER_PAYLOAD_LIMIT = 1024;
+const POST_BROADSIDE_FEATURE_PAYLOAD_LIMIT = 2048;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -122,8 +122,8 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
   invariant(
     boot.length - ACCEPTED_BROADSIDE_PAYLOAD_BYTES <=
-      ENEMY_ROSTER_PAYLOAD_LIMIT,
-    "Enemy-roster plus projectile-correction payload delta exceeds 1024 bytes",
+      POST_BROADSIDE_FEATURE_PAYLOAD_LIMIT,
+    "Post-broadside feature payload delta exceeds 2048 bytes",
   );
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
     "Broadside relocation source must begin at $4000");
@@ -131,8 +131,15 @@ export function validateBuildDirectory(rootDirectory) {
     "Broadside runtime must begin at reclaimed RAM $5E10");
   invariant(manifest.broadsideRuntime?.bytes <= manifest.broadsideRuntime?.reservedBytes,
     "Broadside runtime exceeds its reserved relocation block");
-  invariant(boot.length === 0x2000 + manifest.broadsideRuntime.packedBytes,
-    "Boot payload does not contain the packed broadside relocation tail");
+  invariant(manifest.starfieldRuntime?.runAddress === 0x555a,
+    "Starfield runtime must begin in the reviewed pre-broadside gap $555A");
+  invariant(manifest.starfieldRuntime?.bytes <= manifest.starfieldRuntime?.reservedBytes,
+    "Starfield runtime exceeds its reserved relocation block");
+  invariant(manifest.starfieldRuntime?.packedBytes <= manifest.starfieldRuntime?.stagingBytes,
+    "Packed starfield exceeds temporary staging storage");
+  invariant(boot.length === 0x2000 + manifest.broadsideRuntime.packedBytes +
+    manifest.starfieldRuntime.packedBytes,
+  "Boot payload does not contain both packed relocation tails");
 
   const parsedXex = parseXex(xex);
   invariant(parsedXex.segments.length === 2, "XEX must contain the payload and RUNAD segments");

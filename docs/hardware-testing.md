@@ -44,8 +44,11 @@
   oraz ekranie końcowym i wraca dopiero po ponownym wejściu do main menu;
 - przy SOUND OFF strzał, trafienie i tło silnika są niesłyszalne, kanały nie
   zostawiają zawieszonego tonu, a obraz i sterowanie zachowują timing;
-- `TOP SCORES` pokazuje dziesięć wierszy `01`–`10`; pierwszy FIRE po wejściu
-  nie wraca natychmiast, a osobne naciśnięcie wraca do menu;
+- `TOP SCORES` pokazuje dziesięć wierszy `01`–`10`; po zdobyciu punktów
+  pierwszy wiersz pokazuje sesyjny TOP w tej samej postaci cyfr co SCORE;
+  śmierć i respawn zachowują SCORE, a dopiero ponowny `START GAME` zeruje
+  SCORE bez obniżania TOP; pierwszy
+  FIRE po wejściu nie wraca natychmiast, a osobne naciśnięcie wraca do menu;
 - `EXIT GAME?` domyślnie wskazuje `NO`; NO wraca do menu;
 - wybranie YES pokazuje `DARK FIGHTER ENDED` oraz `PRESS RESET TO RESTART`,
   wycisza audio i pozostaje stabilne bez próby powrotu do DOS-u aż do RESET;
@@ -53,6 +56,15 @@
 - FIRE użyty do startu nie tworzy natychmiast pocisku; po puszczeniu kolejne
   FIRE działa normalnie;
 - tytuł oraz gwiazdy są stabilne;
+- w gameplayu widać rzadką warstwę jasnych near stars i liczniejszą,
+  stalowo-niebieską warstwę far; w długim oknie near wykonuje dokładnie 70%,
+  a far 35% kroków kadłubów na każdej trudności;
+- najwyżej pojedynczy far star subtelnie zmienia fazę co 16 ramek; nie ma
+  pełnoekranowego flashu, regularnych siatek ani wzorów podobnych do pocisków;
+- pociski Vipera i Raidera oraz capital slug chwilowo zakrywają gwiazdy, po
+  zejściu przywracają aktualne tło bez czarnego prostokąta lub starej pozycji;
+- wspólna fighter explosion nad gwiazdami kończy się pełnym odtworzeniem tła,
+  bez glyphów w HUD i bez kolizyjnego ghosta;
 - statek porusza się w czterech kierunkach i nie wychodzi poza ekran;
 - przytrzymany FIRE tworzy żółty dziesięciostrzałowy burst co 3 ramki,
   a starsze strzały nie dziedziczą późniejszego ruchu Vipera;
@@ -86,9 +98,13 @@
 - `MEDIUM` przesuwa dokładnie 9 wierszy w 20 ramkach (22,5/180), a `EASY` 8
   (20/160); pełne skoki nie tworzą irytującej pauzy, flickeru ani pozoru
   błędnego fine scrollu;
-- kadłuby wykonują w tych samych 20 ramkach odpowiednio 5 (`HARD`) oraz po
-  4 (`MEDIUM` i `EASY`) pełne kroki; w długim oknie zachowują dokładnie połowę
-  world rate, a gwiazdy, fightery i pociski nie zostają spowolnione;
+- kadłuby wykonują w tych samych 20 ramkach odpowiednio 10 (`HARD`), 9
+  (`MEDIUM`) i 8 (`EASY`) pełnych kroków, czyli 100% dawnego world rate;
+- w pełnym oknie 20 kroków kadłubów near wykonuje 14, a far 7 kroków; obie
+  warstwy dają czytelną perspektywę i żadna nie płynie razem z kadłubem;
+- przy ciągłym bocznym pościgu Raider pokonuje 14 HPOS w czasie, gdy Viper
+  pokonuje 16 HPOS; pojedyncza pauza w każdym oknie ośmiu ramek nie może
+  wyglądać jak zacięcie ani pozwolić Raiderowi zrównać się z Viperem;
 - zmiana trudności wpływa na następne wejście do gameplayu, nie zmienia ruchu
   gracza, fightera, pocisków ani logicznych 50 updates/s;
 - nowe warningi rozpoczynają się wyraźnie rzadziej i pozostawiają spokojne
@@ -150,6 +166,10 @@
   channel-4 crack/rumble; drugi bok może eksplodować niezależnie;
 - `SOUND OFF` blokuje nowy capital impact i natychmiast zeruje aktywny
   `AUDC4/AUDCTL`; po 24 ramkach ON kanał również dochodzi do ciszy bez stuck tone;
+- podczas całego broadside gwiazdy występują wyłącznie w kolumnach 9–30,
+  nigdy pod hull bands; po `DRAIN/COMPLETE` pełna szerokość odtwarza się od
+  nowo odsłanianego górnego wiersza bez blank pause, a świeże i trzymane FIRE
+  zachowują zaakceptowany burst;
 - dźwięki nie zawieszają obrazu ani sterowania;
 - po pięciu minutach nie pojawiają się śmieci w grafice.
 

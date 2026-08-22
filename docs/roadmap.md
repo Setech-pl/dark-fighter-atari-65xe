@@ -77,7 +77,8 @@ over, fale, sektory capital ships, debris, repair drone, broadside i boss.
 - menu `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` ze sterowaniem
   joystickiem portu 1, zawijaniem i neutral-release gating;
 - sesyjna opcja `SOUND: ON/OFF`;
-- dziesięciowierszowa domyślna tabela wyników bez zapisu i inicjałów;
+- dziesięciowierszowa tabela z sesyjnym TOP w pierwszym wierszu, bez zapisu
+  i inicjałów;
 - bezpieczne Atari-specific EXIT pozostające na ekranie do RESET;
 - jedna ścieżka resetu uruchamiająca istniejący vertical slice;
 - mieszany playfield: ANTIC 7 dla tytułu, ANTIC 6 dla opcji, ANTIC 4 dla
@@ -96,7 +97,8 @@ Kamień 1, zaakceptowany loader i istniejąca infrastruktura ANTIC 4.
 - przytrzymany FIRE nie wraca natychmiast z ekranu ani nie tworzy pierwszego
   pocisku po `START GAME`;
 - SOUND domyślnie jest ON, wybór trwa w RAM, a OFF wycisza wszystkie kanały;
-- TOP SCORES ma dokładnie dziesięć wierszy i wraca przez FIRE;
+- TOP SCORES ma dokładnie dziesięć wierszy, zachowuje sesyjny rekord między
+  grami i wraca przez FIRE;
 - EXIT domyślnie wybiera NO, a YES nie skacze do DOS-u;
 - testy kontraktowe, build, preview i verify przechodzą; gameplay preview
   pozostaje byte-for-byte zgodny z zaakceptowanym obrazem.
@@ -427,10 +429,10 @@ pakowanych map, 32 B codebooków, 14 B metadanych, 8 B harmonogramu, 268 B
 modułów/sekwencji/masek, 128 B profili/granic prow oraz 576 B map runtime.
 Nie przechowuje surowej mapy
 240×16.
-Po korekcie pacingu world i hull używają osobnych bounded kopii: world event
-kosztuje konserwatywnie około 15 300 cykli i występuje 20/22,5/25 razy na
-sekundę, hull event około 11 600 cykli i występuje 10/11,25/12,5 razy na
-sekundę. PMG pozostaje bez zmian; dwa gameplay DLI należą wyłącznie do
+Po korekcie pacingu hull zachowuje 100% legacy world rate i występuje
+20/22,5/25 razy na sekundę. Near event używa 70%, a far 35% tej częstości;
+najcięższa kopia near kosztuje konserwatywnie około 15 300 cykli, a hull event
+około 11 600 cykli. PMG pozostaje bez zmian; dwa gameplay DLI należą wyłącznie do
 mieszanej warstwy HUD z kamienia 11.
 
 ### Wykluczenia
@@ -480,14 +482,14 @@ menu. Sektor udostępnia czysty stan `COMPLETE` przyszłemu encounter director.
 - `EASY/MEDIUM/HARD` przesuwają pełny wiersz dokładnie 8/9/10 razy na 20
   ramek (160/180/200 scanlines/s); `HARD` zachowuje zaakceptowany szybki
   kandydat, warning nie ma niewidocznej fazy, a gwiazdy nie wywołują kontaktu;
-- osobny hull stream wykonuje w długim oknie dokładnie połowę tych zdarzeń
-  (80/90/100 scanlines/s), bez zmiany ruchu świata, fighterów i pocisków;
+- hull stream wykonuje 100% tych zdarzeń (160/180/200 scanlines/s), near
+  dokładnie 70%, a far 35%, bez zmiany ruchu fighter fire i capital slugs;
 - segment zawiera po jednej funkcjonalnej baterii na stronę zamiast dwóch,
   usunięte pozycje mają nieinteraktywną strukturę, a scheduler wybiera
   najstarszy bezpieczny widoczny emplacement żądanej strony;
 - scheduler pracuje w ramkach PAL niezależnie od scrollu i nadal używa
-  odstępów 68/126/68/138. W pojedynczym skończonym sektorze realizuje
-  po cztery warningi i launchy na każdym poziomie trudności, po czym
+  odstępów 68/126/68/138. Przy szybszym skończonym sektorze realizuje
+  odpowiednio 3/2/2 warningi i launchy na EASY/MEDIUM/HARD, po czym
   `DRAIN` blokuje nowe źródła bez anulowania rozpoczętych efektów.
 
 ### Dowody pamięci i wydajności
@@ -498,9 +500,12 @@ Harmonogram ma 8 B, maski missile 6 B, tabele szerokości 6 B, offsety rekordów
 2 B, dwa rekordy wylotów 14 B, 6 B stawek world/hull, 3 B granic bezpiecznego
 warningu, a wygenerowane granice kontaktu 64 B. Runtime broadside wraz z
 procedurami HUD, sektora, eksplozji, POKEY, fundamentem rosteru i pierwszym
-profilem Raider burst, korektą transition i wspólną fighter explosion zajmuje
-5630/5632 B w odzyskanym RAM, a jego 4714-bajtowy pakowany ogon daje payload
-12 906 B. Sam
+profilem Raider burst, korektą transition i wspólną fighter explosion zajmował
+w zaakceptowanym checkpointcie 5630/5632 B w odzyskanym RAM, a jego
+4714-bajtowy pakowany ogon dawał payload 12 906 B. Starfield candidate przenosi
+176 B wspólnych procedur z tego bloku bez zmiany ich zachowania. Bieżący speed
+pass z obsługą sesyjnego TOP zajmuje 5525/5632 B BROADSIDE oraz 1146/2230 B
+STARFIELD. Sam
 zaakceptowany broadside przed rosterem zajmował 4605/3749 B i
 payload 11 941 B. Rozdzielenie scrollu
 dodało 47 B resident state i 560 B payloadu względem kandydata 9834 B;
@@ -508,13 +513,15 @@ eksplozje i audio dodały 27 B trwałego stanu. Detektor z
 clampem ma około 333 cykli, a konserwatywny worst case systemu broadside około
 1795–1820 cykli na ramkę. VBI ma delta 0; dwa gameplay DLI HUD-u dodają
 121 cykli ciał rutyn na ramkę bez `WSYNC` (konserwatywnie do 349).
-Rozdzielone bounded kopie kosztują około 15 300 cykli dla world eventu i
+Rozdzielone bounded kopie kosztują około 15 300 cykli dla near eventu i
 około 12 050 dla hull eventu z lookupem modułu; konserwatywny wspólny worst
 case z trzema slotami, flashami, dwiema eksplozjami, POKEY, kolizją, profilem
 prow, per-type clampem i nowym Raiderem to około 33 420 cykli bez fighter
 explosion. Po odzyskaniu 23. wiersza wspólny world+hull step finalizuje
-boundary/muzzles tylko raz; konserwatywny wynik z oboma slotami explosion
-wynosi około 33 380 i zostawia około 2120 cykli;
+boundary/muzzles tylko raz; wynik zaakceptowanego checkpointu z oboma slotami
+explosion wynosił około 33 380 i zostawiał około 2120 cykli. Po dodaniu dwóch
+faz starfield, akumulatora Raidera i ograniczonej obsługi TOP bieżący source
+bound wynosi około 34 230 cykli, z około 1270 cykli zapasu;
 zero-page delta wynosi 0 B.
 
 ### Wykluczenia
@@ -567,6 +574,35 @@ ma delta 0. Ostateczna stabilność granicy trybów wymaga Atari800 i 65XE PAL.
 ### Wykluczenia
 
 Bez nowych weapons, enemies, debris, repair drone lub zmian salwy.
+
+## 11A. Dwuwarstwowy PAL starfield — kandydat do testu ownera
+
+### Zakres
+
+- near layer z trzema zwartymi glifami, dokładnym rate `7/10` względem hull i
+  średnią gęstością 8,625 znaków w 23-wierszowym viewporcie;
+- 24-rekordowy far layer z trzema stalowo-niebieskimi glifami i dokładnym
+  rate `7/20` względem hull, czyli połową prędkości near;
+- osobny deterministyczny seed `$A7`, generacja tylko w odsłanianym górnym
+  wierszu oraz pojedynczy bezpieczny twinkle co 16 PAL frames;
+- jawna kolejność background/overlays i backing fighter/capital projectiles;
+- clipping broadside do kolumn 9–30 i stopniowa rekonstrukcja pełnej szerokości
+  po `COMPLETE`.
+
+### Dowody pamięci i wydajności
+
+Starfield dodaje 48 B glyphów, 102 B własnego stanu oraz współdzieli blok bez
+zero page z obsługą TOP; 1146 B kodu/tabel leży pod `$555A-$59D3`, a 2 B
+sesyjnego TOP pod `$4ED7-$4ED8`. Część bloku odzyskuje 176 B z wcześniej
+prawie pełnego BROADSIDE. PMG delta wynosi 0. Pakowany ogon ma 989 B,
+payload 13 829 B, XEX 13 841 B, ATR 92 176 B. Bounded far pass skanuje
+24 rekordy wyłącznie przy zdarzeniu warstwy, nie cały ekran co ramkę; source
+bound pozostawia około 1270 cykli do konserwatywnej ramki PAL 35 500.
+
+### Wykluczenia
+
+Bez nebuli, planet, księżyców, distant battle, debris, asteroid, wrecks,
+obstacles, nowych przeciwników i zmian timingu broni.
 
 ## 12. Zaawansowani enemies: Minelayer, Rammer, Heavy i Ace
 

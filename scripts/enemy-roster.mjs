@@ -238,6 +238,9 @@ export function compileEnemyRoster(definition, rootDirectory) {
   invariant(pursuit?.targetSamplingIntervalFrames === 8 && pursuit.deadZoneHpos === 3 &&
     pursuit.horizontalAccelerationHpos === 1 &&
     pursuit.maximumHorizontalVelocityHpos === 1 &&
+    pursuit.viperReferenceSpeedHposPerFrame === 2 && pursuit.movementStepHpos === 2 &&
+    pursuit.maximumSpeedRatioNumerator === 7 &&
+    pursuit.maximumSpeedRatioDenominator === 8 &&
     pursuit.weaveAmplitudeHpos === 4 && pursuit.weavePeriodFrames === 32 &&
     pursuit.attackActiveTop === 16 && pursuit.attackActiveBottomExclusive === 200,
   "Raider soft-pursuit parameters must remain the reviewed bounded profile");
@@ -345,6 +348,10 @@ export function renderEnemyRosterCa65Include(asset) {
     `RAIDER_TARGET_DEAD_ZONE = ${pursuit.deadZoneHpos}`,
     `RAIDER_HORIZONTAL_ACCELERATION = ${pursuit.horizontalAccelerationHpos}`,
     `RAIDER_MAX_HORIZONTAL_VELOCITY = ${pursuit.maximumHorizontalVelocityHpos}`,
+    `VIPER_HORIZONTAL_STEP_HPOS = ${pursuit.viperReferenceSpeedHposPerFrame}`,
+    `RAIDER_HORIZONTAL_STEP_HPOS = ${pursuit.movementStepHpos}`,
+    `RAIDER_SPEED_NUMERATOR = ${pursuit.maximumSpeedRatioNumerator}`,
+    `RAIDER_SPEED_DENOMINATOR = ${pursuit.maximumSpeedRatioDenominator}`,
     `RAIDER_WEAVE_AMPLITUDE = ${pursuit.weaveAmplitudeHpos}`,
     `RAIDER_WEAVE_PERIOD_FRAMES = ${pursuit.weavePeriodFrames}`,
     `RAIDER_ATTACK_ACTIVE_TOP = ${pursuit.attackActiveTop}`,

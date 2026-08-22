@@ -167,6 +167,7 @@ export function createRaiderPursuitState(asset, {
   x = asset.implemented[0].logicalBounds[0],
   y = ENEMY_FULLY_VISIBLE_TOP,
   velocityX = 0,
+  moveAccumulator = 0,
 } = {}) {
   const raider = asset.implemented[0];
   invariant(raider?.id === "RAIDER", "Soft pursuit requires the release Raider");
@@ -174,7 +175,10 @@ export function createRaiderPursuitState(asset, {
     x <= raider.logicalBounds[1], "Raider pursuit X is outside its legal corridor");
   invariant(Number.isInteger(y), "Raider pursuit Y must be an integer scanline");
   invariant([-1, 0, 1].includes(velocityX), "Raider pursuit velocity must be -1, 0, or 1");
-  return { x, y, velocityX };
+  const denominator = asset.runtime.movementPolicy.raiderSoftPursuit.maximumSpeedRatioDenominator;
+  invariant(Number.isInteger(moveAccumulator) && moveAccumulator >= 0 &&
+    moveAccumulator < denominator, "Raider movement accumulator is outside its rate window");
+  return { x, y, velocityX, moveAccumulator };
 }
 
 // Mirrors update_raider_soft_pursuit in the assembled runtime. The player and
@@ -210,15 +214,27 @@ export function stepRaiderSoftPursuit(asset, state, {
     next.velocityX = Math.max(-policy.maximumHorizontalVelocityHpos,
       Math.min(policy.maximumHorizontalVelocityHpos, requestedVelocity));
   }
-  next.x += next.velocityX;
+  let movedHpos = 0;
+  if (next.velocityX === 0) {
+    next.moveAccumulator = 0;
+  } else {
+    next.moveAccumulator += policy.maximumSpeedRatioNumerator;
+    if (next.moveAccumulator >= policy.maximumSpeedRatioDenominator) {
+      next.moveAccumulator -= policy.maximumSpeedRatioDenominator;
+      movedHpos = next.velocityX * policy.movementStepHpos;
+      next.x += movedHpos;
+    }
+  }
   if (next.x < raider.logicalBounds[0]) {
     next.x = raider.logicalBounds[0];
     next.velocityX = 0;
+    next.moveAccumulator = 0;
   } else if (next.x > raider.logicalBounds[1]) {
     next.x = raider.logicalBounds[1];
     next.velocityX = 0;
+    next.moveAccumulator = 0;
   }
-  return { ...next, sampled, targetDelta, requestedVelocity };
+  return { ...next, sampled, targetDelta, requestedVelocity, movedHpos };
 }
 
 export function simulateRaiderSoftPursuit(asset, {

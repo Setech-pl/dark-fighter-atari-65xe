@@ -103,6 +103,10 @@ test("release Raider uses bounded soft pursuit rather than a player-independent 
     deadZoneHpos: 3,
     horizontalAccelerationHpos: 1,
     maximumHorizontalVelocityHpos: 1,
+    viperReferenceSpeedHposPerFrame: 2,
+    movementStepHpos: 2,
+    maximumSpeedRatioNumerator: 7,
+    maximumSpeedRatioDenominator: 8,
     weaveAmplitudeHpos: 4,
     weavePeriodFrames: 32,
     attackActiveTop: 16,
@@ -128,6 +132,29 @@ test("release Raider uses bounded soft pursuit rather than a player-independent 
       x <= raider.logicalBounds[1]), true);
     assert.equal(trace.every(({ velocityX }) => Math.abs(velocityX) <= 1), true);
   }
+});
+
+test("Raider maximum lateral speed is exactly 7/8 of the Viper reference", () => {
+  const policy = asset.runtime.movementPolicy.raiderSoftPursuit;
+  const initialX = 112;
+  const frames = policy.maximumSpeedRatioDenominator;
+  const pursuit = simulateRaiderSoftPursuit(asset, {
+    frameCount: frames,
+    initialState: createRaiderPursuitState(asset, { x: initialX, y: 56 }),
+    playerXForFrame: () => 160,
+  });
+  const raiderDistance = pursuit.trace.reduce((sum, frame) =>
+    sum + Math.abs(frame.movedHpos), 0);
+  const viperDistance = frames * policy.viperReferenceSpeedHposPerFrame;
+  assert.equal(raiderDistance, 14);
+  assert.equal(viperDistance, 16);
+  assert.equal(raiderDistance * 8, viperDistance * 7);
+  assert.equal(pursuit.trace.filter(({ movedHpos }) => movedHpos !== 0).length, 7,
+    "Raider moves two HPOS on seven of each eight sustained pursuit frames");
+  assert.equal(pursuit.trace.at(-1).x, initialX + raiderDistance);
+  assert.deepEqual(manifest.enemyRoster.movementPolicy.raiderSoftPursuit, policy);
+  assert.match(source,
+    /update_raider_soft_pursuit:[\s\S]+RAIDER_MOVE_ACCUMULATOR[\s\S]+RAIDER_SPEED_NUMERATOR[\s\S]+RAIDER_SPEED_DENOMINATOR/);
 });
 
 test("Raider pursuit reverses gradually and preserves a small deterministic weave", () => {

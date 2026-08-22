@@ -176,7 +176,7 @@ test("both ships share one finite progression and retain an immutable eight-row 
   assert.equal(world.corridorPhase, 248);
   assert.equal(world.drainRows, 23);
   assert.equal(world.hullAdvances, 271);
-  assert.equal(frame, 1084);
+  assert.equal(frame, 542);
 });
 
 test("assembled sector dictionaries, sequences, overlays, and animation match the source asset", () => {
@@ -242,7 +242,7 @@ test("flagship keeps the accepted cadence, warning, speed, damage, and M0 owners
   assert.equal(asset.broadside.playerDamage, 20);
   assert.deepEqual(asset.broadside.worldScrollRates, { easy: 8, medium: 9, hard: 10 });
   assert.deepEqual(asset.broadside.hullScrollRates, { easy: 8, medium: 9, hard: 10 });
-  assert.equal(asset.broadside.hullScrollRateDenominator, 40);
+  assert.equal(asset.broadside.hullScrollRateDenominator, 20);
   assert.equal(updateMissileByte(0xff, 1, false), 0xf3);
   assert.equal(updateMissileSize(0x01, 1, 1) & 0x03, 0x01,
     "changing M1 size preserves M0's pair");
@@ -511,9 +511,9 @@ test("drain blocks new warnings and reaches COMPLETE only after every attached e
   assert.equal(updateSectorCompletion(world, state), CAPITAL_SECTOR_STATES.COMPLETE);
 
   for (const [difficulty, completeFrame] of [
-    ["easy", 1355],
-    ["medium", 1205],
-    ["hard", 1084],
+    ["easy", 678],
+    ["medium", 603],
+    ["hard", 542],
   ]) {
     assert.notEqual(
       simulateBroadsideCadence(asset, { frames: completeFrame - 1, difficulty }).finalSectorState,

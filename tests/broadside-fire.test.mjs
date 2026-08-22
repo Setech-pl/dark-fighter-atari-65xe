@@ -87,6 +87,9 @@ const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex")
 const broadsideRuntime = fs.readFileSync(
   path.join(rootDirectory, "build", "broadside-runtime.bin"),
 );
+const starfieldRuntime = fs.readFileSync(
+  path.join(rootDirectory, "build", "starfield-runtime.bin"),
+);
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -129,6 +132,13 @@ function xexBytesAt(address, length) {
       address - runtime.runAddress + length,
     );
   }
+  const starfield = manifest.starfieldRuntime;
+  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
+    return starfieldRuntime.subarray(
+      address - starfield.runAddress,
+      address - starfield.runAddress + length,
+    );
+  }
   assert.fail(`XEX address $${address.toString(16)} is not in a segment`);
 }
 
@@ -160,7 +170,7 @@ test("broadside source timing and schedule are deterministic and generated with 
     warningEarlyHeight: 2,
     warningMediumHeight: 4,
     worldScrollRateDenominator: 20,
-    hullScrollRateDenominator: 40,
+    hullScrollRateDenominator: 20,
     projectileSpeed: 2,
     warningHeight: 6,
     flyingHeight: 4,
@@ -221,9 +231,14 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(packed), runtime);
   assert.deepEqual(packBroadsideLzss(runtime), packed);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
-  assert.ok(manifest.payloadBytes - 11941 <= 1024);
+  assert.ok(manifest.payloadBytes - 11941 <= 2048);
+  const starRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
+  const starPacked = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime-packed.bin"));
+  assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
+  assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
+  assert.ok(starPacked.length <= 0x400);
   assert.match(routine("start", "unpack_broadside_runtime"),
-    /jsr unpack_broadside_runtime[\s\S]+jsr unpack_loader_bitmap/);
+    /jsr unpack_broadside_runtime[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });
 
 test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve every other pair", () => {
@@ -280,7 +295,7 @@ test("firing opportunities choose the oldest safe visible cannon once per lifecy
   assert.deepEqual(
     ["easy", "medium", "hard"].map((difficulty) =>
       warningHullAdvanceAllowance(asset, difficulty)),
-    [5, 6, 7],
+    [10, 12, 13],
   );
   const selected = selectOldestEligibleTurret(state, asset, world, "allied");
   assert.equal(selected.turret.id, "allied_turret_a");
@@ -353,14 +368,14 @@ test("three fixed slots move in faction directions and never allocate a fourth p
   assert.equal(allied.x, alliedX + 2);
 });
 
-test("assembled fractional cadence keeps the world rates and halves the hull stream", () => {
+test("assembled fractional cadence makes hull movement 100% of the legacy world rate", () => {
   assert.deepEqual(HULL_SCROLL_DIFFICULTIES, { easy: 0, medium: 1, hard: 2 });
   assert.equal(asset.broadside.worldScrollRateDenominator, 20);
-  assert.equal(asset.broadside.hullScrollRateDenominator, 40);
+  assert.equal(asset.broadside.hullScrollRateDenominator, 20);
   const expected = {
-    easy: { rate: 8, world: [8, 40, 400], hull: [4, 20, 200], scanlines: [160, 80] },
-    medium: { rate: 9, world: [9, 45, 450], hull: [4, 22, 225], scanlines: [180, 90] },
-    hard: { rate: 10, world: [10, 50, 500], hull: [5, 25, 250], scanlines: [200, 100] },
+    easy: { rate: 8, world: [8, 40, 400], hull: [8, 40, 400], scanlines: [160, 160] },
+    medium: { rate: 9, world: [9, 45, 450], hull: [9, 45, 450], scanlines: [180, 180] },
+    hard: { rate: 10, world: [10, 50, 500], hull: [10, 50, 500], scanlines: [200, 200] },
   };
   for (const [difficulty, contract] of Object.entries(expected)) {
     assert.equal(worldScrollRate(asset, difficulty), contract.rate);
@@ -398,8 +413,6 @@ test("assembled fractional cadence keeps the world rates and halves the hull str
   assert.equal(hard.advances, 1);
   assert.equal(hard.visibleScrolls, 0);
   assert.equal(advanceHullScroll(hard, asset), false);
-  assert.equal(advanceHullScroll(hard, asset), false);
-  assert.equal(advanceHullScroll(hard, asset), false);
   assert.equal(advanceHullScroll(hard, asset), true);
   assert.equal(hard.visibleScrolls, 1);
   assert.equal(hard.visibleRows[0], 0);
@@ -424,7 +437,7 @@ test("assembled fractional cadence keeps the world rates and halves the hull str
     "DIFFICULTY_SETTING",
   );
   assert.deepEqual([...broadsideRuntimeBytesAt(rateTableAddress, 3)], [8, 9, 10]);
-  const update = broadsideRuntimeBytesAt(labels.get("update_starfield"), 48);
+  const update = xexBytesAt(labels.get("update_starfield"), 48);
   assert.deepEqual([...update.subarray(0, 11)], [
     0xae, difficultyAddress & 0xff,
     difficultyAddress >> 8,
@@ -460,34 +473,34 @@ test("coincident world and hull steps finalize boundary overlays only once", () 
     "a world-only step still performs the required finalization");
 });
 
-test("PAL-frame scheduler remains independent of both world and hull scrolling", () => {
+test("PAL-frame scheduler keeps its timing while the faster finite hull pass shortens opportunities", () => {
   const corrected = simulateBroadsideCadence(asset, { frames: 1000 });
   assert.deepEqual(corrected.warningStats, {
-    count: 4, allied: 2, enemy: 2, minimumGap: 75, averageGap: 110.66666666666667,
+    count: 2, allied: 1, enemy: 1, minimumGap: 103, averageGap: 103,
   });
   assert.deepEqual(corrected.launchStats, {
-    count: 4, allied: 2, enemy: 2, minimumGap: 75, averageGap: 110.66666666666667,
+    count: 2, allied: 1, enemy: 1, minimumGap: 103, averageGap: 103,
   });
   assert.equal(corrected.maximumStartsPerFrame, 1);
   assert.equal(corrected.cancelledWarnings, 0);
-  assert.deepEqual(corrected.deferred, { busy: 0, invisible: 85, separation: 0 });
-  assert.equal(corrected.scheduleAttempts, 89);
+  assert.deepEqual(corrected.deferred, { busy: 0, invisible: 44, separation: 0 });
+  assert.equal(corrected.scheduleAttempts, 46);
 
   const longCorrected = simulateBroadsideCadence(asset, { frames: 10000 });
   assert.deepEqual(
     [longCorrected.warningStats.count, longCorrected.launchStats.count],
-    [4, 4],
+    [2, 2],
   );
   assert.deepEqual(
     [longCorrected.warningStats.allied, longCorrected.warningStats.enemy],
-    [2, 2],
+    [1, 1],
   );
   assert.deepEqual(
     [longCorrected.launchStats.allied, longCorrected.launchStats.enemy],
-    [2, 2],
+    [1, 1],
   );
-  assert.deepEqual(longCorrected.deferred, { busy: 0, invisible: 85, separation: 0 });
-  assert.equal(longCorrected.scheduleAttempts, 89);
+  assert.deepEqual(longCorrected.deferred, { busy: 0, invisible: 44, separation: 0 });
+  assert.equal(longCorrected.scheduleAttempts, 46);
   assert.equal(longCorrected.cancelledWarnings, 0);
   assert.equal(longCorrected.finalSectorState, 6);
   assert.deepEqual(
@@ -539,18 +552,19 @@ test("every difficulty keeps warnings and source-derived contact on its shifted 
   assert.equal(asset.broadside.projectileSpeed, 2);
 });
 
-test("speed sequence decouples world motion while warning follows only the hull boundary", () => {
+test("speed sequence couples hulls to the legacy world clock", () => {
   const snapshots = simulateBroadsideSpeedSequence(asset);
   assert.deepEqual(snapshots.map(({ frame, scrolled }) => [frame, scrolled]), [
     [0, false], [1, false], [2, true], [3, false], [4, true],
   ]);
   assert.deepEqual(snapshots.map(({ world }) => world.advances), [0, 0, 1, 1, 2]);
   assert.deepEqual(snapshots.map(({ world }) => world.accumulator), [0, 10, 0, 10, 0]);
-  assert.deepEqual(snapshots.map(({ world }) => world.hullAdvances), [0, 0, 0, 0, 1]);
-  assert.deepEqual(snapshots.map(({ warning }) => warning.y), [92, 92, 92, 92, 100]);
+  assert.deepEqual(snapshots.map(({ world }) => world.hullAdvances), [0, 0, 1, 1, 2]);
+  assert.deepEqual(snapshots.map(({ warning }) => warning.y), [92, 92, 100, 100, 108]);
   assert.deepEqual(snapshots.map(({ projectile }) => projectile.x), [162, 160, 158, 156, 154]);
   assert.deepEqual(snapshots[0].world.visibleRows, snapshots[1].world.visibleRows);
-  assert.deepEqual(snapshots[0].world.visibleRows, snapshots[3].world.visibleRows);
+  assert.notDeepEqual(snapshots[1].world.visibleRows, snapshots[2].world.visibleRows);
+  assert.deepEqual(snapshots[2].world.visibleRows, snapshots[3].world.visibleRows);
   assert.notDeepEqual(snapshots[3].world.visibleRows, snapshots[4].world.visibleRows);
 });
 
@@ -1007,13 +1021,13 @@ test("speed preview renders consecutive PAL states from the runtime scroll simul
     [0, false], [1, false], [2, true], [3, false], [4, true],
   ]);
   assert.deepEqual(state.panelDefinitions.map(({ world }) => world.advances), [0, 0, 1, 1, 2]);
-  assert.deepEqual(state.panelDefinitions.map(({ world }) => world.hullAdvances), [0, 0, 0, 0, 1]);
+  assert.deepEqual(state.panelDefinitions.map(({ world }) => world.hullAdvances), [0, 0, 1, 1, 2]);
   assert.deepEqual(state.panelDefinitions[0].screen, state.panelDefinitions[1].screen);
   assert.notDeepEqual(state.panelDefinitions[1].screen, state.panelDefinitions[2].screen);
   assert.deepEqual(state.panelDefinitions[2].screen, state.panelDefinitions[3].screen);
   assert.notDeepEqual(state.panelDefinitions[3].screen, state.panelDefinitions[4].screen);
   assert.deepEqual(state.panelDefinitions.map(({ warning }) => warning.y),
-    [92, 92, 92, 92, 100]);
+    [92, 92, 100, 100, 108]);
   assert.deepEqual(
     state.panelDefinitions.map(({ projectile }) => projectile.x),
     [162, 160, 158, 156, 154],
@@ -1065,10 +1079,10 @@ test("cadence preview plots source-derived warning, launch, and world-scroll tim
     [state.baseline.warningStats.count, state.baseline.launchStats.count],
     [4, 4],
   );
-  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [4, 4]);
+  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [2, 2]);
   assert.deepEqual(
     [state.final.warningStats.minimumGap, state.final.warningStats.averageGap],
-    [75, 110.66666666666667],
+    [103, 103],
   );
   assert.ok(state.final.warningScrolls.some(({ frame }) => frame % 4 === 0));
 

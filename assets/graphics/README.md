@@ -118,13 +118,13 @@ kolory, pozycje, granice i fazy pochodzą z tego samego źródła i stałych run
 scrollu z akumulatora. Bieżący wariant mechaniczny pozostaje dowodem `HARD`.
 `build/previews/broadside-speed-sequence.png` pokazuje pięć kolejnych ramek
 PAL z autorytatywnej symulacji: dwa pełne kroki świata występują w ramkach 2
-i 4, natomiast pierwszy krok kadłubów dopiero w ramce 4. Warning przesuwa się
-wtedy dokładnie razem z wylotem, a lecący pocisk zachowuje 2 jednostki HPOS
-ruchu na każdą ramkę.
+i 4, a kadłuby wykonują te same kroki 1:1. Warning przesuwa się wtedy dokładnie
+razem z wylotem, a lecący pocisk zachowuje 2 jednostki HPOS ruchu na każdą
+ramkę.
 `build/previews/difficulty-speed-comparison.png` pokazuje z jednego źródła
-8/9/10 zdarzeń world scrolla oraz 4/4/5 zdarzeń hull scrolla w 20 ramkach,
-przy identycznym warning timerze i ruchu pocisku. W długim oknie hull rates
-wynoszą dokładnie połowę world rates dla każdej trudności.
+8/9/10 zdarzeń zarówno world, jak i hull scrolla w 20 ramkach, przy identycznym
+warning timerze i ruchu pocisku. Osobny preview starfieldu zachowuje względem
+tej bazowej prędkości dokładnie 7/10 dla bliskich oraz 7/20 dla dalekich gwiazd.
 `build/previews/flagship-sector-sequence.png` pokazuje source-derived ENGINES,
 AFT, COMBAT, FORWARD, PROW, terminal tips, DRAIN i COMPLETE z jednego 240-wierszowego
 modelu. `build/previews/heavy-shell-detail-sequence.png` pokazuje końcowy hot

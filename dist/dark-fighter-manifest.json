@@ -7,14 +7,24 @@
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 101,
-  "payloadBytes": 12906,
+  "bootSectors": 109,
+  "payloadBytes": 13829,
   "broadsideRuntime": {
     "loadAddress": 16384,
     "runAddress": 24080,
-    "bytes": 5630,
+    "bytes": 5525,
     "reservedBytes": 5632,
-    "packedBytes": 4714,
+    "packedBytes": 4648,
+    "compression": "LZ-10/5"
+  },
+  "starfieldRuntime": {
+    "loadAddress": 22016,
+    "runAddress": 21850,
+    "bytes": 1146,
+    "reservedBytes": 2230,
+    "packedBytes": 989,
+    "stagingAddress": 29712,
+    "stagingBytes": 1024,
     "compression": "LZ-10/5"
   },
   "loaderScreen": {
@@ -35,7 +45,7 @@
   },
   "capitalHulls": {
     "source": "assets/graphics/capital-hulls.json",
-    "sourceSha256": "a927aa73d9d444425cc52809e40ffc9ac3f26ee92327d02d24cfaa8198cb5bb4",
+    "sourceSha256": "fe034c3c7abaf3fd30168f34859a651d39eb4e13ba3cd9b86a155cfd439d583c",
     "displayMode": "ANTIC 4",
     "segmentRows": 32,
     "glyphCount": 31,
@@ -84,7 +94,7 @@
   },
   "enemyRoster": {
     "source": "assets/graphics/enemy-roster.json",
-    "sourceSha256": "2172e3f523c4ed099566409452d76b1a372c6b51cbd890021ce41b3db399ee78",
+    "sourceSha256": "dd51151c37f2242ea90c523ac7925e225cf304dcb80eaf250080b066135a36a1",
     "inventoryCount": 10,
     "implementedCount": 3,
     "releaseArchetype": "RAIDER",
@@ -95,6 +105,22 @@
       "releaseBodyValue": 132,
       "artifactBodyValue": 132,
       "scannerValue": 70
+    },
+    "movementPolicy": {
+      "raiderSoftPursuit": {
+        "targetSamplingIntervalFrames": 8,
+        "deadZoneHpos": 3,
+        "horizontalAccelerationHpos": 1,
+        "maximumHorizontalVelocityHpos": 1,
+        "viperReferenceSpeedHposPerFrame": 2,
+        "movementStepHpos": 2,
+        "maximumSpeedRatioNumerator": 7,
+        "maximumSpeedRatioDenominator": 8,
+        "weaveAmplitudeHpos": 4,
+        "weavePeriodFrames": 32,
+        "attackActiveTop": 16,
+        "attackActiveBottomExclusive": 200
+      }
     },
     "weaponPolicy": {
       "singlePulse": {
@@ -271,18 +297,73 @@
       "colourValue": 70
     }
   },
+  "starfield": {
+    "source": "assets/graphics/starfield.json",
+    "sourceSha256": "2925ee6f7cb99073c760ea39a4ed57003c6740b67dd1ef56f71fbc5eb097b640",
+    "generationSeed": 167,
+    "corridor": {
+      "firstColumn": 8,
+      "endColumn": 32
+    },
+    "farLayer": {
+      "population": 24,
+      "rateNumerator": 7,
+      "rateDenominator": 20,
+      "colourRegister": "COLPF1",
+      "glyphs": [
+        {
+          "id": "DIM",
+          "screenCode": 1
+        },
+        {
+          "id": "BRIGHT",
+          "screenCode": 2
+        },
+        {
+          "id": "SHIFTED",
+          "screenCode": 3
+        }
+      ]
+    },
+    "nearLayer": {
+      "rateNumerator": 7,
+      "rateDenominator": 10,
+      "densityNumerator": 3,
+      "densityDenominator": 8,
+      "expectedVisible": 8.625,
+      "colourRegister": "COLPF0",
+      "glyphs": [
+        {
+          "id": "POINT",
+          "screenCode": 4
+        },
+        {
+          "id": "DOUBLE",
+          "screenCode": 5
+        },
+        {
+          "id": "SPARKLE",
+          "screenCode": 6
+        }
+      ]
+    },
+    "twinkleIntervalFrames": 16,
+    "glyphBytes": 48,
+    "runtimeStateBytes": 102,
+    "pmgBytes": 0
+  },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 12906,
-      "sha256": "a0e355e90dbcd91dc08e75d9e59fbee4f9ce548c6e7aa4286002665684e1868e"
+      "bytes": 13829,
+      "sha256": "cdcdebf4349ed3b7109b0d141a154782c59f86213912e8ac5427ddc4f799d587"
     },
     "dark-fighter.xex": {
-      "bytes": 12918,
-      "sha256": "465866aef3c0ed68a2146895dd07913077dd4d8f1fbbd9a1bddd0791317a2cd9"
+      "bytes": 13841,
+      "sha256": "d9adabd8e6c9a9181d457d74f51cf74f5dde61511139183b0107301d5ffdb03b"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "cad8f44b54b195de963d47616bcf30ea5f2ec0834e18e246d5057a7860660298"
+      "sha256": "39807bf11b716373bbee374afc99ebadc20548e4935b664263cf124635e438b2"
     }
   }
 }

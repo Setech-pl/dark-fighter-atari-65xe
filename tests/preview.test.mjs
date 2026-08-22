@@ -125,11 +125,6 @@ test("preview consumes the canonical charset, screen, PMG, and palette source", 
   const variants = [
     replaceOnce(
       source,
-      ".byte $00,$00,$10,$54,$10,$00,$00,$00",
-      ".byte $00,$00,$00,$54,$10,$00,$00,$00",
-    ),
-    replaceOnce(
-      source,
       "player_shape:\n    .byte %00011000",
       "player_shape:\n    .byte %00010000",
     ),

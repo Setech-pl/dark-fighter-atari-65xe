@@ -219,13 +219,16 @@ test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => 
   assert.doesNotMatch(routine("init_state"), /DIFFICULTY_SETTING/);
 });
 
-test("TOP SCORES renders exactly ten default rows and returns only on FIRE", () => {
+test("TOP SCORES renders ten rows with the session record first and returns only on FIRE", () => {
   assert.match(
     source,
     /top_score_row_template:[\s\S]+CH_FRONT_DASH,CH_FRONT_DASH,CH_FRONT_DASH/,
   );
   assert.match(routine("draw_top_score_rows"), /cpx #10\s+bne @row/);
   assert.match(routine("draw_top_score_rows"), /cpx #\$09\s+beq @ten/);
+  assert.match(routine("draw_top_score_rows"), /jmp draw_session_top_score/);
+  assert.match(source,
+    /draw_session_top_score:[\s\S]+TOP_SCORE_BCD_HI[\s\S]+TOP_SCORE_BCD_LO[\s\S]+CH_FRONT_ZERO/);
   assert.match(routine("handle_top_scores_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
   assert.doesNotMatch(source, /jsr SIOV|initials_entry|save_high_scores/i);
 });

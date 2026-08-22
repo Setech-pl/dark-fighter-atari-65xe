@@ -16,9 +16,11 @@ w `docs/roadmap.md`.
 
 Program przejmuje ekran i po starcie nie korzysta z usług DOS-u. XEX i ATR
 zawierają ten sam payload ładowany pod `$2000`. Pierwsze 8192 B pozostaje pod
-`$2000-$3FFF`; 4714-bajtowy pakowany ogon spod `$4000` jest przed loaderem
-rozwijany własnym ograniczonym dekoderem do `$5E10-$740D`. Dopiero potem
-bitmapa loadera może nadpisać przejściowe źródło. XEX uruchamia etykietę `start`,
+`$2000-$3FFF`; 4648-bajtowy pakowany ogon spod `$4000` jest przed loaderem
+rozwijany własnym ograniczonym dekoderem do `$5E10-$73A4`. Drugi, 989-bajtowy
+strumień starfield jest zachowywany pod `$7410-$77EC` i po loaderze rozwijany
+do `$555A-$59D3`. Dopiero potem bitmapa loadera może nadpisać przejściowe
+źródła. XEX uruchamia etykietę `start`,
 a bootowalny ATR wczytuje kolejne sektory i dochodzi do `start` przez
 `DOSVEC`. Bieżący gameplay jest jednym resident programem; title loader jest
 jedyną fazą ładowania.
@@ -32,8 +34,8 @@ wtedy wchodzi do istniejącej głównej pętli:
 3. aktualizuje pojedynczego przeciwnika;
 4. przechwytuje wszystkie potrzebne latch'e PMG, zachowuje kontrakt M0,
    aktualizuje trzy sloty broadside i dopiero potem zapisuje `HITCLR`;
-5. niezależnie akumuluje world i hull rate; środek przewija z pełną stawką
-   trudności, a kadłuby i przyczepione warningi dokładnie o połowę wolniej;
+5. akumuluje legacy world rate jako zegar kadłubów; kadłuby i przyczepione
+   warningi zachowują 100% tej stawki, near stars 70%, a far stars 35%;
 6. aktualizuje krótkie efekty POKEY.
 
 Nie jest to jeszcze docelowy scheduler. Nie ma docelowego player hull, game over,
@@ -85,8 +87,11 @@ ANTIC 2 dla dolnego hintu. Sub-screeny używają jednolitego ANTIC 2.
 Frontend charset przechowuje 42 zwarte glify 6×7 oraz kopie 16 istniejących
 glifów strukturalnych ANTIC 4. `frontend_hint_dli` działa raz na ramkę main
 menu; po widocznym obszarze pętla przywraca paletę główną. Nie ma DLI per opcja.
-`TOP SCORES` generuje dziesięć wierszy domyślnych przy wejściu, bez SIO,
-zapisu ATR, inicjałów lub trwałego formatu.
+`TOP SCORES` generuje dziesięć wierszy przy wejściu. Pierwszy pokazuje
+sesyjny TOP aktualizowany przez `max(TOP, SCORE)` po każdej punktacji; pozostałe
+wiersze zachowują szablon `--- 000000`. TOP przeżywa śmierć, respawn, game over
+i nową grę, ale pełny restart programu zeruje go. Nie ma SIO, zapisu ATR,
+inicjałów ani trwałego formatu.
 
 `START GAME` jest jedyną bieżącą ścieżką wejścia do gameplayu. Wyłącza DMA
 i PMG, wycisza POKEY, czyści PMG oraz ekran, inicjalizuje istniejący stan,
@@ -118,16 +123,34 @@ wybór. Dzięki temu ustawienie trwa przez powroty do menu w jednej sesji.
   `$4400-$47FF`. Frontend używa tego samego bufora z własnym charsetem
   `$4800-$4BFF`; mieszany main menu ma wiersze 20- i 40-bajtowe, a sub-screeny
   40-kolumnowy ANTIC 2.
-- Tło i kadłuby mają dwa jawne akumulatory. Środkowe kolumny 9–30 oraz
-  44-bajtowy backing gwiazd dla kolumn 8/31 zachowują world rate `8/9/10`
-  przy mianowniku 20: `EASY` daje dokładnie 20 wierszy/160 scanlines/s,
-  `MEDIUM` 22,5/180, a `HARD` 25/200. Ośmiokolumnowe masy kadłubów używają
-  tych samych liczników przy mianowniku 40, czyli dokładnie 10/80,
-  11,25/90 i 12,5/100. Oba strumienie wykonują najwyżej jeden pełny krok
-  8 scanlines na ramkę; nie jest to ANTIC fine scrolling. Warningi i granice
-  kolizji czytają wyłącznie fazę hull, natomiast po launchu M1–M3 poruszają
-  się nadal o 2 HPOS/ramkę. Gameplay wykonuje 50 logicznych updates/s, a oba
-  akumulatory są niezależne od schedulera broadside.
+- Kadłuby używają dotychczasowego world rate `8/9/10` przy mianowniku 20:
+  `EASY` daje dokładnie 20 wierszy/160 scanlines/s, `MEDIUM` 22,5/180, a
+  `HARD` 25/200. Ośmiokolumnowe masy obu statków, wyloty, warningi i granice
+  kolizji zachowują 100% tej stawki. Pełny krok ma 8 scanlines i występuje
+  najwyżej raz na ramkę; nie jest to ANTIC fine scrolling. Po launchu M1–M3
+  poruszają się nadal o 2 HPOS/ramkę, a scheduler broni nadal liczy ramki PAL.
+- Starfield ma dwie warstwy wyprowadzane z hull/world eventu. Warstwa near jest
+  autorytatywnym tłem w screen RAM: generuje najwyżej jedną z trzech figur
+  w nowo odsłoniętym górnym wierszu i używa dokładnego akumulatora `7/10`,
+  czyli 70% prędkości kadłubów. Warstwa far ma stałą pulę 24 rekordów i osobny
+  akumulator `7/20`, czyli 35% prędkości kadłubów. Każdy rekord przechowuje
+  tylko flagę renderu, dokładny adres
+  komórki i jeden z trzech kodów. Far zapisuje się wyłącznie na `CH_SPACE`,
+  jest zdejmowany przed kopią world i ponownie nakładany po niej. Fighter fire
+  oraz capital slug przechwytują ten złożony kod jako backing, dlatego po zejściu
+  obiektu wraca bieżąca gwiazda, a nie hardkodowana pustka. Kolejność dwóch
+  fighter overlays jest odwracana przy kasowaniu, więc nakładające się obiekty
+  nie przywracają starej warstwy ponad nadal aktywną.
+- W broadside obie warstwy generują tylko w bezpiecznych kolumnach 9–30;
+  8/31 pozostają pod kontrolą backingów granic i wylotów, a kolumny kadłubów
+  nigdy nie są dotykane przez starfield. Po `COMPLETE` nowo odsłaniane wiersze
+  rozszerzają tło do 0–39 bez osobnej pauzy lub pełnoekranowego redraw.
+- Seed `$A7`, gęstość near `3/8`, populacja far 24, proporcje `7/10` i `7/20`
+  względem hull oraz szesnastoramkowy
+  timer twinkle i wybór specjalnego near star co `1/8` są wygenerowanymi
+  parametrami z `assets/graphics/starfield.json`. Twinkle zmienia najwyżej jeden
+  aktualnie widoczny far glyph i najpierw potwierdza jego screen code, więc nie
+  prześwituje przez overlay gameplayu.
 - Dwa oryginalne side hulls i efekty używają 31 glifów w istniejącym 1024-bajtowym
   gameplay charset. Osobne mapy 32×9 B są przechowywane w payloadzie w
   postaci 320 B danych pakowanych plus dwa 16-bajtowe codebooki. Dwa
@@ -168,9 +191,15 @@ wybór. Dzięki temu ustawienie trwa przez powroty do menu w jednej sesji.
 
 Bieżący stan zajmuje 34 bajty zero page pod `$0080-$00A1`. Obejmuje
 pozycje gracza, jednego przeciwnika i pocisku, timery, score BCD, prosty
-`rng_state` oraz wskaźniki używane przy scrollu i dekompresji. `random_byte`
-jest małym deterministycznym generatorem używanym do pozycji przeciwnika
-i gwiazd. Nie jest jeszcze API kontrolowanej losowości poziomów.
+`rng_state` oraz wskaźniki używane przy scrollu i dekompresji. Ordinary enemy
+zachowuje swój mały deterministyczny generator, natomiast starfield ma osobny
+LFSR pod `$4ED1` i jawny seed `$A7`, więc jego układ nie zależy od ruchu ani
+respawnu przeciwnika i nigdy nie czyta niezainicjalizowanego RAM.
+
+Viper przesuwa się bocznie o 2 HPOS w każdej aktywnej ramce. Raider zachowuje
+soft pursuit i kierunek `-1/0/+1`, lecz istniejący bajt `$4ECC` jest jego
+akumulatorem: krok 2 HPOS występuje w dokładnie 7 z 8 aktywnych ramek. Maksimum
+wynosi więc 14 HPOS wobec 16 HPOS Vipera w pełnym oknie, dokładnie `7/8`.
 
 Frontend dodaje 7 bajtów ZP: 5 bajtów trwałego stanu przejść/opcji/bramek oraz
 2-bajtowy wskaźnik używany podczas renderowania. Trudność zajmuje poza ZP jeden
@@ -446,12 +475,15 @@ zajmują `$4EA7-$4EAD`,
 bez delta zero page. Dwa timery/pointery/kolumny eksplozji, 18 B backing i
 timer audio dodają 27 B pod `$4EAE-$4EC8`. Timer i faza trzyfazowej animacji
 silników dodają 2 B pod `$4EC9-$4ECA`.
-Aktywny indeks archetypu, cooldown/active flag oraz trzy bajty HP/pending
+Aktywny indeks archetypu, akumulator ruchu/active flag oraz trzy bajty HP/pending
 damage/pending source zajmują 6 B pod `$4ECB-$4ED0`; zero page pozostaje bez zmian.
-Kod, tabele i relokowane dane zajmują 5630/5632 B pod `$5E10-$740D`; blok linkera
+Sesyjny TOP SCORE zajmuje 2 B packed BCD pod `$4ED7-$4ED8`; bieżący SCORE nadal
+używa `$0090-$0091`. Kod, tabele i relokowane dane broadside zajmują
+5525/5632 B pod `$5E10-$73A4`; 1146 B starfield oraz przeniesionych wspólnych
+procedur zajmuje osobny blok `$555A-$59D3`. Blok linkera
 rezerwuje dokładnie ten sam zakres. Obejmuje to 64 B granic kolizji oraz
 64 B profili occupancy i 64 B prow boundaries, a także procedury budowy fontu
-i przełączania HUD-u. Ogon jest zapisany w payloadzie jako 4714 B
+i przełączania HUD-u. Ogony są zapisane w payloadzie jako 4648 B oraz 989 B
 deterministycznego LZ-10/5. Sam bounded
 detektor z clampem kosztuje konserwatywnie do około 333 cykli; nie wykonuje
 pełnego skanu ekranu. Łączny koszt systemu po korekcie szacuje się na około
@@ -461,7 +493,7 @@ trzech aktywnych slotów. Jednoczesny heavy impact i clamp pozostaje poniżej
 około 1820 cykli. Zmiana tabeli schedulera nie zwiększa żadnej z tych ścieżek.
 Nowy dispatch akumulatora kosztuje około 26 cykli bez scrolla i 23 przed
 ścieżką scrolla, czyli konserwatywnie do 12 cykli więcej niż poprzedni timer.
-Po odzyskaniu dodatkowego wiersza world event przenosi 484 komórki środka,
+Po odzyskaniu dodatkowego wiersza near event przenosi 484 komórki środka,
 przesuwa 46 B
 backingu, generuje gwiazdy i ponownie nakłada dwa źródłowe wyloty; hull event
 przenosi 352 komórki mas kadłubów, aktualizuje fazę, warningi oraz flagi
@@ -478,10 +510,15 @@ cykli. Stacjonarny efekt zapisuje osiem scanlines wyłącznie na granicy
 czteroramkowej fazy i czyści je raz przy expiry, a nie co PAL frame. Surowy
 koszt zmiany obu slotów pozostaje poniżej około 1100 cykli; równoczesne stany
 `DYING/EXPLODING` pomijają co najmniej około 640 cykli zwykłego inputu,
-ruchu, sprite renderu, broni i kolizji. Konserwatywny wynik daje więc około
-33 380 cykli i około 2120
-cykli zapasu do ramki PAL ~35 500. Średnia częstość kosztownego hull eventu jest dokładnie
-połową częstości world eventu; VBI pozostaje bez zmian.
+ruchu, sprite renderu, broni i kolizji. Zaakceptowany checkpoint dawał około
+33 380 cykli i 2120 cykli zapasu. Po zastąpieniu pełnego generatora wiersza
+jednym wyborem near, dodaniu 24-rekordowego far erase/redraw i akumulatora
+Raidera konserwatywny source bound po usunięciu 21-cyklowego testu/resetu
+SCORE wynosi około 34 230 cykli, czyli około 1270 cykli do ramki PAL ~35 500.
+Aktualizacja TOP kosztuje najwyżej 48 cykli wraz z `JSR` tylko w ramce
+punktacji; śmierć i respawn nie zapisują SCORE ani TOP. Hull zachowuje 100%
+legacy world rate, near
+wykonuje 70%, a far 35% jego zdarzeń; VBI pozostaje bez zmian.
 VBI pozostaje bez zmian. Gameplay wykonuje dwa DLI na ramkę: pierwszy po
 jedynym wierszu HUD-u przełącza `CHBASE=$44` i przywraca paletę ANTIC 4, drugi
 po ostatnim wierszu playfieldu przywraca `CHBASE=$50` oraz neutralne
@@ -513,6 +550,14 @@ Wartość dziesięciu jednostek health skaluje się dokładnie do
 statycznymi placeholderami bez readers, writers ani efektu gameplay i zostały
 usunięte z HUD-u.
 
+Każde przyznanie punktów wykonuje decimal-mode BCD add, następnie
+`TOP=max(TOP,SCORE)` i na końcu zapisuje nowe cyfry SCORE pod `$4006-$400A`.
+SCORE obejmuje wszystkie życia bieżącej gry: damage, śmierć, eksplozja,
+zmniejszenie LIFE, respawn i game over nie zapisują licznika. Wyłącznie
+`init_state`, wywoływane przy rozpoczęciu zupełnie nowej gry, zeruje SCORE;
+nie zeruje sesyjnego TOP. Pierwszy wiersz `TOP SCORES` konwertuje te same dwa
+bajty BCD do sześciu frontend screen codes przy wejściu na ekran.
+
 Przed włączeniem DMA `start_gameplay` instaluje `$50` w `CHBASE`, neutralne
 `COLPF1=$0E`, `COLPF2=$00` i fazę DLI równą zero. DLI po dividerze instaluje
 `CHBASE=$44` oraz kompletną paletę gameplayu przed pierwszym scanline ANTIC 4;
@@ -529,19 +574,19 @@ przedstawiane jako wolne miejsce w innej.
 | Kategoria | Potwierdzony stan bieżący | Bramka dla przyszłych zmian |
 | --- | --- | --- |
 | 1. Pojemność ATR | Standardowy ATR ma 92 176 B pliku: 16 B nagłówka i 92 160 B danych, czyli 720 sektorów po 128 B. Duża część obrazu jest pusta. | Wolne sektory nie zwiększają resident RAM i nie uzasadniają same w sobie modułów ładowanych podczas gry. |
-| 2. Boot payload i sektory startowe | Payload ma 12 906 B i zajmuje 101 sektorów. Pierwsze 8192 B trafia pod `$2000-$3FFF`, a pakowany ogon 4714 B pod `$4000-$5269`; ostatni sektor ma 22 B paddingu. XEX ma 12 918 B wraz z headers/RUNAD. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granice czasowe relokacji. |
-| 3. Resident gameplay RAM | CODE/RODATA pozostają w `$2000-$3FFF`, mapy kadłubów 576 B pod `$4C00-$4E3F`, broadside state 48 B pod `$4E40-$4E6F`, difficulty 1 B pod `$4E70`, 49 B stanu rozdzielonego scrollu pod `$4E71-$4EA1`, 12 B flash/sector/contact/player lifecycle pod `$4EA2-$4EAD`, 27 B eksplozji/audio pod `$4EAE-$4EC8`, 2 B animacji silników pod `$4EC9-$4ECA`, archetyp/fire/HP/damage state pod `$4ECB-$4ED0`, HUD charset 1024 B pod `$5000-$53FF`, 202 B puli burst i dwóch slotów eksplozji pod `$5400-$54C9`, a relokowany runtime zajmuje 5630/5632 B pod `$5E10-$740D`. | Każda dalsza funkcja ma mierzyć rzeczywiście trwałe dane, bez zakładania, że każdy nieadresowany bajt jest bezpieczny. |
-| 4. Pamięć przejściowa loadera | Przed loaderem `$4000-$5269` zawiera pakowany broadside ogon; start rozwija go do `$5E10`. Potem surowa bitmapa zajmuje `$4010-$5E0F`. Strumień LZ-10/5 i display list mieszczą się w głównym bloku `$2000-$3FFF`; PMG/DMA są wtedy wyłączone. | Koszt i zakresy obu rozpakowań raportować jako setup/transient, nie jako stały gameplay asset. |
-| 5. Pamięć odzyskiwalna po przejściu | `$3800-$3FFF` zostaje wyzerowane i przechodzi z loader-only payloadu na PMG. Frontend zajmuje `$4800-$4BFF`, mapy `$4C00-$4E3F`, state i scroll backing `$4E40-$4ED0`, HUD charset `$5000-$53FF`, fighter projectile/explosion state `$5400-$54C9`, `$54CA-$5E0F` pozostaje wolne, a relokowany runtime zajmuje `$5E10-$740D`. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma allocatora ani overlayu. |
+| 2. Boot payload i sektory startowe | Payload ma 13 829 B i zajmuje 109 sektorów. Pierwsze 8192 B trafia pod `$2000-$3FFF`, a pakowane ogony mają 4648 B i 989 B; ostatni sektor ma 123 B paddingu. XEX ma 13 841 B wraz z headers/RUNAD. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granice czasowe relokacji. |
+| 3. Resident gameplay RAM | CODE/RODATA pozostają w `$2000-$3F5F`, mapy kadłubów 576 B pod `$4C00-$4E3F`, broadside state 48 B pod `$4E40-$4E6F`, difficulty 1 B pod `$4E70`, dotychczasowy state pod `$4E71-$4ED0`, 6 B skalarów starfield pod `$4ED1-$4ED6`, TOP SCORE 2 B pod `$4ED7-$4ED8`, HUD charset 1024 B pod `$5000-$53FF`, 202 B puli burst/eksplozji pod `$5400-$54C9`, 96 B rekordów far pod `$54CA-$5529`, starfield runtime 1146/2230 B pod `$555A-$59D3` oraz broadside runtime 5525/5632 B pod `$5E10-$73A4`. | Każda dalsza funkcja ma mierzyć rzeczywiście trwałe dane, bez zakładania, że każdy nieadresowany bajt jest bezpieczny. |
+| 4. Pamięć przejściowa loadera | Przed loaderem `$4000-$5227` zawiera pakowany broadside ogon; start rozwija go do `$5E10`, a 989 B starfield kopiuje czasowo do `$7410-$77EC`. Potem surowa bitmapa zajmuje `$4010-$5E0F`; po loaderze drugi ogon trafia do `$555A`. Pakowany loader `$36AB-$3E95` pozostaje nienaruszony. | Koszt i zakresy obu rozpakowań raportować jako setup/transient, nie jako stały gameplay asset. |
+| 5. Pamięć odzyskiwalna po przejściu | `$3800-$3FFF` zostaje wyzerowane i przechodzi na PMG; `$7410-$780F` po rozpakowaniu ponownie jest wolne. Frontend zajmuje `$4800-$4BFF`, mapy `$4C00-$4E3F`, state `$4E40-$4ED8`, HUD charset `$5000-$53FF`, projectile/explosion state `$5400-$54C9`, far records `$54CA-$5529`, starfield runtime `$555A-$59D3`, a broadside runtime `$5E10-$73A4`. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma allocatora ani overlayu. |
 | 6. PMG | PMBASE `$3800`; missiles `$3B00-$3BFF`: M0 pozostaje wyłącznie zarezerwowany dla player weapon, M1–M3 dla warning/impact broadside. P0/P3 to Viper hull/engine, P1/P2 hostile hull/scanner. Viper i Raider burst oraz lecące capital slugs używają przywracanych znaków ANTIC 4, więc nie przejmują missile ani `COLPM`. | Każda zmiana ról, multipleksowania lub trybu DMA wymaga limitu obiektów, kosztu i testu PAL/real hardware. |
-| 7. Display memory i charset | Wspólny ekran `$4000-$43FF`; gameplay charset `$4400-$47FF`; frontend charset `$4800-$4BFF`; HUD charset `$5000-$53FF`. Kadłuby i efekty zajmują 31 indeksów gameplay charset od 59 do 89; zwarty frontend source zasila jednorazowo dedykowany font HUD. Main menu używa 820 B ekranu, sub-screeny i gameplay 960 B. | Kolejne glify wymagają ponownego audytu indeksów i niewyświetlanych danych źródłowych; każdy runtime charset nadal ma dokładnie 1024 B. |
+| 7. Display memory i charset | Wspólny ekran `$4000-$43FF`; gameplay charset `$4400-$47FF`; frontend charset `$4800-$4BFF`; HUD charset `$5000-$53FF`. Starfield zajmuje sześć izolowanych indeksów 1–6 (48 B), Viper fire zaczyna się od 11, kadłuby/efekty od 59, Raider fire od 90. Main menu używa 820 B ekranu, sub-screeny i gameplay 960 B. | Kolejne glify wymagają ponownego audytu indeksów, bitów koloru ANTIC 4 i guard bytes; każdy runtime charset nadal ma dokładnie 1024 B. |
 | 8. Zero page | Linker raportuje 34 B pod `$0080-$00A1`; w zadeklarowanym regionie `$0080-$00FF` pozostają 94 nieprzydzielone bajty. | Każda funkcja podaje delta ZP; wolnych bajtów nie przydziela się bez audytu konfliktów i czasu życia. |
-| 9. Koszt widocznej ramki | World event pozostaje ograniczony do jednej kopii w ramce, hull event do jednej osobnej kopii, a obie pule fighter fire wykonują stały skan 19 slotów bez alokacji dynamicznej. W ramce wspólnego world+hull kroku restore granic i redraw wylotów wykonuje się raz po obu kopiach. Konserwatywny source bound wynosi około 33 380 cykli przy dwóch równoczesnych fighter explosions, czyli zachowuje około 2120 cykli do budżetu PAL ~35 500. Dwa gameplay DLI i VBI pozostają bez zmian. | Trace nie zastępuje pomiaru najcięższej kombinacji na realnym 65XE; hardware acceptance nadal musi objąć pełny burst, obie eksplozje i wspólną ramkę scrolla. |
-| 10. Jednorazowy setup/transition | `start` rozwija 4714 B ogona do 5630 B przed loaderem oraz buduje 1024-bajtowy HUD charset w około 11,8 tys. cykli przy wyłączonym DMA. `START GAME` rozwija dwie mapy do 576 B, buduje niekolidujące glify projectile phases, zeruje pule i inicjalizuje state scroll/lifecycle/sector/contact/explosion/enemy/fire/damage oraz oba akumulatory. Loader DLI działa tylko przez 250 ramek; frontend i gameplay instalują własne ograniczone DLI. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
+| 9. Koszt widocznej ramki | Hull event nadal występuje najwyżej raz na ramkę, a pule fighter fire skanują stałe 19 slotów. Near generation zastępuje dawny 24-komórkowy skan jednym ograniczonym wyborem. Far erase/redraw skanuje 24 rekordy wyłącznie przy zdarzeniu warstwy; near/far zachowują dokładne fazy 7/10 i 7/20, a twinkle dotyka jednego rekordu co 16 PAL frames. Usunięcie nieprawidłowego testu/resetu SCORE odzyskuje 21 cykli normalnej ramki; TOP jest aktualizowany tylko przy punktacji. Konserwatywny source bound wynosi około 34 230 cykli, pozostawiając około 1270 do PAL ~35 500. DLI/VBI są bez zmian. | Trace nie zastępuje pomiaru najcięższej kombinacji na realnym 65XE; hardware acceptance nadal musi objąć pełny burst, obie eksplozje i wspólną ramkę scrolla. |
+| 10. Jednorazowy setup/transition | `start` rozwija 4648 B do 5525 B, czasowo zachowuje 989 B pod `$7410` i po loaderze rozwija je do 1146 B starfield runtime. `START GAME` rozwija mapy 576 B, buduje projectile glyphs i 48 B star glyphs, zeruje stałe pule oraz inicjalizuje osobny seed. Loader DLI działa tylko przez 250 ramek; frontend i gameplay instalują własne ograniczone DLI. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
 
-Główny blok linkera kończy RODATA pod `$3FFF`, ale payload nie kończy się w
-tym miejscu: 4714-bajtowy, przejściowy ogon zajmuje `$4000-$5269` do chwili
-rozpakowania. Nie jest to resident obraz ekranu ani „cała wolna pamięć Atari”.
+Główny blok linkera kończy RODATA pod `$3F5F`, ale payload nie kończy się w
+tym miejscu: dwa pakowane ogony 4648 B i 989 B następują po stałym bloku do
+chwili rozpakowania. Nie są to resident obraz ekranu ani „cała wolna pamięć Atari”.
 Dokładne role czasowe pozostają w `docs/memory-map.md`.
 
 ## Odrzucony spike architektoniczny: osobny playfield broadside ANTIC 2

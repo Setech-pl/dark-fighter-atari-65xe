@@ -79,6 +79,11 @@ z prędkością 6 i 12-ramkową pauzą. `TALON` i `SCYTHE_BOMBER` pozostają
 review-only z `WEAPON_NONE`. Tabela nie autoryzuje jeszcze AI, broni ani
 balansu pozostałych typów.
 
+Boczny ruch Vipera jest wartością odniesienia 100%: 2 HPOS na aktywną ramkę.
+Raider przy ciągłym ruchu wykonuje taki sam krok w dokładnie 7 z 8 ramek,
+czyli osiąga dokładnie `7/8 = 87,5%` maksimum Vipera. Soft pursuit, dead zone,
+weave i pionowy ruch pozostają bez zmian.
+
 ## Model sektorów
 
 **BINDING**
@@ -123,6 +128,14 @@ W sektorze bitwy:
 
 Kolizje burtowe mają wynikać z jednej spójnej symulacji, a nie z osobnych
 efektów dekoracyjnych dla każdej frakcji.
+
+Pierwsza warstwa tła jest wyłącznie dekoracyjna i deterministyczna. Capital
+hulls zachowują 100% kanonicznego world rate `8/9/10 ÷ 20`; near stars używają
+dokładnie `7/10`, a far stars `7/20` liczby kroków hull, czyli 70% i 35%.
+W broadside obie warstwy istnieją tylko
+w środkowym korytarzu i nigdy nie należą do collision, damage, score ani
+steering. Po `COMPLETE` nowo odsłaniane wiersze wracają do pełnej szerokości,
+bez resetu broni gracza lub dodatkowej pauzy sektorowej.
 
 Punkty za zniszczenie fightera wynikają z archetypu i jawnego źródła damage.
 Pocisk Vipera oraz rzeczywisty contact Vipera dają pełny score nawet, gdy ten
@@ -363,21 +376,26 @@ wyłączenia zasilania. UP/DOWN wybiera wiersz, LEFT/RIGHT zawija trudność mi�
 trzema wartościami, a FIRE na `BACK` wraca do menu. Trudności nie można
 zmieniać podczas aktywnego gameplayu. OFF wycisza wszystkie kanały POKEY.
 
-Trudność ustala pełnowierszowy ruch świata: `EASY` to dokładnie 20
+Trudność ustala pełnowierszowy ruch capital hulls: `EASY` to dokładnie 20
 wierszy/160 scanlines na sekundę, `MEDIUM` 22,5/180, a `HARD` 25/200.
-Side hulls używają osobnego akumulatora z tymi samymi licznikami i mianownikiem
-40, więc poruszają się dokładnie o połowę wolniej: odpowiednio 10/80,
-11,25/90 i 12,5/100. `EASY` jest 80% prędkości `HARD`. Harmonogram broadside,
+Side hulls używają tych samych liczników i mianownika 20, czyli 100% dawnego
+world rate. `EASY` jest 80% prędkości `HARD`. Harmonogram broadside,
 25-ramkowy warning, prędkość pocisków, sterowanie i kolizje pozostają oparte
-na ramkach PAL i nie są skalowane przez ten wybór. `HARD` pozostawia
-zaakceptowaną prędkość świata, a tylko masa capital ships otrzymuje wolniejszy
-strumień wzdłużny.
+na ramkach PAL i nie są skalowane przez ten wybór. Near i far zachowują wobec
+tej stawki dokładne proporcje 70% i 35%.
 
-`TOP SCORES` pokazuje dziesięć ponumerowanych wierszy domyślnej tabeli
-`--- 000000`. FIRE wraca do menu. Tabela nie jest jeszcze połączona z wynikami
-zakończonych gier; wpisywanie inicjałów i wstawianie score powstaną razem
-z integracją game over i scoringu. Tabela nie jest zapisywana na dysk i nie
-definiuje trwałego formatu high scores.
+`TOP SCORES` pokazuje dziesięć ponumerowanych wierszy. Pierwszy wiersz
+`--- 000000` jest sesyjnym TOP: po każdej punktacji przyjmuje
+`max(TOP, SCORE)`, nie maleje i jest zachowywany przez śmierć, respawn, game
+over oraz rozpoczęcie nowej gry. Pełny restart programu zeruje TOP. Pozostałe
+wiersze są nadal szablonami `--- 000000`; FIRE wraca do menu. Tabela nie jest
+zapisywana na dysk, nie obsługuje inicjałów i nie definiuje trwałego formatu
+high scores.
+
+SCORE obejmuje całą bieżącą grę i wszystkie życia gracza. Damage, śmierć,
+eksplozja, zmniejszenie LIFE i respawn nie zmieniają SCORE. Licznik wraca do
+zera wyłącznie przy rozpoczęciu zupełnie nowej gry; końcowy SCORE pozostaje
+dostępny podczas game over, a TOP jest zachowany przy kolejnym `START GAME`.
 
 `EXIT` najpierw pokazuje `EXIT GAME?`, z `NO` wybranym domyślnie. `NO` wraca do
 menu. `YES` wycisza POKEY, wyłącza gameplay i pozostawia stabilny ekran

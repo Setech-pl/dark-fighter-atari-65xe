@@ -6,6 +6,9 @@
 .export start
 .export boot_return
 .import __BROADSIDE_LOAD__, __BROADSIDE_RUN__
+.import __STARFIELD_RUN__
+
+.include "starfield.inc"
 
 ; -----------------------------------------------------------------------------
 ; OS workspace and vectors
@@ -80,6 +83,7 @@ NMIEN       = $D40E
 ; Reserved RAM
 
 PMG_BASE    = $3800
+STARFIELD_STAGING = $7410
 MISSILES    = PMG_BASE + $0300
 PLAYER0     = PMG_BASE + $0400
 PLAYER1     = PMG_BASE + $0500
@@ -146,12 +150,37 @@ CAPITAL_EXPLOSION_SOUND_TIMER = CAPITAL_EXPLOSION_BACKUP+$12
 ENGINE_ANIMATION_TIMER      = CAPITAL_EXPLOSION_SOUND_TIMER+$01
 ENGINE_ANIMATION_PHASE      = ENGINE_ANIMATION_TIMER+$01
 ENEMY_ARCHETYPE             = ENGINE_ANIMATION_PHASE+$01
-ENEMY_STEERING_TIMER        = ENEMY_ARCHETYPE+$01
-ENEMY_ACTIVE                = ENEMY_STEERING_TIMER+$01
+RAIDER_MOVE_ACCUMULATOR     = ENEMY_ARCHETYPE+$01
+ENEMY_ACTIVE                = RAIDER_MOVE_ACCUMULATOR+$01
 ENEMY_HP                    = ENEMY_ACTIVE+$01
 ENEMY_PENDING_DAMAGE        = ENEMY_HP+$01
 ENEMY_PENDING_SOURCE        = ENEMY_PENDING_DAMAGE+$01
 GAMEPLAY_RESIDENT_END       = ENEMY_PENDING_SOURCE+$01
+
+; Sparse far stars are decorative overlays above the authoritative
+; near-layer screen cells.  Each record stores an exact screen address, so
+; erase/redraw never has to recompute a column or retain a stale background
+; byte.  Far stars are drawn only over CH_SPACE; erasing one therefore restores
+; that same authoritative blank cell.  The four byte arrays live after the
+; fixed fighter-projectile state and before the relocated starfield code.
+STAR_FAR_ACTIVE              = $54CA
+STAR_FAR_SCREEN_LO           = STAR_FAR_ACTIVE+STAR_FAR_CAPACITY
+STAR_FAR_SCREEN_HI           = STAR_FAR_SCREEN_LO+STAR_FAR_CAPACITY
+STAR_FAR_CODE                = STAR_FAR_SCREEN_HI+STAR_FAR_CAPACITY
+STAR_FAR_STATE_END           = STAR_FAR_CODE+STAR_FAR_CAPACITY
+
+STAR_RNG_STATE               = GAMEPLAY_RESIDENT_END
+STAR_NEAR_PHASE              = STAR_RNG_STATE+$01
+STAR_FAR_PHASE               = STAR_NEAR_PHASE+$01
+STAR_TWINKLE_TIMER           = STAR_FAR_PHASE+$01
+STAR_TWINKLE_SLOT            = STAR_TWINKLE_TIMER+$01
+STAR_GENERATION_FLAGS        = STAR_TWINKLE_SLOT+$01
+STARFIELD_STATE_END          = STAR_GENERATION_FLAGS+$01
+TOP_SCORE_BCD_LO             = STARFIELD_STATE_END
+TOP_SCORE_BCD_HI             = TOP_SCORE_BCD_LO+$01
+SESSION_SCORE_STATE_END      = TOP_SCORE_BCD_HI+$01
+
+.assert SESSION_SCORE_STATE_END <= $5000, error, "session score state exceeds reclaimed loader RAM"
 
 .include "fighter-weapons.inc"
 
@@ -229,6 +258,9 @@ CH_ZERO     = 16
 CH_HUD_A    = 33
 CH_COLON    = 26
 CH_QUESTION = 31
+
+STAR_GENERATE_NEAR = $01
+STAR_GENERATE_FAR  = $02
 
 KAWASAKI_GREEN = $D8
 GAMEPLAY_COLPF0 = $0E
@@ -367,6 +399,10 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
 .assert GAMEPLAY_RESIDENT_END <= $4F00, error, "gameplay resident state exceeds reclaimed RAM"
+.assert STARFIELD_STATE_END <= $4F00, error, "starfield scalar state exceeds reclaimed RAM"
+.assert STAR_FAR_STATE_END <= $555A, error, "far-star records overlap relocated starfield code"
+.assert STAR_FAR_FIRST > CH_SPACE, error, "star codes must not alias blank space"
+.assert STAR_NEAR_END <= VIPER_PROJECTILE_GLYPH_BASE, error, "star glyphs overlap Viper projectile glyphs"
 .assert PLAYER_RESPAWN_X = 124, error, "player respawn must center the eight-HPOS envelope in the 24-column corridor"
 .assert ENEMY_X_MIN = 80, error, "enemy left edge must begin at the central corridor"
 .assert ENEMY_X_MAX = 160, error, "double-width enemy must end before the enemy hull"
@@ -399,6 +435,10 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 .assert SHARED_FIGHTER_EXPLOSION_TOTAL = 24, error, "fighter explosion must last exactly 24 PAL frames"
 .assert RAIDER_HORIZONTAL_ACCELERATION = 1, error, "Raider acceleration hot path assumes one HPOS unit"
 .assert RAIDER_MAX_HORIZONTAL_VELOCITY = 1, error, "Raider velocity state is bounded to -1/0/+1"
+.assert VIPER_HORIZONTAL_STEP_HPOS = 2, error, "Viper lateral reference must remain two HPOS per PAL frame"
+.assert RAIDER_HORIZONTAL_STEP_HPOS = VIPER_HORIZONTAL_STEP_HPOS, error, "fighter step units diverged"
+.assert RAIDER_SPEED_NUMERATOR*8 = RAIDER_SPEED_DENOMINATOR*7, error, "Raider maximum speed must remain exactly 7/8 of Viper"
+.assert RAIDER_SPEED_NUMERATOR < RAIDER_SPEED_DENOMINATOR, error, "Raider fractional rate must skip at least one frame"
 .assert RAIDER_WEAVE_PERIOD_FRAMES = 32, error, "Raider weave hot path assumes a 32-frame period"
 .assert RAIDER_ATTACK_ACTIVE_TOP = GAMEPLAY_TOP, error, "Raider pursuit begins at the gameplay viewport"
 .assert RAIDER_ATTACK_ACTIVE_BOTTOM = GAMEPLAY_BOTTOM, error, "Raider pursuit ends at the gameplay viewport"
@@ -507,10 +547,12 @@ start:
     ; The packed boot tail is expanded to reclaimed resident RAM before the
     ; loader starts using $4010-$5E0F for its bitmap.
     jsr unpack_broadside_runtime
+    jsr stage_starfield_runtime
 
     sta game_state                 ; STATE_LOADER
     jsr unpack_loader_bitmap
     jsr show_loader
+    jsr unpack_starfield_runtime
 
     ; Rebuild the gameplay and mixed-mode frontend displays with DMA off.
     ; This also reclaims loader-only payload bytes before Player 2 PMG data.
@@ -519,6 +561,11 @@ start:
     jsr copy_frontend_charset
     jsr copy_hud_charset
     jsr clear_screen
+
+    ; Session TOP survives gameplay resets but not a full program restart.
+    lda #$00
+    sta TOP_SCORE_BCD_LO
+    sta TOP_SCORE_BCD_HI
 
     lda #<display_list
     sta DLISTL
@@ -622,6 +669,64 @@ broadside_match_source:
     bne broadside_copy_match
     jmp broadside_unpack_command
 broadside_unpack_done:
+    rts
+
+unpack_starfield_runtime:
+    lda #<STARFIELD_STAGING
+    sta broadside_read_source+1
+    lda #>STARFIELD_STAGING
+    sta broadside_read_source+2
+    lda #<__STARFIELD_RUN__
+    sta broadside_destination+1
+    lda #>__STARFIELD_RUN__
+    sta broadside_destination+2
+    jmp broadside_unpack_command
+
+; Patched by scripts/build.mjs. The packed starfield stream follows the packed
+; BROADSIDE stream in the boot payload and is staged before loader bitmap use.
+starfield_packed_source:
+    .word $FFFF
+starfield_packed_size:
+    .word $FFFF
+
+; Preserve the compact stream above the resident broadside reservation, clear
+; of both the packed loader source and its bitmap destination. The buffer is
+; transient and released after the loader.
+stage_starfield_runtime:
+    lda starfield_packed_source
+    sta src_ptr
+    lda starfield_packed_source+1
+    sta src_ptr+1
+    lda #<STARFIELD_STAGING
+    sta dst_ptr
+    lda #>STARFIELD_STAGING
+    sta dst_ptr+1
+    lda starfield_packed_size+1
+    sta row_counter
+    ldy #$00
+    lda row_counter
+    beq @tail_setup
+@page:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    iny
+    bne @page
+    inc src_ptr+1
+    inc dst_ptr+1
+    dec row_counter
+    bne @page
+@tail_setup:
+    lda starfield_packed_size
+    beq @done
+    tax
+    ldy #$00
+@tail:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    iny
+    dex
+    bne @tail
+@done:
     rts
 
 broadside_read_source:
@@ -1314,7 +1419,7 @@ draw_top_score_rows:
     inx
     cpx #10
     bne @row
-    rts
+    jmp draw_session_top_score
 
 ; One reset path owns all gameplay state, hardware latches, PMG and audio.
 start_gameplay:
@@ -1332,6 +1437,7 @@ start_gameplay:
     jsr unpack_capital_hull_maps
     jsr init_broadside
     jsr init_screen
+    jsr init_far_star_population
     lda player_x
     sta HPOSP0
     sta HPOSP3
@@ -1409,6 +1515,8 @@ main_loop:
     jsr update_viper_weapon
     jsr update_enemy_weapon
     jsr update_starfield
+    jsr tick_star_twinkle
+    jsr render_far_star_overlays_if_needed
     jsr handle_player_hull_contact
     jsr render_launch_flashes
     jsr render_capital_explosions
@@ -1556,8 +1664,11 @@ init_state:
 
     lda #$00
     sta enemy_velocity_x
+    sta RAIDER_MOVE_ACCUMULATOR
     lda #$A7
     sta rng_state
+    lda #STAR_GENERATION_SEED
+    sta STAR_RNG_STATE
 
     lda #$00
     sta bullet_active
@@ -1577,6 +1688,7 @@ init_state:
     sta scroll_accumulator
     sta HULL_SCROLL_ACCUMULATOR
     jsr init_fighter_projectiles
+    jsr init_starfield_state
     jsr reset_enemy_fire_cooldown
     rts
 
@@ -1893,7 +2005,7 @@ init_screen:
     lda #$00
     sta BROAD_WORK_COUNT
 @corridor_rows:
-    jsr generate_starfield_row  ; hull rows enter from the top at half world speed
+    jsr generate_starfield_row  ; initial near background uses its independent seed
     ldx BROAD_WORK_COUNT
     ldy #CORRIDOR_CENTRAL_FIRST
     lda (dst_ptr),y
@@ -2098,7 +2210,8 @@ init_fighter_projectiles:
     inx
     cpx #32
     bne @viper_glyph_tail
-    jmp build_raider_projectile_glyphs
+    jsr build_raider_projectile_glyphs
+    jmp build_star_glyphs
 
 clear_fighter_projectiles:
     jsr erase_fighter_projectile_overlays
@@ -2994,6 +3107,7 @@ reset_enemy:
     sta enemy_x
     lda #$00
     sta enemy_velocity_x
+    sta RAIDER_MOVE_ACCUMULATOR
     lda #ENEMY_ACTIVE_STATE
     sta ENEMY_ACTIVE
     ldx ENEMY_ARCHETYPE
@@ -3028,6 +3142,7 @@ clamp_enemy_x:
     sta enemy_x
     lda #$00
     sta enemy_velocity_x
+    sta RAIDER_MOVE_ACCUMULATOR
     rts
 @right:
     cmp enemy_logical_x_maxs,x
@@ -3037,13 +3152,15 @@ clamp_enemy_x:
     sta enemy_x
     lda #$00
     sta enemy_velocity_x
+    sta RAIDER_MOVE_ACCUMULATOR
 @done:
     rts
 
 ; The release Raider samples a Viper-centred target every eight PAL frames,
 ; retaining a small deterministic weave. Signed velocity is bounded to
-; -1/0/+1 HPOS per frame. Reversal passes through zero for one sample period,
-; so the Raider reacts without mirroring the Viper's two-HPOS joystick motion.
+; -1/0/+1 direction. Reversal passes through zero for one sample period. The
+; fractional movement clock advances two HPOS on exactly seven of eight active
+; frames, giving a maximum 14/16 = 7/8 of Viper lateral speed.
 update_raider_soft_pursuit:
     lda frame_counter
     and #(RAIDER_TARGET_SAMPLE_INTERVAL-1)
@@ -3087,16 +3204,30 @@ update_raider_soft_pursuit:
     sta enemy_velocity_x
 @move:
     lda enemy_velocity_x
-    beq @done
+    bne @accumulate
+    sta RAIDER_MOVE_ACCUMULATOR
+    rts
+@accumulate:
+    lda RAIDER_MOVE_ACCUMULATOR
+    clc
+    adc #RAIDER_SPEED_NUMERATOR
+    cmp #RAIDER_SPEED_DENOMINATOR
+    bcs @advance
+    sta RAIDER_MOVE_ACCUMULATOR
+    rts
+@advance:
+    sbc #RAIDER_SPEED_DENOMINATOR
+    sta RAIDER_MOVE_ACCUMULATOR
+    lda enemy_velocity_x
     bmi @move_left
+    inc enemy_x
     inc enemy_x
     bne @clamp
 @move_left:
     dec enemy_x
+    dec enemy_x
 @clamp:
     jmp clamp_enemy_x
-@done:
-    rts
 
 update_enemy_animation:
     inc scanner_phase
@@ -3177,7 +3308,7 @@ update_enemy_review_harness:
     jmp draw_enemy
 .endif
 
-.segment "CODE"
+.segment "STARFIELD"
 
 ; -----------------------------------------------------------------------------
 ; Collision and score
@@ -3285,8 +3416,56 @@ add_archetype_score:
     adc #$00
     sta score_bcd_hi
     cld
-    jsr update_score_display
+    jsr update_top_score
+    jmp update_score_display
+
+; Packed BCD bytes preserve numeric ordering, so a high-byte/low-byte compare
+; implements TOP = max(TOP, SCORE) without converting the score.
+update_top_score:
+    lda score_bcd_hi
+    cmp TOP_SCORE_BCD_HI
+    bcc @done
+    bne @store
+    lda score_bcd_lo
+    cmp TOP_SCORE_BCD_LO
+    bcc @done
+    beq @done
+@store:
+    lda score_bcd_lo
+    sta TOP_SCORE_BCD_LO
+    lda score_bcd_hi
+    sta TOP_SCORE_BCD_HI
+@done:
     rts
+
+; The frontend table has six score columns. The gameplay counter is four BCD
+; digits, so the template keeps two leading zeroes and this routine writes the
+; remaining four digits into the first (session TOP) row.
+.segment "BROADSIDE"
+draw_session_top_score:
+    ldx #$00
+    lda TOP_SCORE_BCD_HI
+    jsr draw_top_score_bcd_byte
+    lda TOP_SCORE_BCD_LO
+draw_top_score_bcd_byte:
+    pha
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc #CH_FRONT_ZERO
+    sta SCREEN+5*40+23,x
+    inx
+    pla
+    and #$0F
+    clc
+    adc #CH_FRONT_ZERO
+    sta SCREEN+5*40+23,x
+    inx
+    rts
+
+.segment "STARFIELD"
 
 player_contacts_enemy:
     lda ENEMY_ACTIVE
@@ -3359,9 +3538,10 @@ update_score_display:
     rts
 
 ; -----------------------------------------------------------------------------
-; Starfield
+; Starfield. This separately relocated block occupies the otherwise unused
+; gap between projectile state and BROADSIDE; neither constrained block grows.
 
-.segment "BROADSIDE"
+.segment "STARFIELD"
 
 update_starfield:
     ldx DIFFICULTY_SETTING
@@ -3375,7 +3555,7 @@ update_starfield:
 @world_scroll:
     sbc #WORLD_SCROLL_RATE_DENOMINATOR
     sta scroll_accumulator
-    jsr scroll_world_columns
+    jsr advance_starfield_layers
 @hull_rate:
     ldx DIFFICULTY_SETTING
     lda HULL_SCROLL_ACCUMULATOR
@@ -3384,8 +3564,8 @@ update_starfield:
     cmp #HULL_SCROLL_RATE_DENOMINATOR
     bcs @hull_scroll
     sta HULL_SCROLL_ACCUMULATOR
-    ; A world step leaves its boundary/muzzle finalization pending so that a
-    ; coincident hull step can perform it once after both copies.  With the
+    ; A legacy-world clock event leaves boundary/muzzle finalization pending so
+    ; that the coincident hull step can perform it once after both copies. With the
     ; fixed-point accumulator, a post-subtraction world value is always less
     ; than the active numerator; a non-step value is always at least it.
     lda scroll_accumulator
@@ -3398,6 +3578,57 @@ update_starfield:
     sbc #HULL_SCROLL_RATE_DENOMINATOR
     sta HULL_SCROLL_ACCUMULATOR
     jmp scroll_hull_columns
+
+; The legacy world clock is now the 100% hull reference. Near and far layers
+; use independent exact fixed-point ratios against each hull/world event:
+; 7/10 (70%) and 7/20 (35%). Both remain bounded to at most one row per event.
+advance_starfield_layers:
+    lda #$00
+    sta STAR_GENERATION_FLAGS
+    lda STAR_NEAR_PHASE
+    clc
+    adc #STAR_NEAR_RATE_NUMERATOR
+    cmp #STAR_NEAR_RATE_DENOMINATOR
+    bcs @near_step
+    sta STAR_NEAR_PHASE
+    jmp @far_rate
+@near_step:
+    sbc #STAR_NEAR_RATE_DENOMINATOR
+    sta STAR_NEAR_PHASE
+    lda #STAR_GENERATE_NEAR
+    sta STAR_GENERATION_FLAGS
+@far_rate:
+    lda STAR_FAR_PHASE
+    clc
+    adc #STAR_FAR_RATE_NUMERATOR
+    cmp #STAR_FAR_RATE_DENOMINATOR
+    bcs @far_step
+    sta STAR_FAR_PHASE
+    jmp @dispatch
+@far_step:
+    sbc #STAR_FAR_RATE_DENOMINATOR
+    sta STAR_FAR_PHASE
+    lda STAR_GENERATION_FLAGS
+    ora #STAR_GENERATE_FAR
+    sta STAR_GENERATION_FLAGS
+@dispatch:
+    lda STAR_GENERATION_FLAGS
+    beq @done
+    jsr erase_far_star_overlays
+    lda STAR_GENERATION_FLAGS
+    and #STAR_GENERATE_NEAR
+    beq @far_dispatch
+    jsr scroll_world_columns
+@far_dispatch:
+    lda STAR_GENERATION_FLAGS
+    and #STAR_GENERATE_FAR
+    beq @mark_dirty
+    jsr advance_far_stars
+@mark_dirty:
+    lda #$80
+    sta STAR_GENERATION_FLAGS
+@done:
+    rts
 
 ; The 24-column star corridor keeps the accepted gameplay difficulty cadence.
 ; Only columns 9..30 live directly in screen memory. Columns 8 and 31 have a
@@ -3416,6 +3647,17 @@ scroll_world_columns:
     sta row_counter
 
 @copy_row:
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_COMPLETE
+    bne @copy_corridor
+    ldy #39
+@copy_full:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    bpl @copy_full
+    jmp @row_done
+@copy_corridor:
     ldy #(CORRIDOR_CENTRAL_END-2)
 @copy_byte:
     lda (src_ptr),y
@@ -3423,7 +3665,7 @@ scroll_world_columns:
     dey
     cpy #CORRIDOR_CENTRAL_FIRST
     bne @copy_byte
-
+@row_done:
     sec
     lda src_ptr
     sbc #40
@@ -3463,9 +3705,329 @@ scroll_world_columns:
     sta CORRIDOR_BOUNDARY_RIGHT
     rts
 
-; The two eight-column hull masses advance from their own half-speed fixed-point
-; clock. Muzzle projections are restored from source metadata after the bases
-; move, and attached WARNING slots receive exactly the same eight-scanline step.
+; Scalar state is reset before the initial near rows are generated. Sparse far
+; records are populated afterwards so they only claim completed blank cells.
+init_starfield_state:
+    lda #$00
+    sta STAR_NEAR_PHASE
+    sta STAR_FAR_PHASE
+    sta STAR_TWINKLE_SLOT
+    sta STAR_GENERATION_FLAGS
+    lda #STAR_TWINKLE_INTERVAL
+    sta STAR_TWINKLE_TIMER
+    ldx #(STAR_FAR_CAPACITY-1)
+@clear:
+    lda #$00
+    sta STAR_FAR_ACTIVE,x
+    sta STAR_FAR_SCREEN_LO,x
+    sta STAR_FAR_SCREEN_HI,x
+    sta STAR_FAR_CODE,x
+    dex
+    bpl @clear
+    rts
+
+build_star_glyphs:
+    ldx #$00
+@byte:
+    lda star_glyph_bytes,x
+    sta CHARSET+STAR_FAR_FIRST*8,x
+    inx
+    cpx #((STAR_NEAR_END-STAR_FAR_FIRST)*8)
+    bne @byte
+    rts
+
+; Initial setup distributes exactly 24 logical far stars over the 23 gameplay
+; rows. Cells already occupied by a near star remain logically present but are
+; not drawn until their next 35%-rate step reaches clear background.
+init_far_star_population:
+    ldx #$00
+@slot:
+    lda #$01
+    sta STAR_FAR_ACTIVE,x
+    jsr star_random_byte
+    and #$1F
+    cmp #GAMEPLAY_SCREEN_ROWS
+    bcc :+
+    sec
+    sbc #GAMEPLAY_SCREEN_ROWS
+:
+    sta row_counter
+    lda #<GAMEPLAY_SCREEN
+    sta dst_ptr
+    lda #>GAMEPLAY_SCREEN
+    sta dst_ptr+1
+@row:
+    lda row_counter
+    beq @column
+    clc
+    lda dst_ptr
+    adc #40
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
+    dec row_counter
+    bne @row
+@column:
+    jsr choose_far_star_column
+    clc
+    adc dst_ptr
+    sta STAR_FAR_SCREEN_LO,x
+    lda dst_ptr+1
+    adc #$00
+    sta STAR_FAR_SCREEN_HI,x
+    jsr choose_far_star_code
+    sta STAR_FAR_CODE,x
+    inx
+    cpx #STAR_FAR_CAPACITY
+    bne @slot
+    jmp render_far_star_overlays
+
+; The near layer is authoritative character background. At most one star is
+; introduced in a newly exposed row, keeping generation bounded and sparse.
+generate_near_star_row:
+    jsr star_random_byte
+    and #(STAR_DENSITY_DENOMINATOR-1)
+    cmp #STAR_NEAR_DENSITY_NUMERATOR
+    bcs @done
+    jsr choose_star_column
+    tay
+    lda (dst_ptr),y
+    bne @done
+    jsr star_random_byte
+    and #(STAR_SPECIAL_FREQUENCY-1)
+    beq @sparkle
+    cmp #$02
+    bcc @double
+    lda #STAR_NEAR_POINT
+    bne @store
+@double:
+    lda #STAR_NEAR_DOUBLE
+    bne @store
+@sparkle:
+    lda #STAR_NEAR_SPARKLE
+@store:
+    sta (dst_ptr),y
+@done:
+    rts
+
+choose_star_column:
+    jsr star_random_byte
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_COMPLETE
+    bne @corridor
+    lda STAR_RNG_STATE
+    and #$3F
+    cmp #40
+    bcc @done
+    sec
+    sbc #40
+@done:
+    rts
+@corridor:
+    lda STAR_RNG_STATE
+    and #$1F
+    cmp #22
+    bcc :+
+    sec
+    sbc #22
+:
+    clc
+    adc #(CORRIDOR_CENTRAL_FIRST+1)
+    rts
+
+; Boundary cells 8/31 are part of the legal flight corridor, but the hull
+; projection code temporarily owns them for source muzzles. Persistent far
+; overlays therefore use the safe 22-cell interior until COMPLETE.
+choose_far_star_column:
+    jsr star_random_byte
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_COMPLETE
+    bne @corridor
+    lda STAR_RNG_STATE
+    and #$3F
+    cmp #40
+    bcc @done
+    sec
+    sbc #40
+@done:
+    rts
+@corridor:
+    lda STAR_RNG_STATE
+    and #$1F
+    cmp #22
+    bcc :+
+    sec
+    sbc #22
+:
+    clc
+    adc #(CORRIDOR_CENTRAL_FIRST+1)
+    rts
+
+choose_far_star_code:
+    jsr star_random_byte
+    and #$07
+    cmp #$05
+    bcc @dim
+    beq @bright
+    lda #STAR_FAR_SHIFTED
+    rts
+@bright:
+    lda #STAR_FAR_BRIGHT
+    rts
+@dim:
+    lda #STAR_FAR_DIM
+    rts
+
+star_random_byte:
+    lda STAR_RNG_STATE
+    lsr
+    bcc :+
+    eor #$B8
+:
+    sta STAR_RNG_STATE
+    rts
+
+erase_far_star_overlays:
+    ldx #(STAR_FAR_CAPACITY-1)
+@slot:
+    lda STAR_FAR_ACTIVE,x
+    bpl @next
+    and #$7F
+    sta STAR_FAR_ACTIVE,x
+    lda STAR_FAR_SCREEN_LO,x
+    sta dst_ptr
+    lda STAR_FAR_SCREEN_HI,x
+    sta dst_ptr+1
+    ldy #$00
+    lda #CH_SPACE
+    sta (dst_ptr),y
+@next:
+    dex
+    bpl @slot
+    rts
+
+render_far_star_overlays:
+    ldx #$00
+@slot:
+    lda STAR_FAR_ACTIVE,x
+    cmp #$01
+    bne @next
+    lda STAR_FAR_SCREEN_LO,x
+    sta dst_ptr
+    lda STAR_FAR_SCREEN_HI,x
+    sta dst_ptr+1
+    ldy #$00
+    lda (dst_ptr),y
+    bne @next                       ; near stars and gameplay backing win
+    lda STAR_FAR_CODE,x
+    sta (dst_ptr),y
+    lda #$81
+    sta STAR_FAR_ACTIVE,x
+@next:
+    inx
+    cpx #STAR_FAR_CAPACITY
+    bne @slot
+    rts
+
+; Far stars persist as composed background until a world-scroll step erases
+; them.  Revisit the bounded 24-slot population only after that step rather
+; than scanning it on every PAL frame.
+render_far_star_overlays_if_needed:
+    lda STAR_GENERATION_FLAGS
+    beq @done
+    lda #$00
+    sta STAR_GENERATION_FLAGS
+    jmp render_far_star_overlays
+@done:
+    rts
+
+advance_far_stars:
+    ldx #$00
+@slot:
+    lda STAR_FAR_ACTIVE,x
+    beq @next
+    clc
+    lda STAR_FAR_SCREEN_LO,x
+    adc #40
+    sta STAR_FAR_SCREEN_LO,x
+    lda STAR_FAR_SCREEN_HI,x
+    adc #$00
+    sta STAR_FAR_SCREEN_HI,x
+    cmp #>GAMEPLAY_SCREEN_END
+    bcc @next
+    bne @respawn
+    lda STAR_FAR_SCREEN_LO,x
+    cmp #<GAMEPLAY_SCREEN_END
+    bcc @next
+@respawn:
+    jsr choose_far_star_column
+    clc
+    adc #<GAMEPLAY_SCREEN
+    sta STAR_FAR_SCREEN_LO,x
+    lda #>GAMEPLAY_SCREEN
+    adc #$00
+    sta STAR_FAR_SCREEN_HI,x
+    jsr choose_far_star_code
+    sta STAR_FAR_CODE,x
+    lda #$01
+    sta STAR_FAR_ACTIVE,x
+@next:
+    inx
+    cpx #STAR_FAR_CAPACITY
+    bne @slot
+    rts
+
+tick_star_twinkle:
+    dec STAR_TWINKLE_TIMER
+    bne @done
+    lda #STAR_TWINKLE_INTERVAL
+    sta STAR_TWINKLE_TIMER
+    inc STAR_TWINKLE_SLOT
+    lda STAR_TWINKLE_SLOT
+    cmp #STAR_FAR_CAPACITY
+    bcc :+
+    lda #$00
+    sta STAR_TWINKLE_SLOT
+:
+    tax
+    lda STAR_FAR_ACTIVE,x
+    bpl @done                         ; hidden/covered stars hold their phase
+    lda STAR_FAR_CODE,x
+    sta loader_repeat_value
+    lda STAR_FAR_SCREEN_LO,x
+    sta dst_ptr
+    lda STAR_FAR_SCREEN_HI,x
+    sta dst_ptr+1
+    ldy #$00
+    lda (dst_ptr),y
+    cmp loader_repeat_value
+    bne @done                         ; never change through an overlay owner
+    lda loader_repeat_value
+    cmp #STAR_FAR_BRIGHT
+    beq @dim
+    lda #STAR_FAR_BRIGHT
+    bne @store
+@dim:
+    lda #STAR_FAR_DIM
+@store:
+    sta STAR_FAR_CODE,x
+    lda STAR_FAR_CODE,x
+    sta (dst_ptr),y
+@done:
+    rts
+
+star_glyph_bytes:
+    EMIT_STAR_GLYPHS
+
+.assert * - star_glyph_bytes = (STAR_NEAR_END-STAR_FAR_FIRST)*8, error, "star glyph byte count changed"
+.assert * - __STARFIELD_RUN__ <= $08B6, error, "starfield runtime exceeds the pre-broadside gap"
+
+.segment "BROADSIDE"
+
+; The two eight-column hull masses advance at 100% of the legacy world clock.
+; Muzzle projections are restored from source metadata after the bases move,
+; and attached WARNING slots receive exactly the same eight-scanline step.
 scroll_hull_columns:
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_COMPLETE
@@ -3737,13 +4299,23 @@ generate_corridor_row:
 ; the two streams are independent and source-derived muzzles are overlaid later.
 generate_starfield_row:
     lda #CH_SPACE
+    ldy #$00
+    ldx CAPITAL_SECTOR_STATE
+    cpx #CAPITAL_HULL_STATE_COMPLETE
+    beq @clear_central
     ldy #CORRIDOR_CENTRAL_FIRST
 @clear_central:
     sta (dst_ptr),y
     iny
+    cpx #CAPITAL_HULL_STATE_COMPLETE
+    beq @full_limit
     cpy #CORRIDOR_CENTRAL_END
     bne @clear_central
-    jmp fill_starfield_empty_cells
+    jmp generate_near_star_row
+@full_limit:
+    cpy #40
+    bne @clear_central
+    jmp generate_near_star_row
 
 ; Resolve a finite sector row to one reusable eight-row source module. The
 ; selected module id and local row remain in BROAD_WORK_VALUE/COUNT so the
@@ -4007,30 +4579,7 @@ draw_hull_row:
     rts
 
 fill_starfield_empty_cells:
-    ldy #CORRIDOR_CENTRAL_FIRST
-@cell:
-    lda (dst_ptr),y
-    bne @occupied
-    jsr random_byte
-    and #$0F
-    bne @space
-    jsr random_byte
-    and #$03
-    beq @bright
-    lda #CH_DOT
-    bne @store
-@bright:
-    lda #CH_STAR
-    bne @store
-@space:
-    lda #CH_SPACE
-@store:
-    sta (dst_ptr),y
-@occupied:
-    iny
-    cpy #CORRIDOR_CENTRAL_END
-    bne @cell
-    rts
+    jmp generate_near_star_row
 
 ; Initial rows preserve the historical RNG sequence: a hull projection stores
 ; black behind itself rather than leaking a capital-hull screen code into the

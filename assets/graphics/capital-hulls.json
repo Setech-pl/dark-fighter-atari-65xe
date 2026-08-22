@@ -466,7 +466,7 @@
       "medium": 9,
       "hard": 10
     },
-    "hullScrollRateDenominator": 40,
+    "hullScrollRateDenominator": 20,
     "hullScrollRates": {
       "easy": 8,
       "medium": 9,

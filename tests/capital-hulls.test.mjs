@@ -40,6 +40,7 @@ const asset = compileCapitalHulls(definition);
 const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
 const broadsideRuntime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
+const starfieldRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -63,6 +64,10 @@ function readXexBytes(address, length) {
   const runtime = manifest.broadsideRuntime;
   if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
     return broadsideRuntime.subarray(address - runtime.runAddress, address - runtime.runAddress + length);
+  }
+  const starfield = manifest.starfieldRuntime;
+  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
+    return starfieldRuntime.subarray(address - starfield.runAddress, address - starfield.runAddress + length);
   }
   assert.fail(`Resident image does not contain $${address.toString(16)}`);
 }
@@ -142,7 +147,7 @@ test("31 generated ANTIC 4 glyphs fit the 1024-byte assembled gameplay charset",
   assert.equal(graphics.charset.length, 1024);
   assert.deepEqual(
     readXexBytes(labels.get("charset_data"), 1024),
-    Buffer.from(graphics.charset),
+    Buffer.from(graphics.sourceCharset),
   );
 });
 
@@ -217,7 +222,7 @@ test("assembled ANTIC 2 HUD keeps independent live score, life, and hull fields"
   const scoreAddress = labels.get("update_score_display");
   const scoreBytes = readXexBytes(
     scoreAddress,
-    labels.get("play_hit_sound") - scoreAddress,
+    labels.get("update_starfield") - scoreAddress,
   );
   for (let offset = 6; offset <= 10; offset += 1) {
     assert.notEqual(
@@ -289,7 +294,7 @@ test("generated include, packed maps, codebooks, and turret records match assemb
   );
   assert.deepEqual(
     readXexBytes(labels.get("turret_warning_last_safe_rows"), 3),
-    Buffer.from([17, 16, 15]),
+    Buffer.from([12, 10, 9]),
     "assembled firing bounds reserve the complete 25-frame warning plus one hull row",
   );
   for (const side of ["allied", "enemy"]) {
@@ -534,11 +539,9 @@ test("runtime map reservation and payload remain bounded and do not consume PMG 
     Uint8Array.from(readXexBytes(labels.get("enemy_collision_boundaries"), asset.segmentRows)),
     asset.collisionBoundaries.get("enemy"),
   );
-  const generator = source.slice(
-    source.indexOf("generate_corridor_row:"),
-    source.indexOf("random_byte:"),
-  );
-  assert.match(generator, /lda \(dst_ptr\),y\s+bne @occupied/);
+  const generator = source.slice(source.indexOf("generate_near_star_row:"),
+    source.indexOf("choose_star_column:"));
+  assert.match(generator, /lda \(dst_ptr\),y\s+bne @done/);
   assert.doesNotMatch(generator, /PMG|GRACTL|NMIEN|VDSLST|WSYNC/);
   assert.match(source, /lda #GAMEPLAY_SCREEN_ROWS\s+sta row_counter[\s\S]+jsr generate_starfield_row/);
   assert.match(source, /scroll_world_columns:[\s\S]+generate_starfield_row/);
@@ -574,7 +577,7 @@ test("joystick, FIRE, projectile, enemy, and scoring routines remain connected",
   assert.match(source, /read_input:[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
   assert.match(source, /allocate_viper_projectile:[\s\S]+sta bullet_active/);
   assert.match(source,
-    /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jsr update_score_display/);
+    /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jsr update_top_score[\s\S]+jmp update_score_display/);
   assert.match(source,
     /update_enemy:[\s\S]+jsr update_raider_soft_pursuit[\s\S]+update_enemy_animation/);
   assert.match(source,

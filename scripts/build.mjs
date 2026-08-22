@@ -25,6 +25,11 @@ import {
   loadFighterWeaponsDefinition,
   renderFighterWeaponsCa65Include,
 } from "./fighter-weapons.mjs";
+import {
+  compileStarfield,
+  loadStarfieldDefinition,
+  renderStarfieldCa65Include,
+} from "./starfield.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -50,7 +55,9 @@ const isReviewVariant = enemyReviewHarness || enemyCombatReviewHarness || Boolea
 const acceptedBroadsidePayloadBytes = 11941;
 // Pass 1 plus the focused projectile/scoring correction remains below 1 KiB
 // while preserving the protected finale arena and fixed resident regions.
-const enemyRosterPayloadLimit = 1024;
+const starfieldPassPayloadLimit = 2048;
+const starfieldStagingAddress = 0x7410;
+const starfieldStagingBytes = 0x400;
 
 function ensureDirectory(fsApi, directory) {
   const parts = directory.split("/").filter(Boolean);
@@ -178,6 +185,12 @@ async function build() {
     renderFighterWeaponsCa65Include(fighterWeaponsAsset),
   );
   writeFile(path.join(buildDirectory, "fighter-weapons.inc"), fighterWeaponsInclude);
+  const starfieldDefinitionPath = path.join(
+    rootDirectory, "assets", "graphics", "starfield.json",
+  );
+  const starfieldAsset = compileStarfield(loadStarfieldDefinition(starfieldDefinitionPath));
+  const starfieldInclude = Buffer.from(renderStarfieldCa65Include(starfieldAsset));
+  writeFile(path.join(buildDirectory, "starfield.inc"), starfieldInclude);
 
   const assembled = await runWasmTool(
     "ca65",
@@ -187,6 +200,7 @@ async function build() {
       "/project/build/capital-hulls.inc": capitalHullsInclude,
       "/project/build/enemy-roster.inc": enemyRosterInclude,
       "/project/build/fighter-weapons.inc": fighterWeaponsInclude,
+      "/project/build/starfield.inc": starfieldInclude,
     },
     [
       "--cpu",
@@ -242,16 +256,29 @@ async function build() {
   const broadsideLoadAddress = labels.get("__BROADSIDE_LOAD__");
   const broadsideRunAddress = labels.get("__BROADSIDE_RUN__");
   const broadsideRuntimeBytes = labels.get("__BROADSIDE_SIZE__");
+  const starfieldLoadAddress = labels.get("__STARFIELD_LOAD__");
+  const starfieldRunAddress = labels.get("__STARFIELD_RUN__");
+  const starfieldRuntimeBytes = labels.get("__STARFIELD_SIZE__");
+  const starfieldPackedSourceOperand = labels.get("starfield_packed_source");
+  const starfieldPackedSizeOperand = labels.get("starfield_packed_size");
+  const loaderPackedAddress = labels.get("loader_bitmap_lzss");
   const loadAddress = 0x2000;
 
   if (!Number.isInteger(startAddress) || !Number.isInteger(bootInitAddress) ||
     !Number.isInteger(broadsideLoadAddress) || !Number.isInteger(broadsideRunAddress) ||
-    !Number.isInteger(broadsideRuntimeBytes)) {
-    throw new Error("ld65 label file is missing entry or broadside relocation labels");
+    !Number.isInteger(broadsideRuntimeBytes) || !Number.isInteger(starfieldLoadAddress) ||
+    !Number.isInteger(starfieldRunAddress) || !Number.isInteger(starfieldRuntimeBytes) ||
+    !Number.isInteger(starfieldPackedSourceOperand) ||
+    !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(loaderPackedAddress)) {
+    throw new Error("ld65 label file is missing entry or resident relocation labels");
   }
   if (broadsideLoadAddress !== 0x4000 || broadsideRunAddress !== 0x5e10 ||
     broadsideRuntimeBytes > 0x1600) {
     throw new Error("Broadside relocation lies outside its reviewed load/run ranges");
+  }
+  if (starfieldLoadAddress !== 0x5600 || starfieldRunAddress !== 0x555a ||
+    starfieldRuntimeBytes > 0x08b6) {
+    throw new Error("Starfield relocation lies outside its reviewed load/run ranges");
   }
   const broadsideRuntime = linkedPayload.subarray(
     broadsideLoadAddress - loadAddress,
@@ -261,16 +288,51 @@ async function build() {
   if (!unpackBroadsideLzss(packedBroadsideRuntime).equals(broadsideRuntime)) {
     throw new Error("Broadside LZSS round trip failed");
   }
-  const rawPayload = Buffer.concat([
+  const starfieldRuntime = linkedPayload.subarray(
+    starfieldLoadAddress - loadAddress,
+    starfieldLoadAddress - loadAddress + starfieldRuntimeBytes,
+  );
+  const packedStarfieldRuntime = packBroadsideLzss(starfieldRuntime);
+  if (!unpackBroadsideLzss(packedStarfieldRuntime).equals(starfieldRuntime)) {
+    throw new Error("Starfield LZSS round trip failed");
+  }
+  if (packedStarfieldRuntime.length > starfieldStagingBytes) {
+    throw new Error("Packed starfield exceeds the reviewed temporary staging buffer");
+  }
+  if (broadsideRunAddress + 0x1600 > starfieldStagingAddress ||
+    starfieldStagingAddress + starfieldStagingBytes > 0xc000) {
+    throw new Error("Starfield staging overlaps resident RAM or the XL/XE OS ROM window");
+  }
+  const stagingEnd = starfieldStagingAddress + packedStarfieldRuntime.length;
+  const loaderPackedEnd = loaderPackedAddress + loaderAsset.packedBitmap.length;
+  const loaderBitmapEnd = loaderAsset.bitmapAddress + loaderAsset.bitmapBytes.length;
+  if (starfieldStagingAddress < loaderPackedEnd && stagingEnd > loaderPackedAddress ||
+    starfieldStagingAddress < loaderBitmapEnd && stagingEnd > loaderAsset.bitmapAddress) {
+    throw new Error("Starfield staging overlaps loader source or bitmap destination");
+  }
+  const residentMain = Buffer.from(
     linkedPayload.subarray(0, broadsideLoadAddress - loadAddress),
+  );
+  const packedStarfieldAddress = loadAddress + residentMain.length + packedBroadsideRuntime.length;
+  residentMain.writeUInt16LE(
+    packedStarfieldAddress,
+    starfieldPackedSourceOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
+    packedStarfieldRuntime.length,
+    starfieldPackedSizeOperand - loadAddress,
+  );
+  const rawPayload = Buffer.concat([
+    residentMain,
     packedBroadsideRuntime,
+    packedStarfieldRuntime,
   ]);
   if (!isReviewVariant &&
-    rawPayload.length - acceptedBroadsidePayloadBytes > enemyRosterPayloadLimit) {
+    rawPayload.length - acceptedBroadsidePayloadBytes > starfieldPassPayloadLimit) {
     throw new Error(
-      `Enemy-roster pass-1 payload delta is ` +
+      `Post-broadside feature payload delta is ` +
       `${rawPayload.length - acceptedBroadsidePayloadBytes} bytes and exceeds ` +
-      `${enemyRosterPayloadLimit} bytes`,
+      `${starfieldPassPayloadLimit} bytes`,
     );
   }
 
@@ -313,6 +375,16 @@ async function build() {
       bytes: broadsideRuntimeBytes,
       reservedBytes: 0x1600,
       packedBytes: packedBroadsideRuntime.length,
+      compression: "LZ-10/5",
+    },
+    starfieldRuntime: {
+      loadAddress: starfieldLoadAddress,
+      runAddress: starfieldRunAddress,
+      bytes: starfieldRuntimeBytes,
+      reservedBytes: 0x08b6,
+      packedBytes: packedStarfieldRuntime.length,
+      stagingAddress: starfieldStagingAddress,
+      stagingBytes: starfieldStagingBytes,
       compression: "LZ-10/5",
     },
     loaderScreen: {
@@ -394,6 +466,7 @@ async function build() {
         artifactBodyValue: paletteCandidate?.value ?? enemyRosterAsset.runtime.colourPolicy.bodyValue,
         scannerValue: enemyRosterAsset.runtime.colourPolicy.accentValue,
       },
+      movementPolicy: enemyRosterAsset.runtime.movementPolicy,
       weaponPolicy: enemyRosterAsset.runtime.weaponPolicy,
       projectileVisuals: capitalHullsAsset.broadside.projectileVisuals,
       damagePolicy: {
@@ -443,6 +516,32 @@ async function build() {
       viper: fighterWeaponsAsset.viper,
       raider: fighterWeaponsAsset.raider,
     },
+    starfield: {
+      source: "assets/graphics/starfield.json",
+      sourceSha256: sha256(fs.readFileSync(starfieldDefinitionPath)),
+      generationSeed: starfieldAsset.generationSeed,
+      corridor: starfieldAsset.corridor,
+      farLayer: {
+        population: starfieldAsset.farLayer.population,
+        rateNumerator: starfieldAsset.farLayer.rateNumerator,
+        rateDenominator: starfieldAsset.farLayer.rateDenominator,
+        colourRegister: starfieldAsset.farLayer.colourRegister,
+        glyphs: starfieldAsset.farLayer.glyphs.map(({ id, screenCode }) => ({ id, screenCode })),
+      },
+      nearLayer: {
+        rateNumerator: starfieldAsset.nearLayer.rateNumerator,
+        rateDenominator: starfieldAsset.nearLayer.rateDenominator,
+        densityNumerator: starfieldAsset.nearLayer.densityNumerator,
+        densityDenominator: starfieldAsset.nearLayer.densityDenominator,
+        expectedVisible: starfieldAsset.expectedNearVisible,
+        colourRegister: starfieldAsset.nearLayer.colourRegister,
+        glyphs: starfieldAsset.nearLayer.glyphs.map(({ id, screenCode }) => ({ id, screenCode })),
+      },
+      twinkleIntervalFrames: starfieldAsset.twinkle.intervalFrames,
+      glyphBytes: starfieldAsset.glyphBytes.length,
+      runtimeStateBytes: starfieldAsset.stateBytes,
+      pmgBytes: 0,
+    },
     artifacts: {
       "dark-fighter-boot.bin": { bytes: rawPayload.length, sha256: sha256(rawPayload) },
       "dark-fighter.xex": { bytes: xex.length, sha256: sha256(xex) },
@@ -454,6 +553,8 @@ async function build() {
   writeFile(path.join(buildDirectory, "dark-fighter.bin"), rawPayload);
   writeFile(path.join(buildDirectory, "broadside-runtime.bin"), broadsideRuntime);
   writeFile(path.join(buildDirectory, "broadside-runtime-packed.bin"), packedBroadsideRuntime);
+  writeFile(path.join(buildDirectory, "starfield-runtime.bin"), starfieldRuntime);
+  writeFile(path.join(buildDirectory, "starfield-runtime-packed.bin"), packedStarfieldRuntime);
   writeFile(path.join(buildDirectory, "dark-fighter.map"), mapFile);
   writeFile(path.join(buildDirectory, "dark-fighter.lbl"), labelFile);
   writeFile(path.join(buildDirectory, "manifest.json"), manifestBytes);

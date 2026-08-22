@@ -218,13 +218,11 @@ Efekt zapisuje tylko komórki rzeczywistego bandu kadłuba, podąża za jego
 scrollingiem i przywraca dokładnie przechwycony moduł; nie zużywa M0–M3 ani
 nie zmienia kolorów fighterów.
 
-Pełny skok zawsze ma 8 scanlines, bez fine scrollingu. Centralny świat
-wykonuje dokładnie 8/9/10 takich skoków w 20 ramkach: `EASY` daje 20 wierszy
-lub 160 scanlines/s, `MEDIUM` 22,5/180, a `HARD` 25/200. Osobny stream obu
-capital hulls używa mianownika 40, więc w długim oknie zachowuje dokładnie
-połowę tych prędkości: 10/80, 11,25/90 i 12,5/100. Wyloty, warningi i granice
-kontaktowe pozostają przy tej wolniejszej fazie; statki, gwiazdy i lecące
-pociski zachowują dotychczasową energię świata.
+Pełny skok zawsze ma 8 scanlines, bez fine scrollingu. Oba capital hulls
+wykonują dokładnie 8/9/10 takich skoków w 20 ramkach: `EASY` daje 20 wierszy
+lub 160 scanlines/s, `MEDIUM` 22,5/180, a `HARD` 25/200. Jest to 100%
+dotychczasowej prędkości świata. Wyloty, warningi i granice kontaktowe
+pozostają przy tej samej fazie; lecące pociski zachowują własny timing PAL.
 Skalę obu capital ships podkreślają rzadsze, niezależnie planowane sekwencje
 ognia i spokojne odstępy między nimi, nie spowolnienie całego świata. Fizyczna
 krawędź, łącznie z projekcjami turretów, jest też granicą kontaktu gracza.
@@ -276,6 +274,23 @@ kodami znaków, nie PMG ani bitmapowym ornamentem; niewyjaśnione placeholdery
 
 PNG nie ustala rozdzielczości, liczby PMG ani zagęszczenia obiektów. Te wartości
 są adaptowane do ANTIC/GTIA, budżetu PMG i jednej ramki PAL.
+
+## Pierwszy pass starfield
+
+Gameplay zachowuje dużo czarnego negative space. Warstwa far używa 24
+logicznych, przeważnie jednokropkowych znaków `COLPF1=$84`; near generuje
+średnio 8,625 widocznego znaku w 23 wierszach z jasnym `COLPF0=$0E` i tylko
+rzadkim dwupikselowym lub czteroramiennym wariantem. Near porusza się z 70%,
+a far z 35% prędkości kadłubów; zachowują więc czytelny stosunek 2:1, ale
+żadna warstwa nie płynie razem z kadłubami. Co 16 ramek najwyżej jeden
+aktualnie odsłonięty far star
+zmienia spokojnie fazę dim/bright. Gwiazdy nie mogą czytać się jak żółty ogień
+Vipera, czerwony Raider pulse ani poziomy capital slug.
+
+Sześć oryginalnych glyphów zajmuje screen codes 1–6. Far używa wyłącznie
+ANTIC 4 pixel value `10`, near `01`; kształty są bez antyaliasingu i bez
+fragmentów poza zwartym 8×8 polem znaku. W broadside tło pozostaje w kolumnach
+9–30, więc czarne/kolorowe masy kadłubów i ich wyloty zachowują pełną własność.
 
 ## Main menu i frontend
 

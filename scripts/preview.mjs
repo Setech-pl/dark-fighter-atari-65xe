@@ -26,6 +26,13 @@ import {
   stepViperBurst,
 } from "./fighter-weapons.mjs";
 import {
+  compileStarfield,
+  createStarfieldState,
+  loadStarfieldDefinition,
+  composeStarfield,
+  stepStarfieldWorld,
+} from "./starfield.mjs";
+import {
   beginEnemyDamageFrame,
   createEnemyCombatState,
   createEnemyDamageState,
@@ -322,6 +329,12 @@ const DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH = path.join(
   "assets",
   "graphics",
   "capital-hulls-antic2-prototype.json",
+);
+const DEFAULT_STARFIELD_DEFINITION_PATH = path.join(
+  rootDirectory,
+  "assets",
+  "graphics",
+  "starfield.json",
 );
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -622,6 +635,9 @@ export function readGameGraphicsSource(
   const fighterWeapons = compileFighterWeapons(loadFighterWeaponsDefinition(
     path.join(rootDirectory, "assets", "graphics", "fighter-weapons.json"),
   ), enemyRoster);
+  const starfield = compileStarfield(loadStarfieldDefinition(
+    DEFAULT_STARFIELD_DEFINITION_PATH,
+  ));
   const releaseEnemy = enemyRoster.implemented.find(
     ({ id }) => id === enemyRoster.runtime.releaseArchetype,
   );
@@ -654,6 +670,14 @@ export function readGameGraphicsSource(
     ["RAIDER_PROJECTILE_COLOR", fighterWeapons.raider.colourValue],
     ["GAMEPLAY_COLPF2", fighterWeapons.viper.colourValue],
     ["GAMEPLAY_COLPF3", fighterWeapons.raider.colourValue],
+    ["STAR_FAR_CAPACITY", starfield.farLayer.population],
+    ["STAR_FAR_STEP_RATIO", starfield.farLayer.stepRatio],
+    ["STAR_NEAR_STEP_RATIO", starfield.nearLayer.stepRatio],
+    ["STAR_NEAR_DENSITY_NUMERATOR", starfield.nearLayer.densityNumerator],
+    ["STAR_DENSITY_DENOMINATOR", starfield.nearLayer.densityDenominator],
+    ["STAR_SPECIAL_FREQUENCY", starfield.nearLayer.specialFrequency],
+    ["STAR_TWINKLE_INTERVAL", starfield.twinkle.intervalFrames],
+    ["STAR_GENERATION_SEED", starfield.generationSeed],
   ]) {
     constants.set(name, value);
   }
@@ -719,6 +743,8 @@ export function readGameGraphicsSource(
     frontendGlyphRows,
     capitalHulls.definition.charsetBaseIndex * CHARACTER_HEIGHT + capitalHulls.glyphBytes.length,
   );
+  const sourceCharset = Uint8Array.from(charset);
+  charset.set(starfield.glyphBytes, starfield.glyphs[0].screenCode * CHARACTER_HEIGHT);
 
   const hudHardwareState = new Map(gameplayHardwareState);
   for (const register of ["COLPF1", "COLPF2", "COLBK"]) {
@@ -770,6 +796,7 @@ export function readGameGraphicsSource(
     playerEngineShape: extractLabeledData(source, "player_engine_shape", constants),
     enemyRoster,
     fighterWeapons,
+    starfield,
     releaseEnemy,
     enemyShape: releaseEnemy.bodyRows,
     scannerShape: releaseEnemy.accentFrameBytes,
@@ -779,6 +806,7 @@ export function readGameGraphicsSource(
     alliedSectorRows: capitalHulls.sector.sectorScreenRowsBySide.get("allied"),
     enemySectorRows: capitalHulls.sector.sectorScreenRowsBySide.get("enemy"),
     charset,
+    sourceCharset,
     hudCharset,
     gameplayDisplayList,
     gameplayLayout,
@@ -949,7 +977,7 @@ export function readFrontendGraphicsSource(source) {
   }
   const graphicsBase = requireValue(graphics.constants, "FRONTEND_GRAPHICS_BASE");
   frontendCharset.set(
-    graphics.charset.subarray(0, 16 * CHARACTER_HEIGHT),
+    graphics.sourceCharset.subarray(0, 16 * CHARACTER_HEIGHT),
     graphicsBase * CHARACTER_HEIGHT,
   );
   const markerBytes = extractLabeledData(
@@ -1040,12 +1068,18 @@ function createCanonicalScreenRuntimeState(
     screen[index] = (graphics.hud[index] - 0x20) & 0xff;
   }
   let rngState = requireValue(initialState, "rng_state");
+  const starfieldState = createStarfieldState(graphics.starfield);
+  const starfieldScreen = composeStarfield(graphics.starfield, starfieldState);
   const corridorPhase = sectorPhase;
   const gameplayFirstRow = requireValue(constants, "GAMEPLAY_FIRST_SCREEN_ROW");
   const visibleRowCount = graphics.capitalHulls.sector.visibleRows;
 
   for (let row = gameplayFirstRow; row < SCREEN_ROWS; row += 1) {
-    rngState = writeCanonicalCorridorRow(screen, row, null, graphics, rngState);
+    const starRow = row - gameplayFirstRow;
+    screen.set(
+      starfieldScreen.subarray(starRow * SCREEN_COLUMNS, (starRow + 1) * SCREEN_COLUMNS),
+      row * SCREEN_COLUMNS,
+    );
   }
 
   const hullBase = requireValue(constants, "CAPITAL_HULL_GLYPH_BASE");
@@ -1077,6 +1111,7 @@ function createCanonicalScreenRuntimeState(
     boundaryRight,
     visibleRows,
     drainRows: 0,
+    starfieldState,
   };
   renderCanonicalHulls(state, graphics);
   return state;
@@ -1128,18 +1163,21 @@ function renderCanonicalHulls(state, graphics) {
 
 function advanceCanonicalScreenRuntimeState(state, graphics) {
   const gameplayFirstRow = requireValue(graphics.constants, "GAMEPLAY_FIRST_SCREEN_ROW");
-  for (let row = 23; row > gameplayFirstRow; row -= 1) {
+  state.starfieldState = stepStarfieldWorld(graphics.starfield, state.starfieldState);
+  const composed = composeStarfield(graphics.starfield, state.starfieldState);
+  for (let row = gameplayFirstRow; row < SCREEN_ROWS; row += 1) {
+    const starRow = row - gameplayFirstRow;
     for (let column = 9; column <= 30; column += 1) {
       state.screen[row * SCREEN_COLUMNS + column] =
-        state.screen[(row - 1) * SCREEN_COLUMNS + column];
+        composed[starRow * SCREEN_COLUMNS + column];
     }
   }
   const priorRows = graphics.capitalHulls.sector.visibleRows - 1;
   state.boundaryLeft.copyWithin(1, 0, priorRows);
   state.boundaryRight.copyWithin(1, 0, priorRows);
-  state.rngState = writeCanonicalStarRow(state.screen, gameplayFirstRow, graphics, state.rngState);
-  state.boundaryLeft[0] = state.screen[gameplayFirstRow * SCREEN_COLUMNS + 8];
-  state.boundaryRight[0] = state.screen[gameplayFirstRow * SCREEN_COLUMNS + 31];
+  state.rngState = state.starfieldState.rng;
+  state.boundaryLeft[0] = composed[8];
+  state.boundaryRight[0] = composed[31];
   renderCanonicalHulls(state, graphics);
   state.advances += 1;
 }
