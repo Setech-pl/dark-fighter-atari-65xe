@@ -323,7 +323,7 @@ test("broadside stars stay inside the corridor and never touch hull ownership", 
     assert.ok(state.far.every(({ column }) => column >= 9 && column <= 30));
     state = stepStarfieldWorld(asset, state);
   }
-  assert.match(source, /render_far_star_overlays:[\s\S]+ldy #\$00[\s\S]+lda \(dst_ptr\),y\s+bne @next/);
+  assert.match(source, /render_far_star_overlays:[\s\S]+RESOLVE_FAR_STAR_PTR[\s\S]+ldy #\$00[\s\S]+lda \(dst_ptr\),y\s+bne render_far_star_next/);
   assert.doesNotMatch(source.slice(source.indexOf("handle_collisions:"),
     source.indexOf("update_score_display:")), /STAR_FAR|STAR_NEAR|star_glyph/);
 });
@@ -343,7 +343,12 @@ test("ordinary-space reconstruction expands deterministically after COMPLETE", (
     outsideCounts.push(outside);
   }
   assert.ok(outsideCounts.some((count) => count > 0));
-  assert.match(source, /CAPITAL_SECTOR_STATE[\s\S]+CAPITAL_HULL_STATE_COMPLETE[\s\S]+@copy_full/);
+  assert.match(source,
+    /scroll_world_columns:[\s\S]+jsr rotate_playfield_rows[\s\S]+jsr generate_starfield_row/,
+    "COMPLETE must use the same bounded row recycle as the corridor");
+  assert.match(source,
+    /generate_starfield_row:[\s\S]+ldx CAPITAL_SECTOR_STATE[\s\S]+cpx #CAPITAL_HULL_STATE_COMPLETE[\s\S]+ldy #CORRIDOR_CENTRAL_FIRST[\s\S]+@full_limit:[\s\S]+cpy #40/,
+    "COMPLETE must regenerate all 40 cells of the recycled row");
 });
 
 test("overlay ownership restores the current background and respects overlap order", () => {

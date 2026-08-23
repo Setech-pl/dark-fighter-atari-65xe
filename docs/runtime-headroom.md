@@ -1,0 +1,205 @@
+# Runtime headroom report
+
+This report records the measured timing work on `feature/runtime-headroom`.
+The CPU comparison is regenerated on every release build under
+`runtimeTiming`. The DMA-on trace is generated with:
+
+```sh
+npm run runtime:wall-trace -- --atari800-source=<atari800-7.1.2-source> --prepare
+```
+
+The command writes `docs/runtime-wall-trace.json`. A release build accepts the
+trace only when its SHA-256 identifies the exact generated XEX, then embeds its
+result in `dist/dark-fighter-manifest.json`. No physical-headroom value is
+handwritten.
+
+## Measurement method and semantics
+
+`scripts/runtime-cycles.mjs` executes the linked resident, STARFIELD,
+BROADSIDE and A2 kernel bytes in `scripts/nmos6502.mjs`. It accounts for NMOS
+6502 branch and page-crossing penalties but deliberately excludes ANTIC
+stalls. It is a repeatable CPU-only before/after measurement.
+
+`scripts/runtime-wall-trace.mjs` builds a host observer against the verified
+official Atari800 7.1.2 source archive (SHA-256
+`9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3`). The
+observer runs before each emulated opcode and reads Atari800's ANTIC master
+clock, scanline/cycle position and host-frame ID. It adds no guest instruction
+or cycle and writes its log only after a session.
+
+The measured interval starts at `main_loop_option_poll`, immediately after
+`wait_frame`, and ends at `main_loop`, immediately before the next
+`wait_frame`. Production settings remain active: `DMACTL=$3E`, `NMIEN=$80`,
+both gameplay DLIs, gameplay music and SFX. `-nosound` disables only host audio
+playback; guest POKEY state and writes remain active.
+
+The report keeps five meanings separate:
+
+- `cpu_cycles_dma_off`: linked main loop including the released OPTION poll;
+- `cpu_comparison_headroom`: 35,568 minus that CPU-only comparison, never a
+  physical PAL result;
+- `measured_wall_cycles_dma_on`: ANTIC-clock interval with production DMA,
+  DLI/NMI and every observed CPU stall;
+- `measured_physical_headroom`: 35,568 minus the DMA-on wall result;
+- `estimated_additive_cycles`: CPU plus fixed DMA and conservative DLI budget,
+  retained only as a diagnostic estimate.
+
+The baseline replay contains 9,040 active frames in ten HARD and MEDIUM
+neutral/sweep/evasive sessions. A separate 920-frame HARD sweep replay targets
+the known heavy coincidence. Both enter gameplay through production frontend
+handlers and use deterministic normal input. Legal coverage includes the full
+19-slot fighter-projectile pool, production broadside lifecycle, a live Raider,
+both explosion types, both tracked muzzles, gameplay music and overlapping
+SFX. Release data exposes two source-turret lifecycles and the replay observed
+at most one simultaneous broadside projectile. The three-slot capacity stress
+remains a CPU-only executable scenario and is not admitted to the physical
+result because no legal release replay produced it.
+
+## Display-list contract
+
+The display is 24 physical 40-byte rows, but the ring contains only the last
+22:
+
+- HUD LMS is fixed at `$4000`;
+- divider LMS is fixed at `$4028` and never rotates;
+- gameplay ring rows are exactly `$4050-$43BF`;
+- each head value 0..21 emits exactly 22 unique, in-range gameplay LMS
+  addresses;
+- the last gameplay LMS retains the second DLI and the JVB remains fixed.
+
+Historical reports used “23 gameplay rows” as shorthand for the divider plus
+22 gameplay rows. The first A2 implementation incorrectly rotated all 23.
+The corrected common event first preserves the old divider content in the
+recycled ring row, rotates only the 22-row mapping, and regenerates the fixed
+divider. `tests/broadside-fire.test.mjs` exhaustively checks all 22 heads, the
+fixed HUD/divider addresses, uniqueness and range of gameplay LMS entries,
+mapper equivalence, DLI position and JVB. Source and generated display-list
+tests separately assert the divider address `$4028`.
+
+## A2 kernel design pass
+
+The corrected pre-kernel A2 heavy frame provided these exclusive CPU costs.
+Inclusive parent values are not added again.
+
+| Work in the heavy frame | Exclusive CPU | Expected wall opportunity before implementation |
+| --- | ---: | ---: |
+| Shift 44 B of row pointer tables | 496 | about 0.5 K if removed without making reads dearer |
+| Build inactive 75 B LMS list in the event frame | 1,125 | about 1.1–1.8 K, plus fewer display-memory/contention stalls |
+| Logical-to-physical mapper, 62 calls | 1,969 | only the portion removed from every caller |
+| Far erase local work | 653 | part of the combined far specialization |
+| Far render local work | 965 | part of the combined far specialization |
+| Far advance | 840 | no safe product-preserving removal identified |
+| Far pointer setup below mapper | 1,978 | part of the combined far specialization |
+| Mapper calls made by far paths | 1,467 | part of the combined far specialization |
+| Two-row projectile advance/overlay work | about 535 | less than 1 K; defer unless the gate still fails |
+| Projectile render, inclusive | about 3,718 | mostly required drawing; specialize addressing only |
+| Projectile erase/update/render passes | 1,150 / 1,720 / 3,718 inclusive | bounded 19-slot contract; no slot or cadence change |
+
+The addressing alternatives were evaluated with all later mapper reads:
+
+| Addressing choice | Event saving | Additional heavy-frame reads | Net CPU result |
+| --- | ---: | ---: | ---: |
+| Current shifted 22-entry low/high tables | baseline | baseline | fastest measured choice |
+| Head with per-read modulo | about 486 | about 826 | about 340 cycles worse |
+| Doubled static address table, indexed by `head+Y` | about 484 | about 649 | about 165 cycles worse |
+
+A head index was therefore not adopted. The 44-byte table shift remains: its
+one event cost is cheaper than taxing every subsequent star, projectile,
+explosion and hull read.
+
+## Staged measured result
+
+Every wall value below is from an artifact-bound DMA-on trace, not a CPU-to-wall
+conversion. `missed` combines the 9,040-frame baseline and targeted replay for
+that checkpoint.
+
+| Checkpoint | CPU DMA off | Measured DMA-on wall | Physical headroom | Missed | Wall gain |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Corrected fixed-divider A2 baseline | 22,494 | 36,464 | -896 | 9 | — |
+| 1. Prebuild inactive LMS list in the guaranteed light next frame | 21,431 | 33,942 | 1,626 | 0 | 2,522 |
+| 2. Addressing comparison; retain shifted tables | 21,431 | 33,942 | 1,626 | 0 | 0 |
+| 3. Ring-specialized far erase/render addressing | 19,845 | 31,583 | 3,985 | 0 | 2,359 |
+| 4. Remove redundant projectile pointer scratch round-trip | 19,761 | 31,440 | 4,128 | 0 | 143 |
+
+Stage 1 leaves publication on the same common-event frame. That frame consumes
+the list already prepared after the preceding common event, then sets a pending
+flag. The following physical frame is guaranteed not to scroll by the asserted
+world cadence and prepares the future inactive list there. Stage 3 moves only
+the bounded far erase/render address kernels to `$9000`; far count, codes,
+parallax and cadence are unchanged. Stage 4 removes one redundant
+`STA row_counter` / `LDA row_counter` pair per rendered projectile and changes
+neither addressing nor output.
+
+The total measured improvement from the corrected-divider baseline is 5,024
+wall cycles and 2,733 CPU cycles. Optimization stopped at the first full-trace
+checkpoint that passed the requested gate; no D1/D2 product compromise was
+implemented.
+
+## Final physical gate
+
+| Metric | Final measured or generated value |
+| --- | ---: |
+| `cpu_cycles_dma_off` | 19,761 |
+| `cpu_comparison_headroom` | 15,807 |
+| `measured_wall_cycles_dma_on` | 31,440 |
+| `measured_physical_headroom` | 4,128 |
+| `estimated_additive_cycles` | 32,641 |
+| PAL physical frame | 35,568 |
+| Gate maximum | 31,568 |
+| Baseline 9,040 missed synchronisations | 0 |
+| Targeted 920 missed synchronisations | 0 |
+| Deadline overruns | 0 |
+
+The gate passes by 128 cycles. Crossing one Atari800 host/VBI boundary is not
+itself a missed synchronization because active work begins near scanline 224.
+The trace records 4,677 such baseline intervals and 505 targeted intervals;
+none crosses an extra boundary and every following active loop starts at the
+next legal synchronization opportunity.
+
+The five heaviest measured baseline frames are:
+
+| Session/frame | DMA-on wall | Physical headroom |
+| --- | ---: | ---: |
+| `2-sweep-fire4` / 337 | 31,440 | 4,128 |
+| `1-evasive-fire3` / 533 | 30,640 | 4,928 |
+| `1-evasive-fire3` / 351 | 30,601 | 4,967 |
+| `2-sweep-fire4` / 263 | 30,501 | 5,067 |
+| `2-evasive-fire3` / 143 | 30,290 | 5,278 |
+
+The maximum has 16 active fighter projectiles, 22 rendered far stars, one
+tracked muzzle, a live Raider, a capital explosion, gameplay music, fire SFX
+and capital SFX. Its events include common world/far/hull work, broadside
+update, fighter/capital explosion render and a music tick. The targeted replay
+reproduces the same 31,440-cycle frame.
+
+## Size and memory checkpoints
+
+| Checkpoint | Payload | XEX | ATR |
+| --- | ---: | ---: | ---: |
+| ETAP 1 / before | 15,431 B | 15,443 B | 92,176 B |
+| ETAP 2 | 15,506 B | 15,518 B | 92,176 B |
+| ETAP 3 | 15,513 B | 15,525 B | 92,176 B |
+| ETAP 4 / before A2 | 15,558 B | 15,570 B | 92,176 B |
+| Initial A2 hybrid ring | 15,576 B | 15,588 B | 92,176 B |
+| Final A2 kernel pass | 15,754 B | 15,766 B | 92,176 B |
+
+Final protected use is MAIN 8,137/8,192 B, PROJECTILES 202/298 B,
+STARFIELD 2,158/2,278 B, BROADSIDE 6,644/6,656 B and A2 kernel 226/256 B.
+Packed staging uses 1,711/1,792 B until unpacking. A2 display/ring state owns
+203 B at `$7F10-$7FDA`. The kernel is copied identically by XEX and cold-boot
+ATR startup into unconditional 64 KiB RAM at `$9000-$90E1`; `$90E2-$90FF`
+remains free. `$8000-$8FFF` remains the untouched 4 KiB entity/effects
+reservation. `$A000-$BFFF` is excluded.
+
+## Limitations
+
+- Exact Atari800 ANTIC timing is emulated timing, not an electrical
+  measurement from a physical 65XE.
+- Bounded deterministic replay is reproducible coverage, not a proof over
+  every possible joystick history.
+- Release `NMIEN=$80` enables gameplay DLI NMI and deliberately leaves OS VBI
+  NMI off. Atari800 host-frame IDs provide the VBI boundary identifier without
+  changing release behavior.
+- Atari800 cannot prove PORTB/BASIC-ROM behavior after cold ATR boot or on
+  physical SIO2SD hardware. The new code does not depend on that window.
+- Real 65XE/SIO2SD gameplay remains the final hardware acceptance path.

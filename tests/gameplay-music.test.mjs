@@ -294,15 +294,22 @@ test("assembly preserves SFX ownership, lifecycle, and GAME MUSIC persistence", 
     /cmp #STATE_MAIN_MENU[\s\S]+jsr music_stop[\s\S]+jsr music_start_menu/);
 });
 
-test("bounded player keeps conservative PAL worst-frame headroom above 1000 cycles", () => {
-  assert.deepEqual(
-    [manifest.gameplayMusic.normalFrameCycles, manifest.gameplayMusic.worstRowFrameCycles,
-      manifest.gameplayMusic.conservativeWorstFrameCycles,
-      manifest.gameplayMusic.conservativePalHeadroomCycles],
-    [78, 256, 34499, 1001],
-  );
-  assert.equal(manifest.gameplayMusic.pauseOptionPollCycles, 13);
-  assert.ok(manifest.gameplayMusic.conservativePalHeadroomCycles >= 1000);
+test("gameplay timing values come from the executable runtime report", () => {
+  const timing = manifest.runtimeTiming;
+  assert.equal(manifest.gameplayMusic.normalFrameCycles,
+    timing.cpuDmaOff.gameplayMusicTickMinimumCycles);
+  assert.equal(manifest.gameplayMusic.worstRowFrameCycles,
+    timing.cpuDmaOff.gameplayMusicTickMaximumCycles);
+  assert.equal(manifest.gameplayMusic.pauseOptionPollCycles,
+    timing.cpuDmaOff.optionPollCycles);
+  assert.equal(manifest.gameplayMusic.cpuWorstFrameCyclesDmaOff,
+    timing.cpu_cycles_dma_off);
+  assert.equal(manifest.gameplayMusic.cpuComparisonHeadroomCycles,
+    timing.cpu_comparison_headroom);
+  assert.equal(manifest.gameplayMusic.measuredWallCyclesDmaOn,
+    timing.measured_wall_cycles_dma_on);
+  assert.equal(manifest.gameplayMusic.measuredPhysicalHeadroomCycles,
+    timing.measured_physical_headroom);
   assert.ok(manifest.starfieldRuntime.bytes <= manifest.starfieldRuntime.reservedBytes);
   assert.ok(manifest.starfieldRuntime.packedBytes <= manifest.starfieldRuntime.stagingBytes);
 });

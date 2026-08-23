@@ -57,6 +57,7 @@ import {
   renderCapitalHullsCa65Include,
 } from "../scripts/capital-hulls.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import {
   createBroadsideAcceptanceSequencePreview,
   createBroadsideCadenceSequencePreview,
@@ -89,6 +90,9 @@ const broadsideRuntime = fs.readFileSync(
 );
 const starfieldRuntime = fs.readFileSync(
   path.join(rootDirectory, "build", "starfield-runtime.bin"),
+);
+const a2KernelRuntime = fs.readFileSync(
+  path.join(rootDirectory, "build", "a2-kernel-runtime.bin"),
 );
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -125,6 +129,13 @@ function xexBytesAt(address, length) {
       address - starfield.runAddress + length,
     );
   }
+  const kernel = manifest.a2Kernel;
+  if (address >= kernel.runAddress && address + length <= kernel.runAddress + kernel.bytes) {
+    return a2KernelRuntime.subarray(
+      address - kernel.runAddress,
+      address - kernel.runAddress + length,
+    );
+  }
   let offset = 0;
   while (offset < xex.length) {
     if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
@@ -140,6 +151,44 @@ function xexBytesAt(address, length) {
     offset += bytes;
   }
   assert.fail(`XEX address $${address.toString(16)} is not in a segment`);
+}
+
+function createLinkedRuntimeMemory() {
+  const memory = new Uint8Array(0x10000);
+  let offset = 0;
+  while (offset < xex.length) {
+    if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
+    const start = xex.readUInt16LE(offset);
+    const end = xex.readUInt16LE(offset + 2);
+    offset += 4;
+    memory.set(xex.subarray(offset, offset + end - start + 1), start);
+    offset += end - start + 1;
+  }
+  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
+  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
+  memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
+  const rowLo = labels.get("PLAYFIELD_ROW_LO");
+  const rowHi = labels.get("PLAYFIELD_ROW_HI");
+  for (let row = 0; row < 22; row += 1) {
+    const address = 0x4050 + row * 40;
+    memory[rowLo + row] = address & 0xff;
+    memory[rowHi + row] = address >> 8;
+  }
+  memory[labels.get("PLAYFIELD_ACTIVE_DLIST_LO")] = labels.get("PLAYFIELD_DLIST_A") & 0xff;
+  memory[labels.get("PLAYFIELD_NEXT_DLIST_LO")] = labels.get("PLAYFIELD_DLIST_B") & 0xff;
+  memory[labels.get("PLAYFIELD_RING_FLAGS")] = 0;
+  return memory;
+}
+
+function runAssembledRoutine(memory, name) {
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = labels.get(name);
+  for (let steps = 0; steps < 100_000 && cpu.pc !== stop; steps += 1) cpu.step();
+  assert.equal(cpu.pc, stop, `${name} did not return`);
+  return cpu.cycles;
 }
 
 function containsBytes(haystack, needle) {
@@ -231,14 +280,14 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(packed), runtime);
   assert.deepEqual(packBroadsideLzss(runtime), packed);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
-  assert.ok(manifest.payloadBytes - 14314 <= 1280);
+  assert.ok(manifest.payloadBytes - 14314 <= 1536);
   const starRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
   const starPacked = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime-packed.bin"));
   assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
   assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
   assert.ok(starPacked.length <= 0x700);
   assert.match(routine("start", "unpack_broadside_runtime"),
-    /jsr unpack_broadside_runtime[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
+    /jsr unpack_broadside_runtime[\s\S]+jsr stage_a2_kernel[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });
 
 test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve every other pair", () => {
@@ -254,7 +303,7 @@ test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve e
     }
   }
   for (const [name, end] of [["allocate_viper_projectile", "update_enemy_weapon_runtime"],
-    ["update_fighter_projectiles", "move_projectile_screen_pointer_up"],
+    ["update_fighter_projectiles", "viper_projectile_hits_enemy"],
     ["erase_bullet", "init_fighter_projectiles"]]) {
     const text = routine(name, end);
     assert.doesNotMatch(text, /MISSILES|HPOSM0|SIZEM/,
@@ -437,14 +486,14 @@ test("assembled fractional cadence makes hull movement 100% of the legacy world 
     "DIFFICULTY_SETTING",
   );
   assert.deepEqual([...broadsideRuntimeBytesAt(rateTableAddress, 3)], [8, 9, 10]);
-  const update = xexBytesAt(labels.get("update_starfield"), 48);
-  assert.deepEqual([...update.subarray(0, 11)], [
+  const update = xexBytesAt(labels.get("update_starfield"), 56);
+  assert.notEqual(update.indexOf(Buffer.from([
     0xae, difficultyAddress & 0xff,
     difficultyAddress >> 8,
     0xa5, labels.get("scroll_accumulator"), 0x18, 0x7d,
     labels.get("world_scroll_rates") & 0xff,
     labels.get("world_scroll_rates") >> 8, 0xc9, 20,
-  ]);
+  ])), -1);
   assert.notEqual(update.indexOf(Buffer.from([0xe9, 20, 0x85,
     labels.get("scroll_accumulator")])), -1);
   const init = xexBytesAt(
@@ -457,20 +506,269 @@ test("assembled fractional cadence makes hull movement 100% of the legacy world 
     difficultyAddress + 1 & 0xff, difficultyAddress + 1 >> 8])), -1);
 });
 
-test("coincident world and hull steps finalize boundary overlays only once", () => {
+test("tracked muzzle records replace the 23-row redraw scan without changing scroll cadence", () => {
   const update = routine("update_starfield", "generate_corridor_row");
-  const worldCopy = routine("scroll_world_columns", "scroll_hull_columns");
+  const worldRing = routine("scroll_world_columns", "init_playfield_display_lists");
   const hullCopy = routine("scroll_hull_columns", "update_sector_state");
   assert.match(update,
     /lda scroll_accumulator[\s\S]+cmp world_scroll_rates,x[\s\S]+bcc @finalize_world[\s\S]+jmp scroll_hull_columns/);
-  assert.doesNotMatch(worldCopy, /jsr restore_boundary_stars|jsr redraw_visible_muzzles/,
-    "the world copy must defer overlay finalization until the hull decision");
+  assert.match(worldRing,
+    /sta PLAYFIELD_RING_FLAGS\s+jsr rotate_playfield_rows[\s\S]+sta CORRIDOR_BOUNDARY_LEFT[\s\S]+sta CORRIDOR_BOUNDARY_RIGHT/,
+    "a world step must rotate LMS rows and shift the two backing streams");
   assert.match(hullCopy,
-    /jsr restore_boundary_stars[\s\S]+jsr redraw_visible_muzzles/,
-    "a coincident hull step owns the single restore/redraw pass");
-  assert.match(source,
-    /restore_and_redraw_muzzles:[\s\S]+jsr restore_boundary_stars[\s\S]+jmp redraw_visible_muzzles/,
-    "a world-only step still performs the required finalization");
+    /jsr restore_active_muzzles[\s\S]+jsr advance_tracked_muzzles[\s\S]+jsr track_top_muzzles[\s\S]+jsr redraw_tracked_muzzles/,
+    "a hull step must restore, advance, claim and redraw at most two tracked records");
+  assert.doesNotMatch(source, /restore_boundary_stars:/,
+    "the ring must retain existing boundary cells rather than rewrite 46 cells");
+  assert.doesNotMatch(source, /redraw_visible_muzzles:/,
+    "the removed full visible-row scan must not return");
+  assert.match(routine("reset_exited_turret_lifecycles", "generate_corridor_row"),
+    /lda MUZZLE_SCREEN_HI,x[\s\S]+sta BROAD_TURRET_FIRED,x/,
+    "turret lifecycle release must use the same tracked visibility record");
+});
+
+test("assembled muzzle records preserve backing and complete the full visible lifecycle", () => {
+  const memory = createLinkedRuntimeMemory();
+  const muzzleRow = labels.get("MUZZLE_VISIBLE_ROW");
+  const muzzleLo = labels.get("MUZZLE_SCREEN_LO");
+  const muzzleHi = labels.get("MUZZLE_SCREEN_HI");
+  const leftBacking = labels.get("CORRIDOR_BOUNDARY_LEFT");
+  const rightBacking = labels.get("CORRIDOR_BOUNDARY_RIGHT");
+  const turretFired = labels.get("BROAD_TURRET_FIRED");
+  const destination = labels.get("dst_ptr");
+  const gameplayScreen = 0x4028;
+  const alliedColumn = 8;
+  const enemyColumn = 31;
+
+  for (let row = 0; row < 23; row += 1) {
+    memory[leftBacking + row] = 0x10 + row;
+    memory[rightBacking + row] = 0x30 + row;
+  }
+  memory[destination] = gameplayScreen & 0xff;
+  memory[destination + 1] = gameplayScreen >> 8;
+  memory[gameplayScreen + alliedColumn] = 0x45;
+  memory[gameplayScreen + enemyColumn] = 0xd0;
+  runAssembledRoutine(memory, "track_top_muzzles");
+
+  assert.deepEqual(
+    [memory[muzzleRow], memory[muzzleRow + 1]],
+    [0, 0],
+  );
+  assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8, gameplayScreen + alliedColumn);
+  assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
+    gameplayScreen + enemyColumn);
+
+  runAssembledRoutine(memory, "restore_active_muzzles");
+  assert.equal(memory[gameplayScreen + alliedColumn], 0x10);
+  assert.equal(memory[gameplayScreen + enemyColumn], 0x30);
+  runAssembledRoutine(memory, "redraw_tracked_muzzles");
+  assert.equal(memory[gameplayScreen + alliedColumn], 0x45);
+  assert.equal(memory[gameplayScreen + enemyColumn], 0xd0);
+
+  memory[turretFired] = 1;
+  memory[turretFired + 1] = 1;
+  for (let row = 1; row < 23; row += 1) {
+    runAssembledRoutine(memory, "restore_active_muzzles");
+    runAssembledRoutine(memory, "advance_tracked_muzzles");
+    assert.deepEqual([memory[muzzleRow], memory[muzzleRow + 1]], [row, row]);
+    assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8,
+      gameplayScreen + row * 40 + alliedColumn);
+    assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
+      gameplayScreen + row * 40 + enemyColumn);
+  }
+  runAssembledRoutine(memory, "reset_exited_turret_lifecycles");
+  assert.deepEqual([memory[turretFired], memory[turretFired + 1]], [1, 1]);
+
+  runAssembledRoutine(memory, "restore_active_muzzles");
+  runAssembledRoutine(memory, "advance_tracked_muzzles");
+  assert.deepEqual(
+    [memory[muzzleRow], memory[muzzleRow + 1], memory[muzzleHi], memory[muzzleHi + 1]],
+    [0, 0, 0, 0],
+  );
+  runAssembledRoutine(memory, "reset_exited_turret_lifecycles");
+  assert.deepEqual([memory[turretFired], memory[turretFired + 1]], [0, 0]);
+
+  memory[muzzleRow] = 9;
+  memory[muzzleHi] = 0x42;
+  runAssembledRoutine(memory, "init_broadside");
+  assert.deepEqual(
+    Array.from(memory.subarray(muzzleRow, muzzleHi + 2)),
+    [0, 0, 0, 0, 0, 0],
+    "a new sector/game lifecycle cannot inherit stale muzzle records",
+  );
+});
+
+test("hybrid world ring and hull-only copy preserve every logical row and both hull bands", () => {
+  const gameplayScreen = 0x4028;
+  const rowLo = labels.get("PLAYFIELD_ROW_LO");
+  const rowHi = labels.get("PLAYFIELD_ROW_HI");
+  const leftBacking = labels.get("CORRIDOR_BOUNDARY_LEFT");
+  const rightBacking = labels.get("CORRIDOR_BOUNDARY_RIGHT");
+  const logicalAddress = (memory, row) => row === 0
+    ? gameplayScreen
+    : memory[rowLo + row - 1] | memory[rowHi + row - 1] << 8;
+  const fillScreen = (memory) => {
+    for (let row = 0; row < 23; row += 1) {
+      for (let column = 0; column < 40; column += 1) {
+        memory[gameplayScreen + row * 40 + column] = (row * 41 + column * 7 + 3) & 0xff;
+      }
+      memory[leftBacking + row] = 0x20 + row;
+      memory[rightBacking + row] = 0x60 + row;
+    }
+    return Uint8Array.from(memory.subarray(gameplayScreen, gameplayScreen + 23 * 40));
+  };
+
+  const corridorMemory = createLinkedRuntimeMemory();
+  const corridorBefore = fillScreen(corridorMemory);
+  corridorMemory[0x4ea5] = 0;
+  runAssembledRoutine(corridorMemory, "scroll_world_columns");
+  for (let row = 1; row < 23; row += 1) {
+    const address = logicalAddress(corridorMemory, row);
+    for (let column = 8; column <= 31; column += 1) {
+      assert.equal(corridorMemory[address + column],
+        corridorBefore[(row - 1) * 40 + column], `corridor ${row},${column}`);
+    }
+    assert.equal(corridorMemory[leftBacking + row], 0x20 + row - 1);
+    assert.equal(corridorMemory[rightBacking + row], 0x60 + row - 1);
+  }
+
+  const completeMemory = createLinkedRuntimeMemory();
+  const completeBefore = fillScreen(completeMemory);
+  completeMemory[0x4ea5] = 6;
+  runAssembledRoutine(completeMemory, "scroll_world_columns");
+  for (let row = 1; row < 23; row += 1) {
+    const address = logicalAddress(completeMemory, row);
+    for (let column = 0; column < 40; column += 1) {
+      assert.equal(completeMemory[address + column],
+        completeBefore[(row - 1) * 40 + column], `complete ${row},${column}`);
+    }
+  }
+
+  const hullMemory = createLinkedRuntimeMemory();
+  const hullBefore = fillScreen(hullMemory);
+  hullMemory[0x4ea5] = 0;
+  hullMemory[labels.get("corridor_phase")] = 32;
+  runAssembledRoutine(hullMemory, "scroll_hull_columns");
+  for (let row = 1; row < 23; row += 1) {
+    for (const column of [0, 1, 6, 7, 32, 33, 38, 39]) {
+      assert.equal(hullMemory[gameplayScreen + row * 40 + column],
+        hullBefore[(row - 1) * 40 + column], `hull ${row},${column}`);
+    }
+  }
+});
+
+test("HUD and divider LMS remain fixed for every one of the 22 ring heads", () => {
+  const memory = createLinkedRuntimeMemory();
+  const rowLo = labels.get("PLAYFIELD_ROW_LO");
+  const rowHi = labels.get("PLAYFIELD_ROW_HI");
+  const activeListLo = labels.get("PLAYFIELD_ACTIVE_DLIST_LO");
+  const dlistl = 0xd402;
+  runAssembledRoutine(memory, "init_playfield_row_table");
+  runAssembledRoutine(memory, "init_playfield_display_lists");
+
+  for (let head = 0; head < 22; head += 1) {
+    const list = 0x7f00 | memory[activeListLo];
+    assert.deepEqual(Array.from(memory.subarray(list, list + 6)), [
+      0xc2, 0x00, 0x40,
+      0x44, 0x28, 0x40,
+    ], `head ${head} must keep HUD=$4000 and divider=$4028`);
+
+    const addresses = [];
+    for (let row = 0; row < 22; row += 1) {
+      const offset = list + 6 + row * 3;
+      assert.equal(memory[offset], row === 21 ? 0xc4 : 0x44,
+        `head ${head}, row ${row} mode`);
+      const address = memory[offset + 1] | memory[offset + 2] << 8;
+      addresses.push(address);
+      assert.equal(address, memory[rowLo + row] | memory[rowHi + row] << 8,
+        `head ${head}, row ${row} mapper/list mismatch`);
+    }
+    assert.equal(new Set(addresses).size, 22, `head ${head} duplicates a ring row`);
+    assert.deepEqual(addresses, Array.from({ length: 22 }, (_, row) =>
+      0x4050 + ((row - head + 22) % 22) * 40));
+    assert.deepEqual(Array.from(memory.subarray(list + 72, list + 75)),
+      [0x41, list & 0xff, 0x7f]);
+
+    runAssembledRoutine(memory, "rotate_playfield_rows");
+    assert.equal(memory[dlistl], memory[activeListLo], "publication must switch DLISTL only");
+    runAssembledRoutine(memory, "prebuild_next_playfield_display_list");
+  }
+});
+
+test("optimized Viper PMG keeps horizontal pixels and clears only the departed vertical row", () => {
+  const player0 = 0x3c00;
+  const player3 = 0x3f00;
+  const stick0 = 0xd300;
+  const trig0 = 0xd010;
+  const hposp0 = 0xd000;
+  const hposp3 = 0xd003;
+  const lifecycle = 0x4eaa;
+  const blinkFrame = 0x4ead;
+  const playerX = labels.get("player_x");
+  const playerY = labels.get("player_y");
+  const fireGate = labels.get("gameplay_fire_gate");
+  const shape = xexBytesAt(labels.get("player_shape"), 16);
+  const engine = xexBytesAt(labels.get("player_engine_shape"), 16);
+
+  const prepared = () => {
+    const memory = createLinkedRuntimeMemory();
+    memory[playerX] = 124;
+    memory[playerY] = 100;
+    memory[fireGate] = 1;
+    memory[trig0] = 1;
+    memory[lifecycle] = 0;
+    memory.set(shape, player0 + 100);
+    memory.set(engine, player3 + 100);
+    return memory;
+  };
+
+  const horizontal = prepared();
+  const beforeP0 = Uint8Array.from(horizontal.subarray(player0, player0 + 256));
+  const beforeP3 = Uint8Array.from(horizontal.subarray(player3, player3 + 256));
+  horizontal[stick0] = 0x0b;
+  runAssembledRoutine(horizontal, "read_input");
+  assert.equal(horizontal[playerX], 122);
+  assert.deepEqual(horizontal.subarray(player0, player0 + 256), beforeP0);
+  assert.deepEqual(horizontal.subarray(player3, player3 + 256), beforeP3);
+  assert.deepEqual([horizontal[hposp0], horizontal[hposp3]], [122, 122]);
+
+  const upward = prepared();
+  upward[stick0] = 0x0e;
+  runAssembledRoutine(upward, "read_input");
+  assert.equal(upward[playerY], 99);
+  assert.deepEqual([...upward.subarray(player0 + 99, player0 + 115)], [...shape]);
+  assert.deepEqual([...upward.subarray(player3 + 99, player3 + 115)], [...engine]);
+  assert.equal(upward[player0 + 115], 0);
+  assert.equal(upward[player3 + 115], 0);
+
+  const downward = prepared();
+  downward[stick0] = 0x0d;
+  runAssembledRoutine(downward, "read_input");
+  assert.equal(downward[playerY], 101);
+  assert.equal(downward[player0 + 100], 0);
+  assert.equal(downward[player3 + 100], 0);
+  assert.deepEqual([...downward.subarray(player0 + 101, player0 + 117)], [...shape]);
+  assert.deepEqual([...downward.subarray(player3 + 101, player3 + 117)], [...engine]);
+
+  const hiddenBlink = prepared();
+  hiddenBlink[lifecycle] = 2;
+  hiddenBlink[blinkFrame] = 8;
+  hiddenBlink[stick0] = 0x0f;
+  runAssembledRoutine(hiddenBlink, "read_input");
+  assert.deepEqual([...hiddenBlink.subarray(player0 + 100, player0 + 116)],
+    Array(16).fill(0));
+  assert.deepEqual([...hiddenBlink.subarray(player3 + 100, player3 + 116)],
+    Array(16).fill(0));
+});
+
+test("muzzle tracking resets with a new sector/game but survives a same-sector life loss", () => {
+  const respawn = routine("respawn_player", "tick_respawn_invulnerability");
+  const init = routine("init_broadside", "update_player_death");
+  assert.doesNotMatch(respawn, /MUZZLE_(?:VISIBLE_ROW|SCREEN_LO|SCREEN_HI)/,
+    "respawn must not remove a still-visible hull muzzle from the unchanged sector");
+  assert.match(init,
+    /MUZZLE_VISIBLE_ROW,x[\s\S]+MUZZLE_SCREEN_LO,x[\s\S]+MUZZLE_SCREEN_HI,x/,
+    "a new game/sector must clear both tracked records");
 });
 
 test("PAL-frame scheduler keeps its timing while the faster finite hull pass shortens opportunities", () => {
@@ -754,7 +1052,7 @@ test("both capital factions can hit a fighter while scoring remains source-owned
   assert.equal(state.score, 0);
   assert.match(routine("handle_collisions", "update_score_display"),
     /jsr update_fighter_projectiles[\s\S]+jsr update_broadside[\s\S]+jsr resolve_enemy_damage/);
-  assert.match(routine("update_fighter_projectiles", "move_projectile_screen_pointer_up"),
+  assert.match(routine("update_fighter_projectiles", "viper_projectile_hits_enemy"),
     /DAMAGE_PLAYER_PROJECTILE[\s\S]+jsr queue_enemy_damage/);
   assert.match(routine("update_broadside", "schedule_broadside"),
     /@flying:[\s\S]+jmp @targets[\s\S]+@targets:[\s\S]+jsr capital_shell_collision_flags/);

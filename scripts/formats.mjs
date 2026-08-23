@@ -6,7 +6,7 @@ const ATR_HEADER_SIZE = 16;
 const ATR_SECTOR_SIZE = 128;
 const ATR_SECTOR_COUNT = 720;
 const ACCEPTED_MENU_MUSIC_PAYLOAD_BYTES = 14314;
-const GAMEPLAY_AUDIO_PAUSE_PAYLOAD_LIMIT = 1280;
+const RUNTIME_HEADROOM_PAYLOAD_LIMIT = 1536;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -121,8 +121,8 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
   invariant(readWord(boot, 4) === manifest.bootInitAddress, "Boot init address differs from manifest");
   invariant(
-    boot.length - ACCEPTED_MENU_MUSIC_PAYLOAD_BYTES <= GAMEPLAY_AUDIO_PAUSE_PAYLOAD_LIMIT,
-    "Gameplay-music and pause feature payload delta exceeds 1280 bytes",
+    boot.length - ACCEPTED_MENU_MUSIC_PAYLOAD_BYTES <= RUNTIME_HEADROOM_PAYLOAD_LIMIT,
+    "Runtime-headroom feature payload delta exceeds 1536 bytes",
   );
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
     "Broadside relocation source must begin at $4000");
@@ -136,9 +136,14 @@ export function validateBuildDirectory(rootDirectory) {
     "Starfield runtime exceeds its reserved relocation block");
   invariant(manifest.starfieldRuntime?.packedBytes <= manifest.starfieldRuntime?.stagingBytes,
     "Packed starfield exceeds temporary staging storage");
+  invariant(manifest.a2Kernel?.runAddress === 0x9000,
+    "A2 kernel must run in unconditional RAM at $9000");
+  invariant(manifest.a2Kernel?.bytes > 0 &&
+    manifest.a2Kernel.bytes <= manifest.a2Kernel.reservedBytes,
+  "A2 kernel exceeds its reserved runtime block");
   invariant(boot.length === 0x2000 + manifest.broadsideRuntime.packedBytes +
-    manifest.starfieldRuntime.packedBytes,
-  "Boot payload does not contain both packed relocation tails");
+    manifest.starfieldRuntime.packedBytes + manifest.a2Kernel.bytes,
+  "Boot payload does not contain both packed relocation tails and the A2 kernel");
 
   const parsedXex = parseXex(xex);
   invariant(parsedXex.segments.length === 2, "XEX must contain the payload and RUNAD segments");

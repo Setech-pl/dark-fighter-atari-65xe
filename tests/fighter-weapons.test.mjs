@@ -46,12 +46,13 @@ function xexBytes(address, length) {
   return segment.data.subarray(address - segment.start, address - segment.start + length);
 }
 
-test("assembled gameplay display begins with one compact HUD row and 23 gameplay rows", () => {
-  const bytes = xexBytes(labels.get("display_list"), 29);
-  assert.deepEqual([...bytes.subarray(0, 4)], [0xc2, 0x00, 0x40, 0x04]);
-  assert.deepEqual([...bytes.subarray(3, 25)], Array(22).fill(0x04));
-  assert.equal(bytes[25], 0x84);
-  assert.equal([...bytes.subarray(0, 26)].includes(0x70), false);
+test("assembled gameplay display keeps HUD, divider and 22 ring rows distinct", () => {
+  assert.match(source, /PLAYFIELD_DLIST_BYTES\s*=\s*3\+3\+PLAYFIELD_RING_ROWS\*3\+3/);
+  assert.match(source, /lda #\$C2[\s\S]+lda #\$44[\s\S]+lda #\$C4[\s\S]+lda #\$41/);
+  assert.doesNotMatch(source.slice(
+    source.indexOf("build_playfield_display_list:"),
+    source.indexOf("rotate_playfield_rows:"),
+  ), /lda #\$70/);
   assert.deepEqual(weapons.viewport, {
     activeImageTop: 8,
     hudRows: 1,

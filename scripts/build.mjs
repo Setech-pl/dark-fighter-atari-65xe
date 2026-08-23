@@ -41,6 +41,7 @@ import {
   renderGameplayMusicCa65Include,
 } from "./gameplay-music.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
+import { measureRuntimeCycles } from "./runtime-cycles.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -64,7 +65,7 @@ if (enemyPaletteSlug && !enemyPaletteIds.has(enemyPaletteSlug)) {
 const isReviewVariant = enemyReviewHarness || enemyCombatReviewHarness || Boolean(enemyPaletteSlug);
 const acceptedMenuMusicPayloadBytes = 14314;
 // Gameplay music plus its in-game pause controls remain a bounded post-menu feature.
-const gameplayAudioPausePayloadLimit = 1280;
+const runtimeHeadroomPayloadLimit = 1536;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -137,6 +138,14 @@ function parseViceLabels(labelText) {
 
 function sha256(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+function parseLinkSegmentSize(mapText, name) {
+  const match = new RegExp(
+    `^${name}\\s+[0-9A-F]+\\s+[0-9A-F]+\\s+([0-9A-F]+)`,
+    "mi",
+  ).exec(mapText);
+  return match ? Number.parseInt(match[1], 16) : undefined;
 }
 
 function writeFile(targetPath, bytes) {
@@ -288,8 +297,15 @@ async function build() {
   const starfieldLoadAddress = labels.get("__STARFIELD_LOAD__");
   const starfieldRunAddress = labels.get("__STARFIELD_RUN__");
   const starfieldRuntimeBytes = labels.get("__STARFIELD_SIZE__");
+  const a2KernelLoadAddress = labels.get("__A2_KERNEL_LOAD__");
+  const a2KernelRunAddress = labels.get("__A2_KERNEL_RUN__");
+  const a2KernelBytes = labels.get("__A2_KERNEL_SIZE__");
+  const codeBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "CODE");
+  const rodataBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "RODATA");
+  const projectileStateBytes = labels.get("__PROJECTILES_SIZE__");
   const starfieldPackedSourceOperand = labels.get("starfield_packed_source");
   const starfieldPackedSizeOperand = labels.get("starfield_packed_size");
+  const a2KernelSourceOperand = labels.get("a2_kernel_source");
   const loaderPackedAddress = labels.get("loader_bitmap_lzss");
   const musicPlayerStart = labels.get("music_player_start");
   const musicPlayerEnd = labels.get("music_player_end");
@@ -305,12 +321,17 @@ async function build() {
     !Number.isInteger(broadsideLoadAddress) || !Number.isInteger(broadsideRunAddress) ||
     !Number.isInteger(broadsideRuntimeBytes) || !Number.isInteger(starfieldLoadAddress) ||
     !Number.isInteger(starfieldRunAddress) || !Number.isInteger(starfieldRuntimeBytes) ||
+    !Number.isInteger(a2KernelLoadAddress) || !Number.isInteger(a2KernelRunAddress) ||
+    !Number.isInteger(a2KernelBytes) ||
     !Number.isInteger(starfieldPackedSourceOperand) ||
-    !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(loaderPackedAddress) ||
+    !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(a2KernelSourceOperand) ||
+    !Number.isInteger(loaderPackedAddress) ||
     !Number.isInteger(musicPlayerStart) || !Number.isInteger(musicPlayerEnd) ||
     !Number.isInteger(musicDataStart) || !Number.isInteger(musicDataEnd) ||
     !Number.isInteger(gameMusicPlayerStart) || !Number.isInteger(gameMusicPlayerEnd) ||
-    !Number.isInteger(gameMusicDataStart) || !Number.isInteger(gameMusicDataEnd)) {
+    !Number.isInteger(gameMusicDataStart) || !Number.isInteger(gameMusicDataEnd) ||
+    !Number.isInteger(codeBytes) || !Number.isInteger(rodataBytes) ||
+    !Number.isInteger(projectileStateBytes)) {
     throw new Error("ld65 label file is missing entry or resident relocation labels");
   }
   if (broadsideLoadAddress !== 0x4000 || broadsideRunAddress !== 0x5e10 ||
@@ -320,6 +341,10 @@ async function build() {
   if (starfieldLoadAddress !== 0x5a00 || starfieldRunAddress !== 0x552a ||
     starfieldRuntimeBytes > 0x08e6) {
     throw new Error("Starfield relocation lies outside its reviewed load/run ranges");
+  }
+  if (a2KernelLoadAddress !== 0x6a00 || a2KernelRunAddress !== 0x9000 ||
+    a2KernelBytes < 1 || a2KernelBytes >= 0x0100) {
+    throw new Error("A2 kernel lies outside its reviewed $9000-$90FF runtime range");
   }
   const broadsideRuntime = linkedPayload.subarray(
     broadsideLoadAddress - loadAddress,
@@ -333,12 +358,17 @@ async function build() {
     starfieldLoadAddress - loadAddress,
     starfieldLoadAddress - loadAddress + starfieldRuntimeBytes,
   );
+  const a2KernelRuntime = linkedPayload.subarray(
+    a2KernelLoadAddress - loadAddress,
+    a2KernelLoadAddress - loadAddress + a2KernelBytes,
+  );
   const packedStarfieldRuntime = packBroadsideLzss(starfieldRuntime);
   if (!unpackBroadsideLzss(packedStarfieldRuntime).equals(starfieldRuntime)) {
     throw new Error("Starfield LZSS round trip failed");
   }
   if (packedStarfieldRuntime.length > starfieldStagingBytes) {
-    throw new Error("Packed starfield exceeds the reviewed temporary staging buffer");
+    throw new Error(`Packed starfield ${packedStarfieldRuntime.length} B exceeds the reviewed ` +
+      `${starfieldStagingBytes} B temporary staging buffer`);
   }
   if (broadsideRunAddress + broadsideRuntimeReservedBytes > starfieldStagingAddress ||
     starfieldStagingAddress + starfieldStagingBytes > 0xc000) {
@@ -363,17 +393,24 @@ async function build() {
     packedStarfieldRuntime.length,
     starfieldPackedSizeOperand - loadAddress,
   );
+  const a2KernelSourceAddress = loadAddress + residentMain.length +
+    packedBroadsideRuntime.length + packedStarfieldRuntime.length;
+  residentMain.writeUInt16LE(
+    a2KernelSourceAddress,
+    a2KernelSourceOperand - loadAddress,
+  );
   const rawPayload = Buffer.concat([
     residentMain,
     packedBroadsideRuntime,
     packedStarfieldRuntime,
+    a2KernelRuntime,
   ]);
   if (!isReviewVariant &&
-    rawPayload.length - acceptedMenuMusicPayloadBytes > gameplayAudioPausePayloadLimit) {
+    rawPayload.length - acceptedMenuMusicPayloadBytes > runtimeHeadroomPayloadLimit) {
     throw new Error(
-      `Gameplay-music feature payload delta is ` +
+      `Runtime-headroom feature payload delta is ` +
       `${rawPayload.length - acceptedMenuMusicPayloadBytes} bytes and exceeds ` +
-      `${gameplayAudioPausePayloadLimit} bytes`,
+      `${runtimeHeadroomPayloadLimit} bytes`,
     );
   }
 
@@ -392,6 +429,55 @@ async function build() {
 
   const xex = makeXex(loadAddress, startAddress, rawPayload);
   const atr = makeAtr(rawPayload);
+  const cpuRuntimeTiming = isReviewVariant ? null : measureRuntimeCycles({
+    residentMain,
+    loadAddress,
+    broadsideRuntime,
+    broadsideRunAddress,
+    starfieldRuntime,
+    starfieldRunAddress,
+    a2KernelRuntime,
+    a2KernelRunAddress,
+    labels,
+    segmentSizes: {
+      code: codeBytes,
+      rodata: rodataBytes,
+      projectiles: projectileStateBytes,
+      starfield: starfieldRuntimeBytes,
+      broadside: broadsideRuntimeBytes,
+      a2Kernel: a2KernelBytes,
+    },
+  });
+  const wallTracePath = path.join(rootDirectory, "docs", "runtime-wall-trace.json");
+  let wallTrace = null;
+  if (!isReviewVariant && fs.existsSync(wallTracePath)) {
+    wallTrace = JSON.parse(fs.readFileSync(wallTracePath, "utf8"));
+    if (wallTrace.artifact?.sha256 !== sha256(xex)) {
+      throw new Error("Runtime wall trace belongs to a different XEX artifact");
+    }
+  }
+  const runtimeTiming = cpuRuntimeTiming === null ? null : {
+    ...cpuRuntimeTiming,
+    cpu_cycles_dma_off: cpuRuntimeTiming.cpuDmaOff.heaviestMainLoopCycles,
+    cpu_comparison_headroom:
+      cpuRuntimeTiming.palFrameCycles - cpuRuntimeTiming.cpuDmaOff.heaviestMainLoopCycles,
+    measured_wall_cycles_dma_on: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
+    measured_physical_headroom: wallTrace?.semantics.measured_physical_headroom ?? null,
+    estimated_additive_cycles: cpuRuntimeTiming.estimatedAdditive.cycles,
+    wallTrace: wallTrace === null ? null : {
+      reportPath: "docs/runtime-wall-trace.json",
+      reportSha256: sha256(fs.readFileSync(wallTracePath)),
+      artifact: wallTrace.artifact,
+      emulator: wallTrace.emulator,
+      semantics: wallTrace.semantics,
+      gate: wallTrace.gate,
+      instrumentation: wallTrace.instrumentation,
+      replay: {
+        baseline_measured_frames: wallTrace.replay.baseline_measured_frames,
+        targeted_measured_frames: wallTrace.replay.targeted_measured_frames,
+      },
+    },
+  };
 
   const manifest = {
     formatVersion: 1,
@@ -427,6 +513,14 @@ async function build() {
       stagingAddress: starfieldStagingAddress,
       stagingBytes: starfieldStagingBytes,
       compression: "LZ-10/5",
+    },
+    a2Kernel: {
+      loadAddress: a2KernelLoadAddress,
+      runAddress: a2KernelRunAddress,
+      sourceAddress: a2KernelSourceAddress,
+      bytes: a2KernelBytes,
+      reservedBytes: 0x0100,
+      availability: "unconditional 64 KB RAM",
     },
     loaderScreen: {
       mode: "mixed ANTIC F/E",
@@ -621,12 +715,15 @@ async function build() {
       runtimeDataBytes: gameMusicDataEnd - gameMusicDataStart,
       runtimeStateBytes: gameplayMusicAsset.stateBytes,
       eventsPerTickLimit: gameplayMusicAsset.eventsPerTickLimit,
-      normalFrameCycles: 78,
-      worstRowFrameCycles: 256,
-      pauseOptionPollCycles: 13,
-      conservativeWorstFrameCycles: 34499,
-      conservativePalHeadroomCycles: 1001,
+      normalFrameCycles: runtimeTiming?.cpuDmaOff.gameplayMusicTickMinimumCycles ?? null,
+      worstRowFrameCycles: runtimeTiming?.cpuDmaOff.gameplayMusicTickMaximumCycles ?? null,
+      pauseOptionPollCycles: runtimeTiming?.cpuDmaOff.optionPollCycles ?? null,
+      cpuWorstFrameCyclesDmaOff: runtimeTiming?.cpu_cycles_dma_off ?? null,
+      cpuComparisonHeadroomCycles: runtimeTiming?.cpu_comparison_headroom ?? null,
+      measuredWallCyclesDmaOn: runtimeTiming?.measured_wall_cycles_dma_on ?? null,
+      measuredPhysicalHeadroomCycles: runtimeTiming?.measured_physical_headroom ?? null,
     },
+    runtimeTiming,
     pause: {
       inputRegister: 0xd01f,
       optionMask: 0x04,
@@ -651,6 +748,7 @@ async function build() {
   writeFile(path.join(buildDirectory, "broadside-runtime-packed.bin"), packedBroadsideRuntime);
   writeFile(path.join(buildDirectory, "starfield-runtime.bin"), starfieldRuntime);
   writeFile(path.join(buildDirectory, "starfield-runtime-packed.bin"), packedStarfieldRuntime);
+  writeFile(path.join(buildDirectory, "a2-kernel-runtime.bin"), a2KernelRuntime);
   writeFile(path.join(buildDirectory, "dark-fighter.map"), mapFile);
   writeFile(path.join(buildDirectory, "dark-fighter.lbl"), labelFile);
   writeFile(path.join(buildDirectory, "manifest.json"), manifestBytes);

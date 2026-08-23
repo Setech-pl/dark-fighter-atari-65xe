@@ -15,9 +15,11 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.match(source, /FRONTEND_CHARSET\s*=\s*\$4800/);
   assert.match(source, /HUD_CHARSET\s*=\s*\$5000/);
   assert.match(source, /sta CHBASE/);
-  assert.match(source, /\.byte \$C2,<SCREEN,>SCREEN\s+; ANTIC 2 HUD \+ LMS \+ DLI/);
-  assert.match(source, /\.repeat 22\s+\.byte \$04\s+\.endrepeat/);
-  assert.match(source, /\.byte \$84\s+; final ANTIC 4 row \+ DLI/);
+  assert.match(source, /PLAYFIELD_DLIST_BYTES\s*=\s*3\+3\+PLAYFIELD_RING_ROWS\*3\+3/);
+  assert.match(source,
+    /build_playfield_display_list:[\s\S]+lda #\$C2[\s\S]+lda #<GAMEPLAY_DIVIDER_SCREEN[\s\S]+cpy #\(6\+\(PLAYFIELD_RING_ROWS-1\)\*3\)[\s\S]+lda #\$C4[\s\S]+lda #\$41/);
+  assert.match(source,
+    /rotate_playfield_rows:[\s\S]+sta DLISTL[\s\S]+inc PLAYFIELD_PREBUILD_PENDING/);
   assert.match(source, /\.byte \$47,<SCREEN,>SCREEN\s+; ANTIC 7 title/);
   assert.match(source, /\.byte \$02\s+; 40-column ANTIC 2 control hint/);
   assert.match(source, /lda #\$3E\s+; normal playfield, single-line PMG DMA/);

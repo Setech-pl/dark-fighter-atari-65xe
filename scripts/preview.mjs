@@ -751,12 +751,17 @@ export function readGameGraphicsSource(
     hudHardwareState.set(register, requireValue(gameplayEntryState, register));
   }
 
-  const gameplayDisplayList = extractLabeledData(
-    source,
-    "display_list",
-    constants,
-    "display_list_jvb",
-  );
+  // Runtime A2 keeps HUD and divider LMS operands fixed, then maps the 22-row
+  // ring. Preview uses the exact accepted head-zero address sequence.
+  const screenAddress = requireValue(constants, "SCREEN");
+  const gameplayDisplayList = Uint8Array.from([
+    0xc2, screenAddress & 0xff, screenAddress >>> 8,
+    0x44, (screenAddress + 40) & 0xff, (screenAddress + 40) >>> 8,
+    ...Array.from({ length: 22 }, (_, row) => {
+      const address = screenAddress + (row + 2) * 40;
+      return [row === 21 ? 0xc4 : 0x44, address & 0xff, address >>> 8];
+    }).flat(),
+  ]);
   const gameplayLayout = decodeMainMenuDisplayList(
     gameplayDisplayList,
     requireValue(constants, "SCREEN"),

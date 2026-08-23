@@ -41,6 +41,7 @@ const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex")
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
 const broadsideRuntime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
 const starfieldRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
+const a2KernelRuntime = fs.readFileSync(path.join(rootDirectory, "build", "a2-kernel-runtime.bin"));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -62,6 +63,10 @@ function readXexBytes(address, length) {
   const starfield = manifest.starfieldRuntime;
   if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
     return starfieldRuntime.subarray(address - starfield.runAddress, address - starfield.runAddress + length);
+  }
+  const kernel = manifest.a2Kernel;
+  if (address >= kernel.runAddress && address + length <= kernel.runAddress + kernel.bytes) {
+    return a2KernelRuntime.subarray(address - kernel.runAddress, address - kernel.runAddress + length);
   }
   const segment = parseXex(xex).segments.find(
     ({ start, end }) => address >= start && address + length - 1 <= end,
@@ -153,16 +158,14 @@ test("31 generated ANTIC 4 glyphs fit the 1024-byte assembled gameplay charset",
 
 test("assembled gameplay display list and DLI switch a dedicated ANTIC 2 HUD", () => {
   const graphics = readGameGraphicsSource(source, definition);
-  const displayListAddress = labels.get("display_list");
-  const displayListLength = labels.get("display_list_jvb") - displayListAddress + 3;
-  const assembledDisplayList = readXexBytes(displayListAddress, displayListLength);
-  const expectedDisplayList = Buffer.from([
-    0xc2, 0x00, 0x40,
-    ...Array(22).fill(0x04),
-    0x84,
-    0x41, displayListAddress & 0xff, displayListAddress >>> 8,
-  ]);
-  assert.deepEqual(assembledDisplayList, expectedDisplayList);
+  const builder = source.slice(
+    source.indexOf("build_playfield_display_list:"),
+    source.indexOf("rotate_playfield_rows:"),
+  );
+  assert.match(builder,
+    /lda #\$C2[\s\S]+lda #<GAMEPLAY_DIVIDER_SCREEN[\s\S]+cpy #\(6\+\(PLAYFIELD_RING_ROWS-1\)\*3\)[\s\S]+lda #\$C4[\s\S]+lda PLAYFIELD_ROW_LO,x[\s\S]+lda PLAYFIELD_ROW_HI,x[\s\S]+lda #\$41/);
+  assert.match(source,
+    /lda PLAYFIELD_ACTIVE_DLIST_LO\s+sta DLISTL\s+lda #>PLAYFIELD_DLIST_A\s+sta DLISTH/);
   assert.deepEqual(
     graphics.gameplayLayout.rows.map(({ mode }) => mode),
     [2, ...Array(23).fill(4)],
@@ -575,7 +578,9 @@ test("loader and accepted menu previews remain unchanged while hull previews are
 test("joystick, FIRE, projectile, enemy, and scoring routines remain connected", () => {
   assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_viper_weapon[\s\S]+jsr update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
   assert.match(source, /read_input:[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
-  assert.match(source, /allocate_viper_projectile:[\s\S]+sta bullet_active/);
+  assert.match(source,
+    /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #VIPER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #RAIDER_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
+  assert.doesNotMatch(source, /\b(?:bullet_x|bullet_y|bullet_active|refresh_bullet_active)\b/);
   assert.match(source,
     /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jsr update_top_score[\s\S]+jmp update_score_display/);
   assert.match(source,

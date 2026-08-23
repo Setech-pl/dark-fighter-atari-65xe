@@ -108,7 +108,7 @@ test("frontend uses distinct clean 6x7 glyphs within ANTIC 6/7 indices", () => {
 
 test("UP and DOWN move once per neutral release and wrap at both bounds", () => {
   assert.match(
-    routine("frontend_loop"),
+    routine("frontend_input_poll"),
     /cmp #\$0F[\s\S]+lda TRIG0[\s\S]+sta frontend_input_armed/,
   );
   assert.match(
@@ -492,7 +492,7 @@ test("menu PMG craft is bounded, main-menu-only, and gameplay setup is restored"
   assert.match(routine("start_gameplay"), /jsr clear_pmg/);
   assert.match(
     routine("start_gameplay"),
-    /sta NMIEN[\s\S]+lda #<display_list[\s\S]+sta DLISTL[\s\S]+lda #<gameplay_dli[\s\S]+lda #>HUD_CHARSET[\s\S]+sta CHBASE/,
+    /sta NMIEN[\s\S]+jsr init_playfield_display_lists[\s\S]+lda PLAYFIELD_ACTIVE_DLIST_LO[\s\S]+sta DLISTL[\s\S]+lda #<gameplay_dli[\s\S]+lda #>HUD_CHARSET[\s\S]+sta CHBASE/,
   );
   assert.match(
     routine("gameplay_dli"),

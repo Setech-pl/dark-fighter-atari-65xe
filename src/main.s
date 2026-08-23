@@ -12,6 +12,8 @@
 .include "menu-music.inc"
 .include "gameplay-music.inc"
 
+.import __A2_KERNEL_RUN__, __A2_KERNEL_SIZE__
+
 ; -----------------------------------------------------------------------------
 ; OS workspace and vectors
 
@@ -87,6 +89,7 @@ NMIEN       = $D40E
 
 PMG_BASE    = $3800
 STARFIELD_STAGING = $7810
+STARFIELD_STAGING_BYTES = $0700
 PAUSE_SCREEN_BACKUP = STARFIELD_STAGING
 PAUSE_SCREEN_BYTES = $03C0
 MISSILES    = PMG_BASE + $0300
@@ -162,16 +165,14 @@ ENEMY_PENDING_DAMAGE        = ENEMY_HP+$01
 ENEMY_PENDING_SOURCE        = ENEMY_PENDING_DAMAGE+$01
 GAMEPLAY_RESIDENT_END       = ENEMY_PENDING_SOURCE+$01
 
-; Sparse far stars are decorative overlays above the authoritative
-; near-layer screen cells.  Each record stores an exact screen address, so
-; erase/redraw never has to recompute a column or retain a stale background
-; byte.  Far stars are drawn only over CH_SPACE; erasing one therefore restores
-; that same authoritative blank cell.  The four byte arrays live after the
-; fixed fighter-projectile state and before the relocated starfield code.
+; Sparse far stars are decorative overlays above the authoritative near-layer
+; cells.  Their row is logical and their column physical within that row, so a
+; 70%-rate LMS rotation cannot accidentally drag the independent 35%-rate
+; layer.  The existing four byte arrays keep the state footprint unchanged.
 STAR_FAR_ACTIVE              = $54CA
-STAR_FAR_SCREEN_LO           = STAR_FAR_ACTIVE+STAR_FAR_CAPACITY
-STAR_FAR_SCREEN_HI           = STAR_FAR_SCREEN_LO+STAR_FAR_CAPACITY
-STAR_FAR_CODE                = STAR_FAR_SCREEN_HI+STAR_FAR_CAPACITY
+STAR_FAR_ROW                 = STAR_FAR_ACTIVE+STAR_FAR_CAPACITY
+STAR_FAR_COLUMN              = STAR_FAR_ROW+STAR_FAR_CAPACITY
+STAR_FAR_CODE                = STAR_FAR_COLUMN+STAR_FAR_CAPACITY
 STAR_FAR_STATE_END           = STAR_FAR_CODE+STAR_FAR_CAPACITY
 
 STAR_RNG_STATE               = GAMEPLAY_RESIDENT_END
@@ -197,10 +198,54 @@ GAME_MUSIC_CH2_CONTROL       = GAME_MUSIC_CH2_FREQUENCY+$01
 MUSIC_TRANSIENT_STATE_END    = GAME_MUSIC_CH2_CONTROL+$01
 GAME_MUSIC_ENABLED           = MUSIC_TRANSIENT_STATE_END
 MUSIC_STATE_END              = GAME_MUSIC_ENABLED+$01
+MUZZLE_VISIBLE_ROW           = MUSIC_STATE_END             ; 2 B, allied/enemy
+MUZZLE_SCREEN_LO             = MUZZLE_VISIBLE_ROW+$02       ; 2 B exact overlay pointer
+MUZZLE_SCREEN_HI             = MUZZLE_SCREEN_LO+$02         ; 2 B, zero means inactive
+MUZZLE_TRACKING_STATE_END    = MUZZLE_SCREEN_HI+$02
 
-.assert MUSIC_STATE_END <= $5000, error, "session and music state exceed reclaimed loader RAM"
+.export MUZZLE_VISIBLE_ROW, MUZZLE_SCREEN_LO, MUZZLE_SCREEN_HI
+.export CORRIDOR_BOUNDARY_LEFT, CORRIDOR_BOUNDARY_RIGHT, BROAD_TURRET_FIRED
+; Build/debug tooling reads these symbols from the linker label file. Exporting
+; constants has no runtime footprint and avoids duplicating the resident-state
+; layout in a host-side wall-clock tracer.
+.export BROAD_STATE, DIFFICULTY_SETTING, CAPITAL_SECTOR_STATE, PLAYER_LIFECYCLE
+.export CAPITAL_EXPLOSION_TIMER, CAPITAL_EXPLOSION_SOUND_TIMER, ENEMY_ACTIVE
+.export STAR_FAR_ACTIVE, MUSIC_ACTIVE
+
+.assert MUZZLE_TRACKING_STATE_END <= $5000, error, "session, music and muzzle state exceed reclaimed loader RAM"
 
 .include "fighter-weapons.inc"
+
+; A2 hybrid-ring runtime contract. HUD and divider LMS operands are immutable;
+; only the 22 rows below the divider participate in the ring. The two lists and
+; their logical row lookup tables occupy the otherwise unused tail immediately
+; after the released starfield staging reservation. Keeping both lists on page
+; $7F permits an atomic DLISTL-only swap while DLISTH remains unchanged.
+PLAYFIELD_RING_ROWS = GAMEPLAY_SCREEN_ROWS-1
+PLAYFIELD_DLIST_BYTES = 3+3+PLAYFIELD_RING_ROWS*3+3
+PLAYFIELD_DLIST_A = STARFIELD_STAGING+STARFIELD_STAGING_BYTES
+PLAYFIELD_DLIST_B = PLAYFIELD_DLIST_A+PLAYFIELD_DLIST_BYTES
+PLAYFIELD_ROW_LO = PLAYFIELD_DLIST_B+PLAYFIELD_DLIST_BYTES
+PLAYFIELD_ROW_HI = PLAYFIELD_ROW_LO+PLAYFIELD_RING_ROWS
+PLAYFIELD_ACTIVE_DLIST_LO = PLAYFIELD_ROW_HI+PLAYFIELD_RING_ROWS
+PLAYFIELD_NEXT_DLIST_LO = PLAYFIELD_ACTIVE_DLIST_LO+$01
+PLAYFIELD_RING_FLAGS = PLAYFIELD_NEXT_DLIST_LO+$01
+PLAYFIELD_BROAD_ROW = PLAYFIELD_RING_FLAGS+$01
+PLAYFIELD_CAPITAL_EXPLOSION_ROW = PLAYFIELD_BROAD_ROW+BROADSIDE_SLOT_COUNT
+PLAYFIELD_PREBUILD_PENDING = PLAYFIELD_CAPITAL_EXPLOSION_ROW+$02
+PLAYFIELD_RING_STATE_END = PLAYFIELD_PREBUILD_PENDING+$01
+
+.assert GAMEPLAY_SCREEN_ROWS = 23, error, "display requires divider plus 22 gameplay rows"
+.assert PLAYFIELD_RING_ROWS = 22, error, "hybrid ring must exclude the fixed divider"
+.assert PLAYFIELD_DLIST_BYTES = 75, error, "per-row LMS display list size changed"
+.assert >PLAYFIELD_DLIST_A = >PLAYFIELD_DLIST_B, error, "hybrid display lists must share one page"
+.assert PLAYFIELD_RING_STATE_END <= $7FDD, error, "hybrid ring exceeds its reviewed 205-byte reservation"
+.assert PLAYFIELD_RING_STATE_END <= $8000, error, "hybrid ring overlaps future entity/effects RAM"
+.export PLAYFIELD_DLIST_A, PLAYFIELD_DLIST_B, PLAYFIELD_ROW_LO, PLAYFIELD_ROW_HI
+.export PLAYFIELD_RING_ROWS
+.export PLAYFIELD_ACTIVE_DLIST_LO, PLAYFIELD_NEXT_DLIST_LO, PLAYFIELD_RING_FLAGS
+.export PLAYFIELD_BROAD_ROW, PLAYFIELD_CAPITAL_EXPLOSION_ROW
+.export PLAYFIELD_PREBUILD_PENDING, PLAYFIELD_RING_STATE_END
 
 BROAD_FREE    = 0
 BROAD_WARNING = 1
@@ -238,6 +283,8 @@ BROADSIDE_SCREEN_TOP = HUD_TOP
 BROADSIDE_PLAYFIELD_TOP = GAMEPLAY_TOP
 GAMEPLAY_FIRST_SCREEN_ROW = 1
 GAMEPLAY_SCREEN = SCREEN+GAMEPLAY_FIRST_SCREEN_ROW*40
+GAMEPLAY_DIVIDER_SCREEN = GAMEPLAY_SCREEN
+GAMEPLAY_RING_SCREEN = GAMEPLAY_DIVIDER_SCREEN+40
 GAMEPLAY_SCREEN_END = SCREEN+24*40
 BROADSIDE_SLOT_COUNT = 3
 ENEMY_SLOT_COUNT = 1
@@ -424,6 +471,7 @@ ENEMY_X_RANGE = ENEMY_X_MAX-ENEMY_X_MIN
 ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
+.assert CAPITAL_HULL_TURRET_COUNT = 2, error, "tracked muzzle records require exactly one turret per side"
 .assert GAMEPLAY_RESIDENT_END <= $4F00, error, "gameplay resident state exceeds reclaimed RAM"
 .assert STARFIELD_STATE_END <= $4F00, error, "starfield scalar state exceeds reclaimed RAM"
 .assert STAR_FAR_STATE_END <= $552A, error, "far-star records overlap relocated starfield code"
@@ -438,6 +486,9 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 .assert GAMEPLAY_BOTTOM-GAMEPLAY_TOP = CAPITAL_HULL_VISIBLE_ROWS*8, error, "gameplay viewport height changed"
 .assert GAMEPLAY_SCREEN_ROWS = 23, error, "compact HUD must expose 23 gameplay rows"
 .assert GAMEPLAY_SCREEN+GAMEPLAY_SCREEN_ROWS*40 = GAMEPLAY_SCREEN_END, error, "gameplay must retain the 960-byte screen end"
+.assert GAMEPLAY_DIVIDER_SCREEN = $4028, error, "divider LMS address changed"
+.assert GAMEPLAY_RING_SCREEN = $4050, error, "ring must begin below the divider"
+.assert GAMEPLAY_RING_SCREEN+PLAYFIELD_RING_ROWS*40 = GAMEPLAY_SCREEN_END, error, "22-row ring must end at $43BF"
 .assert PLAYER_RESPAWN_Y = 184, error, "respawn must retain its accepted hardware Y"
 .assert VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "Viper phase glyphs overlap capital hulls"
 .assert RAIDER_PROJECTILE_GLYPH_BASE >= CAPITAL_HULL_GLYPH_BASE+CAPITAL_HULL_GLYPH_COUNT, error, "Raider phase glyphs overlap capital hulls"
@@ -465,6 +516,10 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 .assert RAIDER_HORIZONTAL_STEP_HPOS = VIPER_HORIZONTAL_STEP_HPOS, error, "fighter step units diverged"
 .assert RAIDER_SPEED_NUMERATOR*8 = RAIDER_SPEED_DENOMINATOR*7, error, "Raider maximum speed must remain exactly 7/8 of Viper"
 .assert RAIDER_SPEED_NUMERATOR < RAIDER_SPEED_DENOMINATOR, error, "Raider fractional rate must skip at least one frame"
+.assert WORLD_SCROLL_RATE_EASY = HULL_SCROLL_RATE_EASY, error, "world/hull easy cadence must remain phase-aligned"
+.assert WORLD_SCROLL_RATE_MEDIUM = HULL_SCROLL_RATE_MEDIUM, error, "world/hull medium cadence must remain phase-aligned"
+.assert WORLD_SCROLL_RATE_HARD = HULL_SCROLL_RATE_HARD, error, "world/hull hard cadence must remain phase-aligned"
+.assert WORLD_SCROLL_RATE_HARD*2 <= WORLD_SCROLL_RATE_DENOMINATOR, error, "hard cadence must leave one light frame for LMS prebuild"
 .assert RAIDER_WEAVE_PERIOD_FRAMES = 32, error, "Raider weave hot path assumes a 32-frame period"
 .assert RAIDER_ATTACK_ACTIVE_TOP = GAMEPLAY_TOP, error, "Raider pursuit begins at the gameplay viewport"
 .assert RAIDER_ATTACK_ACTIVE_BOTTOM = GAMEPLAY_BOTTOM, error, "Raider pursuit ends at the gameplay viewport"
@@ -476,9 +531,6 @@ player_y:           .res 1
 enemy_x:            .res 1
 enemy_y:            .res 1
 enemy_velocity_x:   .res 1
-bullet_x:           .res 1
-bullet_y:           .res 1
-bullet_active:      .res 1
 scanner_phase:      .res 1
 frame_counter:      .res 1
 scroll_accumulator: .res 1
@@ -574,6 +626,7 @@ start:
     ; The packed boot tail is expanded to reclaimed resident RAM before the
     ; loader starts using $4010-$5E0F for its bitmap.
     jsr unpack_broadside_runtime
+    jsr stage_a2_kernel
     jsr stage_starfield_runtime
 
     sta game_state                 ; STATE_LOADER
@@ -593,11 +646,6 @@ start:
     lda #$00
     sta TOP_SCORE_BCD_LO
     sta TOP_SCORE_BCD_HI
-
-    lda #<display_list
-    sta DLISTL
-    lda #>display_list
-    sta DLISTH
 
     lda #>PMG_BASE
     sta PMBASE
@@ -717,6 +765,8 @@ starfield_packed_source:
     .word $FFFF
 starfield_packed_size:
     .word $FFFF
+a2_kernel_source:
+    .word $FFFF
 
 ; Preserve the compact stream above the resident broadside reservation, clear
 ; of both the packed loader source and its bitmap destination. The buffer is
@@ -758,6 +808,27 @@ stage_starfield_runtime:
 @done:
     rts
 
+; The build appends the exact A2 kernel bytes after both packed relocation
+; streams and patches a2_kernel_source in resident CODE. This bounded copy is
+; shared by XEX and cold-boot ATR, so neither artifact relies on a loader-only
+; memory mapping side effect.
+stage_a2_kernel:
+    lda a2_kernel_source
+    sta src_ptr
+    lda a2_kernel_source+1
+    sta src_ptr+1
+    ldy #$00
+@copy:
+    lda (src_ptr),y
+    sta __A2_KERNEL_RUN__,y
+    iny
+    cpy #<__A2_KERNEL_SIZE__
+    bne @copy
+    rts
+
+.assert __A2_KERNEL_SIZE__ > 0, error, "A2 kernel must not be empty"
+.assert __A2_KERNEL_SIZE__ < $0100, error, "A2 kernel copy loop is limited to 255 bytes"
+
 broadside_read_source:
 @source:
     lda __BROADSIDE_LOAD__
@@ -787,6 +858,7 @@ frontend_loop:
     jsr music_tick
     jsr set_main_menu_palette      ; restore after the hint-row DLI
 :
+frontend_input_poll:
     lda STICK0
     and #$0F
     sta stick_value
@@ -974,7 +1046,7 @@ move_selection_down:
     inc frontend_selection
     jmp update_frontend_marker
 
-.segment "STARFIELD"
+.segment "RODATA"
 toggle_sound:
     lda sound_enabled
     eor #$01
@@ -1431,7 +1503,7 @@ toggle_main_menu_highlight:
     bne @character
     rts
 
-.segment "STARFIELD"
+.segment "CODE"
 draw_sound_value:
     lda sound_enabled
     beq @off
@@ -1540,6 +1612,8 @@ start_gameplay:
     jsr music_stop
     jsr clear_pmg
     jsr clear_screen
+    jsr init_playfield_row_table
+    jsr init_playfield_display_lists
     jsr init_state
     jsr unpack_capital_hull_maps
     jsr init_broadside
@@ -1554,9 +1628,9 @@ start_gameplay:
     jsr update_hud_status
     sta HITCLR
 
-    lda #<display_list
+    lda PLAYFIELD_ACTIVE_DLIST_LO
     sta DLISTL
-    lda #>display_list
+    lda #>PLAYFIELD_DLIST_A
     sta DLISTH
     lda #<gameplay_dli
     sta VDSLST
@@ -1658,6 +1732,10 @@ main_loop:
 :
     inc pause_option_latched
     jmp enter_pause
+
+main_loop_option_poll = main_loop+3
+main_loop_active = main_loop+14
+.export frontend_input_poll, main_loop_option_poll, main_loop_active
 
 ; -----------------------------------------------------------------------------
 ; Pause lifecycle. The gameplay screen is copied into the starfield stream's
@@ -1808,9 +1886,9 @@ resume_gameplay:
     jsr restore_gameplay_screen
     lda #STATE_GAMEPLAY
     sta game_state
-    lda #<display_list
+    lda PLAYFIELD_ACTIVE_DLIST_LO
     sta DLISTL
-    lda #>display_list
+    lda #>PLAYFIELD_DLIST_A
     sta DLISTH
     lda #<gameplay_dli
     sta VDSLST
@@ -1934,6 +2012,11 @@ quit_gameplay_to_menu:
     sta BROAD_STATE_BASE,x
     dex
     bpl @clear_broadside
+    ldx #(MUZZLE_TRACKING_STATE_END-MUZZLE_VISIBLE_ROW)-1
+@clear_muzzles:
+    sta MUZZLE_VISIBLE_ROW,x
+    dex
+    bpl @clear_muzzles
     ldx #(GAMEPLAY_RESIDENT_END-HULL_SCROLL_ACCUMULATOR)-1
 @clear_gameplay:
     sta HULL_SCROLL_ACCUMULATOR,x
@@ -2147,7 +2230,6 @@ init_state:
     sta STAR_RNG_STATE
 
     lda #$00
-    sta bullet_active
     sta scanner_phase
     sta frame_counter
     sta fire_timer
@@ -2461,6 +2543,56 @@ clear_screen:
     bne @loop
     rts
 
+; Build the logical-to-physical lookup for the 22 rows below the fixed divider.
+; Logical row zero is always $4028 and is handled directly by the mapper.
+init_playfield_row_table:
+    lda #<GAMEPLAY_RING_SCREEN
+    sta dst_ptr
+    lda #>GAMEPLAY_RING_SCREEN
+    sta dst_ptr+1
+    ldx #$00
+@row:
+    lda dst_ptr
+    sta PLAYFIELD_ROW_LO,x
+    lda dst_ptr+1
+    sta PLAYFIELD_ROW_HI,x
+    clc
+    lda dst_ptr
+    adc #40
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
+    inx
+    cpx #PLAYFIELD_RING_ROWS
+    bne @row
+    lda #$00
+    sta PLAYFIELD_RING_FLAGS
+    sta PLAYFIELD_PREBUILD_PENDING
+    rts
+
+.segment "STARFIELD"
+
+; A is a zero-based visible row. Row zero is the immutable divider LMS; rows
+; 1..22 resolve through the rotating table while preserving the linear head.
+set_gameplay_row_ptr:
+    tax
+    beq @divider
+    dex
+    lda PLAYFIELD_ROW_LO,x
+    sta dst_ptr
+    lda PLAYFIELD_ROW_HI,x
+    sta dst_ptr+1
+    rts
+@divider:
+    lda #<GAMEPLAY_DIVIDER_SCREEN
+    sta dst_ptr
+    lda #>GAMEPLAY_DIVIDER_SCREEN
+    sta dst_ptr+1
+    rts
+
+.segment "CODE"
+
 init_screen:
     ldx #$00
 @title_loop:
@@ -2507,8 +2639,6 @@ init_screen:
 ; Player and input
 
 read_input:
-    jsr erase_player
-
     lda STICK0
     sta stick_value
 
@@ -2530,6 +2660,20 @@ read_input:
     inc player_x
 @not_right:
     lda stick_value
+    and #$03                    ; only vertical movement changes PMG bytes
+    cmp #$03
+    beq @stationary_y
+    lda #$00
+    sta loader_repeat_value
+    lda PLAYER_LIFECYCLE
+    cmp #PLAYER_RESPAWN_INVULNERABLE
+    bne @capture_y
+    inc loader_repeat_value
+    jsr erase_player
+@capture_y:
+    lda player_y
+    sta row_counter
+    lda stick_value
     and #$01                    ; up
     bne @not_up
     lda player_y
@@ -2545,10 +2689,42 @@ read_input:
     beq @not_down
     inc player_y
 @not_down:
+    lda loader_repeat_value
+    beq @alive_vertical
+    jsr draw_player_for_lifecycle
+    jmp @position
+@alive_vertical:
+    lda player_y
+    cmp row_counter
+    beq @position
+    bcc @moved_up
+    ldy row_counter              ; old top row leaves after a downward move
+    bcs @save_departing
+@moved_up:
+    clc
+    adc #PLAYER_H                ; old bottom row leaves after an upward move
+    tay
+@save_departing:
+    sty row_counter
+@draw_vertical:
+    jsr draw_player
+    ldy row_counter
+    lda #$00
+    sta PLAYER0,y
+    sta PLAYER3,y
+    jmp @position
+@stationary_y:
+    lda PLAYER_LIFECYCLE
+    cmp #PLAYER_RESPAWN_INVULNERABLE
+    bne @position
+    ; Blink visibility still changes on stationary/horizontal invulnerable
+    ; frames, so only that lifecycle retains the old bounded PMG refresh.
+    jsr erase_player
+    jsr draw_player_for_lifecycle
+@position:
     lda player_x
     sta HPOSP0
     sta HPOSP3
-    jsr draw_player_for_lifecycle
 
     lda gameplay_fire_gate
     bne @fire_ready
@@ -2665,7 +2841,6 @@ init_fighter_projectiles:
     sta RAIDER_BURST_STATE
     sta RAIDER_BURST_REMAINING
     sta RAIDER_BURST_TIMER
-    sta bullet_active
     ldx #(SHARED_FIGHTER_EXPLOSION_SLOT_COUNT-1)
 @explosion_state:
     sta FIGHTER_EXPLOSION_TIMER,x
@@ -2704,7 +2879,6 @@ clear_fighter_projectiles:
     sta RAIDER_BURST_STATE
     sta RAIDER_BURST_REMAINING
     sta RAIDER_BURST_TIMER
-    sta bullet_active
     rts
 
 clear_viper_projectiles:
@@ -2719,7 +2893,6 @@ clear_viper_projectiles:
     sta VIPER_BURST_STATE
     sta VIPER_BURST_REMAINING
     sta VIPER_BURST_TIMER
-    sta bullet_active
     rts
 
 clear_raider_projectiles:
@@ -2738,6 +2911,8 @@ clear_raider_projectiles:
     rts
 
 erase_fighter_projectile_overlays:
+    lda #(9-RAIDER_PROJECTILE_HEIGHT)
+    sta loader_repeat_value
     ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
 @slot:
     lda FIGHTER_PROJECTILE_ACTIVE,x
@@ -2755,19 +2930,10 @@ erase_fighter_projectile_overlays:
     sta (dst_ptr),y
     lda FIGHTER_PROJECTILE_Y,x
     and #$07
-    sta row_counter
-    cpx #VIPER_PROJECTILE_SLOT_COUNT
-    bcc @viper_height
-    lda #RAIDER_PROJECTILE_HEIGHT
-    bne @height_ready
-@viper_height:
-    lda #VIPER_PROJECTILE_HEIGHT
-@height_ready:
-    clc
-    adc row_counter
-    cmp #$09
+    cmp loader_repeat_value
     bcc @restored
-    ldy #40
+    jsr advance_dst_to_next_physical_row
+    ldy #$00
     lda FIGHTER_PROJECTILE_BACKUP_BOTTOM,x
     sta (dst_ptr),y
 @restored:
@@ -2775,36 +2941,51 @@ erase_fighter_projectile_overlays:
     sta FIGHTER_PROJECTILE_RENDERED,x
 @next:
     dex
-    bpl @slot
+    bmi @done
+    cpx #(RAIDER_PROJECTILE_SLOT_BASE-1)
+    bne @slot
+    lda #(9-VIPER_PROJECTILE_HEIGHT)
+    sta loader_repeat_value
+    bne @slot
+@done:
     rts
 
 update_fighter_projectiles:
     ldx #$00
-@slot:
+@viper_slot:
     lda FIGHTER_PROJECTILE_ACTIVE,x
-    beq @next
+    beq @viper_next
     dec FIGHTER_PROJECTILE_LIFETIME,x
-    beq @free
-    lda FIGHTER_PROJECTILE_ACTIVE,x
-    cmp #FIGHTER_PROJECTILE_VIPER
-    bne @raider
+    beq @viper_free
     lda FIGHTER_PROJECTILE_Y,x
     sta FIGHTER_PROJECTILE_PREV_Y,x
     cmp #(GAMEPLAY_TOP+VIPER_PROJECTILE_SPEED)
-    bcc @free
+    bcc @viper_free
     sec
     sbc #VIPER_PROJECTILE_SPEED
     sta FIGHTER_PROJECTILE_Y,x
-    jsr move_projectile_screen_pointer_up
     jsr viper_projectile_hits_enemy
-    bcc @next
+    bcc @viper_next
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
     lda #$01
     ldy #DAMAGE_PLAYER_PROJECTILE
     jsr queue_enemy_damage
-    jmp @next
-@raider:
+    jmp @viper_next
+@viper_free:
+    lda #FIGHTER_PROJECTILE_FREE
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+@viper_next:
+    inx
+    cpx #VIPER_PROJECTILE_SLOT_COUNT
+    bne @viper_slot
+
+    ldx #RAIDER_PROJECTILE_SLOT_BASE
+@raider_slot:
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    beq @raider_next
+    dec FIGHTER_PROJECTILE_LIFETIME,x
+    beq @raider_free
     lda FIGHTER_PROJECTILE_Y,x
     sta FIGHTER_PROJECTILE_PREV_Y,x
     clc
@@ -2813,58 +2994,23 @@ update_fighter_projectiles:
     clc
     adc #RAIDER_PROJECTILE_HEIGHT
     cmp #(GAMEPLAY_BOTTOM+1)
-    bcs @free
-    jsr move_projectile_screen_pointer_down
+    bcs @raider_free
     jsr raider_projectile_hits_player
-    bcc @next
+    bcc @raider_next
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
     lda #ENEMY_PULSE_DAMAGE_UNITS
     stx BROAD_WORK_SLOT
     jsr apply_player_damage
     ldx BROAD_WORK_SLOT
-    jmp @next
-@free:
+    jmp @raider_next
+@raider_free:
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
-@next:
+@raider_next:
     inx
     cpx #FIGHTER_PROJECTILE_SLOT_COUNT
-    bne @slot
-    jmp refresh_bullet_active
-
-move_projectile_screen_pointer_up:
-    lda FIGHTER_PROJECTILE_PREV_Y,x
-    and #$F8
-    sta loader_repeat_value
-    lda FIGHTER_PROJECTILE_Y,x
-    and #$F8
-    cmp loader_repeat_value
-    beq @done
-    sec
-    lda FIGHTER_PROJECTILE_SCREEN_LO,x
-    sbc #40
-    sta FIGHTER_PROJECTILE_SCREEN_LO,x
-    bcs @done
-    dec FIGHTER_PROJECTILE_SCREEN_HI,x
-@done:
-    rts
-
-move_projectile_screen_pointer_down:
-    lda FIGHTER_PROJECTILE_PREV_Y,x
-    and #$F8
-    sta loader_repeat_value
-    lda FIGHTER_PROJECTILE_Y,x
-    and #$F8
-    cmp loader_repeat_value
-    beq @done
-    clc
-    lda FIGHTER_PROJECTILE_SCREEN_LO,x
-    adc #40
-    sta FIGHTER_PROJECTILE_SCREEN_LO,x
-    bcc @done
-    inc FIGHTER_PROJECTILE_SCREEN_HI,x
-@done:
+    bne @raider_slot
     rts
 
 viper_projectile_hits_enemy:
@@ -2925,23 +3071,6 @@ raider_projectile_hits_player:
     rts
 @miss:
     clc
-    rts
-
-refresh_bullet_active:
-    lda #$00
-    sta bullet_active
-    ldx #$00
-@slot:
-    lda FIGHTER_PROJECTILE_ACTIVE,x
-    cmp #FIGHTER_PROJECTILE_VIPER
-    bne @next
-    lda #$01
-    sta bullet_active
-    rts
-@next:
-    inx
-    cpx #VIPER_PROJECTILE_SLOT_COUNT
-    bne @slot
     rts
 
 update_viper_weapon:
@@ -3015,20 +3144,16 @@ allocate_viper_projectile:
     clc
     adc #(PLAYER_COLLISION_WIDTH/2)
     sta FIGHTER_PROJECTILE_X,x
-    sta bullet_x
     lda player_y
     sec
     sbc #VIPER_PROJECTILE_HEIGHT
     sta FIGHTER_PROJECTILE_Y,x
     sta FIGHTER_PROJECTILE_PREV_Y,x
-    sta bullet_y
     lda #$FF
     sta FIGHTER_PROJECTILE_LIFETIME,x
     lda #$00
     sta FIGHTER_PROJECTILE_RENDERED,x
     jsr initialize_projectile_screen_pointer
-    lda #$01
-    sta bullet_active
     lda sound_enabled
     beq @accepted
     lda #$32
@@ -3157,23 +3282,7 @@ initialize_projectile_screen_pointer:
     lsr
     lsr
     lsr
-    sta row_counter
-    lda #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
-    sta dst_ptr+1
-@row:
-    lda row_counter
-    beq @column
-    clc
-    lda dst_ptr
-    adc #40
-    sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
-    dec row_counter
-    bne @row
+    jsr set_gameplay_row_ptr
 @column:
     ldx BROAD_WORK_SLOT
     lda FIGHTER_PROJECTILE_X,x
@@ -3196,21 +3305,16 @@ render_fighter_projectile_overlays:
     bne :+
     jmp @next
 :
-    stx BROAD_WORK_SLOT
-    lda FIGHTER_PROJECTILE_X,x
-    sec
-    sbc #GAMEPLAY_LEFT_HPOS
-    and #$03
-    sta loader_repeat_value
     lda FIGHTER_PROJECTILE_Y,x
     and #$07
     sta row_counter
-    lda FIGHTER_PROJECTILE_ACTIVE,x
-    cmp #FIGHTER_PROJECTILE_VIPER
-    bne @raider_code
-    ldy loader_repeat_value
-    lda viper_projectile_group_offsets,y
-    sta src_ptr
+    cpx #RAIDER_PROJECTILE_SLOT_BASE
+    bcs @raider_code
+    lda FIGHTER_PROJECTILE_X,x
+    and #$02                    ; allocation and two-HPOS movement keep even X
+    beq :+
+    lda #(VIPER_PROJECTILE_GLYPH_STRIDE*2)
+:
     clc
     adc row_counter
     adc #VIPER_PROJECTILE_GLYPH_BASE
@@ -3220,17 +3324,17 @@ render_fighter_projectile_overlays:
     lda row_counter
     cmp #$07
     bne @code_ready
-    lda src_ptr
+    lda loader_repeat_value
     clc
-    adc #(VIPER_PROJECTILE_GLYPH_BASE+8)
+    adc #$01
     sta src_ptr+1
     bne @code_ready
 @raider_code:
-    lda loader_repeat_value
-    lsr
-    tay
-    lda raider_projectile_group_offsets,y
-    sta src_ptr
+    lda FIGHTER_PROJECTILE_X,x
+    and #$02                    ; Raider allocation explicitly masks bit zero
+    beq :+
+    lda #RAIDER_PROJECTILE_GLYPH_STRIDE
+:
     clc
     adc row_counter
     adc #RAIDER_PROJECTILE_GLYPH_BASE
@@ -3241,15 +3345,12 @@ render_fighter_projectile_overlays:
     lda row_counter
     cmp #$06
     bcc @code_ready
-    sec
-    sbc #$06
+    lda loader_repeat_value
     clc
-    adc src_ptr
-    adc #(RAIDER_PROJECTILE_GLYPH_BASE+8)
-    ora #$80
+    adc #$02
     sta src_ptr+1
 @code_ready:
-
+    jsr initialize_projectile_screen_pointer
     lda FIGHTER_PROJECTILE_SCREEN_LO,x
     sta dst_ptr
     lda FIGHTER_PROJECTILE_SCREEN_HI,x
@@ -3261,7 +3362,8 @@ render_fighter_projectile_overlays:
     sta (dst_ptr),y
     lda src_ptr+1
     beq @rendered
-    ldy #40
+    jsr advance_dst_to_next_physical_row
+    ldy #$00
     lda (dst_ptr),y
     sta FIGHTER_PROJECTILE_BACKUP_BOTTOM,x
     lda src_ptr+1
@@ -3269,7 +3371,6 @@ render_fighter_projectile_overlays:
 @rendered:
     lda #$01
     sta FIGHTER_PROJECTILE_RENDERED,x
-    ldx BROAD_WORK_SLOT
 @next:
     inx
     cpx #FIGHTER_PROJECTILE_SLOT_COUNT
@@ -3789,12 +3890,7 @@ update_enemy_review_harness:
 ; -----------------------------------------------------------------------------
 ; Collision and score
 
-; Shared world-scroll tail lives in the main block because the relocated
-; BROADSIDE block is intentionally capped at $740F.  A coincident hull step
-; performs this work after both copies and bypasses this tail.
-restore_and_redraw_muzzles:
-    jsr restore_boundary_stars
-    jmp redraw_visible_muzzles
+.segment "STARFIELD"
 
 handle_collisions:
     lda #$00
@@ -4029,6 +4125,8 @@ player_contacts_enemy:
     lda #$00
     rts
 
+.segment "STARFIELD"
+
 update_score_display:
     lda #CH_ZERO
     sta SCREEN+6
@@ -4038,14 +4136,12 @@ update_score_display:
     lsr
     lsr
     lsr
-    clc
-    adc #CH_ZERO
+    ora #CH_ZERO
     sta SCREEN+7
 
     lda score_bcd_hi
     and #$0F
-    clc
-    adc #CH_ZERO
+    ora #CH_ZERO
     sta SCREEN+8
 
     lda score_bcd_lo
@@ -4053,14 +4149,12 @@ update_score_display:
     lsr
     lsr
     lsr
-    clc
-    adc #CH_ZERO
+    ora #CH_ZERO
     sta SCREEN+9
 
     lda score_bcd_lo
     and #$0F
-    clc
-    adc #CH_ZERO
+    ora #CH_ZERO
     sta SCREEN+10
     rts
 
@@ -4071,6 +4165,13 @@ update_score_display:
 .segment "STARFIELD"
 
 update_starfield:
+    lda PLAYFIELD_PREBUILD_PENDING
+    beq :+
+    jsr prebuild_next_playfield_display_list
+:
+    lda #$00
+    sta PLAYFIELD_RING_FLAGS
+    sta PLAYFIELD_PREBUILD_PENDING
     ldx DIFFICULTY_SETTING
     lda scroll_accumulator
     clc
@@ -4100,7 +4201,7 @@ update_starfield:
     bcc @finalize_world
     rts
 @finalize_world:
-    jmp restore_and_redraw_muzzles
+    rts
 @hull_scroll:
     sbc #HULL_SCROLL_RATE_DENOMINATOR
     sta HULL_SCROLL_ACCUMULATOR
@@ -4157,58 +4258,14 @@ advance_starfield_layers:
 @done:
     rts
 
-; The 24-column star corridor keeps the accepted gameplay difficulty cadence.
-; Only columns 9..30 live directly in screen memory. Columns 8 and 31 have a
-; 46-byte backing store because a slower hull-mounted muzzle may cover them.
+; A near/world step is always coincident with the 100%-rate hull clock. Keep
+; logical row zero at the fixed divider LMS, rotate the 22 rows below it, copy
+; the prior divider into logical row one, then regenerate logical row zero.
+; Hull generation follows; hull-only events retain their side-band copy path.
 scroll_world_columns:
-
-    lda #<(SCREEN+23*40)
-    sta dst_ptr
-    lda #>(SCREEN+23*40)
-    sta dst_ptr+1
-    lda #<(SCREEN+22*40)
-    sta src_ptr
-    lda #>(SCREEN+22*40)
-    sta src_ptr+1
-    lda #(GAMEPLAY_SCREEN_ROWS-1)
-    sta row_counter
-
-@copy_row:
-    lda CAPITAL_SECTOR_STATE
-    cmp #CAPITAL_HULL_STATE_COMPLETE
-    bne @copy_corridor
-    ldy #39
-@copy_full:
-    lda (src_ptr),y
-    sta (dst_ptr),y
-    dey
-    bpl @copy_full
-    jmp @row_done
-@copy_corridor:
-    ldy #(CORRIDOR_CENTRAL_END-2)
-@copy_byte:
-    lda (src_ptr),y
-    sta (dst_ptr),y
-    dey
-    cpy #CORRIDOR_CENTRAL_FIRST
-    bne @copy_byte
-@row_done:
-    sec
-    lda src_ptr
-    sbc #40
-    sta src_ptr
-    bcs :+
-    dec src_ptr+1
-:
-    sec
-    lda dst_ptr
-    sbc #40
-    sta dst_ptr
-    bcs :+
-    dec dst_ptr+1
-:
-    dec row_counter
-    bne @copy_row
+    lda #$01
+    sta PLAYFIELD_RING_FLAGS
+    jsr rotate_playfield_rows
 
     ldx #(CAPITAL_HULL_VISIBLE_ROWS-1)
 @shift_boundaries:
@@ -4219,10 +4276,8 @@ scroll_world_columns:
     dex
     bne @shift_boundaries
 
-    lda #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
-    sta dst_ptr+1
+    lda #$00
+    jsr set_gameplay_row_ptr
     jsr generate_starfield_row
     ldy #CORRIDOR_CENTRAL_FIRST
     lda (dst_ptr),y
@@ -4230,6 +4285,129 @@ scroll_world_columns:
     ldy #(CORRIDOR_CENTRAL_END-1)
     lda (dst_ptr),y
     sta CORRIDOR_BOUNDARY_RIGHT
+    rts
+
+; Both runtime display lists keep HUD=$4000 and divider=$4028 immutable. Only
+; the following 22 LMS addresses differ after a rotation. The inactive list is
+; prepared in the guaranteed light frame following a common event; changing
+; DLISTL here remains the sole publication point.
+init_playfield_display_lists:
+    ldx #$00
+    lda #<PLAYFIELD_DLIST_A
+    sta PLAYFIELD_ACTIVE_DLIST_LO
+    jsr build_playfield_display_list
+    lda #<PLAYFIELD_DLIST_B
+    sta PLAYFIELD_NEXT_DLIST_LO
+    jsr prebuild_next_playfield_display_list
+    rts
+
+.segment "A2_KERNEL"
+
+prebuild_next_playfield_display_list:
+    ldx #(PLAYFIELD_RING_ROWS-1)
+    lda PLAYFIELD_NEXT_DLIST_LO
+    jmp build_playfield_display_list
+
+; Build either the current order (X=0) or the next right-rotated order (X=21).
+; A is the page-local list address. Both lists reside on page $7F, allowing the
+; active display to be switched with one hardware write after completion.
+build_playfield_display_list:
+    sta dst_ptr
+    lda #>PLAYFIELD_DLIST_A
+    sta dst_ptr+1
+    ldy #$00
+    lda #$C2
+    sta (dst_ptr),y
+    iny
+    lda #<SCREEN
+    sta (dst_ptr),y
+    iny
+    lda #>SCREEN
+    sta (dst_ptr),y
+    iny
+    lda #$44
+    sta (dst_ptr),y
+    iny
+    lda #<GAMEPLAY_DIVIDER_SCREEN
+    sta (dst_ptr),y
+    iny
+    lda #>GAMEPLAY_DIVIDER_SCREEN
+    sta (dst_ptr),y
+    iny
+@lms:
+    lda #$44
+    cpy #(6+(PLAYFIELD_RING_ROWS-1)*3)
+    bne :+
+    lda #$C4
+:
+    sta (dst_ptr),y
+    iny
+    lda PLAYFIELD_ROW_LO,x
+    sta (dst_ptr),y
+    iny
+    lda PLAYFIELD_ROW_HI,x
+    sta (dst_ptr),y
+    iny
+    inx
+    cpx #PLAYFIELD_RING_ROWS
+    bcc :+
+    ldx #$00
+:
+    cpy #(PLAYFIELD_DLIST_BYTES-3)
+    bne @lms
+    lda #$41
+    sta (dst_ptr),y
+    iny
+    lda dst_ptr
+    sta (dst_ptr),y
+    iny
+    lda #>PLAYFIELD_DLIST_A
+    sta (dst_ptr),y
+    rts
+
+.segment "STARFIELD"
+
+rotate_playfield_rows:
+    ; Preserve exact visual scroll order while the divider LMS stays fixed:
+    ; copy its prior contents into the physical row recycled from the bottom.
+    ldx #(PLAYFIELD_RING_ROWS-1)
+    lda PLAYFIELD_ROW_LO,x
+    sta dst_ptr
+    lda PLAYFIELD_ROW_HI,x
+    sta dst_ptr+1
+    lda #<GAMEPLAY_DIVIDER_SCREEN
+    sta src_ptr
+    lda #>GAMEPLAY_DIVIDER_SCREEN
+    sta src_ptr+1
+    ldy #39
+@copy_divider:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    bpl @copy_divider
+
+rotate_playfield_table_shift:
+@row:
+    lda PLAYFIELD_ROW_LO-1,x
+    sta PLAYFIELD_ROW_LO,x
+    lda PLAYFIELD_ROW_HI-1,x
+    sta PLAYFIELD_ROW_HI,x
+    dex
+    bne @row
+    lda dst_ptr
+    sta PLAYFIELD_ROW_LO
+    lda dst_ptr+1
+    sta PLAYFIELD_ROW_HI
+rotate_playfield_table_shift_end:
+
+    lda PLAYFIELD_ACTIVE_DLIST_LO
+    pha
+    lda PLAYFIELD_NEXT_DLIST_LO
+    sta PLAYFIELD_ACTIVE_DLIST_LO
+    sta DLISTL
+    pla
+    sta PLAYFIELD_NEXT_DLIST_LO
+    inc PLAYFIELD_PREBUILD_PENDING
     rts
 
 ; Scalar state is reset before the initial near rows are generated. Sparse far
@@ -4246,8 +4424,8 @@ init_starfield_state:
 @clear:
     lda #$00
     sta STAR_FAR_ACTIVE,x
-    sta STAR_FAR_SCREEN_LO,x
-    sta STAR_FAR_SCREEN_HI,x
+    sta STAR_FAR_ROW,x
+    sta STAR_FAR_COLUMN,x
     sta STAR_FAR_CODE,x
     dex
     bpl @clear
@@ -4278,31 +4456,10 @@ init_far_star_population:
     sec
     sbc #GAMEPLAY_SCREEN_ROWS
 :
-    sta row_counter
-    lda #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
-    sta dst_ptr+1
-@row:
-    lda row_counter
-    beq @column
-    clc
-    lda dst_ptr
-    adc #40
-    sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
-    dec row_counter
-    bne @row
+    sta STAR_FAR_ROW,x
 @column:
     jsr choose_far_star_column
-    clc
-    adc dst_ptr
-    sta STAR_FAR_SCREEN_LO,x
-    lda dst_ptr+1
-    adc #$00
-    sta STAR_FAR_SCREEN_HI,x
+    sta STAR_FAR_COLUMN,x
     jsr choose_far_star_code
     sta STAR_FAR_CODE,x
     inx
@@ -4415,47 +4572,71 @@ star_random_byte:
     sta STAR_RNG_STATE
     rts
 
+.macro RESOLVE_FAR_STAR_PTR
+.local ring, column, ready
+    lda STAR_FAR_ROW,x
+    bne ring
+    lda #<GAMEPLAY_DIVIDER_SCREEN
+    sta dst_ptr
+    lda #>GAMEPLAY_DIVIDER_SCREEN
+    sta dst_ptr+1
+    bne column
+ring:
+    tay
+    dey
+    lda PLAYFIELD_ROW_LO,y
+    sta dst_ptr
+    lda PLAYFIELD_ROW_HI,y
+    sta dst_ptr+1
+column:
+    clc
+    lda dst_ptr
+    adc STAR_FAR_COLUMN,x
+    sta dst_ptr
+    bcc ready
+    inc dst_ptr+1
+ready:
+.endmacro
+
+.segment "A2_KERNEL"
+
 erase_far_star_overlays:
     ldx #(STAR_FAR_CAPACITY-1)
-@slot:
+erase_far_star_slot:
     lda STAR_FAR_ACTIVE,x
-    bpl @next
+    bpl erase_far_star_next
     and #$7F
     sta STAR_FAR_ACTIVE,x
-    lda STAR_FAR_SCREEN_LO,x
-    sta dst_ptr
-    lda STAR_FAR_SCREEN_HI,x
-    sta dst_ptr+1
+    RESOLVE_FAR_STAR_PTR
     ldy #$00
     lda #CH_SPACE
     sta (dst_ptr),y
-@next:
+erase_far_star_next:
     dex
-    bpl @slot
+    bpl erase_far_star_slot
     rts
 
 render_far_star_overlays:
     ldx #$00
-@slot:
+render_far_star_slot:
     lda STAR_FAR_ACTIVE,x
     cmp #$01
-    bne @next
-    lda STAR_FAR_SCREEN_LO,x
-    sta dst_ptr
-    lda STAR_FAR_SCREEN_HI,x
-    sta dst_ptr+1
+    bne render_far_star_next
+    RESOLVE_FAR_STAR_PTR
     ldy #$00
     lda (dst_ptr),y
-    bne @next                       ; near stars and gameplay backing win
+    bne render_far_star_next        ; near stars and gameplay backing win
     lda STAR_FAR_CODE,x
     sta (dst_ptr),y
     lda #$81
     sta STAR_FAR_ACTIVE,x
-@next:
+render_far_star_next:
     inx
     cpx #STAR_FAR_CAPACITY
-    bne @slot
+    bne render_far_star_slot
     rts
+
+.segment "STARFIELD"
 
 ; Far stars persist as composed background until a world-scroll step erases
 ; them.  Revisit the bounded 24-slot population only after that step rather
@@ -4474,27 +4655,15 @@ advance_far_stars:
 @slot:
     lda STAR_FAR_ACTIVE,x
     beq @next
-    clc
-    lda STAR_FAR_SCREEN_LO,x
-    adc #40
-    sta STAR_FAR_SCREEN_LO,x
-    lda STAR_FAR_SCREEN_HI,x
-    adc #$00
-    sta STAR_FAR_SCREEN_HI,x
-    cmp #>GAMEPLAY_SCREEN_END
-    bcc @next
-    bne @respawn
-    lda STAR_FAR_SCREEN_LO,x
-    cmp #<GAMEPLAY_SCREEN_END
+    inc STAR_FAR_ROW,x
+    lda STAR_FAR_ROW,x
+    cmp #GAMEPLAY_SCREEN_ROWS
     bcc @next
 @respawn:
+    lda #$00
+    sta STAR_FAR_ROW,x
     jsr choose_far_star_column
-    clc
-    adc #<GAMEPLAY_SCREEN
-    sta STAR_FAR_SCREEN_LO,x
-    lda #>GAMEPLAY_SCREEN
-    adc #$00
-    sta STAR_FAR_SCREEN_HI,x
+    sta STAR_FAR_COLUMN,x
     jsr choose_far_star_code
     sta STAR_FAR_CODE,x
     lda #$01
@@ -4522,10 +4691,7 @@ tick_star_twinkle:
     bpl @done                         ; hidden/covered stars hold their phase
     lda STAR_FAR_CODE,x
     sta loader_repeat_value
-    lda STAR_FAR_SCREEN_LO,x
-    sta dst_ptr
-    lda STAR_FAR_SCREEN_HI,x
-    sta dst_ptr+1
+    jsr set_far_star_ptr
     ldy #$00
     lda (dst_ptr),y
     cmp loader_repeat_value
@@ -4542,6 +4708,24 @@ tick_star_twinkle:
     lda STAR_FAR_CODE,x
     sta (dst_ptr),y
 @done:
+    rts
+
+; Resolve one far-star record to its current physical LMS row while preserving
+; X as the slot index.  The column remains unchanged across every ring head.
+set_far_star_ptr:
+    txa
+    pha
+    lda STAR_FAR_ROW,x
+    jsr set_gameplay_row_ptr
+    pla
+    tax
+    clc
+    lda dst_ptr
+    adc STAR_FAR_COLUMN,x
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
     rts
 
 star_glyph_bytes:
@@ -4831,23 +5015,43 @@ scroll_hull_columns:
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_COMPLETE
     bne :+
+    lda #$00
+    sta PLAYFIELD_RING_FLAGS
     rts
 :
-    jsr restore_boundary_stars
+    lda PLAYFIELD_RING_FLAGS
+    bne scroll_hull_columns_advance_scene
+    jsr restore_active_muzzles
 
-    lda #<(SCREEN+23*40)
-    sta dst_ptr
-    lda #>(SCREEN+23*40)
-    sta dst_ptr+1
-    lda #<(SCREEN+22*40)
-    sta src_ptr
-    lda #>(SCREEN+22*40)
-    sta src_ptr+1
-    lda #(GAMEPLAY_SCREEN_ROWS-1)
-    sta row_counter
+scroll_hull_columns_copy:
+    ; The fixed divider is logical source row zero. Table indices 0..21 map
+    ; logical rows 1..22, so the descending copy needs no general mapper calls.
+    ldx #(PLAYFIELD_RING_ROWS-1)
 @copy_hull_row:
+    stx row_counter
+    lda PLAYFIELD_ROW_LO,x
+    sta dst_ptr
+    lda PLAYFIELD_ROW_HI,x
+    sta dst_ptr+1
+    dex
+    bmi @divider_source
+    lda PLAYFIELD_ROW_LO,x
+    sta src_ptr
+    lda PLAYFIELD_ROW_HI,x
+    sta src_ptr+1
+    bpl @copy_bands
+@divider_source:
+    lda #<GAMEPLAY_DIVIDER_SCREEN
+    sta src_ptr
+    lda #>GAMEPLAY_DIVIDER_SCREEN
+    sta src_ptr+1
+@copy_bands:
+    ldx row_counter
     ldy #(CORRIDOR_ALLIED_COLUMNS-1)
 @copy_allied:
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
     lda (src_ptr),y
     sta (dst_ptr),y
     dey
@@ -4857,35 +5061,25 @@ scroll_hull_columns:
     lda (src_ptr),y
     sta (dst_ptr),y
     dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
     cpy #(CORRIDOR_ENEMY_FIRST-1)
     bne @copy_enemy
 
-    sec
-    lda src_ptr
-    sbc #40
-    sta src_ptr
-    bcs :+
-    dec src_ptr+1
-:
-    sec
-    lda dst_ptr
-    sbc #40
-    sta dst_ptr
-    bcs :+
-    dec dst_ptr+1
-:
-    dec row_counter
-    bne @copy_hull_row
+    dex
+    bpl @copy_hull_row
 
+scroll_hull_columns_advance_scene:
+    jsr advance_tracked_muzzles
     jsr scroll_broadside_scene
-    lda #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
-    sta dst_ptr+1
+    lda #$00
+    jsr set_gameplay_row_ptr
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
     bcs @drain_row
     jsr draw_hull_row
+    jsr track_top_muzzles
     inc corridor_phase
     lda BROAD_VISIBLE_SCROLLS
     cmp #CAPITAL_HULL_VISIBLE_ROWS
@@ -4901,8 +5095,10 @@ scroll_hull_columns:
     bcs @redraw
     inc CAPITAL_SECTOR_DRAIN_ROWS
 @redraw:
-    jsr redraw_visible_muzzles
+    jsr redraw_tracked_muzzles
     jsr reset_exited_turret_lifecycles
+    lda #$00
+    sta PLAYFIELD_RING_FLAGS
     rts
 
 clear_top_hull_row:
@@ -4952,82 +5148,126 @@ update_sector_state:
     sta CAPITAL_SECTOR_STATE
     rts
 
-; Restore the two nominal corridor-boundary columns from the independent star
-; stream. Hull muzzle projections are added afterwards, never baked into this
-; backing store.
-restore_boundary_stars:
-    lda #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
+; At most one source muzzle per side can be visible in the 23-row viewport.
+; Each record keeps its row and exact screen pointer, eliminating the former
+; full sector/module scan. The pointer high byte doubles as the active flag.
+restore_active_muzzles:
+    ldx #(CAPITAL_HULL_TURRET_COUNT-1)
+@slot:
+    lda MUZZLE_SCREEN_HI,x
+    beq @next
     sta dst_ptr+1
-    ldx #$00
-@restore_row:
-    ldy #CORRIDOR_CENTRAL_FIRST
-    lda CORRIDOR_BOUNDARY_LEFT,x
-    sta (dst_ptr),y
-    ldy #(CORRIDOR_CENTRAL_END-1)
-    lda CORRIDOR_BOUNDARY_RIGHT,x
-    sta (dst_ptr),y
-    clc
-    lda dst_ptr
-    adc #40
+    lda MUZZLE_SCREEN_LO,x
     sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
-    inx
-    cpx #CAPITAL_HULL_VISIBLE_ROWS
-    bne @restore_row
+    ldy MUZZLE_VISIBLE_ROW,x
+    cpx #$00
+    bne @enemy
+    lda CORRIDOR_BOUNDARY_LEFT,y
+    jmp @store
+@enemy:
+    lda CORRIDOR_BOUNDARY_RIGHT,y
+@store:
+    ldy #$00
+    sta (dst_ptr),y
+@next:
+    dex
+    bpl @slot
     rts
 
-; Reapply source-declared muzzles after the independent star stream restores
-; boundary columns. Sector module lookup ensures non-combat rows never acquire
-; a functional cannon even when they reuse combat armour primitives.
-redraw_visible_muzzles:
-    lda #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
-    sta dst_ptr+1
-    lda #GAMEPLAY_FIRST_SCREEN_ROW
-    sta row_counter
-@muzzle_row:
-    lda row_counter
-    jsr visible_hull_sector_row
-    bcs @advance
-    tya
-    pha
-    jsr resolve_allied_sector_row
-    bcs @enemy
-    cmp #$08                    ; allied source cannon row
-    bne @enemy
+advance_tracked_muzzles:
+    ldx #(CAPITAL_HULL_TURRET_COUNT-1)
+@slot:
+    lda MUZZLE_SCREEN_HI,x
+    beq @next
+    inc MUZZLE_VISIBLE_ROW,x
+    lda MUZZLE_VISIBLE_ROW,x
+    cmp #CAPITAL_HULL_VISIBLE_ROWS
+    bcs @deactivate
+    lda PLAYFIELD_RING_FLAGS
+    bne @next                    ; the retained physical row moved through LMS
+    stx BROAD_WORK_SLOT
+    lda MUZZLE_VISIBLE_ROW,x
+    jsr set_gameplay_row_ptr
+    ldx BROAD_WORK_SLOT
+    lda dst_ptr
+    cpx #$00
+    bne :+
+    clc
+    adc #CORRIDOR_CENTRAL_FIRST
+    jmp @store_pointer
+:
+    clc
+    adc #(CORRIDOR_CENTRAL_END-1)
+@store_pointer:
+    sta MUZZLE_SCREEN_LO,x
+    lda dst_ptr+1
+    adc #$00
+    sta MUZZLE_SCREEN_HI,x
+    jmp @next
+@deactivate:
+    lda #$00
+    sta MUZZLE_VISIBLE_ROW,x
+    sta MUZZLE_SCREEN_LO,x
+    sta MUZZLE_SCREEN_HI,x
+@next:
+    dex
+    bpl @slot
+    rts
+
+; draw_hull_row has just emitted the new top row, including source projection
+; cells 8/31. Claim only a real generated muzzle; ordinary armour reuse can
+; never create a tracked record.
+track_top_muzzles:
     ldy #CORRIDOR_CENTRAL_FIRST
-    lda #CAPITAL_HULL_ALLIED_MUZZLE_CODE
-    sta (dst_ptr),y
-@enemy:
-    pla
-    cmp #CAPITAL_HULL_SIDE_PHASE_ROWS
-    bcc @advance
-    sec
-    sbc #CAPITAL_HULL_SIDE_PHASE_ROWS
-    jsr resolve_enemy_sector_row
-    bcs @advance
-    cmp #$0C                    ; enemy source cannon row
-    bne @advance
-    ldy #(CORRIDOR_CENTRAL_END-1)
-    lda #CAPITAL_HULL_ENEMY_MUZZLE_CODE
-    sta (dst_ptr),y
-@advance:
+    lda (dst_ptr),y
+    cmp #CAPITAL_HULL_ALLIED_MUZZLE_CODE
+    bne @enemy
+    lda #$00
+    sta MUZZLE_VISIBLE_ROW
     clc
     lda dst_ptr
-    adc #40
+    adc #CORRIDOR_CENTRAL_FIRST
+    sta MUZZLE_SCREEN_LO
+    lda dst_ptr+1
+    adc #$00
+    sta MUZZLE_SCREEN_HI
+@enemy:
+    ldy #(CORRIDOR_CENTRAL_END-1)
+    lda (dst_ptr),y
+    cmp #CAPITAL_HULL_ENEMY_MUZZLE_CODE
+    bne @done
+    lda #$00
+    sta MUZZLE_VISIBLE_ROW+1
+    clc
+    lda dst_ptr
+    adc #(CORRIDOR_CENTRAL_END-1)
+    sta MUZZLE_SCREEN_LO+1
+    lda dst_ptr+1
+    adc #$00
+    sta MUZZLE_SCREEN_HI+1
+@done:
+    rts
+
+redraw_tracked_muzzles:
+    ldx #(CAPITAL_HULL_TURRET_COUNT-1)
+@slot:
+    lda MUZZLE_SCREEN_HI,x
+    beq @next
+    sta dst_ptr+1
+    lda MUZZLE_SCREEN_LO,x
     sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
-    inc row_counter
-    lda row_counter
-    cmp #(GAMEPLAY_FIRST_SCREEN_ROW+GAMEPLAY_SCREEN_ROWS)
-    bne @muzzle_row
+    cpx #$00
+    bne @enemy
+    lda #CAPITAL_HULL_ALLIED_MUZZLE_CODE
+    bne @store
+@enemy:
+    lda #CAPITAL_HULL_ENEMY_MUZZLE_CODE
+@store:
+    ldy #$00
+    sta (dst_ptr),y
+@next:
+    dex
+    bpl @slot
     rts
 
 ; A fired/reserved bit belongs to one source turret lifecycle. It is cleared
@@ -5036,41 +5276,13 @@ redraw_visible_muzzles:
 reset_exited_turret_lifecycles:
     ldx #$00
 @turret:
-    stx BROAD_WORK_COUNT
     lda BROAD_TURRET_FIRED,x
     beq @next_turret
-    lda turret_record_offsets,x
-    tay
-    lda capital_hull_turrets+CAPITAL_TURRET_MUZZLE_SCREEN_CODE_OFFSET,y
-    sta BROAD_WORK_VALUE
-    lda capital_hull_turrets+CAPITAL_TURRET_MUZZLE_COLUMN_OFFSET,y
-    clc
-    adc #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
-    adc #$00
-    sta dst_ptr+1
-    lda #CAPITAL_HULL_VISIBLE_ROWS
-    sta row_counter
-@find_muzzle:
-    ldy #$00
-    lda (dst_ptr),y
-    cmp BROAD_WORK_VALUE
-    beq @next_turret
-    clc
-    lda dst_ptr
-    adc #40
-    sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
-    dec row_counter
-    bne @find_muzzle
-    ldx BROAD_WORK_COUNT
+    lda MUZZLE_SCREEN_HI,x
+    bne @next_turret
     lda #$00
     sta BROAD_TURRET_FIRED,x
 @next_turret:
-    ldx BROAD_WORK_COUNT
     inx
     cpx #CAPITAL_HULL_TURRET_COUNT
     bne @turret
@@ -5393,7 +5605,7 @@ store_boundary_star:
 :
     rts
 
-.segment "CODE"
+.segment "RODATA"
 
 random_byte:
     lda rng_state
@@ -5403,6 +5615,8 @@ random_byte:
 :
     sta rng_state
     rts
+
+.segment "CODE"
 
 ; -----------------------------------------------------------------------------
 ; POKEY sound
@@ -5503,10 +5717,6 @@ frontend_screen_data:
 
 raider_post_burst_frames:
     .byte RAIDER_POST_BURST_EASY,RAIDER_POST_BURST_MEDIUM,RAIDER_POST_BURST_HARD
-viper_projectile_group_offsets:
-    .byte 0,9,18,27
-raider_projectile_group_offsets:
-    .byte 0,10
 viper_projectile_glyphs:
     EMIT_VIPER_PROJECTILE_GLYPHS
     .assert *-viper_projectile_glyphs = VIPER_PROJECTILE_GLYPH_COUNT*8, error, "Viper projectile glyph data changed"
@@ -5886,6 +6096,13 @@ pause_quit_screen_data:
 
 init_broadside:
     lda #$00
+    ldx #(CAPITAL_HULL_TURRET_COUNT-1)
+@clear_muzzles:
+    sta MUZZLE_VISIBLE_ROW,x
+    sta MUZZLE_SCREEN_LO,x
+    sta MUZZLE_SCREEN_HI,x
+    dex
+    bpl @clear_muzzles
     ldx #(BROAD_STATE_END-BROAD_STATE_BASE)-1
 @clear_state:
     sta BROAD_STATE_BASE,x
@@ -5899,8 +6116,14 @@ init_broadside:
     ldx #(BROADSIDE_SLOT_COUNT-1)
 @clear_flash:
     sta BROAD_FLASH_TIMER,x
+    sta PLAYFIELD_BROAD_ROW,x
     dex
     bpl @clear_flash
+    ldx #$01
+@clear_ring_explosions:
+    sta PLAYFIELD_CAPITAL_EXPLOSION_ROW,x
+    dex
+    bpl @clear_ring_explosions
     sta CAPITAL_SECTOR_DRAIN_ROWS
     sta PLAYER_CONTACT_ROWS
     sta PLAYER_CONTACT_LEFT
@@ -6173,38 +6396,25 @@ schedule_broadside:
     beq :+
     jmp @next_candidate
 :
-
-    lda capital_hull_turrets+CAPITAL_TURRET_MUZZLE_SCREEN_CODE_OFFSET,y
-    sta loader_repeat_value
-    lda capital_hull_turrets+CAPITAL_TURRET_MUZZLE_COLUMN_OFFSET,y
-    clc
-    adc #<(GAMEPLAY_SCREEN+40)
-    sta dst_ptr
-    lda #>(GAMEPLAY_SCREEN+40)
-    adc #$00
-    sta dst_ptr+1
-    lda #(GAMEPLAY_FIRST_SCREEN_ROW+1)
-    sta row_counter
-    ldy #$00
-@visible:
-    lda (dst_ptr),y
-    cmp loader_repeat_value
-    beq @visible_row
-    clc
-    lda dst_ptr
-    adc #40
-    sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
+    ldx BROAD_WORK_COUNT
+    lda MUZZLE_SCREEN_HI,x
+    bne :+
+    jmp @next_candidate
 :
-    inc row_counter
+    sta dst_ptr+1
+    lda MUZZLE_SCREEN_LO,x
+    sta dst_ptr
+    lda MUZZLE_VISIBLE_ROW,x
+    clc
+    adc #GAMEPLAY_FIRST_SCREEN_ROW
+    sta row_counter
     lda row_counter
     ldx BROAD_WORK_SLOT
     cmp BROAD_TIMER,x
-    bcc @visible
-    beq @visible
+    bcc :+
+    beq :+
     bne @next_candidate
-@visible_row:
+:
     lda row_counter
     asl
     asl
@@ -6244,6 +6454,9 @@ schedule_broadside:
     bcs @next_candidate
     lda row_counter
     sta BROAD_Y,x
+    sec
+    sbc #GAMEPLAY_FIRST_SCREEN_ROW
+    sta PLAYFIELD_BROAD_ROW,x
     lda BROAD_WORK_COUNT
     sta BROAD_TURRET,x
     ldy BROAD_WORK_VALUE
@@ -6371,7 +6584,7 @@ scroll_broadside_scene:
 @warning:
     lda BROAD_STATE,x
     cmp #BROAD_WARNING
-    bne @next
+    bne @screen_fixed
     jsr erase_broadside_slot
     lda BROAD_Y,x
     clc
@@ -6382,14 +6595,17 @@ scroll_broadside_scene:
     jsr free_broadside_slot
     jmp @next
 :
-    clc
-    lda BROAD_ROW_LO,x
-    adc #40
-    sta BROAD_ROW_LO,x
-    bcc :+
-    inc BROAD_ROW_HI,x
-:
+    jsr advance_broadside_row
     jsr render_broadside_warning
+    jmp @next
+@screen_fixed:
+    lda BROAD_STATE,x
+    beq @next
+    lda PLAYFIELD_RING_FLAGS
+    beq @next
+    lda BROAD_FLASH_TIMER,x
+    bne @next                    ; the attached flash advances in the next pass
+    jsr set_broadside_row_ptr    ; flying/impact remains at its screen row
 @next:
     inx
     cpx #BROADSIDE_SLOT_COUNT
@@ -6398,12 +6614,7 @@ scroll_broadside_scene:
 @flash:
     lda BROAD_FLASH_TIMER,x
     beq @next_flash
-    clc
-    lda BROAD_ROW_LO,x
-    adc #40
-    sta BROAD_ROW_LO,x
-    bcc @next_flash
-    inc BROAD_ROW_HI,x
+    jsr advance_broadside_row
 @next_flash:
     inx
     cpx #BROADSIDE_SLOT_COUNT
@@ -6412,27 +6623,51 @@ scroll_broadside_scene:
 @explosion:
     lda CAPITAL_EXPLOSION_TIMER,x
     beq @next_explosion
-    clc
-    lda CAPITAL_EXPLOSION_ROW_LO,x
-    adc #40
-    sta CAPITAL_EXPLOSION_ROW_LO,x
-    bcc :+
-    inc CAPITAL_EXPLOSION_ROW_HI,x
-:
-    lda CAPITAL_EXPLOSION_ROW_HI,x
-    cmp #>GAMEPLAY_SCREEN_END
-    bcc @next_explosion
-    bne @expire_explosion
-    lda CAPITAL_EXPLOSION_ROW_LO,x
-    cmp #<GAMEPLAY_SCREEN_END
+    inc PLAYFIELD_CAPITAL_EXPLOSION_ROW,x
+    lda PLAYFIELD_CAPITAL_EXPLOSION_ROW,x
+    cmp #GAMEPLAY_SCREEN_ROWS
     bcc @next_explosion
 @expire_explosion:
     lda #$00
     sta CAPITAL_EXPLOSION_TIMER,x
+    beq @next_explosion
 @next_explosion:
+    lda CAPITAL_EXPLOSION_TIMER,x
+    beq :+
+    lda PLAYFIELD_RING_FLAGS
+    bne :+
+    jsr set_capital_explosion_row_ptr
+:
     inx
     cpx #$02
     bne @explosion
+    rts
+
+advance_broadside_row:
+    inc PLAYFIELD_BROAD_ROW,x
+    lda PLAYFIELD_RING_FLAGS
+    beq set_broadside_row_ptr
+    rts
+set_broadside_row_ptr:
+    stx BROAD_WORK_SLOT
+    lda PLAYFIELD_BROAD_ROW,x
+    jsr set_gameplay_row_ptr
+    ldx BROAD_WORK_SLOT
+    lda dst_ptr
+    sta BROAD_ROW_LO,x
+    lda dst_ptr+1
+    sta BROAD_ROW_HI,x
+    rts
+
+set_capital_explosion_row_ptr:
+    stx BROAD_WORK_SLOT
+    lda PLAYFIELD_CAPITAL_EXPLOSION_ROW,x
+    jsr set_gameplay_row_ptr
+    ldx BROAD_WORK_SLOT
+    lda dst_ptr
+    sta CAPITAL_EXPLOSION_ROW_LO,x
+    lda dst_ptr+1
+    sta CAPITAL_EXPLOSION_ROW_HI,x
     rts
 
 ; Launch flashes use a temporary character at the real muzzle cell. They are
@@ -6712,16 +6947,19 @@ begin_capital_hull_explosion:
 @store_column:
     sta CAPITAL_EXPLOSION_COLUMN,x
     ldy BROAD_WORK_SLOT
+    lda PLAYFIELD_BROAD_ROW,y
+    beq :+
     sec
-    lda BROAD_ROW_LO,y
-    sbc #40
-    sta CAPITAL_EXPLOSION_ROW_LO,x
-    lda BROAD_ROW_HI,y
-    sbc #$00
-    sta CAPITAL_EXPLOSION_ROW_HI,x
+    sbc #$01
+:
+    sta PLAYFIELD_CAPITAL_EXPLOSION_ROW,x
+    tya
+    pha
+    jsr set_capital_explosion_row_ptr
     lda #CAPITAL_EXPLOSION_DURATION
     sta CAPITAL_EXPLOSION_TIMER,x
-    ldx BROAD_WORK_SLOT
+    pla
+    tax
     rts
 
 play_capital_explosion_sound:
@@ -6764,6 +7002,44 @@ restore_capital_explosions:
     bne @effect
     rts
 
+; Move a physical gameplay pointer to the next logical row. The fixed divider
+; enters the current ring head; within the 22-row physical ring only the last
+; row wraps back to $4050.
+advance_dst_to_next_physical_row:
+    lda dst_ptr
+    cmp #<GAMEPLAY_DIVIDER_SCREEN
+    bne @ring
+    lda PLAYFIELD_ROW_LO
+    sta dst_ptr
+    lda PLAYFIELD_ROW_HI
+    sta dst_ptr+1
+    rts
+@ring:
+    clc
+    lda dst_ptr
+    adc #40
+    sta dst_ptr
+    bcc :+
+    inc dst_ptr+1
+:
+    lda dst_ptr+1
+    cmp #>GAMEPLAY_SCREEN_END
+    bcc @done
+    bne @wrap
+    lda dst_ptr
+    cmp #<GAMEPLAY_SCREEN_END
+    bcc @done
+@wrap:
+    sec
+    lda dst_ptr
+    sbc #<(PLAYFIELD_RING_ROWS*40)
+    sta dst_ptr
+    lda dst_ptr+1
+    sbc #>(PLAYFIELD_RING_ROWS*40)
+    sta dst_ptr+1
+@done:
+    rts
+
 restore_capital_explosion:
     stx BROAD_WORK_SLOT
     lda CAPITAL_EXPLOSION_ROW_LO,x
@@ -6788,13 +7064,7 @@ restore_capital_explosion:
     iny
     dec PLAYER_CONTACT_ROWS
     bne @cell
-    clc
-    lda dst_ptr
-    adc #40
-    sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
+    jsr advance_dst_to_next_physical_row
     dec row_counter
     bne @row
     ldx BROAD_WORK_SLOT
@@ -6856,13 +7126,7 @@ render_capital_explosion:
     iny
     dec PLAYER_CONTACT_ROWS
     bne @cell
-    clc
-    lda dst_ptr
-    adc #40
-    sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
+    jsr advance_dst_to_next_physical_row
     dec row_counter
     bne @row
     ldx BROAD_WORK_SLOT
@@ -7519,18 +7783,6 @@ frontend_text_display_list:
     .endrepeat
     .byte $41
     .word frontend_text_display_list
-
-; One compact ANTIC 2 HUD row shares its empty eighth scanline with the raster
-; separator. Its DLI installs the gameplay charset/palette before 23 ANTIC 4
-; corridor rows; the final-row DLI restores the HUD font for the next PAL frame.
-display_list:
-    .byte $C2,<SCREEN,>SCREEN      ; ANTIC 2 HUD + LMS + DLI
-    .repeat 22
-        .byte $04
-    .endrepeat
-    .byte $84                      ; final ANTIC 4 row + DLI
-display_list_jvb:
-    .byte $41,<display_list,>display_list
 
     .assert MAIN_MENU_SCREEN_BYTES <= $400, error, "main-menu screen data exceeds shared buffer"
 

@@ -12,6 +12,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.j
 const xex = fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"));
 const starfieldRuntime = fs.readFileSync(path.join(root, "build", "starfield-runtime.bin"));
 const broadsideRuntime = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
+const a2KernelRuntime = fs.readFileSync(path.join(root, "build", "a2-kernel-runtime.bin"));
 const labels = new Map(
   fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -60,6 +61,7 @@ function createRuntimeMemory() {
   for (const segment of parseXex(xex).segments) memory.set(segment.data, segment.start);
   memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
   memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
+  memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
   return memory;
 }
 
@@ -130,6 +132,9 @@ function executeScoreRoutine(memory, startAddress, {
     switch (readByte()) {
       case 0x05: // ORA zp
         setAccumulator(accumulator | memory[readByte()]);
+        break;
+      case 0x09: // ORA #imm
+        setAccumulator(accumulator | readByte());
         break;
       case 0x18: // CLC
         carry = false;
