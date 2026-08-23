@@ -20,7 +20,7 @@ const baselineSessions = [
   { difficulty: 2, policy: "neutral", fireDelay: 0, frames: 760 },
   ...Array.from({ length: 8 }, (_, fireDelay) => ({
     difficulty: 2,
-    policy: fireDelay & 1 ? "evasive" : "sweep",
+    policy: (fireDelay & 1) !== 0 && fireDelay !== 5 ? "evasive" : "sweep",
     fireDelay,
     frames: 920,
   })),

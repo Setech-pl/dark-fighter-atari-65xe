@@ -55,9 +55,9 @@ const enemyCombatReviewHarness = process.argv.includes("--enemy-combat-review");
 const enemyPaletteArgument = process.argv.find((argument) => argument.startsWith("--enemy-palette="));
 const enemyPaletteSlug = enemyPaletteArgument?.slice("--enemy-palette=".length);
 const enemyPaletteIds = new Map([
-  ["dark-navy", "DARK_NAVY"],
-  ["medium-steel-blue", "MEDIUM_STEEL_BLUE"],
-  ["graphite-blue", "GRAPHITE_BLUE"],
+  ["cylon-oxblood", "CYLON_OXBLOOD"],
+  ["cylon-burgundy", "CYLON_BURGUNDY"],
+  ["cylon-scarlet", "CYLON_SCARLET"],
 ]);
 if (enemyPaletteSlug && !enemyPaletteIds.has(enemyPaletteSlug)) {
   throw new Error(`Unknown enemy palette build ${enemyPaletteSlug}`);

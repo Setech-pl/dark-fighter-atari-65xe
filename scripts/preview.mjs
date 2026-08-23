@@ -246,23 +246,23 @@ export const DEFAULT_ENEMY_BEFORE_AFTER_PREVIEW_PATH = path.join(
   "previews",
   "enemy-raider-before-after.png",
 );
-export const DEFAULT_ENEMY_PALETTE_DARK_NAVY_PREVIEW_PATH = path.join(
+export const DEFAULT_ENEMY_PALETTE_CYLON_OXBLOOD_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-palette-dark-navy.png",
+  "enemy-palette-cylon-oxblood.png",
 );
-export const DEFAULT_ENEMY_PALETTE_MEDIUM_STEEL_BLUE_PREVIEW_PATH = path.join(
+export const DEFAULT_ENEMY_PALETTE_CYLON_BURGUNDY_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-palette-medium-steel-blue.png",
+  "enemy-raider-cylon-burgundy-comparison.png",
 );
-export const DEFAULT_ENEMY_PALETTE_GRAPHITE_BLUE_PREVIEW_PATH = path.join(
+export const DEFAULT_ENEMY_PALETTE_CYLON_SCARLET_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-palette-graphite-blue.png",
+  "enemy-palette-cylon-scarlet.png",
 );
 export const DEFAULT_ENEMY_COMBAT_SEQUENCE_PREVIEW_PATH = path.join(
   rootDirectory,
@@ -2569,7 +2569,7 @@ export function createEnemyFighterLimitsPreview(
 function drawEnemyRaster(registerPixels, width, height, archetype, x, y, phase = 0, {
   scale = 1,
   accent = true,
-  bodyColor = 0x84,
+  bodyColor = 0x44,
   accentColor = 0x46,
 } = {}) {
   const bitWidth = archetype.hposPerBit * HIGH_RES_PIXELS_PER_COLOR_CLOCK * scale;
@@ -4969,17 +4969,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       ["Enemy review harness", generateEnemyReviewHarnessPreview()],
       ["Enemy scanner comparison", generateEnemyScannerComparisonPreview()],
       ["Enemy Raider before/after", generateEnemyRaiderBeforeAfterPreview()],
-      ["Enemy palette dark navy", generateEnemyPaletteCandidatePreview({
-        candidateId: "DARK_NAVY",
-        outputPath: DEFAULT_ENEMY_PALETTE_DARK_NAVY_PREVIEW_PATH,
+      ["Enemy palette Cylon oxblood", generateEnemyPaletteCandidatePreview({
+        candidateId: "CYLON_OXBLOOD",
+        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_OXBLOOD_PREVIEW_PATH,
       })],
-      ["Enemy palette medium steel-blue", generateEnemyPaletteCandidatePreview({
-        candidateId: "MEDIUM_STEEL_BLUE",
-        outputPath: DEFAULT_ENEMY_PALETTE_MEDIUM_STEEL_BLUE_PREVIEW_PATH,
+      ["Enemy palette Cylon burgundy comparison", generateEnemyPaletteCandidatePreview({
+        candidateId: "CYLON_BURGUNDY",
+        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_BURGUNDY_PREVIEW_PATH,
       })],
-      ["Enemy palette graphite-blue", generateEnemyPaletteCandidatePreview({
-        candidateId: "GRAPHITE_BLUE",
-        outputPath: DEFAULT_ENEMY_PALETTE_GRAPHITE_BLUE_PREVIEW_PATH,
+      ["Enemy palette Cylon scarlet", generateEnemyPaletteCandidatePreview({
+        candidateId: "CYLON_SCARLET",
+        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_SCARLET_PREVIEW_PATH,
       })],
       ["Enemy single-pulse combat", generateEnemyCombatSequencePreview()],
       ["Projectile visual language", generateProjectileVisualLanguagePreview()],

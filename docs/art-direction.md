@@ -124,12 +124,19 @@ fuselage. Wszystkie lecą dolnym nosem ku graczowi i pozostają rozpoznawalne w
 monochromatycznej masce; nie są palette aliases.
 
 P1/P2 pozwalają zachować prawdziwy czerwony scanner bez zmniejszania capacity.
-Niemal biały P1 `$0C` został zastąpiony medium steel-blue `$84`; Viper `$0E`
-pozostaje najjaśniejszym statkiem. Ten sam `COLPM1` barwi teraz M1 chłodnym
-steel-blue, co jest jawnym sprzętowym sprzężeniem. P2 `$46` niesie trzyfazowy
-czerwony scanner; Raider burst używa niezależnie `COLPF3=$46`, więc kolor nie
-jest globalnie pulsowany. Kandydaci `$82/$84/$04` są renderowani deterministyczną paletą
-Atari, a `$84` jest domyślnym kompromisem czytelności i masy.
+P1 Raidera używa teraz burgundowego `$44`: należy do tej samej rodziny hue
+`$4x` co dominujący pancerz prawej, cylonowej burty `$46`, ale ma niższą
+luminancję. Dzięki temu nie aliasuje ani czarnego tła `$00`, ani cylonowej
+burty `$46`; od lewej, kolonialnej burty `$84` odcina go inny hue. Viper `$0E`
+pozostaje najjaśniejszym statkiem. P2 `$46` niesie trzyfazowy czerwony scanner,
+jaśniejszy od body o jeden krok GTIA; Raider burst używa niezależnie
+`COLPF3=$46`, więc jego kolor się nie zmienia. Kandydaci `$42/$44/$48` są
+renderowani deterministyczną paletą Atari, a `$44` jest domyślnym kompromisem
+czytelności na czerni i przynależności do palety Cylonów. Na 24 ramki eksplozji
+Raidera P1 wraca do zaakceptowanego `$84`, po czym wygaśnięcie efektu
+przywraca body `$44` przed kolejnym spawnem; wejście do nowej gry również
+jawnie przywraca `$44`, jeśli poprzedni efekt został przerwany w frontendzie;
+efekt `$84/$46` pozostaje wizualnie bez zmian.
 
 Obwiednia jest per-type. Raider i Scythe zajmują `[80,96)` przy lewej oraz
 `[160,176)` przy prawej granicy. Talon zajmuje tylko 6 HPOS i porusza się

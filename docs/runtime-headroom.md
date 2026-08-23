@@ -137,22 +137,27 @@ implemented.
 
 ## Final physical gate
 
+The current artifact includes the post-feature Raider `4/5` lateral pursuit
+limit and Cylon-family `$44` body colour with fixed `$84/$46` enemy explosion.
+The staged table above remains the historical A2 optimization record; the
+values below are regenerated from the current linked XEX.
+
 | Metric | Final measured or generated value |
 | --- | ---: |
-| `cpu_cycles_dma_off` | 19,761 |
-| `cpu_comparison_headroom` | 15,807 |
-| `measured_wall_cycles_dma_on` | 31,440 |
-| `measured_physical_headroom` | 4,128 |
-| `estimated_additive_cycles` | 32,641 |
+| `cpu_cycles_dma_off` | 19,736 |
+| `cpu_comparison_headroom` | 15,832 |
+| `measured_wall_cycles_dma_on` | 31,399 |
+| `measured_physical_headroom` | 4,169 |
+| `estimated_additive_cycles` | 32,616 |
 | PAL physical frame | 35,568 |
 | Gate maximum | 31,568 |
 | Baseline 9,040 missed synchronisations | 0 |
 | Targeted 920 missed synchronisations | 0 |
 | Deadline overruns | 0 |
 
-The gate passes by 128 cycles. Crossing one Atari800 host/VBI boundary is not
+The gate passes by 169 cycles. Crossing one Atari800 host/VBI boundary is not
 itself a missed synchronization because active work begins near scanline 224.
-The trace records 4,677 such baseline intervals and 505 targeted intervals;
+The trace records 4,836 such baseline intervals and 516 targeted intervals;
 none crosses an extra boundary and every following active loop starts at the
 next legal synchronization opportunity.
 
@@ -160,17 +165,17 @@ The five heaviest measured baseline frames are:
 
 | Session/frame | DMA-on wall | Physical headroom |
 | --- | ---: | ---: |
-| `2-sweep-fire4` / 337 | 31,440 | 4,128 |
-| `1-evasive-fire3` / 533 | 30,640 | 4,928 |
-| `1-evasive-fire3` / 351 | 30,601 | 4,967 |
+| `2-sweep-fire4` / 337 | 31,399 | 4,169 |
+| `2-sweep-fire5` / 263 | 31,209 | 4,359 |
 | `2-sweep-fire4` / 263 | 30,501 | 5,067 |
-| `2-evasive-fire3` / 143 | 30,290 | 5,278 |
+| `2-sweep-fire0` / 177 | 30,211 | 5,357 |
+| `2-evasive-fire1` / 283 | 29,522 | 6,046 |
 
 The maximum has 16 active fighter projectiles, 22 rendered far stars, one
 tracked muzzle, a live Raider, a capital explosion, gameplay music, fire SFX
 and capital SFX. Its events include common world/far/hull work, broadside
 update, fighter/capital explosion render and a music tick. The targeted replay
-reproduces the same 31,440-cycle frame.
+reproduces the same 31,399-cycle frame.
 
 ## Size and memory checkpoints
 
@@ -182,10 +187,11 @@ reproduces the same 31,440-cycle frame.
 | ETAP 4 / before A2 | 15,558 B | 15,570 B | 92,176 B |
 | Initial A2 hybrid ring | 15,576 B | 15,588 B | 92,176 B |
 | Final A2 kernel pass | 15,754 B | 15,766 B | 92,176 B |
+| Current release / Raider `4/5` + Cylon `$44` | 15,759 B | 15,771 B | 92,176 B |
 
-Final protected use is MAIN 8,137/8,192 B, PROJECTILES 202/298 B,
-STARFIELD 2,158/2,278 B, BROADSIDE 6,644/6,656 B and A2 kernel 226/256 B.
-Packed staging uses 1,711/1,792 B until unpacking. A2 display/ring state owns
+Final protected use is MAIN 8,154/8,192 B, PROJECTILES 202/298 B,
+STARFIELD 2,163/2,278 B, BROADSIDE 6,644/6,656 B and A2 kernel 226/256 B.
+Packed staging uses 1,716/1,792 B until unpacking. A2 display/ring state owns
 203 B at `$7F10-$7FDA`. The kernel is copied identically by XEX and cold-boot
 ATR startup into unconditional 64 KiB RAM at `$9000-$90E1`; `$90E2-$90FF`
 remains free. `$8000-$8FFF` remains the untouched 4 KiB entity/effects

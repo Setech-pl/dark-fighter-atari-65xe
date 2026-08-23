@@ -239,8 +239,8 @@ export function compileEnemyRoster(definition, rootDirectory) {
     pursuit.horizontalAccelerationHpos === 1 &&
     pursuit.maximumHorizontalVelocityHpos === 1 &&
     pursuit.viperReferenceSpeedHposPerFrame === 2 && pursuit.movementStepHpos === 2 &&
-    pursuit.maximumSpeedRatioNumerator === 7 &&
-    pursuit.maximumSpeedRatioDenominator === 8 &&
+    pursuit.maximumSpeedRatioNumerator === 4 &&
+    pursuit.maximumSpeedRatioDenominator === 5 &&
     pursuit.weaveAmplitudeHpos === 4 && pursuit.weavePeriodFrames === 32 &&
     pursuit.attackActiveTop === 16 && pursuit.attackActiveBottomExclusive === 200,
   "Raider soft-pursuit parameters must remain the reviewed bounded profile");
@@ -253,14 +253,14 @@ export function compileEnemyRoster(definition, rootDirectory) {
     runtime.colourPolicy.candidates.length === 3,
   "Enemy roster must define exactly three reviewed body-colour candidates");
   const paletteCandidates = new Map(runtime.colourPolicy.candidates.map(({ id, value }) => [id, value]));
-  invariant(paletteCandidates.get("DARK_NAVY") === 0x82 &&
-    paletteCandidates.get("MEDIUM_STEEL_BLUE") === 0x84 &&
-    paletteCandidates.get("GRAPHITE_BLUE") === 0x04,
-  "Enemy palette candidates must remain $82/$84/$04");
-  invariant(runtime.colourPolicy.selected === "MEDIUM_STEEL_BLUE" &&
+  invariant(paletteCandidates.get("CYLON_OXBLOOD") === 0x42 &&
+    paletteCandidates.get("CYLON_BURGUNDY") === 0x44 &&
+    paletteCandidates.get("CYLON_SCARLET") === 0x48,
+  "Enemy palette candidates must remain Cylon-family $42/$44/$48");
+  invariant(runtime.colourPolicy.selected === "CYLON_BURGUNDY" &&
     runtime.colourPolicy.bodyValue === paletteCandidates.get(runtime.colourPolicy.selected) &&
     runtime.colourPolicy.accentValue === 0x46,
-  "Enemy roster must select medium steel-blue $84 with a red $46 scanner");
+  "Enemy roster must select Cylon burgundy $44 with a brighter red $46 scanner");
   const pulse = runtime.weaponPolicy?.singlePulse;
   invariant(pulse?.renderer === "ANTIC4_GLYPH_POOL" && pulse.poolSlots === 9,
     "Raider burst must use its nine-slot ANTIC 4 glyph pool");
@@ -358,9 +358,9 @@ export function renderEnemyRosterCa65Include(asset) {
     `RAIDER_ATTACK_ACTIVE_BOTTOM = ${pursuit.attackActiveBottomExclusive}`,
     `ENEMY_RELEASE_VISIBLE_WIDTH = ${implemented[0].visibleWidth}`,
     `ENEMY_RELEASE_FRAME_HEIGHT = ${implemented[0].height}`,
-    `ENEMY_BODY_COLOR_DARK_NAVY = ${byteHex(asset.runtime.colourPolicy.candidates[0].value)}`,
-    `ENEMY_BODY_COLOR_MEDIUM_STEEL_BLUE = ${byteHex(asset.runtime.colourPolicy.candidates[1].value)}`,
-    `ENEMY_BODY_COLOR_GRAPHITE_BLUE = ${byteHex(asset.runtime.colourPolicy.candidates[2].value)}`,
+    `ENEMY_BODY_COLOR_CYLON_OXBLOOD = ${byteHex(asset.runtime.colourPolicy.candidates[0].value)}`,
+    `ENEMY_BODY_COLOR_CYLON_BURGUNDY = ${byteHex(asset.runtime.colourPolicy.candidates[1].value)}`,
+    `ENEMY_BODY_COLOR_CYLON_SCARLET = ${byteHex(asset.runtime.colourPolicy.candidates[2].value)}`,
     `ENEMY_BODY_COLOR = ${byteHex(asset.runtime.colourPolicy.bodyValue)}`,
     `ENEMY_SCANNER_COLOR = ${byteHex(asset.runtime.colourPolicy.accentValue)}`,
     `ENEMY_WEAPON_NONE = ${ENEMY_WEAPON_PROFILES.NONE}`,

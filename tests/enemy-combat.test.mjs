@@ -76,24 +76,45 @@ function readRuntimeBytes(address, length) {
   throw new Error(`Runtime address $${address.toString(16)} is outside assembled data`);
 }
 
-test("selected Cylon palette is medium steel-blue with an independent red scanner", () => {
+test("selected Raider palette matches the Cylon hull hue with independent luminance and eye", () => {
   assert.deepEqual(asset.runtime.colourPolicy.candidates, [
-    { id: "DARK_NAVY", value: 0x82 },
-    { id: "MEDIUM_STEEL_BLUE", value: 0x84 },
-    { id: "GRAPHITE_BLUE", value: 0x04 },
+    { id: "CYLON_OXBLOOD", value: 0x42 },
+    { id: "CYLON_BURGUNDY", value: 0x44 },
+    { id: "CYLON_SCARLET", value: 0x48 },
   ]);
   assert.deepEqual(
     [asset.runtime.colourPolicy.bodyValue, asset.runtime.colourPolicy.accentValue],
-    [0x84, 0x46],
+    [0x44, 0x46],
   );
-  assert.ok((asset.runtime.colourPolicy.bodyValue & 0x0f) <= 4,
-    "the Cylon body must remain at medium or lower luminance");
   const graphics = readGameGraphicsSource(source);
+  const body = asset.runtime.colourPolicy.bodyValue;
+  const eye = asset.runtime.colourPolicy.accentValue;
+  const colonialHull = graphics.hardwareState.get("COLPF1");
+  const cylonHull = graphics.hardwareState.get("COLPF3");
+  const background = graphics.hardwareState.get("COLBK");
+  assert.equal(body & 0xf0, cylonHull & 0xf0,
+    "Raider body must use the Cylon hull hue family");
+  assert.notEqual(body & 0x0f, cylonHull & 0x0f,
+    "Raider and Cylon hull must not share luminance");
+  assert.notEqual(body & 0x0f, background & 0x0f,
+    "Raider must not share the background luminance");
+  assert.notEqual(body & 0xf0, colonialHull & 0xf0,
+    "Raider must no longer use the Colonial hull hue family");
+  assert.equal((eye & 0x0f) - (body & 0x0f), 2,
+    "the red eye remains one GTIA luminance step brighter than the body");
   assert.deepEqual(
     [graphics.hardwareState.get("COLPM0"), graphics.hardwareState.get("COLPM1"),
       graphics.hardwareState.get("COLPM2"), graphics.hardwareState.get("COLPM3")],
-    [0x0e, 0x84, 0x46, 0x28],
+    [0x0e, 0x44, 0x46, 0x28],
   );
+  assert.match(source,
+    /resolve_enemy_damage:[\s\S]+lda #ENEMY_EXPLOSION_CORE_COLOR[\s\S]+sta COLPM1[\s\S]+jsr begin_enemy_fighter_explosion/);
+  assert.match(source,
+    /tick_shared_fighter_explosions:[\s\S]+cpx #FIGHTER_EXPLOSION_ENEMY_SLOT[\s\S]+lda #ENEMY_RUNTIME_BODY_COLOR[\s\S]+sta COLPM1/);
+  assert.match(source,
+    /start_gameplay:[\s\S]+lda #ENEMY_RUNTIME_BODY_COLOR[\s\S]+sta COLPM1[\s\S]+music_start_gameplay/,
+  "a new game must restore the Raider body even after an interrupted explosion");
+  assert.match(source, /ENEMY_EXPLOSION_CORE_COLOR = \$84/);
 });
 
 test("release Raider uses bounded soft pursuit rather than a player-independent sinusoid", () => {
@@ -105,8 +126,8 @@ test("release Raider uses bounded soft pursuit rather than a player-independent 
     maximumHorizontalVelocityHpos: 1,
     viperReferenceSpeedHposPerFrame: 2,
     movementStepHpos: 2,
-    maximumSpeedRatioNumerator: 7,
-    maximumSpeedRatioDenominator: 8,
+    maximumSpeedRatioNumerator: 4,
+    maximumSpeedRatioDenominator: 5,
     weaveAmplitudeHpos: 4,
     weavePeriodFrames: 32,
     attackActiveTop: 16,
@@ -134,7 +155,7 @@ test("release Raider uses bounded soft pursuit rather than a player-independent 
   }
 });
 
-test("Raider maximum lateral speed is exactly 7/8 of the Viper reference", () => {
+test("Raider maximum lateral speed is exactly 4/5 of the Viper reference", () => {
   const policy = asset.runtime.movementPolicy.raiderSoftPursuit;
   const initialX = 112;
   const frames = policy.maximumSpeedRatioDenominator;
@@ -146,15 +167,58 @@ test("Raider maximum lateral speed is exactly 7/8 of the Viper reference", () =>
   const raiderDistance = pursuit.trace.reduce((sum, frame) =>
     sum + Math.abs(frame.movedHpos), 0);
   const viperDistance = frames * policy.viperReferenceSpeedHposPerFrame;
-  assert.equal(raiderDistance, 14);
-  assert.equal(viperDistance, 16);
-  assert.equal(raiderDistance * 8, viperDistance * 7);
-  assert.equal(pursuit.trace.filter(({ movedHpos }) => movedHpos !== 0).length, 7,
-    "Raider moves two HPOS on seven of each eight sustained pursuit frames");
+  assert.equal(raiderDistance, 8);
+  assert.equal(viperDistance, 10);
+  assert.equal(raiderDistance * 5, viperDistance * 4);
+  assert.deepEqual(pursuit.trace.map(({ moveAccumulator }) => moveAccumulator), [4, 3, 2, 1, 0]);
+  assert.deepEqual(pursuit.trace.map(({ movedHpos }) => movedHpos), [0, 2, 2, 2, 2],
+    "Raider moves two HPOS on exactly four of each five sustained pursuit frames");
   assert.equal(pursuit.trace.at(-1).x, initialX + raiderDistance);
   assert.deepEqual(manifest.enemyRoster.movementPolicy.raiderSoftPursuit, policy);
   assert.match(source,
     /update_raider_soft_pursuit:[\s\S]+RAIDER_MOVE_ACCUMULATOR[\s\S]+RAIDER_SPEED_NUMERATOR[\s\S]+RAIDER_SPEED_DENOMINATOR/);
+});
+
+test("stationary Viper is intercepted while active manoeuvring opens the lateral gap", () => {
+  const stationaryPlayerX = 136;
+  const idlePursuit = simulateRaiderSoftPursuit(asset, {
+    frameCount: 32,
+    initialState: createRaiderPursuitState(asset, { x: 88, y: 56 }),
+    playerXForFrame: () => stationaryPlayerX,
+  });
+  assert.equal(idlePursuit.trace.some(({ x }) =>
+    x < stationaryPlayerX + 8 && x + raider.visibleWidth > stationaryPlayerX), true,
+  "a sustained Raider pursuit must reach an idle Viper envelope");
+
+  const viperStartX = 120;
+  const raiderStartX = 100;
+  const centreCorrection = (raider.visibleWidth - 8) / 2;
+  const activePursuit = simulateRaiderSoftPursuit(asset, {
+    frameCount: 5,
+    initialState: createRaiderPursuitState(asset, { x: raiderStartX, y: 56 }),
+    playerXForFrame: (frame) => viperStartX + (frame + 1) * 2,
+  });
+  const initialGap = viperStartX - raiderStartX - centreCorrection;
+  const finalGap = activePursuit.trace.at(-1).playerX - activePursuit.state.x - centreCorrection;
+  assert.equal(finalGap, initialGap + 2,
+    "a five-frame maximum-speed Viper manoeuvre must gain two HPOS on the Raider");
+});
+
+test("Raider fractional phase resets after spawn, player life, and new game", () => {
+  const routines = new Map([
+    ["new game", source.slice(source.indexOf("init_state:"), source.indexOf("clear_pmg:"))],
+    ["spawn", source.slice(source.indexOf("reset_enemy:"),
+      source.indexOf("reset_enemy_fire_cooldown:"))],
+    ["player life", source.slice(source.indexOf("clear_fighter_projectiles:"),
+      source.indexOf("clear_viper_projectiles:"))],
+  ]);
+  for (const [pathName, routineSource] of routines) {
+    assert.match(routineSource, /lda #\$00[\s\S]+sta RAIDER_MOVE_ACCUMULATOR/,
+      `${pathName} must deterministically restart the 4/5 movement phase`);
+  }
+  assert.match(source.slice(source.indexOf("respawn_player:"),
+    source.indexOf("tick_respawn_invulnerability:")), /jsr clear_fighter_projectiles/,
+  "player respawn must use the projectile reset path that restarts Raider phase");
 });
 
 test("Raider pursuit reverses gradually and preserves a small deterministic weave", () => {
@@ -568,11 +632,16 @@ test("projectile definitions preserve PMG colours and make capital fire material
 });
 
 test("all three palette review sheets are deterministic source-derived PAL-register evidence", () => {
-  for (const [id, value] of [["DARK_NAVY", 0x82], ["MEDIUM_STEEL_BLUE", 0x84],
-    ["GRAPHITE_BLUE", 0x04]]) {
+  for (const [id, value] of [["CYLON_OXBLOOD", 0x42], ["CYLON_BURGUNDY", 0x44],
+    ["CYLON_SCARLET", 0x48]]) {
     const state = readEnemyPaletteCandidateRuntimeState(source, id, hulls);
     assert.equal(state.candidate.value, value);
     assert.equal(state.panelDefinitions.length, 4);
+    assert.deepEqual(state.panelDefinitions.slice(1).map(({ label }) => label), [
+      "LEFT BOUND BESIDE ALLIED HULL",
+      "CENTER WITH VIPER AND M0",
+      "RIGHT BOUND BESIDE ENEMY HULL",
+    ]);
     assert.equal(state.panelDefinitions.slice(1).every(({ enemyX }) =>
       enemyX >= raider.logicalBounds[0] && enemyX <= raider.logicalBounds[1]), true);
     const first = createEnemyPaletteCandidatePreview(source, id, hulls);

@@ -104,7 +104,7 @@ test("roster conversion is deterministic and runtime never contains PNG data or 
   assert.doesNotMatch(source, /\.png|PNG_SIGNATURE|readFileSync/);
   assert.deepEqual(
     [asset.runtime.colourPolicy.bodyValue, asset.runtime.colourPolicy.accentValue],
-    [0x84, 0x46],
+    [0x44, 0x46],
   );
 });
 

@@ -10,10 +10,12 @@ Editable source art and conversion metadata belong here. Every accepted asset sh
   `SCYTHE_BOMBER`. Normal gameplay enables only `RAIDER`; Talon and Scythe are
   available through the compile-time `npm run enemy:review` harness. The
   converter validates Unicode-normalised paths, native envelopes, scanner
-  attachment, cleared tail bytes, the `$82/$84/$04` palette candidates and the
+  attachment, cleared tail bytes, the Cylon-family `$42/$44/$48` palette
+  candidates and the
   first descriptor-driven `SINGLE_PULSE` policy, then emits
-  `build/enemy-roster.inc`. Release selects medium steel-blue `$84`; Talon and
-  Scythe remain `WEAPON_NONE` review-only anchors.
+  `build/enemy-roster.inc`. Release selects burgundy `$44`, one luminance step
+  below the red scanner and the right-hull `$46`; Talon and Scythe remain
+  `WEAPON_NONE` review-only anchors.
 - `Cylon Raider.png`, `Talon Interceptor.png`, `Scythe Bomber.png`,
   `Reaper Gunship.png`, `Specter Scout.png`, `Stalker Hunter.png`,
   `Leech Drone.png`, `Aegis Escort.png`, `Nemesis Command Raider.png`, and

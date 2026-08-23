@@ -13,8 +13,8 @@
         "maximumHorizontalVelocityHpos": 1,
         "viperReferenceSpeedHposPerFrame": 2,
         "movementStepHpos": 2,
-        "maximumSpeedRatioNumerator": 7,
-        "maximumSpeedRatioDenominator": 8,
+        "maximumSpeedRatioNumerator": 4,
+        "maximumSpeedRatioDenominator": 5,
         "weaveAmplitudeHpos": 4,
         "weavePeriodFrames": 32,
         "attackActiveTop": 16,
@@ -27,16 +27,16 @@
     },
     "colourPolicy": {
       "bodyRegister": "COLPM1",
-      "bodyValue": 132,
+      "bodyValue": 68,
       "accentRegister": "COLPM2",
       "accentValue": 70,
       "candidates": [
-        { "id": "DARK_NAVY", "value": 130 },
-        { "id": "MEDIUM_STEEL_BLUE", "value": 132 },
-        { "id": "GRAPHITE_BLUE", "value": 4 }
+        { "id": "CYLON_OXBLOOD", "value": 66 },
+        { "id": "CYLON_BURGUNDY", "value": 68 },
+        { "id": "CYLON_SCARLET", "value": 72 }
       ],
-      "selected": "MEDIUM_STEEL_BLUE",
-      "note": "P1/P2 remain the steel-blue body and red scanner. Fighter pulses use the independent ANTIC 4 playfield pool, so broadside M1-M3 no longer couple their colours."
+      "selected": "CYLON_BURGUNDY",
+      "note": "P1 uses Cylon-family burgundy $44, distinct in luminance from the Cylon hull $46; P2 remains the brighter red $46 scanner. Fighter pulses use the independent ANTIC 4 playfield pool, so broadside M1-M3 no longer couple their colours."
     },
     "weaponPolicy": {
       "singlePulse": {

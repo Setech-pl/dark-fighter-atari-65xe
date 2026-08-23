@@ -112,7 +112,7 @@ test("preview consumes the canonical charset, screen, PMG, and palette source", 
     ["COLBK", "COLPF0", "COLPF1", "COLPF2", "COLPF3", "COLPM0", "COLPM1", "COLPM2", "COLPM3"].map(
       (name) => graphics.hardwareState.get(name),
     ),
-    [0x00, 0x0e, 0x84, 0x1e, 0x46, 0x0e, 0x84, 0x46, 0x28],
+    [0x00, 0x0e, 0x84, 0x1e, 0x46, 0x0e, 0x44, 0x46, 0x28],
   );
   assert.equal(graphics.frontendHardwareState.get("COLPF3"), 0xd8);
   assert.match(

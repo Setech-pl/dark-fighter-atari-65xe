@@ -141,8 +141,8 @@
   (`MEDIUM`) i 8 (`EASY`) pełnych kroków, czyli 100% dawnego world rate;
 - w pełnym oknie 20 kroków kadłubów near wykonuje 14, a far 7 kroków; obie
   warstwy dają czytelną perspektywę i żadna nie płynie razem z kadłubem;
-- przy ciągłym bocznym pościgu Raider pokonuje 14 HPOS w czasie, gdy Viper
-  pokonuje 16 HPOS; pojedyncza pauza w każdym oknie ośmiu ramek nie może
+- przy ciągłym bocznym pościgu Raider pokonuje 8 HPOS w czasie, gdy Viper
+  pokonuje 10 HPOS; pojedyncza pauza w każdym oknie pięciu ramek nie może
   wyglądać jak zacięcie ani pozwolić Raiderowi zrównać się z Viperem;
 - zmiana trudności wpływa na następne wejście do gameplayu, nie zmienia ruchu
   gracza, fightera, pocisków ani logicznych 50 updates/s;
@@ -234,15 +234,19 @@ pokazuje Raidera, Talona i Scythe Bombera w środku oraz przy obu granicach.
 
 Korekta palety i pierwszej broni dodaje osobne artefakty review:
 
-- `npm run enemy:palette:dark-navy` — `COLPM1=$82`;
-- `npm run enemy:palette:medium-steel-blue` — `COLPM1=$84`, release default;
-- `npm run enemy:palette:graphite-blue` — `COLPM1=$04`;
+- `npm run enemy:palette:cylon-oxblood` — `COLPM1=$42`;
+- `npm run enemy:palette:cylon-burgundy` — `COLPM1=$44`, release default;
+- `npm run enemy:palette:cylon-scarlet` — `COLPM1=$48`;
 - `npm run enemy:combat-review` — direct gameplay z rzeczywistym Raiderem,
   profilem `WEAPON_SINGLE_PULSE` i pulą ANTIC 4.
 
 Każdy wariant trafia pod `build/enemy-*` i nie nadpisuje release `dist/`.
-Sprawdź na PAL: P1 body pozostaje czytelny na czerni i przy obu side hulls,
-P2 scanner jest czerwony, playfield pulse powstaje pod aktualną obwiednią
+Porównanie release `$44` jest generowane jako
+`build/previews/enemy-raider-cylon-burgundy-comparison.png`: pokazuje Raidera
+przy lewej, kolonialnej burcie `$84`, na środku `$00` i przy prawej, cylonowej
+burcie `$46`. Sprawdź na PAL: P1 body pozostaje czytelny we wszystkich trzech
+położeniach, P2 scanner jest wyraźnie czerwony i jaśniejszy od body, a eksplozja
+Raidera zachowuje dotychczasowe `$84/$46`. Playfield pulse powstaje pod aktualną obwiednią
 Raidera, porusza się o 5 scanlines, odejmuje dokładnie 10, a podczas 250 ramek
 invulnerability jest zużywany bez damage. W broadside pule fighterów nie mogą
 zmienić właściciela M1–M3 ani nadpisać capital slotu.

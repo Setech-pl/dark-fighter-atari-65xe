@@ -1250,7 +1250,7 @@ test("sequence preview uses runtime PMG colours, source muzzles, and determinist
   assert.deepEqual([inspectPng(png).width, inspectPng(png).height], [1280, 1248]);
   assert.equal(sha256(png).length, 64);
   const graphics = readGameGraphicsSource(source, definition);
-  assert.deepEqual([1, 2, 3].map((slot) => graphics.hardwareState.get(`COLPM${slot}`)), [0x84, 0x46, 0x28]);
+  assert.deepEqual([1, 2, 3].map((slot) => graphics.hardwareState.get(`COLPM${slot}`)), [0x44, 0x46, 0x28]);
 });
 
 test("acceptance sequence is source-derived across warning, contact, damage, and lethal states", () => {

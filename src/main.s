@@ -362,6 +362,7 @@ ENEMY_RUNTIME_BODY_COLOR = ENEMY_BODY_COLOR
 .else
 ENEMY_RUNTIME_BODY_COLOR = ENEMY_BODY_COLOR_OVERRIDE
 .endif
+ENEMY_EXPLOSION_CORE_COLOR = $84
 
 ; ANTIC 6/7 use bits 6-7 as a direct COLPF0-COLPF3 colour bank.
 ANTIC67_COLOR_PF0 = $00
@@ -514,7 +515,7 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 .assert RAIDER_MAX_HORIZONTAL_VELOCITY = 1, error, "Raider velocity state is bounded to -1/0/+1"
 .assert VIPER_HORIZONTAL_STEP_HPOS = 2, error, "Viper lateral reference must remain two HPOS per PAL frame"
 .assert RAIDER_HORIZONTAL_STEP_HPOS = VIPER_HORIZONTAL_STEP_HPOS, error, "fighter step units diverged"
-.assert RAIDER_SPEED_NUMERATOR*8 = RAIDER_SPEED_DENOMINATOR*7, error, "Raider maximum speed must remain exactly 7/8 of Viper"
+.assert RAIDER_SPEED_NUMERATOR*5 = RAIDER_SPEED_DENOMINATOR*4, error, "Raider maximum speed must remain exactly 4/5 of Viper"
 .assert RAIDER_SPEED_NUMERATOR < RAIDER_SPEED_DENOMINATOR, error, "Raider fractional rate must skip at least one frame"
 .assert WORLD_SCROLL_RATE_EASY = HULL_SCROLL_RATE_EASY, error, "world/hull easy cadence must remain phase-aligned"
 .assert WORLD_SCROLL_RATE_MEDIUM = HULL_SCROLL_RATE_MEDIUM, error, "world/hull medium cadence must remain phase-aligned"
@@ -663,7 +664,7 @@ start:
 
     lda #$0E                    ; cold white player hull
     sta COLPM0
-    lda #ENEMY_RUNTIME_BODY_COLOR ; reviewed medium steel-blue Cylon hull
+    lda #ENEMY_RUNTIME_BODY_COLOR ; Cylon-family burgundy Raider hull
     sta COLPM1
     lda #ENEMY_SCANNER_COLOR    ; hostile red scanner and M2 pulse
     sta COLPM2
@@ -1652,6 +1653,8 @@ start_gameplay:
     sta COLPF3
     lda #$00
     sta COLBK
+    lda #ENEMY_RUNTIME_BODY_COLOR ; new game cannot inherit an interrupted explosion colour
+    sta COLPM1
 
     lda sound_enabled
     beq @display
@@ -2802,6 +2805,10 @@ tick_shared_fighter_explosions:
     cmp #$01
     bne @tick
     jsr erase_shared_fighter_explosion_slot
+    cpx #FIGHTER_EXPLOSION_ENEMY_SLOT
+    bne @tick
+    lda #ENEMY_RUNTIME_BODY_COLOR
+    sta COLPM1                 ; restore the Raider body as its explosion expires
 @tick:
     dec FIGHTER_EXPLOSION_TIMER,x
 @next:
@@ -2867,6 +2874,7 @@ init_fighter_projectiles:
 clear_fighter_projectiles:
     jsr erase_fighter_projectile_overlays
     lda #$00
+    sta RAIDER_MOVE_ACCUMULATOR
     ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
 @slot:
     sta FIGHTER_PROJECTILE_ACTIVE,x
@@ -3736,8 +3744,8 @@ clamp_enemy_x:
 ; The release Raider samples a Viper-centred target every eight PAL frames,
 ; retaining a small deterministic weave. Signed velocity is bounded to
 ; -1/0/+1 direction. Reversal passes through zero for one sample period. The
-; fractional movement clock advances two HPOS on exactly seven of eight active
-; frames, giving a maximum 14/16 = 7/8 of Viper lateral speed.
+; fractional movement clock advances two HPOS on exactly four of five active
+; frames, giving a maximum 8/10 = 4/5 of Viper lateral speed.
 update_raider_soft_pursuit:
     lda frame_counter
     and #(RAIDER_TARGET_SAMPLE_INTERVAL-1)
@@ -3964,6 +3972,8 @@ resolve_enemy_damage:
     lda #$00
     sta enemy_velocity_x
     sta HITCLR
+    lda #ENEMY_EXPLOSION_CORE_COLOR ; preserve the accepted $84/$46 explosion
+    sta COLPM1
     jsr begin_enemy_fighter_explosion
     jsr reset_enemy_fire_cooldown
     pla

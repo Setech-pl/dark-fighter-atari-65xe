@@ -80,8 +80,8 @@ review-only z `WEAPON_NONE`. Tabela nie autoryzuje jeszcze AI, broni ani
 balansu pozostałych typów.
 
 Boczny ruch Vipera jest wartością odniesienia 100%: 2 HPOS na aktywną ramkę.
-Raider przy ciągłym ruchu wykonuje taki sam krok w dokładnie 7 z 8 ramek,
-czyli osiąga dokładnie `7/8 = 87,5%` maksimum Vipera. Soft pursuit, dead zone,
+Raider przy ciągłym ruchu wykonuje taki sam krok w dokładnie 4 z 5 ramek,
+czyli osiąga dokładnie `4/5 = 80%` maksimum Vipera. Soft pursuit, dead zone,
 weave i pionowy ruch pozostają bez zmian.
 
 ## Model sektorów
