@@ -280,14 +280,22 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(packed), runtime);
   assert.deepEqual(packBroadsideLzss(runtime), packed);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
-  assert.ok(manifest.payloadBytes - 14314 <= 1536);
+  assert.deepEqual(manifest.payloadBudget.historicalRuntimeHeadroom, {
+    baselineBytes: 14314,
+    approvedDeltaBytes: 1536,
+    limitBytes: 15850,
+    finalBytes: 15759,
+    preservedForHistory: true,
+  });
+  assert.ok(manifest.payloadBudget.entityEffectsFoundation.actualDeltaBytes <=
+    manifest.payloadBudget.entityEffectsFoundation.approvedDeltaBytes);
   const starRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
   const starPacked = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime-packed.bin"));
   assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
   assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
   assert.ok(starPacked.length <= 0x700);
   assert.match(routine("start", "unpack_broadside_runtime"),
-    /jsr unpack_broadside_runtime[\s\S]+jsr stage_a2_kernel[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
+    /jsr unpack_entity_runtime[\s\S]+jsr init_entity_effects[\s\S]+jsr unpack_broadside_runtime[\s\S]+jsr stage_a2_kernel[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });
 
 test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve every other pair", () => {

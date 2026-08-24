@@ -42,6 +42,8 @@ typedef struct {
 	unsigned gameplay_frame;
 	unsigned difficulty;
 	unsigned active_muzzles;
+	unsigned entity_active;
+	unsigned entity_y;
 } DFTraceFrame;
 
 enum {
@@ -51,7 +53,10 @@ enum {
 	DFTRACE_EVENT_BROADSIDE = 1u << 3,
 	DFTRACE_EVENT_FIGHTER_EXPLOSION = 1u << 4,
 	DFTRACE_EVENT_CAPITAL_EXPLOSION = 1u << 5,
-	DFTRACE_EVENT_MUSIC_TICK = 1u << 6
+	DFTRACE_EVENT_MUSIC_TICK = 1u << 6,
+	DFTRACE_EVENT_ENTITY_SPAWN = 1u << 7,
+	DFTRACE_EVENT_ENTITY_CONTACT = 1u << 8,
+	DFTRACE_EVENT_ENTITY_DESPAWN = 1u << 9
 };
 
 static int dftrace_initialised;
@@ -77,6 +82,9 @@ static unsigned dftrace_pc_broadside;
 static unsigned dftrace_pc_fighter_explosion;
 static unsigned dftrace_pc_capital_explosion;
 static unsigned dftrace_pc_music_tick;
+static unsigned dftrace_pc_entity_spawn;
+static unsigned dftrace_pc_entity_contact;
+static unsigned dftrace_pc_entity_despawn;
 
 static unsigned dftrace_player_x;
 static unsigned dftrace_player_y;
@@ -99,6 +107,8 @@ static unsigned dftrace_frontend_input_armed;
 static unsigned dftrace_difficulty_setting;
 static unsigned dftrace_gameplay_frame;
 static unsigned dftrace_muzzle_screen_hi;
+static unsigned dftrace_entity_active_count;
+static unsigned dftrace_entity_y;
 
 static unsigned dftrace_env_u(const char *name)
 {
@@ -239,6 +249,8 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->gameplay_frame = MEMORY_mem[dftrace_gameplay_frame];
 	frame->difficulty = MEMORY_mem[dftrace_difficulty_setting];
 	frame->active_muzzles = dftrace_count_nonzero(dftrace_muzzle_screen_hi, 2);
+	frame->entity_active = MEMORY_mem[dftrace_entity_active_count];
+	frame->entity_y = MEMORY_mem[dftrace_entity_y];
 }
 
 static void dftrace_write(void)
@@ -250,7 +262,7 @@ static void dftrace_write(void)
 		perror("darkfighter trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,events\n");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_y,events\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -259,7 +271,7 @@ static void dftrace_write(void)
 		unsigned extra_boundaries = host_boundaries > 1 ? host_boundaries - 1 : 0;
 		unsigned missed_frames = cadence_frames > 1 ? cadence_frames - 1 : 0;
 		fprintf(file,
-			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
 			dftrace_session, index,
 			(unsigned long long) frame->start_clock,
 			(unsigned long long) frame->end_clock,
@@ -273,7 +285,8 @@ static void dftrace_write(void)
 			frame->capital_explosion, frame->music_active, frame->fire_sfx,
 			frame->hit_sfx, frame->capital_sfx, frame->sound_enabled,
 			frame->player_lifecycle, frame->sector_state, frame->gameplay_frame,
-			frame->difficulty, frame->active_muzzles, frame->events);
+			frame->difficulty, frame->active_muzzles, frame->entity_active,
+			frame->entity_y, frame->events);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -314,6 +327,9 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_fighter_explosion, "DFTRACE_PC_FIGHTER_EXPLOSION");
 	DFTRACE_ADDRESS(dftrace_pc_capital_explosion, "DFTRACE_PC_CAPITAL_EXPLOSION");
 	DFTRACE_ADDRESS(dftrace_pc_music_tick, "DFTRACE_PC_MUSIC_TICK");
+	DFTRACE_ADDRESS(dftrace_pc_entity_spawn, "DFTRACE_PC_ENTITY_SPAWN");
+	DFTRACE_ADDRESS(dftrace_pc_entity_contact, "DFTRACE_PC_ENTITY_CONTACT");
+	DFTRACE_ADDRESS(dftrace_pc_entity_despawn, "DFTRACE_PC_ENTITY_DESPAWN");
 	DFTRACE_ADDRESS(dftrace_player_x, "DFTRACE_PLAYER_X");
 	DFTRACE_ADDRESS(dftrace_player_y, "DFTRACE_PLAYER_Y");
 	DFTRACE_ADDRESS(dftrace_projectile_active, "DFTRACE_PROJECTILE_ACTIVE");
@@ -335,6 +351,8 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_difficulty_setting, "DFTRACE_DIFFICULTY_SETTING");
 	DFTRACE_ADDRESS(dftrace_gameplay_frame, "DFTRACE_GAMEPLAY_FRAME");
 	DFTRACE_ADDRESS(dftrace_muzzle_screen_hi, "DFTRACE_MUZZLE_SCREEN_HI");
+	DFTRACE_ADDRESS(dftrace_entity_active_count, "DFTRACE_ENTITY_ACTIVE_COUNT");
+	DFTRACE_ADDRESS(dftrace_entity_y, "DFTRACE_ENTITY_Y");
 #undef DFTRACE_ADDRESS
 	dftrace_initialised = 1;
 }
@@ -394,6 +412,12 @@ static void DFTrace_Observe(unsigned pc)
 		dftrace_current.events |= DFTRACE_EVENT_CAPITAL_EXPLOSION;
 	else if (pc == dftrace_pc_music_tick)
 		dftrace_current.events |= DFTRACE_EVENT_MUSIC_TICK;
+	else if (pc == dftrace_pc_entity_spawn)
+		dftrace_current.events |= DFTRACE_EVENT_ENTITY_SPAWN;
+	else if (pc == dftrace_pc_entity_contact)
+		dftrace_current.events |= DFTRACE_EVENT_ENTITY_CONTACT;
+	else if (pc == dftrace_pc_entity_despawn)
+		dftrace_current.events |= DFTRACE_EVENT_ENTITY_DESPAWN;
 
 	if (pc == dftrace_pc_end) {
 		dftrace_current.end_clock = dftrace_clock();

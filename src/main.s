@@ -7,10 +7,13 @@
 .export boot_return
 .import __BROADSIDE_LOAD__, __BROADSIDE_RUN__
 .import __STARFIELD_RUN__
+.import __ENTITY_CODE_RUN__, __ENTITY_CODE_SIZE__
+.import __ENTITY_STATE_RUN__, __ENTITY_STATE_SIZE__
 
 .include "starfield.inc"
 .include "menu-music.inc"
 .include "gameplay-music.inc"
+.include "entity-effects.inc"
 
 .import __A2_KERNEL_RUN__, __A2_KERNEL_SIZE__
 
@@ -470,6 +473,12 @@ ENEMY_X_MAX = CORRIDOR_RIGHT_HPOS-ENEMY_RELEASE_VISIBLE_WIDTH
 ENEMY_VISIBLE_WIDTH = ENEMY_RELEASE_VISIBLE_WIDTH
 ENEMY_X_RANGE = ENEMY_X_MAX-ENEMY_X_MIN
 ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
+ENTITY_CORRIDOR_FIRST_COLUMN = CORRIDOR_CENTRAL_FIRST+1
+ENTITY_CORRIDOR_END_COLUMN = CORRIDOR_CENTRAL_END-1
+ENTITY_CORRIDOR_COLUMNS = ENTITY_CORRIDOR_END_COLUMN-ENTITY_CORRIDOR_FIRST_COLUMN
+ENTITY_CORRIDOR_LEFT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_CORRIDOR_FIRST_COLUMN*4
+ENTITY_CORRIDOR_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_CORRIDOR_END_COLUMN*4
+ENTITY_DEBRIS_GLYPH = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
 .assert CAPITAL_HULL_TURRET_COUNT = 2, error, "tracked muzzle records require exactly one turret per side"
@@ -482,6 +491,14 @@ ENEMY_SPAWN_X = ENEMY_X_MIN+ENEMY_X_RANGE/2
 .assert ENEMY_X_MIN = 80, error, "enemy left edge must begin at the central corridor"
 .assert ENEMY_X_MAX = 160, error, "double-width enemy must end before the enemy hull"
 .assert ENEMY_X_MAX+ENEMY_RELEASE_VISIBLE_WIDTH = CORRIDOR_RIGHT_HPOS, error, "enemy envelope must fit the corridor exactly"
+.assert ENTITY_CORRIDOR_LEFT_HPOS = CORRIDOR_LEFT_HPOS+4, error, "entity corridor must exclude the allied boundary column"
+.assert ENTITY_CORRIDOR_RIGHT_HPOS = CORRIDOR_RIGHT_HPOS-4, error, "entity corridor must exclude the Cylon boundary column"
+.assert ENTITY_CORRIDOR_COLUMNS = CORRIDOR_CENTRAL_END-CORRIDOR_CENTRAL_FIRST-2, error, "entity spawn columns must derive from the central corridor"
+.assert ENTITY_CORRIDOR_COLUMNS = 22, error, "debris RNG reduction assumes 22 interior corridor columns"
+.assert ENTITY_GAMEPLAY_TOP = GAMEPLAY_TOP+8, error, "entity gameplay must begin below the fixed divider"
+.assert ENTITY_GAMEPLAY_BOTTOM = GAMEPLAY_BOTTOM, error, "entity gameplay bottom must match the visible viewport"
+.assert ENTITY_LOGICAL_ROWS = PLAYFIELD_RING_ROWS, error, "entities must address exactly the 22 rotating rows"
+.assert ENTITY_DEBRIS_GLYPH < 128, error, "debris glyph exceeds the ANTIC 4 charset"
 .assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
 .assert HUD_BOTTOM = GAMEPLAY_TOP, error, "gameplay must begin immediately below the HUD"
 .assert GAMEPLAY_BOTTOM-GAMEPLAY_TOP = CAPITAL_HULL_VISIBLE_ROWS*8, error, "gameplay viewport height changed"
@@ -586,6 +603,96 @@ FIGHTER_PROJECTILE_STATE_END:
 
 .assert FIGHTER_PROJECTILE_STATE_END-FIGHTER_PROJECTILE_ACTIVE = 202, error, "fighter projectile and explosion state budget changed"
 
+; The complete page is explicit BSS, but no byte is trusted after cold boot.
+; init_entity_effects clears all 256 bytes before installing deterministic
+; seeds and timers on startup and on every new game.
+.segment "ENTITY_STATE"
+
+ENTITY_ACTIVE_MASK:          .res 1
+ENTITY_RENDERED_MASK:        .res 1
+ENTITY_ACTIVE_COUNT:         .res 1
+ENTITY_SPAWN_TIMER_LO:       .res 1
+ENTITY_SPAWN_TIMER_HI:       .res 1
+ENTITY_SPAWN_PHASE:          .res 1
+ENTITY_RNG_STATE:            .res 1
+ENTITY_FRAME_EVENTS:         .res 1
+ENTITY_PENDING_DAMAGE:       .res 1
+ENTITY_PENDING_CATEGORY:     .res 1
+ENTITY_COLLISION_SLOT:       .res 1
+ENTITY_ALLOCATION_RESULT:    .res 1
+ENTITY_SCRATCH_SLOT:         .res 1
+ENTITY_SCRATCH0:             .res 1
+ENTITY_SCRATCH1:             .res 1
+ENTITY_SCRATCH2:             .res 1
+ENTITY_TYPE:                 .res ENTITY_SLOT_COUNT
+ENTITY_STATE:                .res ENTITY_SLOT_COUNT
+ENTITY_FLAGS:                .res ENTITY_SLOT_COUNT
+ENTITY_X:                    .res ENTITY_SLOT_COUNT
+ENTITY_Y:                    .res ENTITY_SLOT_COUNT
+ENTITY_VX:                   .res ENTITY_SLOT_COUNT
+ENTITY_VY:                   .res ENTITY_SLOT_COUNT
+ENTITY_MOVE_ACCUMULATOR:     .res ENTITY_SLOT_COUNT
+ENTITY_TIMER:                .res ENTITY_SLOT_COUNT
+ENTITY_RENDER_ID:            .res ENTITY_SLOT_COUNT
+ENTITY_COLLISION_CATEGORY:   .res ENTITY_SLOT_COUNT
+ENTITY_SCREEN_LO:            .res ENTITY_SLOT_COUNT
+ENTITY_SCREEN_HI:            .res ENTITY_SLOT_COUNT
+ENTITY_BACKING0:             .res ENTITY_SLOT_COUNT
+ENTITY_BACKING1:             .res ENTITY_SLOT_COUNT
+ENTITY_BACKING2:             .res ENTITY_SLOT_COUNT
+ENTITY_BACKING3:             .res ENTITY_SLOT_COUNT
+ENTITY_DRAWN_MASK:           .res ENTITY_SLOT_COUNT
+ENTITY_HP:                   .res ENTITY_SLOT_COUNT
+ENTITY_OWNER:                .res ENTITY_SLOT_COUNT
+ENTITY_INTERACTIVE_END:
+
+.assert ENTITY_INTERACTIVE_END-ENTITY_ACTIVE_MASK = 96, error, "interactive entity state must remain 96 bytes"
+.res $20
+
+EFFECT_ACTIVE_MASK:          .res 1
+EFFECT_RENDERED_MASK:        .res 1
+EFFECT_ACTIVE_COUNT:         .res 1
+EFFECT_ALLOCATION_RESULT:    .res 1
+EFFECT_SCRATCH_SLOT:         .res 1
+EFFECT_SCRATCH0:             .res 1
+EFFECT_SCRATCH1:             .res 1
+EFFECT_SCRATCH2:             .res 1
+EFFECT_TYPE:                 .res EFFECT_SLOT_COUNT
+EFFECT_STATE:                .res EFFECT_SLOT_COUNT
+EFFECT_FLAGS:                .res EFFECT_SLOT_COUNT
+EFFECT_X:                    .res EFFECT_SLOT_COUNT
+EFFECT_Y:                    .res EFFECT_SLOT_COUNT
+EFFECT_VX:                   .res EFFECT_SLOT_COUNT
+EFFECT_VY:                   .res EFFECT_SLOT_COUNT
+EFFECT_MOVE_ACCUMULATOR:     .res EFFECT_SLOT_COUNT
+EFFECT_TIMER:                .res EFFECT_SLOT_COUNT
+EFFECT_RENDER_ID:            .res EFFECT_SLOT_COUNT
+EFFECT_COLLISION_CATEGORY:   .res EFFECT_SLOT_COUNT
+EFFECT_SCREEN_LO:            .res EFFECT_SLOT_COUNT
+EFFECT_SCREEN_HI:            .res EFFECT_SLOT_COUNT
+EFFECT_BACKING0:             .res EFFECT_SLOT_COUNT
+EFFECT_BACKING1:             .res EFFECT_SLOT_COUNT
+EFFECT_BACKING2:             .res EFFECT_SLOT_COUNT
+EFFECT_BACKING3:             .res EFFECT_SLOT_COUNT
+EFFECT_DRAWN_MASK:           .res EFFECT_SLOT_COUNT
+ENTITY_EFFECT_USED_END:
+
+.assert EFFECT_ACTIVE_MASK = ENTITY_ACTIVE_MASK+$80, error, "effect pool must remain page-aligned at $8080"
+.assert ENTITY_EFFECT_USED_END-ENTITY_ACTIVE_MASK = 244, error, "entity/effect live state must remain 244 bytes including alignment"
+.res ENTITY_STATE_BYTES-(ENTITY_EFFECT_USED_END-ENTITY_ACTIVE_MASK)
+ENTITY_EFFECT_STATE_END:
+
+.assert ENTITY_ACTIVE_MASK = ENTITY_STATE_ADDRESS, error, "entity state must begin at $8000"
+.assert ENTITY_EFFECT_STATE_END = ENTITY_STATE_ADDRESS+ENTITY_STATE_BYTES, error, "entity state must end at $80FF"
+.assert __ENTITY_STATE_SIZE__ = ENTITY_STATE_BYTES, error, "entity BSS reservation must be exactly one page"
+
+.export ENTITY_ACTIVE_MASK, ENTITY_RENDERED_MASK, ENTITY_ACTIVE_COUNT
+.export ENTITY_SPAWN_TIMER_LO, ENTITY_SPAWN_PHASE, ENTITY_RNG_STATE, ENTITY_FRAME_EVENTS
+.export ENTITY_TYPE, ENTITY_STATE, ENTITY_FLAGS, ENTITY_X, ENTITY_Y
+.export ENTITY_SCREEN_LO, ENTITY_SCREEN_HI, ENTITY_BACKING0, ENTITY_DRAWN_MASK
+.export EFFECT_ACTIVE_MASK, EFFECT_RENDERED_MASK, EFFECT_ACTIVE_COUNT
+.export ENTITY_EFFECT_STATE_END
+
 .segment "CODE"
 
 ; The first six bytes are interpreted by the Atari OS disk boot routine.
@@ -626,6 +733,8 @@ start:
 
     ; The packed boot tail is expanded to reclaimed resident RAM before the
     ; loader starts using $4010-$5E0F for its bitmap.
+    jsr unpack_entity_runtime
+    jsr init_entity_effects
     jsr unpack_broadside_runtime
     jsr stage_a2_kernel
     jsr stage_starfield_runtime
@@ -697,7 +806,6 @@ start:
     jmp frontend_loop
 .endif
 
-unpack_broadside_runtime:
 broadside_unpack_command:
     jsr broadside_read_source
     cmp #$00
@@ -768,6 +876,22 @@ starfield_packed_size:
     .word $FFFF
 a2_kernel_source:
     .word $FFFF
+entity_packed_source:
+    .word $FFFF
+
+; ENTITY_CODE may extend past the broadside destination boundary in the
+; consecutive boot payload. It is therefore expanded first, before the
+; broadside decoder is allowed to overwrite any already-consumed source byte.
+unpack_entity_runtime:
+    lda entity_packed_source
+    sta broadside_read_source+1
+    lda entity_packed_source+1
+    sta broadside_read_source+2
+    lda #<__ENTITY_CODE_RUN__
+    sta broadside_destination+1
+    lda #>__ENTITY_CODE_RUN__
+    sta broadside_destination+2
+    jmp broadside_unpack_command
 
 ; Preserve the compact stream above the resident broadside reservation, clear
 ; of both the packed loader source and its bitmap destination. The buffer is
@@ -829,6 +953,8 @@ stage_a2_kernel:
 
 .assert __A2_KERNEL_SIZE__ > 0, error, "A2 kernel must not be empty"
 .assert __A2_KERNEL_SIZE__ < $0100, error, "A2 kernel copy loop is limited to 255 bytes"
+.assert __ENTITY_CODE_SIZE__ > 0, error, "ENTITY_CODE must not be empty"
+.assert __ENTITY_CODE_SIZE__ <= ENTITY_CODE_RESERVED_BYTES, error, "ENTITY_CODE exceeds $9100-$9FFF"
 
 broadside_read_source:
 @source:
@@ -1616,6 +1742,8 @@ start_gameplay:
     jsr init_playfield_row_table
     jsr init_playfield_display_lists
     jsr init_state
+    jsr init_entity_effects
+    jsr install_entity_effects_glyph
     jsr unpack_capital_hull_maps
     jsr init_broadside
     jsr init_screen
@@ -1685,6 +1813,7 @@ main_loop:
     sta pause_option_latched
 @frame_active:
     inc frame_counter
+    jsr entity_effects_erase
     jsr erase_fighter_projectile_overlays
     jsr tick_shared_fighter_explosions
     jsr tick_capital_explosions
@@ -1713,11 +1842,13 @@ main_loop:
     jsr tick_star_twinkle
     jsr render_far_star_overlays_if_needed
     jsr handle_player_hull_contact
+    jsr entity_effects_update
     jsr render_launch_flashes
     jsr render_capital_explosions
     jsr render_shared_fighter_explosions
     jsr render_capital_shell_overlays
     jsr render_fighter_projectile_overlays
+    jsr entity_effects_render
     jsr update_sector_completion
     jsr update_sound
     lda MUSIC_ACTIVE
@@ -4418,6 +4549,8 @@ rotate_playfield_table_shift_end:
     pla
     sta PLAYFIELD_NEXT_DLIST_LO
     inc PLAYFIELD_PREBUILD_PENDING
+    lda #ENTITY_EVENT_WORLD_ROW_ADVANCED
+    sta ENTITY_FRAME_EVENTS
     rts
 
 ; Scalar state is reset before the initial near rows are generated. Sparse far
@@ -7704,7 +7837,7 @@ draw_broadside_span_at_hpos:
     ldx BROAD_WORK_SLOT
     rts
 
-.segment "CODE"
+.segment "ENTITY_CODE"
 set_broadside_slot_normal:
     lda SIZEM
     and missile_clear_masks,x
@@ -7797,3 +7930,335 @@ frontend_text_display_list:
     .assert MAIN_MENU_SCREEN_BYTES <= $400, error, "main-menu screen data exceeds shared buffer"
 
 .include "loader-screen.inc"
+
+.segment "ENTITY_CODE"
+
+; ENTITY_CODE is already resident when the boot flow reaches this second LZSS
+; stream. Re-arm the shared self-modifying decoder after ENTITY_CODE unpacking
+; changed both operands, without growing the protected resident CODE segment.
+unpack_broadside_runtime:
+    lda #<__BROADSIDE_LOAD__
+    sta broadside_read_source+1
+    lda #>__BROADSIDE_LOAD__
+    sta broadside_read_source+2
+    lda #<__BROADSIDE_RUN__
+    sta broadside_destination+1
+    lda #>__BROADSIDE_RUN__
+    sta broadside_destination+2
+    jmp broadside_unpack_command
+
+; New backed overlays form the top of the character stack. Effects are
+; restored first, then interactive entities. Existing fighter projectiles and
+; broadside shells are restored later by their established routines.
+entity_effects_erase:
+    lda EFFECT_RENDERED_MASK
+    beq @entities
+    jsr erase_transient_effect_overlays
+@entities:
+    lda ENTITY_RENDERED_MASK
+    beq @done
+    jmp erase_interactive_entity_overlays
+@done:
+    rts
+
+erase_transient_effect_overlays:
+    ldx #(EFFECT_SLOT_COUNT-1)
+@slot:
+    lda entity_slot_bit_masks,x
+    and EFFECT_RENDERED_MASK
+    beq @next
+    lda EFFECT_DRAWN_MASK,x
+    and #$01
+    beq @clear_slot
+    lda EFFECT_SCREEN_LO,x
+    sta dst_ptr
+    lda EFFECT_SCREEN_HI,x
+    sta dst_ptr+1
+    ldy #$00
+    lda EFFECT_BACKING0,x
+    sta (dst_ptr),y
+@clear_slot:
+    lda #$00
+    sta EFFECT_DRAWN_MASK,x
+    sta EFFECT_SCREEN_HI,x
+@next:
+    dex
+    bpl @slot
+    lda #$00
+    sta EFFECT_RENDERED_MASK
+    rts
+
+erase_interactive_entity_overlays:
+    ; The first slice deliberately admits only slot zero. Avoid scanning the
+    ; three reserved physical slots on the visible-frame path.
+    .assert ENTITY_ACTIVE_LIMIT = 1, error, "slot-zero erase requires active limit one"
+    lda ENTITY_DRAWN_MASK
+    and #$01
+    beq @clear_slot
+    lda ENTITY_SCREEN_LO
+    sta dst_ptr
+    lda ENTITY_SCREEN_HI
+    sta dst_ptr+1
+    ldy #$00
+    lda ENTITY_BACKING0
+    sta (dst_ptr),y
+@clear_slot:
+    lda #$00
+    sta ENTITY_DRAWN_MASK
+    sta ENTITY_SCREEN_HI
+    sta ENTITY_RENDERED_MASK
+    rts
+
+; Snapshot and clear the one-frame A2 event before the fast empty test. A
+; non-zero spawn timer is the ordinary empty path and stays below 100 linked
+; CPU cycles together with erase and render.
+entity_effects_update:
+    lda ENTITY_FRAME_EVENTS
+    sta ENTITY_SCRATCH0
+    lda #$00
+    sta ENTITY_FRAME_EVENTS
+    lda ENTITY_ACTIVE_MASK
+    bne @active
+    dec ENTITY_SPAWN_TIMER_LO
+    bne @done
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_DRAIN
+    bcs @defer_spawn
+    jmp entity_spawn_debris
+@defer_spawn:
+    lda #ENTITY_REPEAT_SPAWN_DELAY
+    sta ENTITY_SPAWN_TIMER_LO
+@done:
+    rts
+
+@active:
+    lda ENTITY_SCRATCH0
+    and #ENTITY_EVENT_WORLD_ROW_ADVANCED
+    beq @collision
+    lda ENTITY_Y
+    clc
+    adc ENTITY_VY
+    cmp #ENTITY_GAMEPLAY_BOTTOM
+    bcc :+
+    jmp entity_despawn_debris
+:
+    sta ENTITY_Y
+@collision:
+    ; Active update has already proved that Y remains in gameplay. Direct
+    ; calls retain the guarded public entry below for boundary tests.
+    jmp entity_collide_player_active
+
+; The first-free allocator is intentionally capped at one active entity even
+; though the physical SoA reserves four slots. The independent LFSR cannot
+; perturb Raider, starfield, broadside or weapon cadence.
+entity_spawn_debris:
+    lda ENTITY_ACTIVE_COUNT
+    cmp #ENTITY_ACTIVE_LIMIT
+    bcs @done
+    jsr entity_next_rng
+    and #$1F
+    cmp #ENTITY_CORRIDOR_COLUMNS
+    bcc :+
+    sec
+    sbc #ENTITY_CORRIDOR_COLUMNS
+:
+    asl
+    asl
+    clc
+    adc #ENTITY_CORRIDOR_LEFT_HPOS
+    sta ENTITY_X
+    lda #ENTITY_GAMEPLAY_TOP
+    sta ENTITY_Y
+    lda #ENTITY_TYPE_DEBRIS
+    sta ENTITY_TYPE
+    lda entity_archetype_descriptors+ENTITY_DESC_INITIAL_STATE
+    sta ENTITY_STATE
+    lda entity_archetype_descriptors+ENTITY_DESC_FLAGS
+    sta ENTITY_FLAGS
+    lda entity_archetype_descriptors+ENTITY_DESC_INITIAL_VX
+    sta ENTITY_VX
+    lda entity_archetype_descriptors+ENTITY_DESC_INITIAL_VY
+    sta ENTITY_VY
+    lda entity_archetype_descriptors+ENTITY_DESC_LIFETIME
+    sta ENTITY_TIMER
+    lda #ENTITY_DEBRIS_GLYPH
+    sta ENTITY_RENDER_ID
+    lda entity_archetype_descriptors+ENTITY_DESC_COLLISION_CATEGORY
+    sta ENTITY_COLLISION_CATEGORY
+    lda entity_archetype_descriptors+ENTITY_DESC_HIT_POINTS
+    sta ENTITY_HP
+    lda #$01
+    sta ENTITY_ACTIVE_MASK
+    sta ENTITY_ACTIVE_COUNT
+    sta ENTITY_ALLOCATION_RESULT
+    inc ENTITY_SPAWN_PHASE
+@done:
+    rts
+
+entity_next_rng:
+    lda ENTITY_RNG_STATE
+    asl
+    bcc :+
+    eor #$1D
+:
+    sta ENTITY_RNG_STATE
+    rts
+
+; Half-open X and inclusive visible-row tests mirror the existing projectile
+; collision contract. Coordinates outside 24..199 cannot reach this path.
+entity_collide_player:
+    lda ENTITY_Y
+    cmp #ENTITY_GAMEPLAY_TOP
+    bcc entity_collision_miss
+    cmp #ENTITY_GAMEPLAY_BOTTOM
+    bcs entity_collision_miss
+entity_collide_player_active:
+    lda ENTITY_Y
+    clc
+    adc #7
+    cmp player_y
+    bcc entity_collision_miss
+    lda player_y
+    clc
+    adc #PLAYER_COLLISION_LAST_ROW
+    cmp ENTITY_Y
+    bcc entity_collision_miss
+    lda ENTITY_X
+    clc
+    adc #4
+    cmp player_x
+    bcc entity_collision_miss
+    beq entity_collision_miss
+    lda player_x
+    clc
+    adc #PLAYER_COLLISION_WIDTH
+    cmp ENTITY_X
+    bcc entity_collision_miss
+    beq entity_collision_miss
+    lda BROAD_DAMAGE_APPLIED
+    bne entity_collision_miss
+    lda #$01
+    jsr apply_player_damage
+    lda BROAD_DAMAGE_APPLIED
+    beq entity_collision_miss
+entity_damage_applied:
+    jmp entity_despawn_debris
+entity_collision_miss:
+    rts
+
+entity_despawn_debris:
+    lda #$00
+    sta ENTITY_ACTIVE_MASK
+    sta ENTITY_ACTIVE_COUNT
+    sta ENTITY_STATE
+    sta ENTITY_ALLOCATION_RESULT
+    lda #ENTITY_REPEAT_SPAWN_DELAY
+    sta ENTITY_SPAWN_TIMER_LO
+    rts
+
+; Render after scroll and after existing shell/projectile rendering. Logical Y
+; is authoritative; the exact physical cell pointer is cached only until the
+; reverse erase at the beginning of the next active frame.
+entity_effects_render:
+    lda ENTITY_ACTIVE_MASK
+    beq @effects
+    .assert EFFECT_ACTIVE_LIMIT = 0, error, "active entity fast path assumes disabled effects"
+    jmp render_interactive_entity_overlays
+@effects:
+    lda EFFECT_ACTIVE_MASK
+    beq @done
+    ; EFFECT_ACTIVE_LIMIT is zero in this feature. Keeping the branch explicit
+    ; makes the disabled pool's empty path observable without activating it.
+@done:
+    rts
+
+render_interactive_entity_overlays:
+    ; Slot zero is the only allocator target while ENTITY_ACTIVE_LIMIT is one.
+    ; The remaining SoA slots stay reserved and deterministically initialised.
+    .assert ENTITY_ACTIVE_LIMIT = 1, error, "slot-zero render requires active limit one"
+    lda ENTITY_Y
+    cmp #ENTITY_GAMEPLAY_TOP
+    bcc @done
+    cmp #ENTITY_GAMEPLAY_BOTTOM
+    bcs @done
+    sec
+    sbc #ENTITY_GAMEPLAY_TOP
+    lsr
+    lsr
+    lsr
+    clc
+    adc #$01                    ; mapper row zero is the fixed divider
+    jsr set_gameplay_row_ptr
+    lda ENTITY_X
+    sec
+    sbc #GAMEPLAY_LEFT_HPOS
+    lsr
+    lsr
+    clc
+    adc dst_ptr
+    sta dst_ptr
+    sta ENTITY_SCREEN_LO
+    lda dst_ptr+1
+    adc #$00
+    sta ENTITY_SCREEN_HI
+    sta dst_ptr+1
+    ldy #$00
+    lda (dst_ptr),y
+    sta ENTITY_BACKING0
+    lda ENTITY_RENDER_ID
+    sta (dst_ptr),y
+    lda #$01
+    sta ENTITY_DRAWN_MASK
+    sta ENTITY_RENDERED_MASK
+@done:
+    rts
+
+; Cold-boot RAM is undefined on real 65XE hardware. Clear the complete owned
+; page, including every mask, slot field, backing byte and scratch byte, then
+; install the deterministic first-spawn state. The absolute,Y loop writes
+; exactly $8000-$80FF and cannot carry into the following page.
+init_entity_effects:
+    lda #$00
+    tay
+@clear_page:
+    sta ENTITY_ACTIVE_MASK,y
+    iny
+    bne @clear_page
+    lda #ENTITY_INITIAL_SPAWN_DELAY
+    sta ENTITY_SPAWN_TIMER_LO
+    lda #ENTITY_RNG_SEED
+    sta ENTITY_RNG_STATE
+    rts
+
+; The editable glyph source is part of ENTITY_CODE, while the live charset is
+; rebuilt after the loader. Keep this copy separate so state initialisation has
+; the strict write footprint $8000-$80FF on startup, XEX and cold-boot ATR.
+install_entity_effects_glyph:
+    ldx #$07
+@copy_glyph:
+    lda entity_debris_glyph,x
+    sta CHARSET+ENTITY_DEBRIS_GLYPH*8,x
+    dex
+    bpl @copy_glyph
+    rts
+
+entity_archetype_descriptors:
+    EMIT_ENTITY_ARCHETYPE_DESCRIPTORS
+entity_archetype_descriptors_end:
+entity_debris_glyph:
+    EMIT_ENTITY_DEBRIS_GLYPH
+entity_debris_glyph_end:
+
+entity_slot_bit_masks:
+    .byte $01,$02,$04,$08,$10,$20
+
+.assert entity_archetype_descriptors_end-entity_archetype_descriptors = ENTITY_ARCHETYPE_DESCRIPTOR_BYTES, error, "entity descriptor size changed"
+.assert entity_debris_glyph_end-entity_debris_glyph = 8, error, "debris glyph must remain one character"
+.assert *-__ENTITY_CODE_RUN__ <= ENTITY_CODE_RESERVED_BYTES, error, "ENTITY_CODE exceeds its unconditional RAM reservation"
+
+.export init_entity_effects, install_entity_effects_glyph
+.export entity_effects_erase, entity_effects_update, entity_effects_render
+.export entity_spawn_debris, entity_damage_applied, entity_despawn_debris
+.export erase_transient_effect_overlays, erase_interactive_entity_overlays
+.export render_interactive_entity_overlays
+.export entity_archetype_descriptors, entity_debris_glyph

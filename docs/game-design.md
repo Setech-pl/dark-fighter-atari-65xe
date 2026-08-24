@@ -173,6 +173,17 @@ modelu kolizji oraz uszkodzeń.
 
 ## Odłamki
 
+**IMPLEMENTED FOUNDATION SLICE**
+
+Pierwszy neutralny obiekt złomu jest małą przeszkodą testową wspólnego
+entity engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny
+jest najwyżej jeden. Spawnuje się na górze gameplayu w centralnym korytarzu,
+porusza wyłącznie razem z krokiem świata i można go ominąć. Kontakt zdejmuje
+jedną jednostkę HULL (10 punktów procentowych) przez wspólną damage gate i
+usuwa złom tylko wtedy, gdy obrażenie zostało przyjęte; invulnerability nie
+zużywa przeszkody. Slice nie dodaje dropów, boosterów, fragmentów ani
+transient effects.
+
 **BINDING**
 
 Zdarzenie odłamków może wystąpić w otwartej przestrzeni, a także w sektorze

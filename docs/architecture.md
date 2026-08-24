@@ -242,6 +242,13 @@ wybór. Dzięki temu ustawienie trwa przez powroty do menu w jednej sesji.
   obiektu wraca bieżąca gwiazda, a nie hardkodowana pustka. Kolejność dwóch
   fighter overlays jest odwracana przy kasowaniu, więc nakładające się obiekty
   nie przywracają starej warstwy ponad nadal aktywną.
+- Pełny kontrakt backed overlays renderuje od dołu do góry:
+  base/ring → broadside shell → fighter projectile → interactive entity →
+  transient effect. Następna ramka usuwa dokładnie w odwrotnej kolejności:
+  effect → entity → fighter projectile → broadside shell → lower/base.
+  ENTITY backing może zatem legalnie zawierać shell lub projectile. Erase
+  entity wykonuje się przed A2 rotation; render dopiero po scroll/update.
+  PMG jest sprzętowo niezależne od tego stosu.
 - W broadside obie warstwy generują tylko w bezpiecznych kolumnach 9–30;
   8/31 pozostają pod kontrolą backingów granic i wylotów, a kolumny kadłubów
   nigdy nie są dotykane przez starfield. Po `COMPLETE` nowo odsłaniane wiersze
@@ -590,13 +597,13 @@ Session TOP SCORE uses 2 B of packed BCD at `$4ED7-$4ED8`; current SCORE still
 uses `$0090-$0091`. Shared music transport uses 6 B at `$4ED9-$4EDE`, gameplay
 voice caches use 4 B at `$4EDF-$4EE2`, and the persistent option uses `$4EE3`.
 Two tracked muzzle records use 6 B at `$4EE4-$4EE9`. Code, tables, and
-relocated broadside/frontend/pause data occupy 6644/6656 B at `$5E10-$7803`.
+relocated broadside/frontend/pause data occupy 6653/6656 B at `$5E10-$780C`.
 Starfield, relocated shared procedures, option helpers, and both music players
-occupy 2163/2278 B at `$552A-$5D9C`. The pre-music portion includes 64 B of collision boundaries, 64 B of
+occupy 2168/2278 B at `$552A-$5DA1`. The pre-music portion includes 64 B of collision boundaries, 64 B of
 prow occupancy profiles, 64 B of prow boundaries, HUD font construction, and
 the Game Over formatter. The packed payload tails are deterministic LZ-10/5
-streams of 5625 B and 1716 B; the product-preserving A2 kernel occupies
-226/256 B at `$9000`. Sam bounded
+streams of 5633 B, 1721 B and 527 B ENTITY_CODE; the product-preserving A2
+kernel occupies 226/256 B at `$9000`. Sam bounded
 detektor z clampem kosztuje konserwatywnie do około 333 cykli; nie wykonuje
 pełnego skanu ekranu. Łączny koszt systemu po korekcie szacuje się na około
 495 cykli bez aktywnego slotu, około 745 dla jednego warningu, około 775 dla
@@ -623,14 +630,14 @@ czteroramkowej fazy i czyści je raz przy expiry, a nie co PAL frame. Surowy
 koszt zmiany obu slotów pozostaje poniżej około 1100 cykli; równoczesne stany
 `DYING/EXPLODING` pomijają co najmniej około 640 cykli zwykłego inputu,
 ruchu, sprite renderu, broni i kolizji. Te historyczne source estimates nie są
-już timing gate. Bieżący artefakt z A2 i limiterem Raidera `4/5` mierzy
-najcięższą legalną ścieżkę jako 19 723 cykli CPU DMA-off i 19 736 wraz z
-13-cyklowym released OPTION poll, dając 15 832 cykli wyłącznie w metryce
+już timing gate. Bieżący artefakt z entity foundation mierzy
+najcięższą legalną ścieżkę jako 20 024 cykle CPU DMA-off i 20 037 wraz z
+13-cyklowym released OPTION poll, dając 15 531 cykli wyłącznie w metryce
 porównawczej. Dokładny trace zegara ANTIC w Atari800 mierzy tę ramkę jako
-31 399 cykli z DMA/DLI, czyli 4 169 cykli fizycznego headroom; addytywne 32 616
+32 025 cykli z DMA/DLI, czyli 3 543 cykle fizycznego headroom; addytywne 32 917
 pozostaje estymacją. Baseline 9 040 ramek i osobny targeted replay mają po zero
-opuszczonych synchronizacji i zero deadline overruns; fizyczny gate 31 568/4 000
-przechodzi z marginesem 169 cykli. Szczegóły
+opuszczonych synchronizacji i zero deadline overruns. Historyczny gate 31 568
+pozostaje jawny; feature gate 32 040/3 528 przechodzi o 15 cykli. Szczegóły
 oraz ograniczenia są w `docs/runtime-headroom.md`. A held OPTION after resume skips simulation until
 release, so its debounce path cannot coincide with the heavy gameplay frame.
 Aktualizacja TOP kosztuje najwyżej 48 cykli wraz z `JSR` tylko w ramce
@@ -657,8 +664,12 @@ plus 22 właściwe wiersze. Dwie 75-bajtowe listy pod `$7F10-$7FA5` zachowują
 stały HUD i divider, a zmieniają kolejność wyłącznie 22 LMS ringu. Common
 world+hull event publikuje przygotowaną listę jednym page-local zapisem
 `DLISTL`; przyszła nieaktywna lista powstaje w gwarantowanej lekkiej następnej
-ramce. Niezależny hull-only event nadal kopiuje tylko boczne pasy. Kanoniczne granice to
-`HUD_TOP=8`, `HUD_BOTTOM=16`, `GAMEPLAY_TOP=16`, `GAMEPLAY_BOTTOM=200`.
+ramce. Niezależny hull-only event nadal kopiuje tylko boczne pasy. Kanoniczna
+mapa wyświetlania to HUD scanlines `8..15` pod `$4000-$4027`, divider
+`16..23` pod `$4028-$404F` oraz gameplay `24..199` pod `$4050-$43BF`.
+Entity/effects używają wyłącznie ostatniego zakresu:
+`logical_row=(Y-24)>>3`, dokładnie `0..21`; Y spoza `24..199` nie może
+renderować ani kolidować.
 Ostatni scanline glifów HUD jest pełnym białym separatorem; nie zajmuje drugiego
 40-bajtowego wiersza. Ekran nadal zużywa 24×40 = 960 B;
 PMG przeciwnika jest jawnie clipowane do gameplayu i nie może zapisać HUD-u.
@@ -692,6 +703,37 @@ Obie ścieżki zachowują A przez `PHA/PLA`, nie modyfikują X/Y i synchronizuj�
 zapisy przez `WSYNC`. Frontend przy wejściu nadal wyłącza NMI i wybiera własną
 display list, więc gameplay HUD ani menu PMG nie przeciekają do sub-screenów.
 
+### Entity/effects foundation
+
+Foundation uses two fixed SoA pools with no dynamic allocation. Interactive
+state occupies `$8000-$805F`: 16 global bytes and twenty four-byte arrays for
+four physical slots, while release allocation is capped at slot zero. Effects
+occupy `$8080-$80F3`: 8 global bytes and eighteen six-byte arrays, with active
+limit zero in this feature. `$8060-$807F` and `$80F4-$80FF` are explicit
+padding/tail, not assumed-zero RAM. Startup and every new game clear the full
+`$8000-$80FF` page, then install deterministic spawn timer 32 and RNG seed
+`$65`. An executable cold-boot test fills the page with `$A5`, runs the packed
+XEX and ATR bootstrap path, compares all 256 bytes and checks guard bytes.
+
+`ENTITY_CODE` runs at `$9100-$9333` and is stored as a 527-byte LZ-10/5 boot
+tail. It is unpacked before broadside, after which the shared self-modifying
+decoder is explicitly re-armed. Build/manifest validation proves XEX/ATR
+payload parity, exact round trips, non-overlap, and exclusion of
+`$A000-$BFFF`. `$8100-$8FFF` and `$9334-$9FFF` remain reserved rather than
+being consumed automatically.
+
+The visible-frame order is bounded: reverse erase, update, render. Empty masks
+early-out; the linked empty wrapper costs 93 CPU cycles. Logical Y is the only
+authoritative vertical position. A physical ring pointer is cached only after
+render and consumed by erase before any A2 rotation. The single neutral debris
+descriptor and one glyph come from `assets/graphics/entity-effects.json`.
+Its independent LFSR chooses one of 22 source-derived inner-corridor columns,
+spawns at Y=24, advances +8 only on `WORLD_ROW_ADVANCED`, and despawns after
+Y=199. Contact delegates to `apply_player_damage(1)`: successful damage removes
+the debris, while invulnerability leaves it active and the shared damage gate
+limits the frame to one player-damage event. No transient effect, fragment,
+booster, drop or Raider migration is enabled.
+
 ## Aktualny obraz pamięci i nośnika
 
 Poniższe kategorie są celowo osobne. Wolne miejsce w jednej nie może być
@@ -700,19 +742,19 @@ przedstawiane jako wolne miejsce w innej.
 | Kategoria | Potwierdzony stan bieżący | Bramka dla przyszłych zmian |
 | --- | --- | --- |
 | 1. Pojemność ATR | Standardowy ATR ma 92 176 B pliku: 16 B nagłówka i 92 160 B danych, czyli 720 sektorów po 128 B. Duża część obrazu jest pusta. | Wolne sektory nie zwiększają resident RAM i nie uzasadniają same w sobie modułów ładowanych podczas gry. |
-| 2. Boot payload i sektory startowe | The payload is 15,759 B in 124 sectors. The first 8192 B occupy `$2000-$3FFF`; packed tails are 5625 B and 1716 B, followed by a 226 B A2 kernel source. The final sector has 113 B of padding. The XEX is 15,771 B including headers/RUNAD. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granice czasowe relokacji. |
-| 3. Resident gameplay RAM | CODE/RODATA occupy `$2000-$3FD9`; the hull maps use 576 B at `$4C00-$4E3F`, persistent state ends at `$4EE9`, the HUD charset uses `$5000-$53FF`, projectile/far-star state uses `$5400-$5529`, starfield/shared/music runtime uses 2163/2278 B at `$552A-$5D9C`, and broadside/frontend/pause runtime uses 6644/6656 B at `$5E10-$7803`. A2 LMS/ring state uses 203 B at `$7F10-$7FDA`; its 226/256 B kernel uses unconditional RAM `$9000-$90E1`. A separate 4096 B future entity/effects reservation remains fixed at `$8000-$8FFF`. | Każda dalsza funkcja ma mierzyć rzeczywiście trwałe dane, bez zakładania, że każdy nieadresowany bajt jest bezpieczny. `$A000-$BFFF` remains excluded until PORTB/BASIC-ROM mapping is proved on XEX, cold ATR and hardware. |
-| 4. Pamięć przejściowa loadera | Before the loader, `$4000-$55F8` contains the packed broadside/pause tail; startup expands it at `$5E10`, temporarily copies the 1716-byte starfield/music stream to `$7810-$7EC3`, and copies the bounded A2 kernel to `$9000-$90E1`. The raw loader bitmap then occupies `$4010-$5E0F`. The packed loader at `$3725-$3F0F` remains intact. | Koszt i zakresy rozpakowań/kopii raportować jako setup/transient, nie jako stały gameplay asset. |
-| 5. Pamięć odzyskiwalna po przejściu | `$3800-$3FFF` is cleared and reused as PMG; after unpacking, `$7810-$7BCF` is reused only while PAUSED as a 960 B screen backup and `$7F10-$7FDA` holds the A2 lists/state. Frontend uses `$4800-$4BFF`, maps/state `$4C00-$4EE9`, HUD charset `$5000-$53FF`, projectile/far state `$5400-$5529`, starfield/shared/music runtime `$552A-$5D9C`, broadside runtime `$5E10-$7803`, and A2 kernel `$9000-$90E1`. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma allocatora ani overlayu. |
+| 2. Boot payload i sektory startowe | The payload is 16,299 B in 128 sectors. The first 8192 B occupy `$2000-$3FFF`; packed tails are 5633 B broadside, 1721 B starfield and 527 B ENTITY_CODE, plus a 226 B A2 kernel source. The final sector has 85 B of padding. The XEX is 16,311 B including headers/RUNAD. | Raportować osobno rozmiar payloadu, liczbę sektorów, padding ostatniego sektora, XEX headers i granice czasowe relokacji. |
+| 3. Resident gameplay RAM | CODE/RODATA occupy `$2000-$3FE9`; the hull maps use 576 B at `$4C00-$4E3F`, persistent state ends at `$4EE9`, HUD charset uses `$5000-$53FF`, projectile/far-star state uses `$5400-$5529`, starfield/shared/music runtime uses 2168/2278 B at `$552A-$5DA1`, and broadside/frontend/pause runtime uses 6653/6656 B at `$5E10-$780C`. A2 LMS/ring state uses 203 B at `$7F10-$7FDA`; ENTITY_STATE uses `$8000-$80FF`, A2 kernel `$9000-$90E1`, and ENTITY_CODE 564/3840 B at `$9100-$9333`. | `$8100-$8FFF` and `$9334-$9FFF` stay reserved rather than being consumed automatically. `$A000-$BFFF` remains excluded until PORTB/BASIC-ROM mapping is proved on XEX, cold ATR and hardware. |
+| 4. Pamięć przejściowa loadera | Before the loader, `$4000-$5FAA` contains packed broadside/starfield, A2 source and ENTITY_CODE. Startup expands ENTITY_CODE first, expands broadside at `$5E10`, stages the 1721-byte starfield stream at `$7810-$7EC8`, and copies A2 to `$9000-$90E1`. The raw loader bitmap then occupies `$4010-$5E0F`. The packed loader at `$3735-$3F1F` remains intact. | Koszt i zakresy rozpakowań/kopii raportować jako setup/transient, nie jako stały gameplay asset. |
+| 5. Pamięć odzyskiwalna po przejściu | `$3800-$3FFF` is cleared and reused as PMG; after unpacking, `$7810-$7BCF` is reused only while PAUSED and `$7F10-$7FDA` holds A2 state. Frontend uses `$4800-$4BFF`, maps/state `$4C00-$4EE9`, HUD charset `$5000-$53FF`, projectile/far state `$5400-$5529`, starfield runtime `$552A-$5DA1`, broadside runtime `$5E10-$780C`, entity state `$8000-$80FF`, A2 `$9000-$90E1`, and entity code `$9100-$9333`. | Reuse wymaga jawnej rezerwacji, testu przejścia i aktualizacji memory map. Nie ma dynamicznego allocatora. |
 | 6. PMG | PMBASE `$3800`; missiles `$3B00-$3BFF`: M0 pozostaje wyłącznie zarezerwowany dla player weapon, M1–M3 dla warning/impact broadside. P0/P3 to Viper hull/engine, P1/P2 hostile hull/scanner. Viper i Raider burst oraz lecące capital slugs używają przywracanych znaków ANTIC 4, więc nie przejmują missile ani `COLPM`. | Każda zmiana ról, multipleksowania lub trybu DMA wymaga limitu obiektów, kosztu i testu PAL/real hardware. |
-| 7. Display memory i charset | Wspólny ekran `$4000-$43FF`; gameplay charset `$4400-$47FF`; frontend charset `$4800-$4BFF`; HUD charset `$5000-$53FF`. Starfield zajmuje sześć izolowanych indeksów 1–6 (48 B), Viper fire zaczyna się od 11, kadłuby/efekty od 59, Raider fire od 90. Main menu używa 820 B ekranu, sub-screeny i gameplay 960 B. Two 75 B LMS lists preserve fixed HUD `$4000`, fixed divider `$4028` and rotate only 22 gameplay rows `$4050-$43BF`. | Kolejne glify wymagają ponownego audytu indeksów, bitów koloru ANTIC 4 i guard bytes; każdy runtime charset nadal ma dokładnie 1024 B. |
+| 7. Display memory i charset | Wspólny ekran `$4000-$43FF`; gameplay charset `$4400-$47FF`; frontend charset `$4800-$4BFF`; HUD charset `$5000-$53FF`. Starfield occupies indices 1–6, Viper fire starts at 11, hull/effects at 59, Raider fire at 90, and neutral debris uses index 110. Main menu uses 820 B, sub-screens/gameplay 960 B. Two 75 B LMS lists preserve HUD `$4000`, divider `$4028` and rotate exactly 22 rows `$4050-$43BF`. | Kolejne glify wymagają ponownego audytu indeksów, bitów koloru ANTIC 4 i guard bytes; każdy runtime charset nadal ma dokładnie 1024 B. |
 | 8. Zero page | Linker reports 32 B at `$0080-$009F`; removal of three unread bullet mirrors recovered 3 B. The declared `$0080-$00FF` region retains 96 unassigned bytes. | Każda funkcja podaje delta ZP; wolnych bajtów nie przydziela się bez audytu konfliktów i czasu życia. |
-| 9. Koszt widocznej ramki | The current A2 release build executes linked NMOS 6502 bytes over 9,040 deterministic frames plus a 920-frame targeted replay. The legal-heavy main loop is 19,736 cycles DMA-off with 15,832 comparison headroom. Atari800's ANTIC-clock trace measures 31,399 wall cycles with DMA/DLI and 4,169 physical headroom; both replays have zero missed synchronisations and zero deadline overruns. The additive estimate is 32,616. | The physical 31,568-cycle/4,000-headroom gate passes by 169 cycles. `docs/runtime-headroom.md` defines the artifact-bound method and staged before/after results; real 65XE/SIO2SD remains an additional hardware check. |
-| 10. Jednorazowy setup/transition | `start` expands 5625 B into 6644 B, preserves 1716 B temporarily at `$7810`, expands it after the loader into 2163 B of starfield/shared/music runtime and copies the 226 B A2 kernel to `$9000`. Pause enter/exit copies 960 B only while gameplay DMA is disabled. Game Over formatting and music start/stop remain bounded transition work. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
+| 9. Koszt widocznej ramki | The foundation build executes linked NMOS 6502 bytes over 9,040 deterministic frames plus a 920-frame targeted replay. The legal-heavy loop is 20,037 cycles DMA-off with 15,531 comparison headroom. Atari800 measures 32,025 wall and 3,543 physical headroom; both replays have zero missed synchronisations and zero deadline overruns. | Historical gate 31,568 remains explicit. Feature baseline 31,440 plus approved 600 gives 32,040/3,528; actual delta is +585, leaving 15 cycles. |
+| 10. Jednorazowy setup/transition | `start` expands 527 B into 564 B ENTITY_CODE, clears 256 B BSS, expands 5633 B into 6653 B broadside, preserves 1721 B at `$7810`, expands it into 2168 B starfield runtime and copies 226 B A2 kernel. Pause enter/exit still copies 960 B only with gameplay DMA disabled. | Nie sumować setup cost z kosztem stałej pętli; ograniczyć i mierzyć osobno przejścia sektorów, restart i inicjalizację poziomu. |
 
-The main linker block ends RODATA at `$3FD9`, but the payload continues with
-packed tails of 5625 B and 1716 B plus the 226 B A2 kernel source until startup
-relocation. These tails are not
+The main linker block ends RODATA at `$3FE9`, but the payload continues with
+packed tails of 5633 B and 1721 B, the 226 B A2 kernel source and 527 B packed
+ENTITY_CODE until startup relocation. These tails are not
 resident display memory or a representation of all free Atari RAM.
 Dokładne role czasowe pozostają w `docs/memory-map.md`.
 

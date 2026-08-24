@@ -16,7 +16,7 @@ handwritten.
 ## Measurement method and semantics
 
 `scripts/runtime-cycles.mjs` executes the linked resident, STARFIELD,
-BROADSIDE and A2 kernel bytes in `scripts/nmos6502.mjs`. It accounts for NMOS
+BROADSIDE, A2 kernel and ENTITY_CODE bytes in `scripts/nmos6502.mjs`. It accounts for NMOS
 6502 branch and page-crossing penalties but deliberately excludes ANTIC
 stalls. It is a repeatable CPU-only before/after measurement.
 
@@ -50,7 +50,7 @@ the known heavy coincidence. Both enter gameplay through production frontend
 handlers and use deterministic normal input. Legal coverage includes the full
 19-slot fighter-projectile pool, production broadside lifecycle, a live Raider,
 both explosion types, both tracked muzzles, gameplay music and overlapping
-SFX. Release data exposes two source-turret lifecycles and the replay observed
+SFX, plus debris spawn, ring/world movement, contact and despawn. Release data exposes two source-turret lifecycles and the replay observed
 at most one simultaneous broadside projectile. The three-slot capacity stress
 remains a CPU-only executable scenario and is not admitted to the physical
 result because no legal release replay produced it.
@@ -135,12 +135,12 @@ wall cycles and 2,733 CPU cycles. Optimization stopped at the first full-trace
 checkpoint that passed the requested gate; no D1/D2 product compromise was
 implemented.
 
-## Final physical gate
+## Historical pre-foundation physical gate
 
-The current artifact includes the post-feature Raider `4/5` lateral pursuit
-limit and Cylon-family `$44` body colour with fixed `$84/$46` enemy explosion.
+The artifact at this checkpoint included the post-feature Raider `4/5` lateral
+pursuit limit and Cylon-family `$44` body colour with fixed `$84/$46` enemy explosion.
 The staged table above remains the historical A2 optimization record; the
-values below are regenerated from the current linked XEX.
+values below preserve that accepted checkpoint and its original 31,568 gate.
 
 | Metric | Final measured or generated value |
 | --- | ---: |
@@ -177,6 +177,38 @@ and capital SFX. Its events include common world/far/hull work, broadside
 update, fighter/capital explosion render and a music tick. The targeted replay
 reproduces the same 31,399-cycle frame.
 
+## Entity/effects foundation feature gate
+
+The foundation keeps the historical 31,568 checkpoint visible and adds the
+owner-approved budget contract: baseline 31,440 wall cycles, at most +600,
+final wall at most 32,040, and physical headroom at least 3,528. The linked
+empty engine path is capped separately at 100 CPU cycles.
+
+| Metric/path | Measured value | Delta from 31,440 baseline |
+| --- | ---: | ---: |
+| Linked empty skeleton, DMA off | 93 CPU | n/a |
+| One-active-debris wrapper, DMA off | 325 CPU | n/a |
+| Spawn wrapper, DMA off | 370 CPU | n/a |
+| Successful-contact wrapper, DMA off | 397 CPU | n/a |
+| Heaviest empty-path wall frame | 31,346 | -94 |
+| Heaviest one-active-debris wall frame | 32,025 | +585 |
+| Heaviest spawn wall frame | 27,737 | -3,703 |
+| Heaviest contact wall frame | 22,087 | -9,353 |
+
+Final measured physical headroom is 3,543 cycles. The feature consumes 585 of
+the approved 600 cycles and leaves 15. Both the 9,040-frame baseline and the
+separate 920-frame targeted replay record zero missed synchronisations, zero
+extra VBI boundaries and zero deadline overruns. The heaviest frame retains a
+live Raider, 16 fighter projectiles, 22 far stars, one muzzle, capital
+explosion, music plus fire/capital SFX, and one active debris at Y=176.
+
+The trace observes 44 debris spawns, 11 successful contacts and 44 despawns;
+33 despawns are the natural Y=192 to off-screen path rather than contact.
+Exhaustive linked-byte tests separately cover every logical row 0..21 for
+every ring head 0..21, including reverse overlay restoration. Thus ring wrap,
+spawn, hit and bottom despawn are all covered without manually seeding the
+DMA-on timing result.
+
 ## Size and memory checkpoints
 
 | Checkpoint | Payload | XEX | ATR |
@@ -187,15 +219,18 @@ reproduces the same 31,399-cycle frame.
 | ETAP 4 / before A2 | 15,558 B | 15,570 B | 92,176 B |
 | Initial A2 hybrid ring | 15,576 B | 15,588 B | 92,176 B |
 | Final A2 kernel pass | 15,754 B | 15,766 B | 92,176 B |
-| Current release / Raider `4/5` + Cylon `$44` | 15,759 B | 15,771 B | 92,176 B |
+| Pre-foundation / Raider `4/5` + Cylon `$44` | 15,759 B | 15,771 B | 92,176 B |
+| Entity/effects foundation + one debris | 16,299 B | 16,311 B | 92,176 B |
 
-Final protected use is MAIN 8,154/8,192 B, PROJECTILES 202/298 B,
-STARFIELD 2,163/2,278 B, BROADSIDE 6,644/6,656 B and A2 kernel 226/256 B.
-Packed staging uses 1,716/1,792 B until unpacking. A2 display/ring state owns
+Final protected use is MAIN 8,170/8,192 B, PROJECTILES 202/298 B,
+STARFIELD 2,168/2,278 B, BROADSIDE 6,653/6,656 B, A2 kernel 226/256 B,
+ENTITY_STATE 256/256 B and ENTITY_CODE 564/3,840 B. Packed staging uses
+1,721/1,792 B until unpacking. A2 display/ring state owns
 203 B at `$7F10-$7FDA`. The kernel is copied identically by XEX and cold-boot
 ATR startup into unconditional 64 KiB RAM at `$9000-$90E1`; `$90E2-$90FF`
-remains free. `$8000-$8FFF` remains the untouched 4 KiB entity/effects
-reservation. `$A000-$BFFF` is excluded.
+remains free. Startup explicitly clears every byte `$8000-$80FF` and loads
+ENTITY_CODE at `$9100-$9333`; `$8100-$8FFF` and `$9334-$9FFF` remain reserved
+and untouched. `$A000-$BFFF` is excluded.
 
 ## Limitations
 

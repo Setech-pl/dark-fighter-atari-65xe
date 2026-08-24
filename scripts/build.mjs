@@ -40,6 +40,11 @@ import {
   loadGameplayMusicDefinition,
   renderGameplayMusicCa65Include,
 } from "./gameplay-music.mjs";
+import {
+  compileEntityEffects,
+  loadEntityEffectsDefinition,
+  renderEntityEffectsCa65Include,
+} from "./entity-effects.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 import { measureRuntimeCycles } from "./runtime-cycles.mjs";
 
@@ -50,6 +55,7 @@ const distDirectory = path.join(rootDirectory, "dist");
 const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
 const gameVersion = packageDefinition.version;
 const quiet = process.argv.includes("--quiet");
+const refreshWallTraceCandidate = process.argv.includes("--refresh-wall-trace-candidate");
 const enemyReviewHarness = process.argv.includes("--enemy-review");
 const enemyCombatReviewHarness = process.argv.includes("--enemy-combat-review");
 const enemyPaletteArgument = process.argv.find((argument) => argument.startsWith("--enemy-palette="));
@@ -66,6 +72,16 @@ const isReviewVariant = enemyReviewHarness || enemyCombatReviewHarness || Boolea
 const acceptedMenuMusicPayloadBytes = 14314;
 // Gameplay music plus its in-game pause controls remain a bounded post-menu feature.
 const runtimeHeadroomPayloadLimit = 1536;
+const acceptedRuntimeHeadroomPayloadBytes = 15759;
+const entityEffectsFoundationPayloadBudget = 1024;
+const entityEffectsFoundationPayloadLimit =
+  acceptedRuntimeHeadroomPayloadBytes + entityEffectsFoundationPayloadBudget;
+const runtimeHeadroomHistoricalWallGate = 31568;
+const entityEffectsBaselineWallCycles = 31440;
+const entityEffectsBaselinePhysicalHeadroom = 4128;
+const entityEffectsApprovedWallDelta = 600;
+const entityEffectsFeatureWallLimit = 32040;
+const entityEffectsFeatureMinimumHeadroom = 3528;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -227,6 +243,16 @@ async function build() {
     renderGameplayMusicCa65Include(gameplayMusicAsset),
   );
   writeFile(path.join(buildDirectory, "gameplay-music.inc"), gameplayMusicInclude);
+  const entityEffectsDefinitionPath = path.join(
+    rootDirectory, "assets", "graphics", "entity-effects.json",
+  );
+  const entityEffectsAsset = compileEntityEffects(
+    loadEntityEffectsDefinition(entityEffectsDefinitionPath),
+  );
+  const entityEffectsInclude = Buffer.from(
+    renderEntityEffectsCa65Include(entityEffectsAsset),
+  );
+  writeFile(path.join(buildDirectory, "entity-effects.inc"), entityEffectsInclude);
 
   const assembled = await runWasmTool(
     "ca65",
@@ -239,6 +265,7 @@ async function build() {
       "/project/build/starfield.inc": starfieldInclude,
       "/project/build/menu-music.inc": menuMusicInclude,
       "/project/build/gameplay-music.inc": gameplayMusicInclude,
+      "/project/build/entity-effects.inc": entityEffectsInclude,
     },
     [
       "--cpu",
@@ -300,12 +327,18 @@ async function build() {
   const a2KernelLoadAddress = labels.get("__A2_KERNEL_LOAD__");
   const a2KernelRunAddress = labels.get("__A2_KERNEL_RUN__");
   const a2KernelBytes = labels.get("__A2_KERNEL_SIZE__");
+  const entityCodeLoadAddress = labels.get("__ENTITY_CODE_LOAD__");
+  const entityCodeRunAddress = labels.get("__ENTITY_CODE_RUN__");
+  const entityCodeBytes = labels.get("__ENTITY_CODE_SIZE__");
+  const entityStateRunAddress = labels.get("__ENTITY_STATE_RUN__");
+  const entityStateBytes = labels.get("__ENTITY_STATE_SIZE__");
   const codeBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "CODE");
   const rodataBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "RODATA");
   const projectileStateBytes = labels.get("__PROJECTILES_SIZE__");
   const starfieldPackedSourceOperand = labels.get("starfield_packed_source");
   const starfieldPackedSizeOperand = labels.get("starfield_packed_size");
   const a2KernelSourceOperand = labels.get("a2_kernel_source");
+  const entityPackedSourceOperand = labels.get("entity_packed_source");
   const loaderPackedAddress = labels.get("loader_bitmap_lzss");
   const musicPlayerStart = labels.get("music_player_start");
   const musicPlayerEnd = labels.get("music_player_end");
@@ -323,8 +356,12 @@ async function build() {
     !Number.isInteger(starfieldRunAddress) || !Number.isInteger(starfieldRuntimeBytes) ||
     !Number.isInteger(a2KernelLoadAddress) || !Number.isInteger(a2KernelRunAddress) ||
     !Number.isInteger(a2KernelBytes) ||
+    !Number.isInteger(entityCodeLoadAddress) || !Number.isInteger(entityCodeRunAddress) ||
+    !Number.isInteger(entityCodeBytes) || !Number.isInteger(entityStateRunAddress) ||
+    !Number.isInteger(entityStateBytes) ||
     !Number.isInteger(starfieldPackedSourceOperand) ||
     !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(a2KernelSourceOperand) ||
+    !Number.isInteger(entityPackedSourceOperand) ||
     !Number.isInteger(loaderPackedAddress) ||
     !Number.isInteger(musicPlayerStart) || !Number.isInteger(musicPlayerEnd) ||
     !Number.isInteger(musicDataStart) || !Number.isInteger(musicDataEnd) ||
@@ -346,6 +383,13 @@ async function build() {
     a2KernelBytes < 1 || a2KernelBytes >= 0x0100) {
     throw new Error("A2 kernel lies outside its reviewed $9000-$90FF runtime range");
   }
+  if (entityCodeLoadAddress !== 0x6b00 || entityCodeRunAddress !== 0x9100 ||
+    entityCodeBytes < 1 || entityCodeBytes > 0x0f00) {
+    throw new Error("ENTITY_CODE lies outside its reviewed $9100-$9FFF runtime range");
+  }
+  if (entityStateRunAddress !== 0x8000 || entityStateBytes !== 0x0100) {
+    throw new Error("Entity/effects BSS must occupy exactly $8000-$80FF");
+  }
   const broadsideRuntime = linkedPayload.subarray(
     broadsideLoadAddress - loadAddress,
     broadsideLoadAddress - loadAddress + broadsideRuntimeBytes,
@@ -362,9 +406,17 @@ async function build() {
     a2KernelLoadAddress - loadAddress,
     a2KernelLoadAddress - loadAddress + a2KernelBytes,
   );
+  const entityCodeRuntime = linkedPayload.subarray(
+    entityCodeLoadAddress - loadAddress,
+    entityCodeLoadAddress - loadAddress + entityCodeBytes,
+  );
   const packedStarfieldRuntime = packBroadsideLzss(starfieldRuntime);
   if (!unpackBroadsideLzss(packedStarfieldRuntime).equals(starfieldRuntime)) {
     throw new Error("Starfield LZSS round trip failed");
+  }
+  const packedEntityCodeRuntime = packBroadsideLzss(entityCodeRuntime);
+  if (!unpackBroadsideLzss(packedEntityCodeRuntime).equals(entityCodeRuntime)) {
+    throw new Error("ENTITY_CODE LZSS round trip failed");
   }
   if (packedStarfieldRuntime.length > starfieldStagingBytes) {
     throw new Error(`Packed starfield ${packedStarfieldRuntime.length} B exceeds the reviewed ` +
@@ -399,18 +451,24 @@ async function build() {
     a2KernelSourceAddress,
     a2KernelSourceOperand - loadAddress,
   );
+  const entityPackedSourceAddress = a2KernelSourceAddress + a2KernelRuntime.length;
+  residentMain.writeUInt16LE(
+    entityPackedSourceAddress,
+    entityPackedSourceOperand - loadAddress,
+  );
   const rawPayload = Buffer.concat([
     residentMain,
     packedBroadsideRuntime,
     packedStarfieldRuntime,
     a2KernelRuntime,
+    packedEntityCodeRuntime,
   ]);
-  if (!isReviewVariant &&
-    rawPayload.length - acceptedMenuMusicPayloadBytes > runtimeHeadroomPayloadLimit) {
+  if (!isReviewVariant && rawPayload.length > entityEffectsFoundationPayloadLimit) {
     throw new Error(
-      `Runtime-headroom feature payload delta is ` +
-      `${rawPayload.length - acceptedMenuMusicPayloadBytes} bytes and exceeds ` +
-      `${runtimeHeadroomPayloadLimit} bytes`,
+      `Entity/effects foundation payload is ${rawPayload.length} bytes and exceeds ` +
+      `its explicit ${entityEffectsFoundationPayloadLimit}-byte limit ` +
+      `(${acceptedRuntimeHeadroomPayloadBytes} baseline + ` +
+      `${entityEffectsFoundationPayloadBudget} approved bytes)`,
     );
   }
 
@@ -438,6 +496,8 @@ async function build() {
     starfieldRunAddress,
     a2KernelRuntime,
     a2KernelRunAddress,
+    entityCodeRuntime,
+    entityCodeRunAddress,
     labels,
     segmentSizes: {
       code: codeBytes,
@@ -446,6 +506,8 @@ async function build() {
       starfield: starfieldRuntimeBytes,
       broadside: broadsideRuntimeBytes,
       a2Kernel: a2KernelBytes,
+      entityCode: entityCodeBytes,
+      entityState: entityStateBytes,
     },
   });
   const wallTracePath = path.join(rootDirectory, "docs", "runtime-wall-trace.json");
@@ -453,7 +515,10 @@ async function build() {
   if (!isReviewVariant && fs.existsSync(wallTracePath)) {
     wallTrace = JSON.parse(fs.readFileSync(wallTracePath, "utf8"));
     if (wallTrace.artifact?.sha256 !== sha256(xex)) {
-      throw new Error("Runtime wall trace belongs to a different XEX artifact");
+      if (!refreshWallTraceCandidate) {
+        throw new Error("Runtime wall trace belongs to a different XEX artifact");
+      }
+      wallTrace = null;
     }
   }
   const runtimeTiming = cpuRuntimeTiming === null ? null : {
@@ -496,6 +561,22 @@ async function build() {
     bootInitAddress,
     bootSectors,
     payloadBytes: rawPayload.length,
+    payloadBudget: {
+      historicalRuntimeHeadroom: {
+        baselineBytes: acceptedMenuMusicPayloadBytes,
+        approvedDeltaBytes: runtimeHeadroomPayloadLimit,
+        limitBytes: acceptedMenuMusicPayloadBytes + runtimeHeadroomPayloadLimit,
+        finalBytes: acceptedRuntimeHeadroomPayloadBytes,
+        preservedForHistory: true,
+      },
+      entityEffectsFoundation: {
+        baselineBytes: acceptedRuntimeHeadroomPayloadBytes,
+        approvedDeltaBytes: entityEffectsFoundationPayloadBudget,
+        actualDeltaBytes: rawPayload.length - acceptedRuntimeHeadroomPayloadBytes,
+        limitBytes: entityEffectsFoundationPayloadLimit,
+        remainingBytes: entityEffectsFoundationPayloadLimit - rawPayload.length,
+      },
+    },
     broadsideRuntime: {
       loadAddress: broadsideLoadAddress,
       runAddress: broadsideRunAddress,
@@ -521,6 +602,49 @@ async function build() {
       bytes: a2KernelBytes,
       reservedBytes: 0x0100,
       availability: "unconditional 64 KB RAM",
+    },
+    entityEffects: {
+      source: "assets/graphics/entity-effects.json",
+      sourceSha256: sha256(fs.readFileSync(entityEffectsDefinitionPath)),
+      stateAddress: entityStateRunAddress,
+      stateBytes: entityStateBytes,
+      initializedBytes: entityStateBytes,
+      liveFieldBytes: 212,
+      interactiveSlots: entityEffectsAsset.pools.interactiveSlots,
+      interactiveActiveLimit: entityEffectsAsset.pools.interactiveActiveLimit,
+      effectSlots: entityEffectsAsset.pools.effectSlots,
+      effectActiveLimit: entityEffectsAsset.pools.effectActiveLimit,
+      codeLoadAddress: entityCodeLoadAddress,
+      codeRunAddress: entityCodeRunAddress,
+      codeBytes: entityCodeBytes,
+      codeReservedBytes: entityEffectsAsset.pools.codeReservedBytes,
+      packedBytes: packedEntityCodeRuntime.length,
+      packedSourceAddress: entityPackedSourceAddress,
+      compression: "LZ-10/5",
+      deterministicFillTestByte: 0xa5,
+      gameplayTopScanline: entityEffectsAsset.coordinateSystem.gameplayTopScanline,
+      gameplayBottomExclusive: entityEffectsAsset.coordinateSystem.gameplayBottomExclusive,
+      logicalRows: entityEffectsAsset.coordinateSystem.logicalRows,
+      archetypeCount: entityEffectsAsset.archetypes.length,
+      descriptorBytes: entityEffectsAsset.descriptor.length,
+      glyphBytes: entityEffectsAsset.glyph.length,
+      glyphIndex: labels.get("ENTITY_DEBRIS_GLYPH"),
+      runtimeBudget: {
+        historicalGateWallCycles: runtimeHeadroomHistoricalWallGate,
+        historicalGatePreserved: true,
+        baselineWallCycles: entityEffectsBaselineWallCycles,
+        baselinePhysicalHeadroomCycles: entityEffectsBaselinePhysicalHeadroom,
+        approvedFeatureDeltaCycles: entityEffectsApprovedWallDelta,
+        featureWallLimitCycles: entityEffectsFeatureWallLimit,
+        minimumPhysicalHeadroomCycles: entityEffectsFeatureMinimumHeadroom,
+        measuredWallCycles: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
+        actualDeltaCycles: wallTrace === null ? null :
+          wallTrace.semantics.measured_wall_cycles_dma_on - entityEffectsBaselineWallCycles,
+        remainingApprovedCycles: wallTrace === null ? null :
+          entityEffectsFeatureWallLimit - wallTrace.semantics.measured_wall_cycles_dma_on,
+        missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+        deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+      },
     },
     loaderScreen: {
       mode: "mixed ANTIC F/E",
@@ -749,6 +873,8 @@ async function build() {
   writeFile(path.join(buildDirectory, "starfield-runtime.bin"), starfieldRuntime);
   writeFile(path.join(buildDirectory, "starfield-runtime-packed.bin"), packedStarfieldRuntime);
   writeFile(path.join(buildDirectory, "a2-kernel-runtime.bin"), a2KernelRuntime);
+  writeFile(path.join(buildDirectory, "entity-code-runtime.bin"), entityCodeRuntime);
+  writeFile(path.join(buildDirectory, "entity-code-runtime-packed.bin"), packedEntityCodeRuntime);
   writeFile(path.join(buildDirectory, "dark-fighter.map"), mapFile);
   writeFile(path.join(buildDirectory, "dark-fighter.lbl"), labelFile);
   writeFile(path.join(buildDirectory, "manifest.json"), manifestBytes);

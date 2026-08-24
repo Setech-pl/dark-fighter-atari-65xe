@@ -75,6 +75,43 @@ test("wall trace records the required legal runtime coverage without incoherent 
   assert.equal(report.coverage.broadside_projectiles.release_source_turrets, 2);
   assert.match(report.coverage.broadside_projectiles.classification,
     /no manual RAM fixture|production scheduler/);
+  for (const name of [
+    "debris_empty_path",
+    "debris_one_active",
+    "debris_spawn",
+    "debris_contact",
+    "debris_despawn",
+    "debris_bottom_despawn",
+  ]) {
+    assert.equal(report.coverage[name].observed, true, `${name} was not observed`);
+  }
+});
+
+test("entity/effects feature budget preserves history and passes its explicit PAL gate", () => {
+  const historical = report.gate.historical_runtime_headroom_gate;
+  const feature = report.gate.entity_effects_foundation;
+  assert.deepEqual([
+    historical.maximum_wall_cycles,
+    historical.preserved_for_history,
+    historical.replaced,
+  ], [31_568, true, false]);
+  assert.deepEqual([
+    feature.baseline_wall_cycles,
+    feature.baseline_physical_headroom,
+    feature.approved_delta_cycles,
+    feature.maximum_wall_cycles,
+    feature.minimum_physical_headroom,
+  ], [31_440, 4_128, 600, 32_040, 3_528]);
+  assert.equal(feature.actual_delta_cycles,
+    report.gate.measured_wall_cycles_dma_on - feature.baseline_wall_cycles);
+  assert.equal(feature.remaining_approved_cycles,
+    feature.maximum_wall_cycles - report.gate.measured_wall_cycles_dma_on);
+  assert.ok(feature.actual_delta_cycles <= feature.approved_delta_cycles);
+  assert.ok(report.gate.measured_physical_headroom >= feature.minimum_physical_headroom);
+  assert.equal(feature.budget_overrun_frames, 0);
+  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 100, true);
+  assert.equal(manifest.entityEffects.runtimeBudget.actualDeltaCycles,
+    feature.actual_delta_cycles);
 });
 
 test("ten heaviest frames retain exact clock positions, VBI IDs and state", () => {

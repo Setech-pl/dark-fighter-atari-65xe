@@ -1,0 +1,46 @@
+{
+  "formatVersion": 1,
+  "coordinateSystem": {
+    "gameplayTopScanline": 24,
+    "gameplayBottomExclusive": 200,
+    "logicalRows": 22
+  },
+  "pools": {
+    "interactiveSlots": 4,
+    "interactiveActiveLimit": 1,
+    "effectSlots": 6,
+    "effectActiveLimit": 0,
+    "stateAddress": 32768,
+    "stateBytes": 256,
+    "codeAddress": 37120,
+    "codeReservedBytes": 3840
+  },
+  "spawn": {
+    "initialDelayFrames": 32,
+    "repeatDelayFrames": 64,
+    "rngSeed": 101
+  },
+  "archetypes": [
+    {
+      "id": "neutral-debris",
+      "type": 1,
+      "initialState": 1,
+      "flags": 53,
+      "updateProfile": 1,
+      "renderProfile": 1,
+      "collisionCategory": 1,
+      "widthHpos": 4,
+      "heightScanlines": 8,
+      "contactDamageUnits": 1,
+      "initialVx": 0,
+      "initialVy": 8,
+      "movementNumerator": 1,
+      "movementDenominator": 1,
+      "lifetime": 0,
+      "hitPoints": 1,
+      "spawnPolicy": 1,
+      "sfxEventId": 0,
+      "glyphRows": [0, 24, 60, 126, 219, 126, 36, 0]
+    }
+  ]
+}

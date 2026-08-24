@@ -81,6 +81,16 @@ const profiledRoutineNames = [
   "raider_projectile_hits_player",
   "update_sound",
   "music_tick_gameplay",
+  "entity_effects_erase",
+  "erase_transient_effect_overlays",
+  "erase_interactive_entity_overlays",
+  "entity_effects_update",
+  "entity_spawn_debris",
+  "entity_collide_player",
+  "entity_damage_applied",
+  "entity_despawn_debris",
+  "entity_effects_render",
+  "render_interactive_entity_overlays",
 ];
 
 function invariant(condition, message) {
@@ -111,6 +121,8 @@ function makeMachine({
   starfieldRunAddress,
   a2KernelRuntime,
   a2KernelRunAddress,
+  entityCodeRuntime,
+  entityCodeRunAddress,
   labels,
   difficulty,
 }) {
@@ -119,6 +131,7 @@ function makeMachine({
   memory.set(broadsideRuntime, broadsideRunAddress);
   memory.set(starfieldRuntime, starfieldRunAddress);
   memory.set(a2KernelRuntime, a2KernelRunAddress);
+  memory.set(entityCodeRuntime, entityCodeRunAddress);
 
   const io = {
     stick: 0x0f,
@@ -287,6 +300,9 @@ function snapshotRuntime(cpu, entryPoints) {
     ),
     playerLifecycle: memory[addresses.playerLifecycle],
     capitalSectorState: memory[addresses.capitalSectorState],
+    entityActiveCount: memory[entryPoints.entityActiveCount],
+    entityActiveMask: memory[entryPoints.entityActiveMask],
+    entityY: memory[entryPoints.entityY],
   };
 }
 
@@ -325,6 +341,9 @@ function eventNames(frame) {
   if (frame.before.liveRaider) names.push("live-raider");
   if (frame.before.activeExplosion) names.push("active-explosion");
   if (frame.before.musicWithSfx) names.push("music+sfx");
+  if (frame.before.entityActiveCount > 0) names.push("active-debris");
+  if (frame.hits.has("entity_spawn_debris")) names.push("debris-spawn");
+  if (frame.hits.has("entity_damage_applied")) names.push("debris-contact");
   return names;
 }
 
@@ -339,6 +358,8 @@ function scenarioRecord(frame, optionPollCycles) {
     broadsideOccupancy: frame.before.broadsideOccupancy,
     renderedFarStars: frame.before.renderedFarStars,
     playerLifecycle: frame.before.playerLifecycle,
+    entityActiveCount: frame.before.entityActiveCount,
+    entityY: frame.before.entityY,
     events: eventNames(frame),
     procedureCycles: frame.procedureCycles,
     procedureTotalCycles: frame.procedureTotalCycles,
@@ -405,13 +426,15 @@ function gameplayDmaCycles() {
 
 function protectedSegments(segmentSizes) {
   const definitions = [
-    ["CODE", segmentSizes.code, 0x0ef0, 0x0f27, null],
+    ["CODE", segmentSizes.code, 0x0ef0, 0x0f2d, null],
     ["RODATA", segmentSizes.rodata, 0x10c8, 0x10c2, null],
-    ["MAIN", segmentSizes.code + segmentSizes.rodata, 0x1fb8, 0x1fe9, 0x2000],
+    ["MAIN", segmentSizes.code + segmentSizes.rodata, 0x1fb8, 0x1fea, 0x2000],
     ["PROJECTILES", segmentSizes.projectiles, 0x00ca, 0x00ca, 0x012a],
     ["STARFIELD", segmentSizes.starfield, 0x08d7, 0x08e0, 0x08e6],
-    ["BROADSIDE", segmentSizes.broadside, 0x1953, 0x19f5, 0x1a00],
+    ["BROADSIDE", segmentSizes.broadside, 0x1953, 0x19fd, 0x1a00],
     ["A2_KERNEL", segmentSizes.a2Kernel, 0x0000, 0x00ff, 0x0100],
+    ["ENTITY_STATE", segmentSizes.entityState, 0x0100, 0x0100, 0x0100],
+    ["ENTITY_CODE", segmentSizes.entityCode, 0x0000, 0x0f00, 0x0f00],
   ];
   return definitions.map(([
     name, bytes, featureStartBytes, acceptedMaximumBytes, reservedMaximumBytes,
@@ -440,8 +463,10 @@ function runtimeRanges() {
     ["broadside-runtime", 0x5e10, 0x780f, "after-loader"],
     ["staging-or-pause-backup", 0x7810, 0x7f0f, "after-loader"],
     ["hybrid-ring-display-state", 0x7f10, 0x7fda, "after-loader"],
-    ["future-entity-effects-state", 0x8000, 0x8fff, "unconditional"],
+    ["entity-effects-state", 0x8000, 0x80ff, "unconditional"],
+    ["future-entity-effects-state", 0x8100, 0x8fff, "unconditional"],
     ["a2-kernel-code", 0x9000, 0x90ff, "unconditional"],
+    ["entity-effects-code", 0x9100, 0x9fff, "unconditional"],
   ].map(([name, start, end, availability]) => ({ name, start, end, bytes: end - start + 1, availability }));
   for (let index = 1; index < ranges.length; index += 1) {
     invariant(ranges[index - 1].end < ranges[index].start,
@@ -463,6 +488,9 @@ export function measureRuntimeCycles(build) {
     fighterExplosionTimer: requiredLabel(build.labels, "FIGHTER_EXPLOSION_TIMER"),
     fireTimer: requiredLabel(build.labels, "fire_timer"),
     hitTimer: requiredLabel(build.labels, "hit_timer"),
+    entityActiveCount: requiredLabel(build.labels, "ENTITY_ACTIVE_COUNT"),
+    entityActiveMask: requiredLabel(build.labels, "ENTITY_ACTIVE_MASK"),
+    entityY: requiredLabel(build.labels, "ENTITY_Y"),
   };
   const routineAddresses = new Map();
   for (const name of profiledRoutineNames) {
@@ -657,6 +685,10 @@ export function measureRuntimeCycles(build) {
   let activeExplosion;
   let musicWithSfx;
   let legalHeavy;
+  let entityEmptyPath;
+  let entityActivePath;
+  let entitySpawnPath;
+  let entityContactPath;
   for (const frame of frames) {
     if (frame.hits.has("scroll_world_columns") && frame.hits.has("erase_far_star_overlays")) {
       worldNearFullErase = chooseMaximum(worldNearFullErase, frame, (candidate) => candidate.cycles);
@@ -675,6 +707,18 @@ export function measureRuntimeCycles(build) {
     if (frame.before.musicWithSfx) {
       musicWithSfx = chooseMaximum(musicWithSfx, frame, (candidate) => candidate.cycles);
     }
+    if (frame.before.entityActiveCount === 0 && !frame.hits.has("entity_spawn_debris")) {
+      entityEmptyPath = chooseMaximum(entityEmptyPath, frame, (candidate) => candidate.cycles);
+    }
+    if (frame.before.entityActiveCount === 1 && !frame.hits.has("entity_damage_applied")) {
+      entityActivePath = chooseMaximum(entityActivePath, frame, (candidate) => candidate.cycles);
+    }
+    if (frame.hits.has("entity_spawn_debris")) {
+      entitySpawnPath = chooseMaximum(entitySpawnPath, frame, (candidate) => candidate.cycles);
+    }
+    if (frame.hits.has("entity_damage_applied")) {
+      entityContactPath = chooseMaximum(entityContactPath, frame, (candidate) => candidate.cycles);
+    }
     legalHeavy = chooseMaximum(legalHeavy, frame, (candidate) => candidate.cycles);
   }
 
@@ -686,6 +730,17 @@ export function measureRuntimeCycles(build) {
   invariant(liveRaider, "Replay did not retain a live release Raider");
   invariant(activeExplosion, "Replay did not reach an active explosion");
   invariant(musicWithSfx, "Replay did not overlap gameplay music with SFX");
+  invariant(entityEmptyPath, "Replay did not execute the empty entity/effects path");
+  invariant(entityActivePath, "Replay did not execute one active debris path");
+  invariant(entitySpawnPath, "Replay did not execute debris spawn");
+  invariant(entityContactPath, "Replay did not execute successful debris contact");
+
+  const entityWrapperCycles = (frame) => [
+    "entity_effects_erase", "entity_effects_update", "entity_effects_render",
+  ].reduce((sum, name) => sum + (frame.procedureTotalCycles[name] ?? 0), 0);
+  const emptyEnginePathCycles = entityWrapperCycles(entityEmptyPath);
+  invariant(emptyEnginePathCycles <= 100,
+    `Empty entity/effects path costs ${emptyEnginePathCycles} linked CPU cycles`);
 
   const heavyMainLoopCycles = legalHeavy.cycles + optionPollCycles;
   const fullPalCycles = heavyMainLoopCycles + dma.total + dli.conservativeCycles;
@@ -725,6 +780,18 @@ export function measureRuntimeCycles(build) {
       liveRaider: scenario(liveRaider),
       activeExplosion: scenario(activeExplosion),
       musicWithSfx: scenario(musicWithSfx),
+      entityEmptyPath: scenario(entityEmptyPath),
+      entityActivePath: scenario(entityActivePath),
+      entitySpawnPath: scenario(entitySpawnPath),
+      entityContactPath: scenario(entityContactPath),
+    },
+    entityEffects: {
+      emptyPathCpuCycles: emptyEnginePathCycles,
+      emptyPathLimitCpuCycles: 100,
+      activePathCpuCycles: entityWrapperCycles(entityActivePath),
+      spawnPathCpuCycles: entityWrapperCycles(entitySpawnPath),
+      contactPathCpuCycles: entityWrapperCycles(entityContactPath),
+      measurement: "inclusive JSR-to-RTS cycles from executed linked release bytes",
     },
     replay: {
       sessions: sessions.map(({ difficulty, policy, fireDelay, frames: frameLimit }) => ({
@@ -740,6 +807,8 @@ export function measureRuntimeCycles(build) {
     memory: {
       runtimeRanges: ranges,
       futureEntityEffectsRange: { start: 0x8000, end: 0x8fff, bytes: 0x1000 },
+      entityEffectsStateRange: { start: 0x8000, end: 0x80ff, bytes: 0x0100 },
+      entityEffectsCodeRange: { start: 0x9100, end: 0x9fff, bytes: 0x0f00 },
       basicRomConditionalRange: { start: 0xa000, end: 0xbfff, reserved: false },
     },
     limitations: [
@@ -756,7 +825,8 @@ function parseSegmentSizes(mapText) {
   for (const [key, name] of [
     ["code", "CODE"], ["rodata", "RODATA"], ["projectiles", "PROJECTILES"],
     ["starfield", "STARFIELD"], ["broadside", "BROADSIDE"],
-    ["a2Kernel", "A2_KERNEL"],
+    ["a2Kernel", "A2_KERNEL"], ["entityState", "ENTITY_STATE"],
+    ["entityCode", "ENTITY_CODE"],
   ]) {
     const match = new RegExp(`^${name}\\s+[0-9A-F]+\\s+[0-9A-F]+\\s+([0-9A-F]+)`, "mi").exec(mapText);
     invariant(match, `Link map is missing ${name}`);
@@ -777,6 +847,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     starfieldRunAddress: requiredLabel(labels, "__STARFIELD_RUN__"),
     a2KernelRuntime: fs.readFileSync(path.join(root, "build", "a2-kernel-runtime.bin")),
     a2KernelRunAddress: requiredLabel(labels, "__A2_KERNEL_RUN__"),
+    entityCodeRuntime: fs.readFileSync(path.join(root, "build", "entity-code-runtime.bin")),
+    entityCodeRunAddress: requiredLabel(labels, "__ENTITY_CODE_RUN__"),
     labels,
     segmentSizes: parseSegmentSizes(fs.readFileSync(path.join(root, "build", "dark-fighter.map"), "utf8")),
   });
