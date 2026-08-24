@@ -337,8 +337,17 @@ GAMEPLAY_COLPF0 = $0E
 GAMEPLAY_COLPF1 = $84
 GAMEPLAY_COLPF2 = VIPER_PROJECTILE_COLOR
 GAMEPLAY_COLPF3 = RAIDER_PROJECTILE_COLOR
+GAMEPLAY_BACKGROUND_COLOR = $00
 HUD_COLPF1 = $0E
 HUD_COLPF2 = $00
+PLAYER_DAMAGE_FLASH_COLOR = $42
+FLASH_YELLOW_BRIGHT = $1E
+FLASH_YELLOW_MID = $1C
+FLASH_RED_BRIGHT = $3C
+FLASH_RED_MID = $38
+FLASH_RED_DARK = $34
+ENEMY_FIGHTER_FLASH_FRAMES = 4
+PLAYER_DEATH_FLASH_FRAMES = 6
 HUD_LIFE_DIGIT_OFFSET = 18
 HUD_HULL_HUNDREDS_OFFSET = 26
 HUD_HULL_TENS_OFFSET = 27
@@ -5838,14 +5847,41 @@ update_sound:
     sta AUDC4
 
 @damage:
+    ; The independent fighter explosion timers are also the colour-flash
+    ; phases. Viper death wins deterministic same-frame arbitration; neither
+    ; sequence can be restarted by the other while its craft remains exploding.
+    lda FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_VIPER_SLOT
+    beq @enemy_fighter_flash
+    cmp #(SHARED_FIGHTER_EXPLOSION_TOTAL-PLAYER_DEATH_FLASH_FRAMES+1)
+    bcc @player_death_restore
+    sbc #(SHARED_FIGHTER_EXPLOSION_TOTAL-PLAYER_DEATH_FLASH_FRAMES+1)
+    tax
+    lda #GAMEPLAY_BACKGROUND_COLOR
+    sta damage_timer             ; suppress the superseded purple death flash
+    lda player_death_flash_colors,x
+    bne @store_background        ; every named fighter flash colour is nonzero
+@player_death_restore:
+    lda #GAMEPLAY_BACKGROUND_COLOR
+    beq @store_background        ; Viper lifecycle suppresses a later enemy flash
+@enemy_fighter_flash:
+    lda FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_ENEMY_SLOT
+    cmp #(SHARED_FIGHTER_EXPLOSION_TOTAL-ENEMY_FIGHTER_FLASH_FRAMES+1)
+    bcc @player_damage_flash
+    sbc #(SHARED_FIGHTER_EXPLOSION_TOTAL-ENEMY_FIGHTER_FLASH_FRAMES+1)
+    tax
+    lda #GAMEPLAY_BACKGROUND_COLOR
+    sta damage_timer             ; fighter sequence owns COLBK through its restore
+    lda enemy_fighter_flash_colors,x
+    bne @store_background
+@player_damage_flash:
     lda damage_timer
     beq @normal_background
     dec damage_timer
-    lda #$42
-    sta COLBK
-    rts
+    lda #PLAYER_DAMAGE_FLASH_COLOR
+    bne @store_background
 @normal_background:
-    lda #$00
+    lda #GAMEPLAY_BACKGROUND_COLOR
+@store_background:
     sta COLBK
     rts
 
@@ -5867,6 +5903,15 @@ silence_audio:
 ; Read-only data
 
 .segment "RODATA"
+
+; Indexed by the descending 24-frame shared explosion timer after subtracting
+; the first active timer value. Tables therefore read expiry-to-impact here,
+; while the visible PAL sequences run in the requested impact-to-expiry order.
+enemy_fighter_flash_colors:
+    .byte FLASH_RED_DARK,FLASH_YELLOW_MID,FLASH_RED_BRIGHT,FLASH_YELLOW_BRIGHT
+player_death_flash_colors:
+    .byte FLASH_RED_DARK,FLASH_RED_MID,FLASH_RED_BRIGHT
+    .byte FLASH_YELLOW_MID,FLASH_RED_BRIGHT,FLASH_YELLOW_BRIGHT
 
 hud_ascii:
     .byte "SCORE 00000  LIFE 3  HULL 100%"

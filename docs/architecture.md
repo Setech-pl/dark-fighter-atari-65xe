@@ -574,6 +574,24 @@ P0/P3 albo P1/P2 bez zapisów `COLPM`, więc nie zmieniają kolorów innych
 obiektów. Respawn i licznik 250 klatek invulnerability zaczynają się dopiero
 po ostatniej klatce eksplozji.
 
+Full-screen fighter flash ma jednego właściciela w końcu `update_sound` i
+zmienia wyłącznie `COLBK`. Gameplay DLI nadal przełącza `CHBASE` i
+`COLPF0-COLPF3`, ale nie zapisuje `COLBK`, więc wybrany kolor pozostaje aktywny
+przez właściwą część gameplayu. Tło HUD w trybie ANTIC 2 pozostaje dokładnie
+czarne dzięki `HUD_COLPF2=$00`, dlatego sam HUD zachowuje czytelność. Dwa istniejące
+`FIGHTER_EXPLOSION_TIMER` są jednocześnie fazą palety: enemy używa czterech
+ramek `$1E,$3C,$1C,$34`, Viper sześciu
+`$1E,$3C,$1C,$3C,$38,$34`, a następna ramka bezwarunkowo przywraca czarne
+`$00`. Slot Vipera jest sprawdzany przez cały jego 24-klatkowy lifecycle:
+pierwsze sześć klatek wybiera profil, a pozostałe wymuszają bazę, dlatego
+enemy explosion nie może wejść po restore ani wygrać remisu. Wejście w dowolny fighter profile zeruje starszy
+`damage_timer`, co uniemożliwia powrót fioletowego `$42` po sekwencji;
+nieletalne trafienie bez eksplozji zachowuje dotychczasowy, ograniczony
+damage flash. Pause zatrzymuje oba timery i pokazuje bazową paletę frontendu,
+a resume zaczyna od `$00`. Mechanizm nie zapisuje `COLPM`, nie zmienia
+lokalnych masek eksplozji i nie jest używany przez capital explosion ani
+launch flash broadside.
+
 Jeśli życie pozostaje, atomowy respawn zapisuje
 `player_x=HPOSP0=HPOSP3=124` oraz `player_y=184`, przywraca 100 zdrowia i
 wchodzi w `PLAYER_RESPAWN_INVULNERABLE`. Wspólna bramka ignoruje wtedy każdy

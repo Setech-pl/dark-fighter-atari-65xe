@@ -316,6 +316,24 @@ export const DEFAULT_SHARED_FIGHTER_EXPLOSION_TRACE_PATH = path.join(
   "previews",
   "shared-fighter-explosion-trace.csv",
 );
+export const DEFAULT_EXPLOSION_FLASH_NATIVE_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "explosion-colour-flash-native.png",
+);
+export const DEFAULT_EXPLOSION_FLASH_COMPARISON_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "explosion-colour-flash-comparison.png",
+);
+export const DEFAULT_EXPLOSION_FLASH_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "explosion-colour-flash-trace.csv",
+);
 export const DEFAULT_DEBRIS_REVIEW_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
@@ -690,6 +708,7 @@ export function readGameGraphicsSource(
     ["PLAYER_RESPAWN_Y", fighterWeapons.viewport.gameplayBottom - 16],
     ["VIPER_PROJECTILE_COLOR", fighterWeapons.viper.colourValue],
     ["RAIDER_PROJECTILE_COLOR", fighterWeapons.raider.colourValue],
+    ["SHARED_FIGHTER_EXPLOSION_TOTAL", fighterWeapons.sharedFighterExplosion.totalFrames],
     ["GAMEPLAY_COLPF2", fighterWeapons.viper.colourValue],
     ["GAMEPLAY_COLPF3", fighterWeapons.raider.colourValue],
     ["STAR_FAR_CAPACITY", starfield.farLayer.population],
@@ -1957,6 +1976,207 @@ export function createGameplayPreview(
 ) {
   const { registerPixels } = readGameplayRuntimeState(source, capitalHullsDefinition);
   return encodePng(scaleAndConvertToRgb(registerPixels));
+}
+
+export function readExplosionFlashRuntimeState(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const { constants } = graphics;
+  const enemyStored = extractLabeledData(
+    source,
+    "enemy_fighter_flash_colors",
+    constants,
+    "player_death_flash_colors",
+  );
+  const playerStored = extractLabeledData(
+    source,
+    "player_death_flash_colors",
+    constants,
+    "hud_ascii",
+  );
+  requireLength("enemy fighter flash table", enemyStored, 4);
+  requireLength("player death flash table", playerStored, 6);
+  const colorNames = [
+    "FLASH_YELLOW_BRIGHT",
+    "FLASH_YELLOW_MID",
+    "FLASH_RED_BRIGHT",
+    "FLASH_RED_MID",
+    "FLASH_RED_DARK",
+  ];
+  const colors = Object.fromEntries(colorNames.map((name) => [name, requireValue(constants, name)]));
+  const baseColor = requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR");
+  const playerDamageColor = requireValue(constants, "PLAYER_DAMAGE_FLASH_COLOR");
+  const enemySequence = [...enemyStored].reverse();
+  const playerSequence = [...playerStored].reverse();
+  const nameByValue = new Map([
+    [baseColor, "GAMEPLAY_BACKGROUND_COLOR"],
+    [playerDamageColor, "PLAYER_DAMAGE_FLASH_COLOR"],
+    ...Object.entries(colors).map(([name, value]) => [value, name]),
+  ]);
+  const basePalette = Object.fromEntries(
+    ["COLBK", "COLPF0", "COLPF1", "COLPF2", "COLPF3", "COLPM0", "COLPM1", "COLPM2", "COLPM3"]
+      .map((register) => [register, requireValue(graphics.hardwareState, register)]),
+  );
+  return {
+    graphics,
+    colors,
+    baseColor,
+    playerDamageColor,
+    basePalette,
+    enemySequence,
+    playerSequence,
+    nameByValue,
+    totalExplosionFrames: requireValue(constants, "SHARED_FIGHTER_EXPLOSION_TOTAL"),
+  };
+}
+
+export function explosionFlashColorForTimers(runtime, {
+  playerTimer = 0,
+  enemyTimer = 0,
+  damageTimer = 0,
+  gameplayActive = true,
+} = {}) {
+  if (!gameplayActive) return runtime.baseColor;
+  const playerIndex = runtime.totalExplosionFrames - playerTimer;
+  if (playerIndex >= 0 && playerIndex < runtime.playerSequence.length) {
+    return runtime.playerSequence[playerIndex];
+  }
+  if (playerTimer > 0) return runtime.baseColor;
+  const enemyIndex = runtime.totalExplosionFrames - enemyTimer;
+  if (enemyIndex >= 0 && enemyIndex < runtime.enemySequence.length) {
+    return runtime.enemySequence[enemyIndex];
+  }
+  return damageTimer > 0 ? runtime.playerDamageColor : runtime.baseColor;
+}
+
+function explosionFlashGameplayPixels(runtime, color) {
+  const hardwareState = new Map(runtime.graphics.hardwareState);
+  hardwareState.set("COLBK", color);
+  const screen = createCanonicalScreen(runtime.graphics);
+  const pixels = drawGameplayMixedScreen(hardwareState, screen, runtime.graphics);
+  overlayCanonicalPmg(pixels, runtime.graphics);
+  return pixels;
+}
+
+export function createExplosionFlashNativePreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const runtime = readExplosionFlashRuntimeState(source, capitalHullsDefinition);
+  const displayName = (name) => name.replaceAll("_", " ");
+  const paletteFrames = Object.entries(runtime.colors).map(([name, color]) => ({
+    label: `PALETTE ${displayName(name)} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
+    color,
+  }));
+  const sequenceFrames = [
+    { label: "BASE PALETTE", color: runtime.baseColor },
+    ...runtime.enemySequence.map((color, index) => ({
+      label: `ENEMY F${index + 1} ${displayName(runtime.nameByValue.get(color))} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
+      color,
+    })),
+    { label: "ENEMY RESTORE BASE", color: runtime.baseColor },
+    ...runtime.playerSequence.map((color, index) => ({
+      label: `VIPER F${index + 1} ${displayName(runtime.nameByValue.get(color))} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
+      color,
+    })),
+    { label: "VIPER RESTORE BASE", color: runtime.baseColor },
+  ];
+  const frames = [...paletteFrames, ...sequenceFrames];
+  const columns = 3;
+  const labelHeight = 16;
+  const rows = Math.ceil(frames.length / columns);
+  const width = SOURCE_WIDTH * columns;
+  const panelHeight = SOURCE_HEIGHT + labelHeight;
+  const height = panelHeight * rows;
+  const registerPixels = new Uint8Array(width * height);
+  const frontend = readFrontendGraphicsSource(source);
+  frames.forEach((frame, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const left = column * SOURCE_WIDTH;
+    const top = row * panelHeight;
+    drawComparisonLabel(registerPixels, width, frame.label, left + 4, top + 4, frontend);
+    const pixels = explosionFlashGameplayPixels(runtime, frame.color);
+    for (let y = 0; y < SOURCE_HEIGHT; y += 1) {
+      registerPixels.set(
+        pixels.subarray(y * SOURCE_WIDTH, (y + 1) * SOURCE_WIDTH),
+        (top + labelHeight + y) * width + left,
+      );
+    }
+  });
+  return encodePng(scaleAndConvertToRgb(registerPixels, width, height, 1), width, height);
+}
+
+export function createExplosionFlashComparisonPreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const runtime = readExplosionFlashRuntimeState(source, capitalHullsDefinition);
+  const width = 640;
+  const height = 248;
+  const registerPixels = new Uint8Array(width * height);
+  const frontend = readFrontendGraphicsSource(source);
+  const hex = (value) => value.toString(16).padStart(2, "0").toUpperCase();
+  const displayName = (name) => name.replaceAll("_", " ");
+  drawComparisonLabel(registerPixels, width, "FIGHTER FULL-SCREEN COLBK FLASH - PAL", 8, 4, frontend);
+  drawComparisonLabel(registerPixels, width,
+    `BASE COLBK ${hex(runtime.baseColor)}  PF ${["COLPF0", "COLPF1", "COLPF2", "COLPF3"]
+      .map((name) => hex(runtime.basePalette[name])).join(" ")}`, 8, 20, frontend);
+  Object.entries(runtime.colors).forEach(([name, color], index) => {
+    const y = 40 + index * 16;
+    drawComparisonLabel(registerPixels, width, `${displayName(name)} GTIA ${hex(color)}`, 8, y + 2, frontend);
+    for (let row = y; row < y + 12; row += 1) {
+      registerPixels.fill(color, row * width + 224, row * width + width - 8);
+    }
+  });
+  const drawTimeline = (label, sequence, top, boxWidth) => {
+    drawComparisonLabel(registerPixels, width, label, 8, top, frontend);
+    const frames = [...sequence, runtime.baseColor];
+    frames.forEach((color, index) => {
+      const left = 112 + index * boxWidth;
+      const name = index < sequence.length ? `F${index + 1}` : "BASE";
+      drawComparisonLabel(registerPixels, width, `${name} ${hex(color)}`, left, top, frontend);
+      for (let y = top + 12; y < top + 32; y += 1) {
+        registerPixels.fill(color, y * width + left, y * width + left + boxWidth - 8);
+      }
+    });
+  };
+  drawTimeline("ENEMY 4F", runtime.enemySequence, 132, 100);
+  drawTimeline("VIPER 6F", runtime.playerSequence, 188, 72);
+  return encodePng(
+    scaleAndConvertToRgb(registerPixels, width, height, 2),
+    width * 2,
+    height * 2,
+  );
+}
+
+export function createExplosionFlashTrace(source) {
+  const runtime = readExplosionFlashRuntimeState(source);
+  const hex = (value) => `$${value.toString(16).padStart(2, "0").toUpperCase()}`;
+  const lines = ["profile,frame,timer,COLBK,symbol,active,elapsed_ms"];
+  for (const [profile, sequence] of [["ENEMY", runtime.enemySequence], ["VIPER", runtime.playerSequence]]) {
+    sequence.forEach((color, index) => lines.push([
+      profile,
+      index + 1,
+      runtime.totalExplosionFrames - index,
+      hex(color),
+      runtime.nameByValue.get(color),
+      1,
+      (index + 1) * 20,
+    ].join(",")));
+    lines.push([
+      profile,
+      sequence.length + 1,
+      runtime.totalExplosionFrames - sequence.length,
+      hex(runtime.baseColor),
+      "GAMEPLAY_BACKGROUND_COLOR",
+      0,
+      (sequence.length + 1) * 20,
+    ].join(","));
+  }
+  return `${lines.join("\n")}\n`;
 }
 
 function createCapitalHullsStripScreen(graphics) {
@@ -5167,6 +5387,44 @@ export function generateSharedFighterExplosionTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
+export function generateExplosionFlashNativePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_EXPLOSION_FLASH_NATIVE_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createExplosionFlashNativePreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateExplosionFlashComparisonPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_EXPLOSION_FLASH_COMPARISON_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createExplosionFlashComparisonPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateExplosionFlashTrace({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_EXPLOSION_FLASH_TRACE_PATH,
+} = {}) {
+  const trace = createExplosionFlashTrace(fs.readFileSync(sourcePath, "utf8"));
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateProjectileVisualLanguagePreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
@@ -5384,6 +5642,23 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Shared fighter-explosion trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, sharedExplosionTrace.outputPath)}`);
     console.log(`  rows: ${sharedExplosionTrace.rows}, ${sharedExplosionTrace.bytes} bytes`);
+
+    const explosionFlashNative = generateExplosionFlashNativePreview();
+    console.log(`Explosion colour-flash native sequence generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, explosionFlashNative.outputPath)}`);
+    console.log(
+      `  size: ${explosionFlashNative.width}x${explosionFlashNative.height}, ${explosionFlashNative.bytes} bytes`,
+    );
+    const explosionFlashComparison = generateExplosionFlashComparisonPreview();
+    console.log(`Explosion colour-flash comparison generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, explosionFlashComparison.outputPath)}`);
+    console.log(
+      `  size: ${explosionFlashComparison.width}x${explosionFlashComparison.height}, ${explosionFlashComparison.bytes} bytes`,
+    );
+    const explosionFlashTrace = generateExplosionFlashTrace();
+    console.log(`Explosion colour-flash frame trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, explosionFlashTrace.outputPath)}`);
+    console.log(`  rows: ${explosionFlashTrace.rows}, ${explosionFlashTrace.bytes} bytes`);
 
     const debrisReviewResult = generateDebrisReviewPreview();
     console.log(`Debris visual-polish owner review generated successfully`);

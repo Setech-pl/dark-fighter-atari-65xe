@@ -10,10 +10,10 @@ loaderze nie są tym samym budżetem.
 | `$0080-$009F` | 32 B zero-page variables; the three unread legacy bullet mirrors were removed |
 | `$0100-$01FF` | stos 6502 |
 | `$0200-$03FF` | obszar systemowy OS i wektory |
-| `$2000-$2F2C` | resident CODE, 3885 B; includes bootstrap, A2 logical-row mapper and display-list publisher |
-| `$2F2D-$3FCB` | resident RODATA, 4255 B; includes charset source, hull/effect glyphs, frontend records including Game Over and the four-row options screen, packed maps, and loader LZ-10/5 source |
-| `$3735-$3F01` | transient loader LZ-10/5 stream, 1997 B |
-| `$3F02-$3FCB` | transient loader display list, 202 B |
+| `$2000-$2F56` | resident CODE, 3927 B; includes bootstrap, A2 logical-row mapper, display-list publisher and the bounded fighter-flash selector |
+| `$2F57-$3FFF` | resident RODATA, 4265 B; includes ten fighter-flash palette bytes, charset source, hull/effect glyphs, frontend records including Game Over and the four-row options screen, packed maps, and loader LZ-10/5 source |
+| `$3769-$3F35` | transient loader LZ-10/5 stream, 1997 B |
+| `$3F36-$3FFF` | transient loader display list, 202 B |
 | `$4000-$55E8` | on entry: 5609 B packed LZ-10/5 broadside/frontend/enemy/pause runtime; expanded before the loader |
 | `$55E9-$5C9E` | on entry: 1718 B packed starfield/shared/music runtime, staged before loader overwrite |
 | `$5C9F-$5D80` | on entry: 226 B source of the A2 kernel copied to `$9000-$90E1` |
@@ -184,7 +184,7 @@ format and its technical field were not changed.
 Menu music and difficulty do not add zero page. The physical OPTION edge latch
 remains present, while removal of three unread bullet mirrors leaves 32 B at
 `$0080-$009F`.
-Dotychczasowy `$008A` pozostaje world akumulatorem, hull akumulator leży pod
+Dotychczasowy `$0087` pozostaje world akumulatorem, hull akumulator leży pod
 `$4E71`, a sesyjny wybór pod `$4E70`.
 Bezpośredni stan puli to dziewięć tablic po trzy bajty, sześć bajtów pointerów
 wierszy i piętnaście bajtów globalnego stanu/scratch, razem 48 B. `SIZEM=$54`
@@ -216,6 +216,10 @@ Wspólna fighter explosion dodaje 54 B danych graficznych: sześć masek 8×8
 oraz sześć masek jasnego core. Dwa równoczesne sloty wykorzystują 6 B pod
 `$54C4-$54C9` (timer/X/Y na Viper i ordinary enemy); nie dodają zero page,
 PMG ani dynamicznej alokacji.
+Feature colour-flash dodaje wyłącznie dwie stałe tablice RODATA, 4 B dla enemy
+i 6 B dla Vipera. Faza pochodzi z tych samych timerów `$54C4-$54C5`, a
+dotychczasowy `damage_timer` pod `$008A` jest zerowany przy wejściu w profil;
+nie przydzielono nowego stanu ani bajta BSS.
 
 The accepted compact-HUD checkpoint had a 12,906 B payload and 12,918 B XEX.
 The current candidate is 16,384 B and 16,396 B respectively; boot uses 128

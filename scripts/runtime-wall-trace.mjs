@@ -20,6 +20,13 @@ const DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES = 32_025;
 const DEBRIS_VISUAL_POLISH_BASELINE_HEADROOM_CYCLES = 3_543;
 const DEBRIS_VISUAL_POLISH_APPROVED_DELTA_CYCLES = 256;
 const DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES = 32_281;
+const DEBRIS_VISUAL_POLISH_ACCEPTED_WALL_CYCLES = 32_081;
+const DEBRIS_VISUAL_POLISH_ACCEPTED_HEADROOM_CYCLES = 3_487;
+const EXPLOSION_FLASH_BASELINE_WALL_CYCLES = 32_081;
+const EXPLOSION_FLASH_BASELINE_HEADROOM_CYCLES = 3_487;
+const EXPLOSION_FLASH_APPROVED_DELTA_CYCLES = 64;
+const EXPLOSION_FLASH_FEATURE_GATE_CYCLES = 32_145;
+const EXPLOSION_FLASH_ABSOLUTE_MINIMUM_HEADROOM_CYCLES = 3_200;
 const EXPECTED_ATARI800_VERSION = "7.1.2";
 const OFFICIAL_SOURCE_ARCHIVE_SHA256 =
   "9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3";
@@ -56,6 +63,15 @@ const cadenceSessions = [0, 1, 2].map((difficulty) => ({
   frames: 400,
   kind: "parallax-cadence",
 }));
+
+const fighterFlashSessions = [{
+  id: "flash-2-neutral-nofire",
+  difficulty: 2,
+  policy: "neutral",
+  fireDelay: 4_000,
+  frames: 1_600,
+  kind: "fighter-flash-coverage",
+}];
 
 const traceLabels = {
   DFTRACE_PC_ACTIVE: "main_loop_option_poll",
@@ -115,6 +131,8 @@ const numericCsvFields = new Set([
   "difficulty", "active_muzzles", "entity_active", "entity_x", "entity_y",
   "entity_vx", "entity_move_accumulator", "entity_vertical_accumulator",
   "entity_render_id", "events",
+  "colbk", "colpm0", "colpm1", "colpm2", "colpm3", "colpf0", "colpf1",
+  "colpf2", "colpf3", "viper_explosion_timer", "enemy_explosion_timer",
 ]);
 let cpuReferenceByFrame = new Map();
 
@@ -343,7 +361,7 @@ function main() {
   const allRows = [];
   const summaries = [];
   const sessionsToRun = smokeFrames === null
-    ? [...baselineSessions, ...targetedSessions, ...cadenceSessions]
+    ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions]
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
   for (const session of sessionsToRun) {
     const outputPath = path.join(buildDirectory, `${session.id}.csv`);
@@ -376,12 +394,15 @@ function main() {
   const baselineRows = allRows.filter((row) => row.trace_kind === "baseline-9040");
   const targetedRows = allRows.filter((row) => row.trace_kind === "targeted-heavy-coincidence");
   const cadenceRows = allRows.filter((row) => row.trace_kind === "parallax-cadence");
+  const fighterFlashRows = allRows.filter((row) => row.trace_kind === "fighter-flash-coverage");
   invariant(baselineRows.length === 9_040,
     `Baseline trace measured ${baselineRows.length}/9040 frames`);
   invariant(targetedRows.length === 920,
     `Targeted trace measured ${targetedRows.length}/920 frames`);
   invariant(cadenceRows.length === 1_200,
     `Parallax trace measured ${cadenceRows.length}/1200 frames`);
+  invariant(fighterFlashRows.length === 1_600,
+    `Fighter-flash trace measured ${fighterFlashRows.length}/1600 frames`);
   invariant(allRows.every((row) => row.dma_ctl === 0x3e),
     "Trace observed gameplay DMACTL other than $3E");
   invariant(allRows.every((row) => row.nmi_en === 0x80),
@@ -428,7 +449,7 @@ function main() {
   const spawnMaximum = maximumRow(spawnRows, (row) => row.wall_cycles);
   const contactMaximum = maximumRow(contactRows, (row) => row.wall_cycles);
   const featureBudgetOverruns = allRows.filter((row) =>
-    row.wall_cycles > DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES);
+    row.wall_cycles > EXPLOSION_FLASH_FEATURE_GATE_CYCLES);
   const activeGlyphOffsets = activeEntityRows.map((row) =>
     row.entity_render_id - manifest.entityEffects.glyphIndex);
   const observedVariants = [...new Set(activeGlyphOffsets.map((offset) => offset >> 2))].sort();
@@ -579,6 +600,55 @@ function main() {
     };
   });
 
+  const enemyFlashSequence = [0x1e, 0x3c, 0x1c, 0x34];
+  const playerFlashSequence = [0x1e, 0x3c, 0x1c, 0x3c, 0x38, 0x34];
+  const enemyFlashRows = fighterFlashRows.filter((row) =>
+    row.viper_explosion_timer < 19 && row.enemy_explosion_timer >= 21);
+  const playerFlashRows = fighterFlashRows.filter((row) => row.viper_explosion_timer >= 19);
+  invariant([...new Set(enemyFlashRows.map((row) => row.enemy_explosion_timer))]
+    .sort((left, right) => right - left).join(",") === "24,23,22,21",
+  "PAL trace did not observe every enemy fighter flash timer value");
+  invariant([...new Set(playerFlashRows.map((row) => row.viper_explosion_timer))]
+    .sort((left, right) => right - left).join(",") === "24,23,22,21,20,19",
+  "PAL trace did not observe every Viper death flash timer value");
+  invariant(enemyFlashRows.every((row) =>
+    row.colbk === enemyFlashSequence[24 - row.enemy_explosion_timer]),
+  "PAL trace observed an incorrect enemy fighter COLBK sequence");
+  invariant(playerFlashRows.every((row) =>
+    row.colbk === playerFlashSequence[24 - row.viper_explosion_timer]),
+  "PAL trace observed an incorrect Viper death COLBK sequence");
+  invariant(fighterFlashRows.filter((row) =>
+    row.viper_explosion_timer > 0 && row.viper_explosion_timer < 19)
+    .every((row) => row.colbk === 0),
+  "PAL trace observed a background flash after the Viper death profile restored base");
+  invariant([...enemyFlashSequence, ...playerFlashSequence].every((color) => color !== 0x84),
+    "Fighter flash reused the accepted $84 local explosion colour");
+
+  const flashRegisterCoverage = {
+    enemy_fighter: {
+      observed: true,
+      active_frames: enemyFlashSequence.length,
+      timer_values: [24, 23, 22, 21],
+      colbk_values: enemyFlashSequence,
+      observations: enemyFlashRows.length,
+    },
+    player_death: {
+      observed: true,
+      active_frames: playerFlashSequence.length,
+      timer_values: [24, 23, 22, 21, 20, 19],
+      colbk_values: playerFlashSequence,
+      observations: playerFlashRows.length,
+    },
+    colpm_values: Object.fromEntries(["colpm0", "colpm1", "colpm2", "colpm3"].map((name) => [
+      name,
+      [...new Set(fighterFlashRows.map((row) => row[name]))].sort((left, right) => left - right),
+    ])),
+    colpf_values: Object.fromEntries(["colpf0", "colpf1", "colpf2", "colpf3"].map((name) => [
+      name,
+      [...new Set(fighterFlashRows.map((row) => row[name]))].sort((left, right) => left - right),
+    ])),
+  };
+
   const report = {
     schema_version: 1,
     method: "Atari800 ANTIC master-clock observation at guest-PC boundaries; no guest logging or instrumentation instructions",
@@ -606,7 +676,7 @@ function main() {
     },
     gate: {
       pal_frame_cycles: PAL_FRAME_CYCLES,
-      maximum_wall_cycles: DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES,
+      maximum_wall_cycles: EXPLOSION_FLASH_FEATURE_GATE_CYCLES,
       historical_runtime_headroom_gate: {
         maximum_wall_cycles: HISTORICAL_PHYSICAL_GATE_CYCLES,
         preserved_for_history: true,
@@ -633,34 +703,46 @@ function main() {
         maximum_wall_cycles: DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES,
         minimum_physical_headroom:
           PAL_FRAME_CYCLES - DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES,
-        actual_delta_cycles: heaviest.wall_cycles - DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
-        remaining_approved_cycles:
-          DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES - heaviest.wall_cycles,
-        budget_overrun_frames: featureBudgetOverruns.length,
-        empty_path: {
-          maximum_wall_cycles: emptyEntityMaximum.wall_cycles,
-          delta_from_baseline: emptyEntityMaximum.wall_cycles -
+        measured_wall_cycles: DEBRIS_VISUAL_POLISH_ACCEPTED_WALL_CYCLES,
+        measured_physical_headroom: DEBRIS_VISUAL_POLISH_ACCEPTED_HEADROOM_CYCLES,
+        actual_delta_cycles:
+          DEBRIS_VISUAL_POLISH_ACCEPTED_WALL_CYCLES -
             DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
-          heaviest: frameState(emptyEntityMaximum),
+        remaining_approved_cycles:
+          DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES -
+            DEBRIS_VISUAL_POLISH_ACCEPTED_WALL_CYCLES,
+        budget_overrun_frames: 0,
+        empty_path: {
+          maximum_wall_cycles: 31_108,
+          delta_from_baseline: -917,
         },
         one_active_debris: {
-          maximum_wall_cycles: activeEntityMaximum.wall_cycles,
-          delta_from_baseline: activeEntityMaximum.wall_cycles -
-            DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
-          heaviest: frameState(activeEntityMaximum),
+          maximum_wall_cycles: DEBRIS_VISUAL_POLISH_ACCEPTED_WALL_CYCLES,
+          delta_from_baseline: 56,
         },
         spawn_path: {
-          maximum_wall_cycles: spawnMaximum.wall_cycles,
-          delta_from_baseline: spawnMaximum.wall_cycles -
-            DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
-          heaviest: frameState(spawnMaximum),
+          maximum_wall_cycles: 28_212,
+          delta_from_baseline: -3_813,
         },
         contact_path: {
-          maximum_wall_cycles: contactMaximum.wall_cycles,
-          delta_from_baseline: contactMaximum.wall_cycles -
-            DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
-          heaviest: frameState(contactMaximum),
+          maximum_wall_cycles: 26_129,
+          delta_from_baseline: -5_896,
         },
+      },
+      explosion_colour_flash: {
+        baseline_wall_cycles: EXPLOSION_FLASH_BASELINE_WALL_CYCLES,
+        baseline_physical_headroom: EXPLOSION_FLASH_BASELINE_HEADROOM_CYCLES,
+        approved_delta_cycles: EXPLOSION_FLASH_APPROVED_DELTA_CYCLES,
+        maximum_wall_cycles: EXPLOSION_FLASH_FEATURE_GATE_CYCLES,
+        delta_limited_minimum_physical_headroom:
+          EXPLOSION_FLASH_BASELINE_HEADROOM_CYCLES -
+            EXPLOSION_FLASH_APPROVED_DELTA_CYCLES,
+        absolute_minimum_physical_headroom:
+          EXPLOSION_FLASH_ABSOLUTE_MINIMUM_HEADROOM_CYCLES,
+        actual_delta_cycles: heaviest.wall_cycles - EXPLOSION_FLASH_BASELINE_WALL_CYCLES,
+        remaining_approved_cycles:
+          EXPLOSION_FLASH_FEATURE_GATE_CYCLES - heaviest.wall_cycles,
+        budget_overrun_frames: featureBudgetOverruns.length,
       },
       measured_wall_cycles_dma_on: heaviest.wall_cycles,
       measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
@@ -684,10 +766,9 @@ function main() {
       host_vbi_boundary_crossings:
         allRows.reduce((sum, row) => sum + row.host_vbi_boundaries, 0),
       extra_vbi_boundaries: allRows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0),
-      passed: heaviest.wall_cycles <= DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES &&
+      passed: heaviest.wall_cycles <= EXPLOSION_FLASH_FEATURE_GATE_CYCLES &&
         PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-          DEBRIS_VISUAL_POLISH_BASELINE_HEADROOM_CYCLES -
-            DEBRIS_VISUAL_POLISH_APPROVED_DELTA_CYCLES &&
+          EXPLOSION_FLASH_ABSOLUTE_MINIMUM_HEADROOM_CYCLES &&
         featureBudgetOverruns.length === 0 && deadlineOverruns.length === 0,
     },
     instrumentation: {
@@ -707,6 +788,7 @@ function main() {
       baseline_measured_frames: baselineRows.length,
       targeted_measured_frames: targetedRows.length,
       parallax_cadence_measured_frames: cadenceRows.length,
+      fighter_flash_measured_frames: fighterFlashRows.length,
       input: "production frontend/options handlers followed by deterministic held-FIRE neutral/sweep/evasive joystick policies",
       sessions: summaries,
       baseline_heaviest: frameState(baselineHeaviest),
@@ -766,6 +848,7 @@ function main() {
         observed: observedTrajectories.length === 3,
         vx_signed_hpos: observedTrajectories,
       },
+      fighter_colour_flash: flashRegisterCoverage,
     },
     ten_heaviest_frames_in_9040_replay: topTenBaseline,
     five_heaviest_frames: topTenBaseline.slice(0, 5).map((frame) => ({

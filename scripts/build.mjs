@@ -90,6 +90,11 @@ const debrisVisualPolishBaselineHeadroomCycles = 3543;
 const debrisVisualPolishApprovedWallDelta = 256;
 const debrisVisualPolishWallLimit = 32281;
 const debrisVisualPolishMinimumHeadroom = 3287;
+const explosionFlashBaselineWallCycles = 32081;
+const explosionFlashBaselineHeadroomCycles = 3487;
+const explosionFlashApprovedWallDelta = 64;
+const explosionFlashWallLimit = 32145;
+const explosionFlashAbsoluteMinimumHeadroom = 3200;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -693,12 +698,28 @@ async function build() {
           approvedFeatureDeltaCycles: debrisVisualPolishApprovedWallDelta,
           featureWallLimitCycles: debrisVisualPolishWallLimit,
           minimumPhysicalHeadroomCycles: debrisVisualPolishMinimumHeadroom,
+          measuredWallCycles:
+            wallTrace?.gate.debris_visual_polish?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.debris_visual_polish?.actual_delta_cycles ?? null,
+          remainingApprovedCycles:
+            wallTrace?.gate.debris_visual_polish?.remaining_approved_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
+        explosionColourFlash: {
+          baselineWallCycles: explosionFlashBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: explosionFlashBaselineHeadroomCycles,
+          approvedFeatureDeltaCycles: explosionFlashApprovedWallDelta,
+          featureWallLimitCycles: explosionFlashWallLimit,
+          deltaLimitedMinimumPhysicalHeadroomCycles:
+            explosionFlashBaselineHeadroomCycles - explosionFlashApprovedWallDelta,
+          absoluteMinimumPhysicalHeadroomCycles: explosionFlashAbsoluteMinimumHeadroom,
           measuredWallCycles: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
           actualDeltaCycles: wallTrace === null ? null :
-            wallTrace.semantics.measured_wall_cycles_dma_on -
-              debrisVisualPolishBaselineWallCycles,
+            wallTrace.semantics.measured_wall_cycles_dma_on - explosionFlashBaselineWallCycles,
           remainingApprovedCycles: wallTrace === null ? null :
-            debrisVisualPolishWallLimit - wallTrace.semantics.measured_wall_cycles_dma_on,
+            explosionFlashWallLimit - wallTrace.semantics.measured_wall_cycles_dma_on,
           missedSynchronization: wallTrace?.gate.missed_frames ?? null,
           deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
         },

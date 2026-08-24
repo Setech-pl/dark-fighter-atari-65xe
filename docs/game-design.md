@@ -453,6 +453,13 @@ explosion. Lethal damage decrements `LIFE` once with a zero floor. When the
 last life is lost, the transition enters `GAME_OVER` exactly once after the
 final explosion frame and leaves the gameplay loop, so player control, both
 weapons, damage, collision, enemy spawning, world updates, and scoring stop.
+The first six frames of Viper death set the full-screen background to bright
+yellow, bright red-orange, lower-luminance yellow, bright red-orange, medium
+red and dark red (`$1E,$3C,$1C,$3C,$38,$34`), one PAL frame each, then restore
+black. An ordinary enemy fighter destruction uses the shorter four-frame
+profile `$1E,$3C,$1C,$34`, then restores black. Viper death has priority when
+both start together; neither profile changes PMG colours, local explosion
+geometry, SFX, score, RNG or gameplay cadence.
 
 The text-mode Game Over screen uses the resident frontend charset and shows
 `GAME OVER`, the final six-column `SCORE`, the session `TOP SCORE`, and

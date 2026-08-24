@@ -49,6 +49,17 @@ typedef struct {
 	unsigned entity_move_accumulator;
 	unsigned entity_vertical_accumulator;
 	unsigned entity_render_id;
+	unsigned colbk;
+	unsigned colpm0;
+	unsigned colpm1;
+	unsigned colpm2;
+	unsigned colpm3;
+	unsigned colpf0;
+	unsigned colpf1;
+	unsigned colpf2;
+	unsigned colpf3;
+	unsigned viper_explosion_timer;
+	unsigned enemy_explosion_timer;
 } DFTraceFrame;
 
 enum {
@@ -272,6 +283,21 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->entity_render_id = MEMORY_mem[dftrace_entity_render_id];
 }
 
+static void dftrace_snapshot_flash(DFTraceFrame *frame)
+{
+	frame->colbk = GTIA_COLBK;
+	frame->colpm0 = GTIA_COLPM0;
+	frame->colpm1 = GTIA_COLPM1;
+	frame->colpm2 = GTIA_COLPM2;
+	frame->colpm3 = GTIA_COLPM3;
+	frame->colpf0 = GTIA_COLPF0;
+	frame->colpf1 = GTIA_COLPF1;
+	frame->colpf2 = GTIA_COLPF2;
+	frame->colpf3 = GTIA_COLPF3;
+	frame->viper_explosion_timer = MEMORY_mem[dftrace_fighter_explosion_timer];
+	frame->enemy_explosion_timer = MEMORY_mem[dftrace_fighter_explosion_timer + 1u];
+}
+
 static void dftrace_write(void)
 {
 	FILE *file;
@@ -281,7 +307,7 @@ static void dftrace_write(void)
 		perror("darkfighter trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,events\n");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -290,7 +316,7 @@ static void dftrace_write(void)
 		unsigned extra_boundaries = host_boundaries > 1 ? host_boundaries - 1 : 0;
 		unsigned missed_frames = cadence_frames > 1 ? cadence_frames - 1 : 0;
 		fprintf(file,
-			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
 			dftrace_session, index,
 			(unsigned long long) frame->start_clock,
 			(unsigned long long) frame->end_clock,
@@ -307,7 +333,10 @@ static void dftrace_write(void)
 			frame->difficulty, frame->active_muzzles, frame->entity_active,
 			frame->entity_x, frame->entity_y, frame->entity_vx,
 			frame->entity_move_accumulator, frame->entity_vertical_accumulator,
-			frame->entity_render_id, frame->events);
+			frame->entity_render_id, frame->colbk, frame->colpm0, frame->colpm1,
+			frame->colpm2, frame->colpm3, frame->colpf0, frame->colpf1,
+			frame->colpf2, frame->colpf3, frame->viper_explosion_timer,
+			frame->enemy_explosion_timer, frame->events);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -452,6 +481,7 @@ static void DFTrace_Observe(unsigned pc)
 		dftrace_current.events |= DFTRACE_EVENT_ENTITY_DESPAWN;
 
 	if (pc == dftrace_pc_end) {
+		dftrace_snapshot_flash(&dftrace_current);
 		dftrace_current.end_clock = dftrace_clock();
 		dftrace_current.end_host_frame = (unsigned) Atari800_nframes;
 		dftrace_current.end_y = ANTIC_ypos;

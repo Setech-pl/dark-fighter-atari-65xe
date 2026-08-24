@@ -256,6 +256,28 @@ full paths and reverse layer erasure. The production transition replay reaches
 `DRAIN` at frame 496, `COMPLETE` at 565, the next `OPEN` at 652 and a new
 post-capital spawn event at 682 after the normal scheduler delay.
 
+## Explosion colour-flash feature gate
+
+The accepted debris visual-polish result is the baseline: 32,081 measured
+wall cycles and 3,487 cycles of physical headroom. The colour-flash contract
+permits at most +64 cycles, caps the final wall at 32,145 and also keeps the
+absolute 3,200-cycle headroom floor. The stricter delta-derived headroom is
+3,423 cycles.
+
+The final artifact measures 32,122 wall cycles, a +41 delta, leaving 3,446
+cycles of physical headroom and 23 cycles of the feature allowance. Across
+the 9,040-frame baseline, 920-frame targeted replay, three 400-frame cadence
+replays and a separate 1,600-frame no-FIRE lifecycle replay there are zero
+missed synchronisations, zero extra VBI boundaries and zero deadline overruns.
+
+The lifecycle replay observes all four enemy timer values and all six Viper
+timer values from legal gameplay. End-of-frame hardware snapshots record exact
+`COLBK` sequences `$1E,$3C,$1C,$34` and
+`$1E,$3C,$1C,$3C,$38,$34`, followed by `$00`. `COLPM0/2/3` remain
+`$0E/$46/$28`; `COLPM1` retains only its pre-existing `$44` body and `$84`
+local-explosion states. The host tracer records these registers without adding
+guest instructions or cycles.
+
 ## Size and memory checkpoints
 
 | Checkpoint | Payload | XEX | ATR |
@@ -269,6 +291,7 @@ post-capital spawn event at 682 after the normal scheduler delay.
 | Pre-foundation / Raider `4/5` + Cylon `$44` | 15,759 B | 15,771 B | 92,176 B |
 | Entity/effects foundation + one debris | 16,299 B | 16,311 B | 92,176 B |
 | Debris visual polish + owner retest glyphs | 16,384 B | 16,396 B | 92,176 B |
+| Explosion colour flash | 16,384 B | 16,396 B | 92,176 B |
 
 The final payload occupies exactly 128 boot sectors and leaves 0 B of padding.
 The on-disk header can technically encode up to 255 sectors, but the build now
@@ -277,7 +300,7 @@ was changed. The dynamic-programming encoder produces a globally minimal parse
 for the existing LZ-10/5 stream, recovering enough bytes without changing its
 decoder contract.
 
-Final protected use is MAIN 8,140/8,192 B, PROJECTILES 202/298 B,
+Final protected use is MAIN 8,192/8,192 B (CODE 3,927 B plus RODATA 4,265 B), PROJECTILES 202/298 B,
 STARFIELD 2,178/2,278 B, BROADSIDE 6,652/6,656 B, A2 kernel 226/256 B,
 ENTITY_STATE 256/256 B and ENTITY_CODE 714/3,840 B. Packed staging uses
 1,718/1,792 B until unpacking; the separate ENTITY_CODE boot tail is 639 B.

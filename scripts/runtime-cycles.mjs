@@ -426,9 +426,9 @@ function gameplayDmaCycles() {
 
 function protectedSegments(segmentSizes) {
   const definitions = [
-    ["CODE", segmentSizes.code, 0x0ef0, 0x0f2d, null],
-    ["RODATA", segmentSizes.rodata, 0x10c8, 0x10c2, null],
-    ["MAIN", segmentSizes.code + segmentSizes.rodata, 0x1fb8, 0x1fea, 0x2000],
+    ["CODE", segmentSizes.code, 0x0f2d, 0x0fad, null],
+    ["RODATA", segmentSizes.rodata, 0x109f, 0x111f, null],
+    ["MAIN", segmentSizes.code + segmentSizes.rodata, 0x1fcc, 0x2000, 0x2000],
     ["PROJECTILES", segmentSizes.projectiles, 0x00ca, 0x00ca, 0x012a],
     ["STARFIELD", segmentSizes.starfield, 0x08d7, 0x08e0, 0x08e6],
     ["BROADSIDE", segmentSizes.broadside, 0x1953, 0x19fd, 0x1a00],
