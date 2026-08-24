@@ -1,0 +1,36 @@
+{
+  "formatVersion": 1,
+  "generationSeed": 167,
+  "corridor": {
+    "firstColumn": 8,
+    "endColumn": 32
+  },
+  "farLayer": {
+    "population": 24,
+    "rateNumerator": 1,
+    "rateDenominator": 4,
+    "colourRegister": "COLPF1",
+    "glyphs": [
+      { "id": "DIM", "screenCode": 1, "bytes": [0, 0, 0, 32, 0, 0, 0, 0] },
+      { "id": "BRIGHT", "screenCode": 2, "bytes": [0, 0, 8, 0, 0, 0, 0, 0] },
+      { "id": "SHIFTED", "screenCode": 3, "bytes": [0, 0, 0, 0, 2, 0, 0, 0] }
+    ]
+  },
+  "nearLayer": {
+    "rateNumerator": 1,
+    "rateDenominator": 2,
+    "densityNumerator": 3,
+    "densityDenominator": 8,
+    "specialFrequency": 8,
+    "colourRegister": "COLPF0",
+    "glyphs": [
+      { "id": "POINT", "screenCode": 4, "bytes": [0, 0, 0, 16, 0, 0, 0, 0] },
+      { "id": "DOUBLE", "screenCode": 5, "bytes": [0, 0, 0, 20, 0, 0, 0, 0] },
+      { "id": "SPARKLE", "screenCode": 6, "bytes": [0, 0, 16, 84, 16, 0, 0, 0] }
+    ]
+  },
+  "twinkle": {
+    "intervalFrames": 16,
+    "starsPerInterval": 1
+  }
+}

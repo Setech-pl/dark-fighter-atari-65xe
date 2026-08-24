@@ -9,9 +9,15 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "enemy:review": "node scripts/build.mjs --enemy-review",
+    "enemy:combat-review": "node scripts/build.mjs --enemy-combat-review",
+    "enemy:palette:cylon-oxblood": "node scripts/build.mjs --enemy-palette=cylon-oxblood",
+    "enemy:palette:cylon-burgundy": "node scripts/build.mjs --enemy-palette=cylon-burgundy",
+    "enemy:palette:cylon-scarlet": "node scripts/build.mjs --enemy-palette=cylon-scarlet",
     "clean": "node scripts/clean.mjs",
     "package": "npm run build && node scripts/package-release.mjs",
-    "preview": "node scripts/preview.mjs",
+    "preview": "node scripts/preview.mjs && node scripts/starfield-preview.mjs",
+    "runtime:wall-trace": "node scripts/runtime-wall-trace.mjs",
     "test": "node scripts/build.mjs --quiet && node --test tests/*.test.mjs",
     "verify": "node scripts/verify-build.mjs"
   },

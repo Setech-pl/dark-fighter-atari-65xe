@@ -4,6 +4,27 @@ Editable source art and conversion metadata belong here. Every accepted asset sh
 
 ## Accepted references
 
+- `enemy-roster.json` — editable pass-1 roster manifest and Atari-native PMG
+  masks. It inventories the ten supplied references with stable IDs and future
+  roles, but emits runtime entries only for `RAIDER`, `TALON`, and
+  `SCYTHE_BOMBER`. Normal gameplay enables only `RAIDER`; Talon and Scythe are
+  available through the compile-time `npm run enemy:review` harness. The
+  converter validates Unicode-normalised paths, native envelopes, scanner
+  attachment, cleared tail bytes, the Cylon-family `$42/$44/$48` palette
+  candidates and the
+  first descriptor-driven `SINGLE_PULSE` policy, then emits
+  `build/enemy-roster.inc`. Release selects burgundy `$44`, one luminance step
+  below the red scanner and the right-hull `$46`; Talon and Scythe remain
+  `WEAPON_NONE` review-only anchors.
+- `Cylon Raider.png`, `Talon Interceptor.png`, `Scythe Bomber.png`,
+  `Reaper Gunship.png`, `Specter Scout.png`, `Stalker Hunter.png`,
+  `Leech Drone.png`, `Aegis Escort.png`, `Nemesis Command Raider.png`, and
+  `Hydra Missile Carrier.png` — transparent/chroma-green build-time design
+  references for the ten stable roster identities. PNG pixels are never loaded
+  by the Atari runtime. Preview generation removes transparent and dominant
+  chroma-green background pixels; final P1/P2 masks remain deliberately
+  hand-authored at native Atari resolution.
+
 - `dark-fighter-screen-concept-v1.png` — accepted composition and art-direction reference for the first gameplay screen. It defines the HUD hierarchy, dark central flight corridor, worn steel-blue structures, red identification stripes, pale player/enemy hulls and amber/cyan weapon accents.
 - `loader.png` — owner-authored visual source of truth for the loader composition,
   Galactica profile, `BSG` marking, title treatment, engine light, and green
@@ -13,7 +34,8 @@ Editable source art and conversion metadata belong here. Every accepted asset sh
   pixel font, landmarks, two LMS addresses, palette zones, timing, and the
   reference checksum. The host compiler rasterizes title and ship rows as
   320-pixel ANTIC F and the studio footer as 160-pixel ANTIC E, always at 40
-  bytes per row. It produces exactly 7680 bytes, PackBits-compresses them, and
+  bytes per row. It produces exactly 7680 bytes, compresses them with the same
+  bounded LZ-10/5 decoder as the resident gameplay tail, and
   derives both ca65 data and `build/previews/loader-screen.png` from that result.
 - `mainmenu.png` — zatwierdzona referencja kompozycji i atmosfery main menu.
   Implementacja Atari używa jej wyłącznie do podziału: duży tytuł u góry,
@@ -70,9 +92,10 @@ and ordered dithering are a deliberate adaptation of `loader.png`, not an
 automatic threshold. Both paths preserve deterministic operation on a stock
 64 KB Atari 65XE.
 
-The two gameplay HUD rows are genuine 40-column ANTIC 2 text. Their dedicated
+The compact gameplay HUD row is genuine 40-column ANTIC 2 text. Its dedicated
 runtime charset at `$5000-$53FF` is built deterministically from the compact
-editable 6×7 glyph source in `src/main.s`; the 22 gameplay rows below still
+editable 6×7 glyph source in `src/main.s`; the bottom glyph scanline forms a
+one-scanline separator and the 23 gameplay rows below still
 use the source-derived ANTIC 4 charset and hull maps.
 
 `npm run preview` odtwarza bieżącą fazę kadłubów w
@@ -97,18 +120,25 @@ kolory, pozycje, granice i fazy pochodzą z tego samego źródła i stałych run
 scrollu z akumulatora. Bieżący wariant mechaniczny pozostaje dowodem `HARD`.
 `build/previews/broadside-speed-sequence.png` pokazuje pięć kolejnych ramek
 PAL z autorytatywnej symulacji: dwa pełne kroki świata występują w ramkach 2
-i 4, natomiast pierwszy krok kadłubów dopiero w ramce 4. Warning przesuwa się
-wtedy dokładnie razem z wylotem, a lecący pocisk zachowuje 2 jednostki HPOS
-ruchu na każdą ramkę.
+i 4, a kadłuby wykonują te same kroki 1:1. Warning przesuwa się wtedy dokładnie
+razem z wylotem, a lecący pocisk zachowuje 2 jednostki HPOS ruchu na każdą
+ramkę.
 `build/previews/difficulty-speed-comparison.png` pokazuje z jednego źródła
-8/9/10 zdarzeń world scrolla oraz 4/4/5 zdarzeń hull scrolla w 20 ramkach,
-przy identycznym warning timerze i ruchu pocisku. W długim oknie hull rates
-wynoszą dokładnie połowę world rates dla każdej trudności.
+8/9/10 zdarzeń zarówno world, jak i hull scrolla w 20 ramkach, przy identycznym
+warning timerze i ruchu pocisku. Osobny preview starfieldu zachowuje względem
+tej bazowej prędkości dokładnie 1/2 dla bliskich oraz 1/4 dla dalekich gwiazd.
+`build/previews/debris-visual-polish-review.png` zestawia poprzedni i większy
+obrys obu faz armour-shard oraz truss-fragment w skali natywnej obok największej
+near star i w powiększeniu, a dalej pokazuje pełne tory
+straight/slight-left/slight-right. Towarzyszący
+`debris-visual-polish-trace.csv` zapisuje obie komórki, backing, A2 ring head,
+fazę, akumulatory, kontakt i pełny spawn-to-despawn pass.
 `build/previews/flagship-sector-sequence.png` pokazuje source-derived ENGINES,
 AFT, COMBAT, FORWARD, PROW, terminal tips, DRAIN i COMPLETE z jednego 240-wierszowego
 modelu. `build/previews/heavy-shell-detail-sequence.png` pokazuje końcowy hot
-warning, czteroramkowy flash, dwie fazy 3/4-scanline sluga i pięcioramkowy
-impact; render używa rzeczywistych kolorów M1–M3 i nie maluje po obrazie Atari.
+warning, czteroramkowy flash, dwie fazy dwukomórkowego 8×6 ANTIC 4 sluga i pięcioramkowy
+impact; flying render używa tych samych przywracanych kodów znaków oraz
+`COLPF2=$1E`/`COLPF3=$46` co runtime, bez udawanych kolorów M1–M3.
 `build/previews/capital-hull-explosion-sequence.png` pokazuje wszystkie sześć
 faz dużego trafienia, a `capital-explosion-pokey-trace.csv` dokładne 24 ramki
 rejestrów channel 4 i końcowe wyciszenie.
@@ -117,6 +147,16 @@ wszystkich trzech fazach oraz przejście housing→AFT;
 `capital-prow-sequence.png` pokazuje pełne zwężenie obu niejednakowych dziobów,
 a `enemy-fighter-corridor-limits.png` renderuje P1/P2 przy obu kanonicznych
 granicach HPOS bez nakładania choćby jednego piksela na side hull.
+`projectile-visual-language.png` porównuje żółte 1×2 Viper fire, czerwone 2×3 Raider pulse i dwa
+dwukomórkowe 8×6 capital slugs na tej samej native skali, a
+`projectile-collision-scoring-sequence.png` renderuje policy score oraz
+spatial first-target z tych samych definicji runtime.
+`raider-natural-fire-trace.csv` zaczyna przed pełnym wejściem i prowadzi realny
+state update przez dziesięciostrzałowy burst w open space oraz broadside;
+nie ustawia projectile active bezpośrednio i nie współdzieli M1–M3.
+`fighter-burst-runtime-trace.csv` używa tych samych definicji dla obu broni i
+rejestruje stan burstu, accepted allocation, niezależne poprzednie/bieżące
+współrzędne, źródło koloru oraz dziesięciopunktowy hit Vipera.
 
 Ten sam publiczny command tworzy trzy pliki eksperymentalne:
 `gameplay-broadside-antic2-prototype.png`, `capital-hulls-antic2-strip.png`

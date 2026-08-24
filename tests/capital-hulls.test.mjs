@@ -13,6 +13,10 @@ import {
 import { parseXex } from "../scripts/formats.mjs";
 import { loadLoaderBitmapDefinition } from "../scripts/loader-assets.mjs";
 import {
+  compileEnemyRoster,
+  loadEnemyRosterDefinition,
+} from "../scripts/enemy-roster.mjs";
+import {
   createCapitalHullsStripPreview,
   createEnemyHullColourOptionsPreview,
   createGameplayPreview,
@@ -36,6 +40,8 @@ const asset = compileCapitalHulls(definition);
 const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
 const broadsideRuntime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
+const starfieldRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
+const a2KernelRuntime = fs.readFileSync(path.join(rootDirectory, "build", "a2-kernel-runtime.bin"));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -50,15 +56,23 @@ function sha256(bytes) {
 }
 
 function readXexBytes(address, length) {
+  const runtime = manifest.broadsideRuntime;
+  if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
+    return broadsideRuntime.subarray(address - runtime.runAddress, address - runtime.runAddress + length);
+  }
+  const starfield = manifest.starfieldRuntime;
+  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
+    return starfieldRuntime.subarray(address - starfield.runAddress, address - starfield.runAddress + length);
+  }
+  const kernel = manifest.a2Kernel;
+  if (address >= kernel.runAddress && address + length <= kernel.runAddress + kernel.bytes) {
+    return a2KernelRuntime.subarray(address - kernel.runAddress, address - kernel.runAddress + length);
+  }
   const segment = parseXex(xex).segments.find(
     ({ start, end }) => address >= start && address + length - 1 <= end,
   );
   if (segment) {
     return segment.data.subarray(address - segment.start, address - segment.start + length);
-  }
-  const runtime = manifest.broadsideRuntime;
-  if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
-    return broadsideRuntime.subarray(address - runtime.runAddress, address - runtime.runAddress + length);
   }
   assert.fail(`Resident image does not contain $${address.toString(16)}`);
 }
@@ -138,27 +152,23 @@ test("31 generated ANTIC 4 glyphs fit the 1024-byte assembled gameplay charset",
   assert.equal(graphics.charset.length, 1024);
   assert.deepEqual(
     readXexBytes(labels.get("charset_data"), 1024),
-    Buffer.from(graphics.charset),
+    Buffer.from(graphics.sourceCharset),
   );
 });
 
 test("assembled gameplay display list and DLI switch a dedicated ANTIC 2 HUD", () => {
   const graphics = readGameGraphicsSource(source, definition);
-  const displayListAddress = labels.get("display_list");
-  const displayListLength = labels.get("display_list_jvb") - displayListAddress + 3;
-  const assembledDisplayList = readXexBytes(displayListAddress, displayListLength);
-  const expectedDisplayList = Buffer.from([
-    0x70, 0x70, 0x70,
-    0x42, 0x00, 0x40,
-    0x82,
-    ...Array(21).fill(0x04),
-    0x84,
-    0x41, displayListAddress & 0xff, displayListAddress >>> 8,
-  ]);
-  assert.deepEqual(assembledDisplayList, expectedDisplayList);
+  const builder = source.slice(
+    source.indexOf("build_playfield_display_list:"),
+    source.indexOf("rotate_playfield_rows:"),
+  );
+  assert.match(builder,
+    /lda #\$C2[\s\S]+lda #<GAMEPLAY_DIVIDER_SCREEN[\s\S]+cpy #\(6\+\(PLAYFIELD_RING_ROWS-1\)\*3\)[\s\S]+lda #\$C4[\s\S]+lda PLAYFIELD_ROW_LO,x[\s\S]+lda PLAYFIELD_ROW_HI,x[\s\S]+lda #\$41/);
+  assert.match(source,
+    /lda PLAYFIELD_ACTIVE_DLIST_LO\s+sta DLISTL\s+lda #>PLAYFIELD_DLIST_A\s+sta DLISTH/);
   assert.deepEqual(
     graphics.gameplayLayout.rows.map(({ mode }) => mode),
-    [2, 2, ...Array(22).fill(4)],
+    [2, ...Array(23).fill(4)],
   );
   assert.deepEqual(
     graphics.gameplayLayout.rows.map(({ screenOffset }) => screenOffset),
@@ -177,13 +187,21 @@ test("assembled gameplay display list and DLI switch a dedicated ANTIC 2 HUD", (
       `HUD glyph ${code} must be present in the dedicated charset`,
     );
   }
+  const percentCode = "%".charCodeAt(0) - 0x20;
+  assert.deepEqual(
+    graphics.hudCharset.subarray(percentCode * 8, percentCode * 8 + 8),
+    Uint8Array.from([0xcc, 0xd8, 0x18, 0x30, 0x60, 0x6c, 0xcc, 0xff]),
+    "HUD percent sign must use the native dedicated glyph copied at startup",
+  );
 
   const state = readGameplayRuntimeState(source, definition);
-  const hudRegisters = new Set(state.registerPixels.subarray(0, 16 * 320));
+  const hudRegisters = new Set(state.registerPixels.subarray(0, 8 * 320));
   assert.deepEqual(hudRegisters, new Set([0x00, 0x0e]));
-  const gameplayRegisters = new Set(state.registerPixels.subarray(16 * 320));
+  const separatorRegisters = new Set(state.registerPixels.subarray(7 * 320, 8 * 320));
+  assert.deepEqual(separatorRegisters, new Set([0x0e]));
+  const gameplayRegisters = new Set(state.registerPixels.subarray(8 * 320));
   assert.ok(gameplayRegisters.has(0x84));
-  assert.ok(gameplayRegisters.has(0x44));
+  assert.ok(gameplayRegisters.has(0x46));
 
   const dliAddress = labels.get("gameplay_dli");
   const dliBytes = readXexBytes(
@@ -202,12 +220,12 @@ test("assembled gameplay display list and DLI switch a dedicated ANTIC 2 HUD", (
   );
 });
 
-test("assembled ANTIC 2 HUD keeps live score and three-digit health fields", () => {
+test("assembled ANTIC 2 HUD keeps independent live score, life, and hull fields", () => {
   const absoluteStore = (address) => Buffer.from([0x8d, address & 0xff, address >>> 8]);
   const scoreAddress = labels.get("update_score_display");
   const scoreBytes = readXexBytes(
     scoreAddress,
-    labels.get("play_hit_sound") - scoreAddress,
+    labels.get("update_starfield") - scoreAddress,
   );
   for (let offset = 6; offset <= 10; offset += 1) {
     assert.notEqual(
@@ -217,30 +235,30 @@ test("assembled ANTIC 2 HUD keeps live score and three-digit health fields", () 
     );
   }
 
-  const lifeAddress = labels.get("update_life_display");
-  const lifeBytes = readXexBytes(
-    lifeAddress,
-    labels.get("life_tens_digits") - lifeAddress,
+  const statusAddress = labels.get("update_hud_status");
+  const statusBytes = readXexBytes(
+    statusAddress,
+    labels.get("begin_broadside_impact") - statusAddress,
   );
-  for (let offset = 33; offset <= 35; offset += 1) {
+  for (const offset of [18, 26, 27]) {
     assert.notEqual(
-      lifeBytes.indexOf(absoluteStore(0x4000 + offset)),
+      statusBytes.indexOf(absoluteStore(0x4000 + offset)),
       -1,
-      `health digit at screen offset ${offset} must remain live`,
+      `HUD status digit at screen offset ${offset} must remain live`,
     );
   }
-  assert.deepEqual(
-    readXexBytes(labels.get("life_tens_digits"), 5),
-    Buffer.from([0, 2, 4, 6, 8]),
-  );
+  assert.match(source, /hud_ascii:\s*\.byte "SCORE 00000  LIFE 3  HULL 100%"/);
+  assert.doesNotMatch(source, /hud_ascii:[\s\S]*?\.byte [^\n]*\b(?:FUEL|ARM)\b/);
+  assert.match(source,
+    /update_hud_status:[\s\S]+lda PLAYER_LIVES[\s\S]+HUD_LIFE_DIGIT_OFFSET[\s\S]+lda BROAD_PLAYER_HEALTH/);
 
   const startGameplay = readXexBytes(
     labels.get("start_gameplay"),
-    labels.get("main_loop") - labels.get("start_gameplay"),
+    labels.get("start_gameplay_end") - labels.get("start_gameplay"),
   );
   const jsr = (address) => Buffer.from([0x20, address & 0xff, address >>> 8]);
   assert.notEqual(startGameplay.indexOf(jsr(labels.get("update_score_display"))), -1);
-  assert.notEqual(startGameplay.indexOf(jsr(labels.get("update_life_display"))), -1);
+  assert.notEqual(startGameplay.indexOf(jsr(labels.get("update_hud_status"))), -1);
 });
 
 test("generated include, packed maps, codebooks, and turret records match assembled bytes", () => {
@@ -279,7 +297,7 @@ test("generated include, packed maps, codebooks, and turret records match assemb
   );
   assert.deepEqual(
     readXexBytes(labels.get("turret_warning_last_safe_rows"), 3),
-    Buffer.from([16, 15, 14]),
+    Buffer.from([12, 10, 9]),
     "assembled firing bounds reserve the complete 25-frame warning plus one hull row",
   );
   for (const side of ["allied", "enemy"]) {
@@ -399,7 +417,8 @@ test("assembled ANTIC 4 screen codes route allied steel and enemy burgundy effec
     .every(({ screenCode }) => (screenCode & 0x80) !== 0));
   assert.ok(asset.glyphs.filter(({ faction, tags }) =>
     faction === "enemy" && tags.includes("engine"))
-    .every(({ screenCode }) => (screenCode & 0x80) === 0));
+    .every(({ screenCode }) => (screenCode & 0x80) !== 0),
+  "enemy engine energy remains burgundy/red when PF2 is dedicated to yellow fire");
 
   const locate = (screenCode, pixelValue) => {
     const screenIndex = state.screen.findIndex((value) => value === screenCode);
@@ -414,7 +433,7 @@ test("assembled ANTIC 4 screen codes route allied steel and enemy burgundy effec
     return (characterRow * 8 + glyphLine) * 320 + column * 8 + pixel * 2;
   };
   assert.equal(state.registerPixels[locate(alliedMass.screenCode, 2)], 0x84);
-  assert.equal(state.registerPixels[locate(enemyMass.screenCode, 3)], 0x44);
+  assert.equal(state.registerPixels[locate(enemyMass.screenCode, 3)], 0x46);
 
   const bright = readCapitalHullsStripRuntimeState(source, definition, 0x46);
   assert.deepEqual(bright.screen, state.screen);
@@ -428,11 +447,11 @@ test("default gameplay phase exposes both factions' first turret without star ov
   for (const turret of visibleTurrets) {
     const cannonRow = asset.sector.cannonRowsBySide.get(turret.side)
       .find((row) => row < asset.sector.previewSectorRow &&
-        row >= asset.sector.previewSectorRow - 22);
+        row >= asset.sector.previewSectorRow - asset.sector.visibleRows);
     const leftRow = turret.side === "enemy"
       ? cannonRow + asset.sector.sidePhaseRows
       : cannonRow;
-    const screenRow = 2 + asset.sector.previewSectorRow - 1 - leftRow;
+    const screenRow = 1 + asset.sector.previewSectorRow - 1 - leftRow;
     const relative = turret.side === "allied" ? turret.muzzleColumn : turret.muzzleColumn - 31;
     assert.equal(
       state.screen[screenRow * 40 + turret.muzzleColumn],
@@ -444,7 +463,7 @@ test("default gameplay phase exposes both factions' first turret without star ov
   assert.ok(playerLeft >= 9 * 8 && playerRight <= 31 * 8);
 });
 
-test("assembled enemy spawn, steering, and final renderer clamp share one corridor envelope", () => {
+test("assembled enemy spawn, steering, and renderer use each archetype corridor envelope", () => {
   const state = readEnemyFighterLimitsRuntimeState(source, definition);
   assert.deepEqual(
     [state.minimum, state.maximum, state.visibleWidth, state.corridorLeft, state.corridorRight],
@@ -453,50 +472,50 @@ test("assembled enemy spawn, steering, and final renderer clamp share one corrid
   assert.equal(state.graphics.enemyShape.some((row) => row === 0xff), true,
     "the double-width P1 body establishes the full sixteen-HPOS visible envelope");
 
-  const routine = (start, end) => readXexBytes(labels.get(start), labels.get(end) - labels.get(start));
-  const has = (bytes, sequence) => bytes.indexOf(Buffer.from(sequence)) !== -1;
-  const update = routine("update_enemy", "draw_enemy");
-  assert.equal(has(update, [0xc9, 0xa0]), true, "right movement compares ENEMY_X_MAX=160");
-  assert.equal(has(update, [0xa9, 0xa0]), true, "right movement clamps before turning");
-  assert.equal(has(update, [0xc9, 0x50]), true, "left movement compares ENEMY_X_MIN=80");
-  assert.equal(has(update, [0xa9, 0x50]), true, "left movement clamps before turning");
+  const roster = compileEnemyRoster(
+    loadEnemyRosterDefinition(path.join(rootDirectory, "assets", "graphics", "enemy-roster.json")),
+    rootDirectory,
+  );
+  for (const [label, values] of [
+    ["enemy_visible_left_insets", roster.implemented.map((entry) => entry.visibleLeftInset)],
+    ["enemy_visible_widths", roster.implemented.map((entry) => entry.visibleWidth)],
+    ["enemy_logical_x_maxs", roster.implemented.map((entry) => entry.logicalBounds[1])],
+  ]) {
+    assert.deepEqual([...readXexBytes(labels.get(label), values.length)], values);
+  }
+  assert.match(source,
+    /clamp_enemy_x:[\s\S]+cmp #CORRIDOR_LEFT_HPOS[\s\S]+cmp enemy_logical_x_maxs,x/,
+    "the shared left corridor edge and per-archetype right edge remain authoritative");
 
-  const reset = routine("reset_enemy", "clamp_enemy_x");
-  assert.equal(has(reset, [0x29, 0x7f, 0xc9, 0x51]), true,
-    "spawn mapping bounds the source value to the inclusive 81-position corridor range");
-  assert.equal(has(reset, [0x69, 0x50]), true, "spawn adds the canonical left corridor origin");
+  for (const archetype of roster.implemented) {
+    const [minimum, maximum] = archetype.logicalBounds;
+    const spawns = Array.from({ length: 256 }, (_, random) => {
+      const range = maximum - minimum + 1;
+      let offset = random & 0x7f;
+      if (offset >= range) offset ^= 0x7f;
+      return offset + minimum;
+    });
+    assert.equal(Math.min(...spawns), minimum);
+    assert.equal(Math.max(...spawns), maximum);
+    assert.equal(spawns.every((x) =>
+      x >= state.corridorLeft && x + archetype.visibleWidth <= state.corridorRight), true);
 
-  const draw = routine("draw_enemy", "erase_enemy");
-  const clampAddress = labels.get("clamp_enemy_x");
-  assert.equal(has(draw, [0x20, clampAddress & 0xff, clampAddress >>> 8]), true,
-    "every renderer path applies the final canonical clamp");
-  assert.equal(has(draw, [0x8d, 0x01, 0xd0, 0x8d, 0x02, 0xd0]), true,
-    "P1 body and P2 scanner receive the same already-clamped HPOS");
-
-  const spawns = Array.from({ length: 256 }, (_, random) => {
-    let offset = random & 0x7f;
-    if (offset >= 81) offset ^= 0x7f;
-    return offset + state.minimum;
-  });
-  assert.equal(Math.min(...spawns), state.minimum);
-  assert.equal(Math.max(...spawns), state.maximum);
-  assert.equal(spawns.every((x) => x >= state.minimum && x + state.visibleWidth <= state.corridorRight), true);
-
-  for (const initial of [0, 79, 80, 120, 160, 161, 255]) {
-    let x = Math.min(state.maximum, Math.max(state.minimum, initial));
-    let direction = initial <= state.minimum ? 1 : 0;
-    let changed = false;
-    for (let step = 0; step < 1024; step += 1) {
-      const before = x;
-      if (direction === 1) {
-        if (x >= state.maximum) direction = 0;
-        else x += 1;
-      } else if (x <= state.minimum) direction = 1;
-      else x -= 1;
-      changed ||= x !== before;
-      assert.ok(x >= state.minimum && x + state.visibleWidth <= state.corridorRight);
+    for (const initial of [0, minimum - 1, minimum, maximum, maximum + 1, 255]) {
+      let x = Math.min(maximum, Math.max(minimum, initial));
+      let direction = initial <= minimum ? 1 : 0;
+      let changed = false;
+      for (let step = 0; step < 1024; step += 1) {
+        const before = x;
+        if (direction === 1) {
+          if (x >= maximum) direction = 0;
+          else x += 1;
+        } else if (x <= minimum) direction = 1;
+        else x -= 1;
+        changed ||= x !== before;
+        assert.ok(x >= minimum && x + archetype.visibleWidth <= state.corridorRight);
+      }
+      assert.equal(changed, true, `${archetype.id} retains active horizontal steering`);
     }
-    assert.equal(changed, true, "corridor bounding preserves active horizontal steering");
   }
 });
 
@@ -523,13 +542,11 @@ test("runtime map reservation and payload remain bounded and do not consume PMG 
     Uint8Array.from(readXexBytes(labels.get("enemy_collision_boundaries"), asset.segmentRows)),
     asset.collisionBoundaries.get("enemy"),
   );
-  const generator = source.slice(
-    source.indexOf("generate_corridor_row:"),
-    source.indexOf("random_byte:"),
-  );
-  assert.match(generator, /lda \(dst_ptr\),y\s+bne @occupied/);
+  const generator = source.slice(source.indexOf("generate_near_star_row:"),
+    source.indexOf("choose_star_column:"));
+  assert.match(generator, /lda \(dst_ptr\),y\s+bne @done/);
   assert.doesNotMatch(generator, /PMG|GRACTL|NMIEN|VDSLST|WSYNC/);
-  assert.match(source, /lda #22\s+sta row_counter[\s\S]+jsr generate_starfield_row/);
+  assert.match(source, /lda #GAMEPLAY_SCREEN_ROWS\s+sta row_counter[\s\S]+jsr generate_starfield_row/);
   assert.match(source, /scroll_world_columns:[\s\S]+generate_starfield_row/);
   assert.match(source, /scroll_hull_columns:[\s\S]+jsr draw_hull_row/);
 });
@@ -559,9 +576,15 @@ test("loader and accepted menu previews remain unchanged while hull previews are
 });
 
 test("joystick, FIRE, projectile, enemy, and scoring routines remain connected", () => {
-  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr update_bullet[\s\S]+jsr update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
+  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_viper_weapon[\s\S]+jsr update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
   assert.match(source, /read_input:[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
-  assert.match(source, /fire_bullet:[\s\S]+sta bullet_active/);
-  assert.match(source, /add_ten_points:[\s\S]+sed[\s\S]+cld[\s\S]+jsr update_score_display/);
-  assert.match(source, /update_enemy:[\s\S]+enemy_direction/);
+  assert.match(source,
+    /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #VIPER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #RAIDER_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
+  assert.doesNotMatch(source, /\b(?:bullet_x|bullet_y|bullet_active|refresh_bullet_active)\b/);
+  assert.match(source,
+    /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jsr update_top_score[\s\S]+jmp update_score_display/);
+  assert.match(source,
+    /update_enemy:[\s\S]+jsr update_raider_soft_pursuit[\s\S]+update_enemy_animation/);
+  assert.match(source,
+    /update_raider_soft_pursuit:[\s\S]+enemy_velocity_x[\s\S]+jmp clamp_enemy_x/);
 });

@@ -37,6 +37,7 @@ import {
   PLAYER_LIFECYCLE_STATES,
   PLAYER_RESPAWN_X,
   PLAYER_RESPAWN_Y,
+  SHARED_FIGHTER_EXPLOSION_TOTAL,
   projectileLeadingEdgeHitsHull,
   resetExitedTurretLifecycles,
   selectOldestEligibleTurret,
@@ -56,6 +57,7 @@ import {
   renderCapitalHullsCa65Include,
 } from "../scripts/capital-hulls.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import {
   createBroadsideAcceptanceSequencePreview,
   createBroadsideCadenceSequencePreview,
@@ -86,6 +88,15 @@ const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex")
 const broadsideRuntime = fs.readFileSync(
   path.join(rootDirectory, "build", "broadside-runtime.bin"),
 );
+const starfieldRuntime = fs.readFileSync(
+  path.join(rootDirectory, "build", "starfield-runtime.bin"),
+);
+const a2KernelRuntime = fs.readFileSync(
+  path.join(rootDirectory, "build", "a2-kernel-runtime.bin"),
+);
+const entityCodeRuntime = fs.readFileSync(
+  path.join(rootDirectory, "build", "entity-code-runtime.bin"),
+);
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -107,6 +118,27 @@ function routine(name, next) {
 }
 
 function xexBytesAt(address, length) {
+  const broadside = manifest.broadsideRuntime;
+  if (address >= broadside.runAddress && address + length <= broadside.runAddress + broadside.bytes) {
+    return broadsideRuntime.subarray(
+      address - broadside.runAddress,
+      address - broadside.runAddress + length,
+    );
+  }
+  const starfield = manifest.starfieldRuntime;
+  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
+    return starfieldRuntime.subarray(
+      address - starfield.runAddress,
+      address - starfield.runAddress + length,
+    );
+  }
+  const kernel = manifest.a2Kernel;
+  if (address >= kernel.runAddress && address + length <= kernel.runAddress + kernel.bytes) {
+    return a2KernelRuntime.subarray(
+      address - kernel.runAddress,
+      address - kernel.runAddress + length,
+    );
+  }
   let offset = 0;
   while (offset < xex.length) {
     if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
@@ -121,14 +153,46 @@ function xexBytesAt(address, length) {
     }
     offset += bytes;
   }
-  const runtime = manifest.broadsideRuntime;
-  if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
-    return broadsideRuntime.subarray(
-      address - runtime.runAddress,
-      address - runtime.runAddress + length,
-    );
-  }
   assert.fail(`XEX address $${address.toString(16)} is not in a segment`);
+}
+
+function createLinkedRuntimeMemory() {
+  const memory = new Uint8Array(0x10000);
+  let offset = 0;
+  while (offset < xex.length) {
+    if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
+    const start = xex.readUInt16LE(offset);
+    const end = xex.readUInt16LE(offset + 2);
+    offset += 4;
+    memory.set(xex.subarray(offset, offset + end - start + 1), start);
+    offset += end - start + 1;
+  }
+  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
+  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
+  memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
+  memory.set(entityCodeRuntime, manifest.entityEffects.codeRunAddress);
+  const rowLo = labels.get("PLAYFIELD_ROW_LO");
+  const rowHi = labels.get("PLAYFIELD_ROW_HI");
+  for (let row = 0; row < 22; row += 1) {
+    const address = 0x4050 + row * 40;
+    memory[rowLo + row] = address & 0xff;
+    memory[rowHi + row] = address >> 8;
+  }
+  memory[labels.get("PLAYFIELD_ACTIVE_DLIST_LO")] = labels.get("PLAYFIELD_DLIST_A") & 0xff;
+  memory[labels.get("PLAYFIELD_NEXT_DLIST_LO")] = labels.get("PLAYFIELD_DLIST_B") & 0xff;
+  memory[labels.get("PLAYFIELD_RING_FLAGS")] = 0;
+  return memory;
+}
+
+function runAssembledRoutine(memory, name) {
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = labels.get(name);
+  for (let steps = 0; steps < 100_000 && cpu.pc !== stop; steps += 1) cpu.step();
+  assert.equal(cpu.pc, stop, `${name} did not return`);
+  return cpu.cycles;
 }
 
 function containsBytes(haystack, needle) {
@@ -159,10 +223,26 @@ test("broadside source timing and schedule are deterministic and generated with 
     warningEarlyHeight: 2,
     warningMediumHeight: 4,
     worldScrollRateDenominator: 20,
-    hullScrollRateDenominator: 40,
+    hullScrollRateDenominator: 20,
     projectileSpeed: 2,
     warningHeight: 6,
     flyingHeight: 4,
+    projectileVisuals: {
+      player: { widthHpos: 1, height: 2, coreRegister: "COLPF2", coreValue: 0x1e },
+      raider: { widthHpos: 2, height: 3, register: "COLPF3", value: 0x46 },
+      capital: {
+        widthHpos: 8,
+        height: 6,
+        coreRegister: "COLPF0",
+        coreValue: 0x0e,
+        colonialRegister: "COLPF2",
+        colonialValue: 0x1e,
+        colonialAttribute: 0,
+        cylonRegister: "COLPF3",
+        cylonValue: 0x46,
+        cylonAttribute: 0x80,
+      },
+    },
     impactHeight: 8,
     impactFrames: 5,
     playerDamage: 20,
@@ -204,15 +284,28 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(packed), runtime);
   assert.deepEqual(packBroadsideLzss(runtime), packed);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
-  assert.ok(manifest.payloadBytes - 9644 <= 2560);
+  assert.deepEqual(manifest.payloadBudget.historicalRuntimeHeadroom, {
+    baselineBytes: 14314,
+    approvedDeltaBytes: 1536,
+    limitBytes: 15850,
+    finalBytes: 15759,
+    preservedForHistory: true,
+  });
+  assert.ok(manifest.payloadBudget.entityEffectsFoundation.actualDeltaBytes <=
+    manifest.payloadBudget.entityEffectsFoundation.approvedDeltaBytes);
+  const starRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
+  const starPacked = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime-packed.bin"));
+  assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
+  assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
+  assert.ok(starPacked.length <= 0x700);
   assert.match(routine("start", "unpack_broadside_runtime"),
-    /jsr unpack_broadside_runtime[\s\S]+jsr unpack_loader_bitmap/);
+    /jsr unpack_entity_runtime[\s\S]+jsr init_entity_effects[\s\S]+jsr unpack_broadside_runtime[\s\S]+jsr stage_a2_kernel[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });
 
 test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve every other pair", () => {
   assert.deepEqual(MISSILE_MASKS, [0x03, 0x0c, 0x30, 0xc0]);
   assert.deepEqual(MISSILE_CLEAR_MASKS, [0xfc, 0xf3, 0xcf, 0x3f]);
-  assert.deepEqual(MISSILE_COLORS, [0x0e, 0x0c, 0x46, 0x28]);
+  assert.deepEqual(MISSILE_COLORS, [0x0e, 0x84, 0x46, 0x28]);
   for (let byte = 0; byte <= 0xff; byte += 1) {
     for (let missile = 0; missile < 4; missile += 1) {
       const unrelated = MISSILE_CLEAR_MASKS[missile];
@@ -221,11 +314,15 @@ test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve e
       assert.equal(updateMissileSize(byte, missile, 1) & unrelated, byte & unrelated);
     }
   }
-  for (const name of ["fire_bullet", "update_bullet", "erase_bullet"]) {
-    const text = routine(name, name === "fire_bullet" ? "update_bullet" :
-      name === "update_bullet" ? "erase_bullet" : "update_enemy");
-    assert.match(text, /and #MISSILE_M0_CLEAR_MASK/);
+  for (const [name, end] of [["allocate_viper_projectile", "update_enemy_weapon_runtime"],
+    ["update_fighter_projectiles", "viper_projectile_hits_enemy"],
+    ["erase_bullet", "init_fighter_projectiles"]]) {
+    const text = routine(name, end);
+    assert.doesNotMatch(text, /MISSILES|HPOSM0|SIZEM/,
+      "fighter burst rendering must not consume or mutate M0");
   }
+  assert.match(routine("allocate_viper_projectile", "update_enemy_weapon_runtime"),
+    /FIGHTER_PROJECTILE_VIPER[\s\S]+initialize_projectile_screen_pointer/);
   assert.match(routine("init_broadside", "update_broadside"),
     /lda SIZEM[\s\S]+and #\$03[\s\S]+ora #BROADSIDE_DOUBLE_SIZES/);
 });
@@ -241,7 +338,7 @@ test("warnings start at source-declared visible muzzles and enforce the vertical
   assert.equal(Math.abs(enemy.y - allied.y), 32);
   assert.equal(enemy.timer, 25);
   assert.throws(() => beginWarning(
-    createBroadsideState(asset), asset, alliedTurretIndex, 0, 2), /unsafe turret/);
+    createBroadsideState(asset), asset, alliedTurretIndex, 0, 1), /unsafe turret/);
   assert.throws(() => beginWarning(
     state, asset, enemyTurretIndex, 2, 11), /vertical safety separation/);
   for (let frame = 0; frame < 24; frame += 1) advanceProjectile(enemy, asset);
@@ -259,12 +356,12 @@ test("firing opportunities choose the oldest safe visible cannon once per lifecy
   assert.deepEqual(
     ["easy", "medium", "hard"].map((difficulty) =>
       warningHullAdvanceAllowance(asset, difficulty)),
-    [5, 6, 7],
+    [10, 12, 13],
   );
   const selected = selectOldestEligibleTurret(state, asset, world, "allied");
   assert.equal(selected.turret.id, "allied_turret_a");
   assert.equal(selected.sectorRow, 64);
-  assert.equal(selected.visibleScreenRow, 5);
+  assert.equal(selected.visibleScreenRow, 4);
   beginWarning(
     state,
     asset,
@@ -332,14 +429,14 @@ test("three fixed slots move in faction directions and never allocate a fourth p
   assert.equal(allied.x, alliedX + 2);
 });
 
-test("assembled fractional cadence keeps the world rates and halves the hull stream", () => {
+test("assembled fractional cadence makes hull movement 100% of the legacy world rate", () => {
   assert.deepEqual(HULL_SCROLL_DIFFICULTIES, { easy: 0, medium: 1, hard: 2 });
   assert.equal(asset.broadside.worldScrollRateDenominator, 20);
-  assert.equal(asset.broadside.hullScrollRateDenominator, 40);
+  assert.equal(asset.broadside.hullScrollRateDenominator, 20);
   const expected = {
-    easy: { rate: 8, world: [8, 40, 400], hull: [4, 20, 200], scanlines: [160, 80] },
-    medium: { rate: 9, world: [9, 45, 450], hull: [4, 22, 225], scanlines: [180, 90] },
-    hard: { rate: 10, world: [10, 50, 500], hull: [5, 25, 250], scanlines: [200, 100] },
+    easy: { rate: 8, world: [8, 40, 400], hull: [8, 40, 400], scanlines: [160, 160] },
+    medium: { rate: 9, world: [9, 45, 450], hull: [9, 45, 450], scanlines: [180, 180] },
+    hard: { rate: 10, world: [10, 50, 500], hull: [10, 50, 500], scanlines: [200, 200] },
   };
   for (const [difficulty, contract] of Object.entries(expected)) {
     assert.equal(worldScrollRate(asset, difficulty), contract.rate);
@@ -377,8 +474,6 @@ test("assembled fractional cadence keeps the world rates and halves the hull str
   assert.equal(hard.advances, 1);
   assert.equal(hard.visibleScrolls, 0);
   assert.equal(advanceHullScroll(hard, asset), false);
-  assert.equal(advanceHullScroll(hard, asset), false);
-  assert.equal(advanceHullScroll(hard, asset), false);
   assert.equal(advanceHullScroll(hard, asset), true);
   assert.equal(hard.visibleScrolls, 1);
   assert.equal(hard.visibleRows[0], 0);
@@ -403,14 +498,14 @@ test("assembled fractional cadence keeps the world rates and halves the hull str
     "DIFFICULTY_SETTING",
   );
   assert.deepEqual([...broadsideRuntimeBytesAt(rateTableAddress, 3)], [8, 9, 10]);
-  const update = broadsideRuntimeBytesAt(labels.get("update_starfield"), 48);
-  assert.deepEqual([...update.subarray(0, 11)], [
+  const update = xexBytesAt(labels.get("update_starfield"), 56);
+  assert.notEqual(update.indexOf(Buffer.from([
     0xae, difficultyAddress & 0xff,
     difficultyAddress >> 8,
     0xa5, labels.get("scroll_accumulator"), 0x18, 0x7d,
     labels.get("world_scroll_rates") & 0xff,
     labels.get("world_scroll_rates") >> 8, 0xc9, 20,
-  ]);
+  ])), -1);
   assert.notEqual(update.indexOf(Buffer.from([0xe9, 20, 0x85,
     labels.get("scroll_accumulator")])), -1);
   const init = xexBytesAt(
@@ -423,34 +518,299 @@ test("assembled fractional cadence keeps the world rates and halves the hull str
     difficultyAddress + 1 & 0xff, difficultyAddress + 1 >> 8])), -1);
 });
 
-test("PAL-frame scheduler remains independent of both world and hull scrolling", () => {
+test("tracked muzzle records replace the 23-row redraw scan without changing scroll cadence", () => {
+  const update = routine("update_starfield", "generate_corridor_row");
+  const worldRing = routine("scroll_world_columns", "init_playfield_display_lists");
+  const hullCopy = routine("scroll_hull_columns", "update_sector_state");
+  assert.match(update,
+    /lda scroll_accumulator[\s\S]+cmp world_scroll_rates,x[\s\S]+bcc @finalize_world[\s\S]+jmp scroll_hull_columns/);
+  assert.match(worldRing,
+    /sta PLAYFIELD_RING_FLAGS\s+jsr rotate_playfield_rows[\s\S]+sta CORRIDOR_BOUNDARY_LEFT[\s\S]+sta CORRIDOR_BOUNDARY_RIGHT/,
+    "a world step must rotate LMS rows and shift the two backing streams");
+  assert.match(hullCopy,
+    /jsr restore_active_muzzles[\s\S]+jsr advance_tracked_muzzles[\s\S]+jsr track_top_muzzles[\s\S]+jsr redraw_tracked_muzzles/,
+    "a hull step must restore, advance, claim and redraw at most two tracked records");
+  assert.doesNotMatch(source, /restore_boundary_stars:/,
+    "the ring must retain existing boundary cells rather than rewrite 46 cells");
+  assert.doesNotMatch(source, /redraw_visible_muzzles:/,
+    "the removed full visible-row scan must not return");
+  assert.match(routine("reset_exited_turret_lifecycles", "generate_corridor_row"),
+    /lda MUZZLE_SCREEN_HI,x[\s\S]+sta BROAD_TURRET_FIRED,x/,
+    "turret lifecycle release must use the same tracked visibility record");
+});
+
+test("assembled muzzle records preserve backing and complete the full visible lifecycle", () => {
+  const memory = createLinkedRuntimeMemory();
+  const muzzleRow = labels.get("MUZZLE_VISIBLE_ROW");
+  const muzzleLo = labels.get("MUZZLE_SCREEN_LO");
+  const muzzleHi = labels.get("MUZZLE_SCREEN_HI");
+  const leftBacking = labels.get("CORRIDOR_BOUNDARY_LEFT");
+  const rightBacking = labels.get("CORRIDOR_BOUNDARY_RIGHT");
+  const turretFired = labels.get("BROAD_TURRET_FIRED");
+  const destination = labels.get("dst_ptr");
+  const gameplayScreen = 0x4028;
+  const alliedColumn = 8;
+  const enemyColumn = 31;
+
+  for (let row = 0; row < 23; row += 1) {
+    memory[leftBacking + row] = 0x10 + row;
+    memory[rightBacking + row] = 0x30 + row;
+  }
+  memory[destination] = gameplayScreen & 0xff;
+  memory[destination + 1] = gameplayScreen >> 8;
+  memory[gameplayScreen + alliedColumn] = 0x45;
+  memory[gameplayScreen + enemyColumn] = 0xd0;
+  runAssembledRoutine(memory, "track_top_muzzles");
+
+  assert.deepEqual(
+    [memory[muzzleRow], memory[muzzleRow + 1]],
+    [0, 0],
+  );
+  assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8, gameplayScreen + alliedColumn);
+  assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
+    gameplayScreen + enemyColumn);
+
+  runAssembledRoutine(memory, "restore_active_muzzles");
+  assert.equal(memory[gameplayScreen + alliedColumn], 0x10);
+  assert.equal(memory[gameplayScreen + enemyColumn], 0x30);
+  runAssembledRoutine(memory, "redraw_tracked_muzzles");
+  assert.equal(memory[gameplayScreen + alliedColumn], 0x45);
+  assert.equal(memory[gameplayScreen + enemyColumn], 0xd0);
+
+  memory[turretFired] = 1;
+  memory[turretFired + 1] = 1;
+  for (let row = 1; row < 23; row += 1) {
+    runAssembledRoutine(memory, "restore_active_muzzles");
+    runAssembledRoutine(memory, "advance_tracked_muzzles");
+    assert.deepEqual([memory[muzzleRow], memory[muzzleRow + 1]], [row, row]);
+    assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8,
+      gameplayScreen + row * 40 + alliedColumn);
+    assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
+      gameplayScreen + row * 40 + enemyColumn);
+  }
+  runAssembledRoutine(memory, "reset_exited_turret_lifecycles");
+  assert.deepEqual([memory[turretFired], memory[turretFired + 1]], [1, 1]);
+
+  runAssembledRoutine(memory, "restore_active_muzzles");
+  runAssembledRoutine(memory, "advance_tracked_muzzles");
+  assert.deepEqual(
+    [memory[muzzleRow], memory[muzzleRow + 1], memory[muzzleHi], memory[muzzleHi + 1]],
+    [0, 0, 0, 0],
+  );
+  runAssembledRoutine(memory, "reset_exited_turret_lifecycles");
+  assert.deepEqual([memory[turretFired], memory[turretFired + 1]], [0, 0]);
+
+  memory[muzzleRow] = 9;
+  memory[muzzleHi] = 0x42;
+  runAssembledRoutine(memory, "init_broadside");
+  assert.deepEqual(
+    Array.from(memory.subarray(muzzleRow, muzzleHi + 2)),
+    [0, 0, 0, 0, 0, 0],
+    "a new sector/game lifecycle cannot inherit stale muzzle records",
+  );
+});
+
+test("hybrid world ring and hull-only copy preserve every logical row and both hull bands", () => {
+  const gameplayScreen = 0x4028;
+  const rowLo = labels.get("PLAYFIELD_ROW_LO");
+  const rowHi = labels.get("PLAYFIELD_ROW_HI");
+  const leftBacking = labels.get("CORRIDOR_BOUNDARY_LEFT");
+  const rightBacking = labels.get("CORRIDOR_BOUNDARY_RIGHT");
+  const logicalAddress = (memory, row) => row === 0
+    ? gameplayScreen
+    : memory[rowLo + row - 1] | memory[rowHi + row - 1] << 8;
+  const fillScreen = (memory) => {
+    for (let row = 0; row < 23; row += 1) {
+      for (let column = 0; column < 40; column += 1) {
+        memory[gameplayScreen + row * 40 + column] = (row * 41 + column * 7 + 3) & 0xff;
+      }
+      memory[leftBacking + row] = 0x20 + row;
+      memory[rightBacking + row] = 0x60 + row;
+    }
+    return Uint8Array.from(memory.subarray(gameplayScreen, gameplayScreen + 23 * 40));
+  };
+
+  const corridorMemory = createLinkedRuntimeMemory();
+  const corridorBefore = fillScreen(corridorMemory);
+  corridorMemory[0x4ea5] = 0;
+  runAssembledRoutine(corridorMemory, "scroll_world_columns");
+  for (let row = 1; row < 23; row += 1) {
+    const address = logicalAddress(corridorMemory, row);
+    for (let column = 8; column <= 31; column += 1) {
+      assert.equal(corridorMemory[address + column],
+        corridorBefore[(row - 1) * 40 + column], `corridor ${row},${column}`);
+    }
+    assert.equal(corridorMemory[leftBacking + row], 0x20 + row - 1);
+    assert.equal(corridorMemory[rightBacking + row], 0x60 + row - 1);
+  }
+
+  const completeMemory = createLinkedRuntimeMemory();
+  const completeBefore = fillScreen(completeMemory);
+  completeMemory[0x4ea5] = 6;
+  runAssembledRoutine(completeMemory, "scroll_world_columns");
+  for (let row = 1; row < 23; row += 1) {
+    const address = logicalAddress(completeMemory, row);
+    for (let column = 0; column < 40; column += 1) {
+      assert.equal(completeMemory[address + column],
+        completeBefore[(row - 1) * 40 + column], `complete ${row},${column}`);
+    }
+  }
+
+  const hullMemory = createLinkedRuntimeMemory();
+  const hullBefore = fillScreen(hullMemory);
+  hullMemory[0x4ea5] = 0;
+  hullMemory[labels.get("corridor_phase")] = 32;
+  runAssembledRoutine(hullMemory, "scroll_hull_columns");
+  for (let row = 1; row < 23; row += 1) {
+    for (const column of [0, 1, 6, 7, 32, 33, 38, 39]) {
+      assert.equal(hullMemory[gameplayScreen + row * 40 + column],
+        hullBefore[(row - 1) * 40 + column], `hull ${row},${column}`);
+    }
+  }
+});
+
+test("HUD and divider LMS remain fixed for every one of the 22 ring heads", () => {
+  const memory = createLinkedRuntimeMemory();
+  const rowLo = labels.get("PLAYFIELD_ROW_LO");
+  const rowHi = labels.get("PLAYFIELD_ROW_HI");
+  const activeListLo = labels.get("PLAYFIELD_ACTIVE_DLIST_LO");
+  const dlistl = 0xd402;
+  runAssembledRoutine(memory, "init_playfield_row_table");
+  runAssembledRoutine(memory, "init_playfield_display_lists");
+
+  for (let head = 0; head < 22; head += 1) {
+    const list = 0x7f00 | memory[activeListLo];
+    assert.deepEqual(Array.from(memory.subarray(list, list + 6)), [
+      0xc2, 0x00, 0x40,
+      0x44, 0x28, 0x40,
+    ], `head ${head} must keep HUD=$4000 and divider=$4028`);
+
+    const addresses = [];
+    for (let row = 0; row < 22; row += 1) {
+      const offset = list + 6 + row * 3;
+      assert.equal(memory[offset], row === 21 ? 0xc4 : 0x44,
+        `head ${head}, row ${row} mode`);
+      const address = memory[offset + 1] | memory[offset + 2] << 8;
+      addresses.push(address);
+      assert.equal(address, memory[rowLo + row] | memory[rowHi + row] << 8,
+        `head ${head}, row ${row} mapper/list mismatch`);
+    }
+    assert.equal(new Set(addresses).size, 22, `head ${head} duplicates a ring row`);
+    assert.deepEqual(addresses, Array.from({ length: 22 }, (_, row) =>
+      0x4050 + ((row - head + 22) % 22) * 40));
+    assert.deepEqual(Array.from(memory.subarray(list + 72, list + 75)),
+      [0x41, list & 0xff, 0x7f]);
+
+    runAssembledRoutine(memory, "rotate_playfield_rows");
+    assert.equal(memory[dlistl], memory[activeListLo], "publication must switch DLISTL only");
+    runAssembledRoutine(memory, "prebuild_next_playfield_display_list");
+  }
+});
+
+test("optimized Viper PMG keeps horizontal pixels and clears only the departed vertical row", () => {
+  const player0 = 0x3c00;
+  const player3 = 0x3f00;
+  const stick0 = 0xd300;
+  const trig0 = 0xd010;
+  const hposp0 = 0xd000;
+  const hposp3 = 0xd003;
+  const lifecycle = 0x4eaa;
+  const blinkFrame = 0x4ead;
+  const playerX = labels.get("player_x");
+  const playerY = labels.get("player_y");
+  const fireGate = labels.get("gameplay_fire_gate");
+  const shape = xexBytesAt(labels.get("player_shape"), 16);
+  const engine = xexBytesAt(labels.get("player_engine_shape"), 16);
+
+  const prepared = () => {
+    const memory = createLinkedRuntimeMemory();
+    memory[playerX] = 124;
+    memory[playerY] = 100;
+    memory[fireGate] = 1;
+    memory[trig0] = 1;
+    memory[lifecycle] = 0;
+    memory.set(shape, player0 + 100);
+    memory.set(engine, player3 + 100);
+    return memory;
+  };
+
+  const horizontal = prepared();
+  const beforeP0 = Uint8Array.from(horizontal.subarray(player0, player0 + 256));
+  const beforeP3 = Uint8Array.from(horizontal.subarray(player3, player3 + 256));
+  horizontal[stick0] = 0x0b;
+  runAssembledRoutine(horizontal, "read_input");
+  assert.equal(horizontal[playerX], 122);
+  assert.deepEqual(horizontal.subarray(player0, player0 + 256), beforeP0);
+  assert.deepEqual(horizontal.subarray(player3, player3 + 256), beforeP3);
+  assert.deepEqual([horizontal[hposp0], horizontal[hposp3]], [122, 122]);
+
+  const upward = prepared();
+  upward[stick0] = 0x0e;
+  runAssembledRoutine(upward, "read_input");
+  assert.equal(upward[playerY], 99);
+  assert.deepEqual([...upward.subarray(player0 + 99, player0 + 115)], [...shape]);
+  assert.deepEqual([...upward.subarray(player3 + 99, player3 + 115)], [...engine]);
+  assert.equal(upward[player0 + 115], 0);
+  assert.equal(upward[player3 + 115], 0);
+
+  const downward = prepared();
+  downward[stick0] = 0x0d;
+  runAssembledRoutine(downward, "read_input");
+  assert.equal(downward[playerY], 101);
+  assert.equal(downward[player0 + 100], 0);
+  assert.equal(downward[player3 + 100], 0);
+  assert.deepEqual([...downward.subarray(player0 + 101, player0 + 117)], [...shape]);
+  assert.deepEqual([...downward.subarray(player3 + 101, player3 + 117)], [...engine]);
+
+  const hiddenBlink = prepared();
+  hiddenBlink[lifecycle] = 2;
+  hiddenBlink[blinkFrame] = 8;
+  hiddenBlink[stick0] = 0x0f;
+  runAssembledRoutine(hiddenBlink, "read_input");
+  assert.deepEqual([...hiddenBlink.subarray(player0 + 100, player0 + 116)],
+    Array(16).fill(0));
+  assert.deepEqual([...hiddenBlink.subarray(player3 + 100, player3 + 116)],
+    Array(16).fill(0));
+});
+
+test("muzzle tracking resets with a new sector/game but survives a same-sector life loss", () => {
+  const respawn = routine("respawn_player", "tick_respawn_invulnerability");
+  const init = routine("init_broadside", "update_player_death");
+  assert.doesNotMatch(respawn, /MUZZLE_(?:VISIBLE_ROW|SCREEN_LO|SCREEN_HI)/,
+    "respawn must not remove a still-visible hull muzzle from the unchanged sector");
+  assert.match(init,
+    /MUZZLE_VISIBLE_ROW,x[\s\S]+MUZZLE_SCREEN_LO,x[\s\S]+MUZZLE_SCREEN_HI,x/,
+    "a new game/sector must clear both tracked records");
+});
+
+test("PAL-frame scheduler keeps its timing while the faster finite hull pass shortens opportunities", () => {
   const corrected = simulateBroadsideCadence(asset, { frames: 1000 });
   assert.deepEqual(corrected.warningStats, {
-    count: 4, allied: 2, enemy: 2, minimumGap: 75, averageGap: 110.66666666666667,
+    count: 2, allied: 1, enemy: 1, minimumGap: 103, averageGap: 103,
   });
   assert.deepEqual(corrected.launchStats, {
-    count: 4, allied: 2, enemy: 2, minimumGap: 75, averageGap: 110.66666666666667,
+    count: 2, allied: 1, enemy: 1, minimumGap: 103, averageGap: 103,
   });
   assert.equal(corrected.maximumStartsPerFrame, 1);
   assert.equal(corrected.cancelledWarnings, 0);
-  assert.deepEqual(corrected.deferred, { busy: 0, invisible: 85, separation: 0 });
-  assert.equal(corrected.scheduleAttempts, 89);
+  assert.deepEqual(corrected.deferred, { busy: 0, invisible: 44, separation: 0 });
+  assert.equal(corrected.scheduleAttempts, 46);
 
   const longCorrected = simulateBroadsideCadence(asset, { frames: 10000 });
   assert.deepEqual(
     [longCorrected.warningStats.count, longCorrected.launchStats.count],
-    [4, 4],
+    [2, 2],
   );
   assert.deepEqual(
     [longCorrected.warningStats.allied, longCorrected.warningStats.enemy],
-    [2, 2],
+    [1, 1],
   );
   assert.deepEqual(
     [longCorrected.launchStats.allied, longCorrected.launchStats.enemy],
-    [2, 2],
+    [1, 1],
   );
-  assert.deepEqual(longCorrected.deferred, { busy: 0, invisible: 85, separation: 0 });
-  assert.equal(longCorrected.scheduleAttempts, 89);
+  assert.deepEqual(longCorrected.deferred, { busy: 0, invisible: 44, separation: 0 });
+  assert.equal(longCorrected.scheduleAttempts, 46);
   assert.equal(longCorrected.cancelledWarnings, 0);
   assert.equal(longCorrected.finalSectorState, 6);
   assert.deepEqual(
@@ -497,23 +857,24 @@ test("every difficulty keeps warnings and source-derived contact on its shifted 
     assert.equal(safe.collided, false, `${difficulty} keeps the central lane clear`);
     assert.equal(allied.side, "allied", `${difficulty} uses the shifted allied boundary`);
     assert.equal(enemy.side, "enemy", `${difficulty} uses the shifted enemy boundary`);
-    assert.deepEqual(safe.segmentRows, world.visibleRows.slice(8, 10));
+    assert.deepEqual(safe.segmentRows, world.visibleRows.slice(12, 14));
   }
   assert.equal(asset.broadside.projectileSpeed, 2);
 });
 
-test("speed sequence decouples world motion while warning follows only the hull boundary", () => {
+test("speed sequence couples hulls to the legacy world clock", () => {
   const snapshots = simulateBroadsideSpeedSequence(asset);
   assert.deepEqual(snapshots.map(({ frame, scrolled }) => [frame, scrolled]), [
     [0, false], [1, false], [2, true], [3, false], [4, true],
   ]);
   assert.deepEqual(snapshots.map(({ world }) => world.advances), [0, 0, 1, 1, 2]);
   assert.deepEqual(snapshots.map(({ world }) => world.accumulator), [0, 10, 0, 10, 0]);
-  assert.deepEqual(snapshots.map(({ world }) => world.hullAdvances), [0, 0, 0, 0, 1]);
-  assert.deepEqual(snapshots.map(({ warning }) => warning.y), [116, 116, 116, 116, 124]);
+  assert.deepEqual(snapshots.map(({ world }) => world.hullAdvances), [0, 0, 1, 1, 2]);
+  assert.deepEqual(snapshots.map(({ warning }) => warning.y), [92, 92, 100, 100, 108]);
   assert.deepEqual(snapshots.map(({ projectile }) => projectile.x), [162, 160, 158, 156, 154]);
   assert.deepEqual(snapshots[0].world.visibleRows, snapshots[1].world.visibleRows);
-  assert.deepEqual(snapshots[0].world.visibleRows, snapshots[3].world.visibleRows);
+  assert.notDeepEqual(snapshots[1].world.visibleRows, snapshots[2].world.visibleRows);
+  assert.deepEqual(snapshots[2].world.visibleRows, snapshots[3].world.visibleRows);
   assert.notDeepEqual(snapshots[3].world.visibleRows, snapshots[4].world.visibleRows);
 });
 
@@ -540,20 +901,20 @@ test("source-derived hull contact clamps P0/P3 and shares one deterministic dama
   const safe = playerHullContact(asset, { ...initial, playerX: 128, playerY: 112 });
   assert.equal(safe.collided, false);
 
-  const allied = playerHullContact(asset, { ...initial, playerX: 82, playerY: 112 });
+  const allied = playerHullContact(asset, { ...initial, playerX: 82, playerY: 80 });
   assert.deepEqual(allied.segmentRows, [8, 9]);
   assert.equal(allied.side, "allied");
   assert.equal(allied.alliedBoundary, 84, "allied turret projection is solid");
   assert.equal(allied.clampedX, 84);
 
-  const enemy = playerHullContact(asset, { ...initial, playerX: 166, playerY: 144 });
+  const enemy = playerHullContact(asset, { ...initial, playerX: 166, playerY: 112 });
   assert.deepEqual(enemy.segmentRows, [12, 13]);
   assert.equal(enemy.side, "enemy");
   assert.equal(enemy.enemyBoundary, 172, "enemy turret projection is solid");
   assert.equal(enemy.clampedX, 164);
 
-  const irregular = playerHullContact(asset, { ...initial, playerX: 78, playerY: 80 });
-  assert.deepEqual(irregular.segmentRows, [4, 5]);
+  const irregular = playerHullContact(asset, { ...initial, playerX: 78, playerY: 56 });
+  assert.deepEqual(irregular.segmentRows, [5, 6]);
   assert.equal(irregular.alliedBoundary, 80, "adjacent source rows use their deepest edge");
   assert.equal(irregular.clampedX, 80);
 
@@ -606,7 +967,7 @@ test("centered player survives every finite hull row while runtime contact state
 
   assert.match(source,
     /PLAYER_CONTACT_ROWS\s*=.+\nPLAYER_CONTACT_LEFT\s*=.+\nPLAYER_CONTACT_RIGHT\s*=/);
-  const contactRoutine = routine("handle_player_hull_contact", "clear_broadside_pool");
+  const contactRoutine = routine("handle_player_hull_contact", "free_broadside_slot");
   assert.match(contactRoutine,
     /sta PLAYER_CONTACT_ROWS[\s\S]+sta PLAYER_CONTACT_LEFT[\s\S]+sta PLAYER_CONTACT_RIGHT/);
   assert.doesNotMatch(contactRoutine, /sta BROAD_WORK_COUNT\s*;.*rows|dec BROAD_WORK_COUNT/);
@@ -616,12 +977,12 @@ test("assembled hull contact uses dedicated boundaries instead of resolver scrat
   const graphics = readGameGraphicsSource(source, definition);
   const constants = graphics.constants;
   const start = labels.get("handle_player_hull_contact");
-  const end = labels.get("clear_broadside_pool");
+  const end = labels.get("free_broadside_slot");
   const bytes = xexBytesAt(start, end - start);
   const residentAddresses = {
-    PLAYER_CONTACT_ROWS: 0x4ea5,
-    PLAYER_CONTACT_LEFT: 0x4ea6,
-    PLAYER_CONTACT_RIGHT: 0x4ea7,
+    PLAYER_CONTACT_ROWS: 0x4ea7,
+    PLAYER_CONTACT_LEFT: 0x4ea8,
+    PLAYER_CONTACT_RIGHT: 0x4ea9,
     BROAD_WORK_COUNT: constants.get("BROAD_WORK_COUNT"),
     BROAD_WORK_VALUE: constants.get("BROAD_WORK_VALUE"),
   };
@@ -643,7 +1004,7 @@ test("heavy impact wins simultaneous damage precedence while hull contact still 
   const graphics = readGameGraphicsSource(source, definition);
   const envelope = combinedPlayerEnvelope(graphics.playerShape, graphics.playerEngineShape);
   const contact = playerHullContact(asset, {
-    playerX: 82,
+    playerX: 48,
     playerY: 112,
     corridorPhase: 22,
     visibleScrolls: 0,
@@ -658,11 +1019,11 @@ test("heavy impact wins simultaneous damage precedence while hull contact still 
   assert.equal(state.health, 80, "one PAL frame subtracts damage only once");
   assert.match(routine("main_loop", "wait_frame"),
     /jsr handle_collisions[\s\S]+jsr update_starfield[\s\S]+jsr handle_player_hull_contact/);
-  assert.match(routine("handle_player_hull_contact", "clear_broadside_pool"),
+  assert.match(routine("handle_player_hull_contact", "free_broadside_slot"),
     /sta player_x[\s\S]+sta HPOSP0[\s\S]+sta HPOSP3[\s\S]+jmp apply_broadside_player_damage/);
-  assert.doesNotMatch(routine("handle_player_hull_contact", "clear_broadside_pool"),
+  assert.doesNotMatch(routine("handle_player_hull_contact", "free_broadside_slot"),
     /jsr erase_player|jsr draw_player/);
-  assert.doesNotMatch(routine("handle_player_hull_contact", "clear_broadside_pool"), /P0PF|P3PF/);
+  assert.doesNotMatch(routine("handle_player_hull_contact", "free_broadside_slot"), /P0PF|P3PF/);
 });
 
 test("five hull contacts enter one guarded death lifecycle and leave source stars irrelevant", () => {
@@ -670,7 +1031,7 @@ test("five hull contacts enter one guarded death lifecycle and leave source star
   const envelope = combinedPlayerEnvelope(graphics.playerShape, graphics.playerEngineShape);
   const contact = playerHullContact(asset, {
     playerX: 82,
-    playerY: 112,
+    playerY: 80,
     corridorPhase: 22,
     visibleScrolls: 0,
     envelope,
@@ -687,27 +1048,34 @@ test("five hull contacts enter one guarded death lifecycle and leave source star
   assert.equal(asset.collisionBoundaries.get("allied").length, 32);
   assert.equal(asset.collisionBoundaries.get("enemy").length, 32);
   assert.match(routine("update_player_death", "respawn_player"),
-    /erase_player[\s\S]+PLAYER_LIVES[\s\S]+jsr respawn_player/);
+    /BROAD_DEATH_TIMER[\s\S]+PLAYER_LIVES[\s\S]+jsr respawn_player/);
+  assert.match(source,
+    /apply_player_damage:[\s\S]+jsr begin_player_fighter_explosion/);
 });
 
-test("crossfire ownership preserves score and hostile-fighter faction immunity", () => {
+test("both capital factions can hit a fighter while scoring remains source-owned", () => {
   const state = createBroadsideState(asset);
   const allied = beginWarning(state, asset, alliedTurretIndex, 0, 10);
   const enemy = beginWarning(state, asset, enemyTurretIndex, 1, 14);
   allied.state = enemy.state = BROADSIDE_STATES.FLYING;
   assert.equal(hitHostileFighter(state, allied, asset), true);
   assert.equal(state.score, 0);
-  assert.equal(hitHostileFighter(state, enemy, asset), false);
+  assert.equal(hitHostileFighter(state, enemy, asset), true);
   assert.equal(state.score, 0);
-  assert.match(routine("handle_collisions", "add_ten_points"),
-    /BROAD_M0_COLLISION[\s\S]+jsr add_ten_points[\s\S]+jsr update_broadside/);
+  assert.match(routine("handle_collisions", "update_score_display"),
+    /jsr update_fighter_projectiles[\s\S]+jsr update_broadside[\s\S]+jsr resolve_enemy_damage/);
+  assert.match(routine("update_fighter_projectiles", "viper_projectile_hits_enemy"),
+    /DAMAGE_PLAYER_PROJECTILE[\s\S]+jsr queue_enemy_damage/);
+  assert.match(routine("update_broadside", "schedule_broadside"),
+    /@flying:[\s\S]+jmp @targets[\s\S]+@targets:[\s\S]+jsr capital_shell_collision_flags/);
 });
 
 test("opposite-hull impacts use source row geometry, ignore stars, and saturate counters", () => {
   const state = createBroadsideState(asset);
   const allied = beginWarning(state, asset, alliedTurretIndex, 0, 10);
   allied.state = BROADSIDE_STATES.FLYING;
-  allied.x = hullBoundary(asset, "enemy", 8) - 3;
+  allied.x = hullBoundary(asset, "enemy", 8) -
+    asset.broadside.projectileVisuals.capital.widthHpos - 1;
   assert.equal(projectileLeadingEdgeHitsHull(allied, asset, 8), false);
   allied.x += 1;
   assert.equal(projectileLeadingEdgeHitsHull(allied, asset, 8), true);
@@ -715,7 +1083,7 @@ test("opposite-hull impacts use source row geometry, ignore stars, and saturate 
   hitOppositeHull(state, allied, asset);
   hitOppositeHull(state, allied, asset);
   assert.equal(state.enemyHullHits, 255);
-  assert.match(routine("broadside_hits_opposite_hull", "clear_broadside_pool"),
+  assert.match(routine("broadside_hits_opposite_hull", "free_broadside_slot"),
     /and #\$7F[\s\S]+cmp #CAPITAL_HULL_GLYPH_BASE/);
   assert.ok(asset.definition.charsetBaseIndex > 14, "star glyphs remain below hull glyph range");
 });
@@ -742,10 +1110,10 @@ test("impact and offscreen paths erase a slot, while zero health enters guarded 
   assert.equal(lethal.health, 0);
   assert.equal(lethal.lives, 2);
   assert.equal(lethal.playerLifecycle, PLAYER_LIFECYCLE_STATES.DYING);
-  assert.match(routine("apply_broadside_player_damage", "update_life_display"),
-    /PLAYER_DYING[\s\S]+dec PLAYER_LIVES[\s\S]+BROADSIDE_RETURN_TO_MENU_FRAMES[\s\S]+jsr erase_bullet/);
+  assert.match(routine("apply_broadside_player_damage", "update_hud_status"),
+    /PLAYER_DYING[\s\S]+dec PLAYER_LIVES[\s\S]+SHARED_FIGHTER_EXPLOSION_TOTAL[\s\S]+jsr erase_bullet/);
   assert.match(routine("main_loop", "wait_frame"),
-    /jsr update_player_death[\s\S]+jsr clear_pmg[\s\S]+jsr enter_main_menu[\s\S]+jmp frontend_loop/);
+    /jsr update_player_death[\s\S]+jsr clear_pmg[\s\S]+jsr silence_audio[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop/);
 });
 
 test("death decrements one life and respawns atomically at canonical corridor center", () => {
@@ -759,7 +1127,7 @@ test("death decrements one life and respawns atomically at canonical corridor ce
   assert.equal(applyPlayerDamage(state, asset, 20, 25, 50), false);
   assert.equal(state.lives, 2, "same-frame and dead-state damage cannot consume another life");
 
-  for (let frame = 0; frame < asset.broadside.returnToMenuFrames - 1; frame += 1) {
+  for (let frame = 0; frame < SHARED_FIGHTER_EXPLOSION_TOTAL - 1; frame += 1) {
     assert.equal(advancePlayerLifecycle(state, asset), "dying");
     assert.notEqual(state.playerX, 0, "death presentation never exposes an uninitialized X");
   }
@@ -780,7 +1148,7 @@ test("respawn is invulnerable for exactly 250 controlled blinking PAL frames", (
   const state = createBroadsideState(asset);
   state.health = 20;
   applyPlayerDamage(state, asset, 20, 25, 0);
-  for (let frame = 0; frame < asset.broadside.returnToMenuFrames; frame += 1) {
+  for (let frame = 0; frame < SHARED_FIGHTER_EXPLOSION_TOTAL; frame += 1) {
     advancePlayerLifecycle(state, asset);
   }
   const positions = [];
@@ -811,10 +1179,10 @@ test("respawn is invulnerable for exactly 250 controlled blinking PAL frames", (
   assert.equal(state.health, 80);
 
   assert.match(routine("main_loop", "wait_frame"),
-    /cmp #PLAYER_DYING[\s\S]+jsr read_input[\s\S]+jsr update_bullet/);
-  assert.match(routine("draw_player_for_lifecycle", "fire_bullet"),
+    /cmp #PLAYER_DYING[\s\S]+jsr read_input[\s\S]+jsr update_viper_weapon/);
+  assert.match(routine("draw_player_for_lifecycle", "begin_player_fighter_explosion"),
     /RESPAWN_BLINK_FRAME[\s\S]+RESPAWN_BLINK_HALF_PERIOD_FRAMES[\s\S]+jmp draw_player/);
-  assert.doesNotMatch(routine("draw_player_for_lifecycle", "fire_bullet"),
+  assert.doesNotMatch(routine("draw_player_for_lifecycle", "begin_player_fighter_explosion"),
     /HPOSP|GRACTL|COLPM|NMIEN|DLI/);
 });
 
@@ -839,9 +1207,10 @@ test("heavy, hull, and fighter damage share the lifecycle gate without pausing t
   assert.equal(contactPlayerHull(state, contact, asset, 1), false);
   assert.equal(state.health, 100);
 
-  const collisions = routine("handle_collisions", "add_ten_points");
-  assert.match(collisions, /BROAD_P0_COLLISION[\s\S]+jsr apply_broadside_player_damage/);
-  const gate = routine("apply_broadside_player_damage", "update_life_display");
+  const collisions = routine("handle_collisions", "update_score_display");
+  assert.match(collisions,
+    /jsr player_contacts_enemy[\s\S]+jsr apply_broadside_player_damage[\s\S]+jsr update_broadside/);
+  const gate = routine("apply_broadside_player_damage", "update_hud_status");
   assert.match(gate, /PLAYER_LIFECYCLE[\s\S]+cmp #PLAYER_ALIVE[\s\S]+bne @done/);
   assert.doesNotMatch(routine("update_broadside", "schedule_broadside"),
     /BROAD_DEATH_TIMER|PLAYER_DYING|PLAYER_RESPAWN_INVULNERABLE/);
@@ -853,7 +1222,9 @@ test("expiry clears captured and hardware collision latches before restoring ALI
     /jsr clear_player_collision_latches[\s\S]+jsr erase_player[\s\S]+jsr draw_player[\s\S]+lda #PLAYER_ALIVE[\s\S]+sta PLAYER_LIFECYCLE/);
   const clear = routine("clear_player_collision_latches", "update_broadside");
   assert.match(clear,
-    /sta BROAD_M0_COLLISION[\s\S]+sta BROAD_P0_COLLISION[\s\S]+sta BROAD_COLLISION,x[\s\S]+sta HITCLR/);
+    /sta BROAD_M0_COLLISION[\s\S]+sta BROAD_P0_COLLISION[\s\S]+sta BROAD_DAMAGE_APPLIED[\s\S]+sta HITCLR/);
+  assert.doesNotMatch(clear, /sta BROAD_COLLISION/,
+    "lifecycle latch clearing cannot erase a flying shell's second backing cell");
   const start = labels.get("respawn_player");
   const end = labels.get("tick_respawn_invulnerability");
   const bytes = xexBytesAt(start, end - start);
@@ -862,16 +1233,16 @@ test("expiry clears captured and hardware collision latches before restoring ALI
   assert.ok(containsBytes(bytes, [0x8d, 0x03, 0xd0]));
   assert.ok(containsBytes(bytes, [0xa9, 184, 0x85, labels.get("player_y")]));
   assert.ok(containsBytes(bytes, [0xa9, 250, 0x8d,
-    0xaa, 0x4e]));
+    0xac, 0x4e]));
 });
 
-test("last life reaches the existing menu game-over path without respawning", () => {
+test("last life reaches GAME OVER after the full death animation without respawning", () => {
   const state = createBroadsideState(asset);
   state.lives = 1;
   state.health = 20;
   assert.equal(applyPlayerDamage(state, asset, 20, 25, 0), true);
   assert.equal(state.lives, 0);
-  for (let frame = 0; frame < asset.broadside.returnToMenuFrames - 1; frame += 1) {
+  for (let frame = 0; frame < SHARED_FIGHTER_EXPLOSION_TOTAL - 1; frame += 1) {
     advancePlayerLifecycle(state, asset);
   }
   assert.equal(advancePlayerLifecycle(state, asset), "game-over");
@@ -891,7 +1262,7 @@ test("sequence preview uses runtime PMG colours, source muzzles, and determinist
   assert.deepEqual([inspectPng(png).width, inspectPng(png).height], [1280, 1248]);
   assert.equal(sha256(png).length, 64);
   const graphics = readGameGraphicsSource(source, definition);
-  assert.deepEqual([1, 2, 3].map((slot) => graphics.hardwareState.get(`COLPM${slot}`)), [0x0c, 0x46, 0x28]);
+  assert.deepEqual([1, 2, 3].map((slot) => graphics.hardwareState.get(`COLPM${slot}`)), [0x44, 0x46, 0x28]);
 });
 
 test("acceptance sequence is source-derived across warning, contact, damage, and lethal states", () => {
@@ -960,13 +1331,13 @@ test("speed preview renders consecutive PAL states from the runtime scroll simul
     [0, false], [1, false], [2, true], [3, false], [4, true],
   ]);
   assert.deepEqual(state.panelDefinitions.map(({ world }) => world.advances), [0, 0, 1, 1, 2]);
-  assert.deepEqual(state.panelDefinitions.map(({ world }) => world.hullAdvances), [0, 0, 0, 0, 1]);
+  assert.deepEqual(state.panelDefinitions.map(({ world }) => world.hullAdvances), [0, 0, 1, 1, 2]);
   assert.deepEqual(state.panelDefinitions[0].screen, state.panelDefinitions[1].screen);
   assert.notDeepEqual(state.panelDefinitions[1].screen, state.panelDefinitions[2].screen);
   assert.deepEqual(state.panelDefinitions[2].screen, state.panelDefinitions[3].screen);
   assert.notDeepEqual(state.panelDefinitions[3].screen, state.panelDefinitions[4].screen);
   assert.deepEqual(state.panelDefinitions.map(({ warning }) => warning.y),
-    [116, 116, 116, 116, 124]);
+    [92, 92, 100, 100, 108]);
   assert.deepEqual(
     state.panelDefinitions.map(({ projectile }) => projectile.x),
     [162, 160, 158, 156, 154],
@@ -1018,10 +1389,10 @@ test("cadence preview plots source-derived warning, launch, and world-scroll tim
     [state.baseline.warningStats.count, state.baseline.launchStats.count],
     [4, 4],
   );
-  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [4, 4]);
+  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [2, 2]);
   assert.deepEqual(
     [state.final.warningStats.minimumGap, state.final.warningStats.averageGap],
-    [75, 110.66666666666667],
+    [103, 103],
   );
   assert.ok(state.final.warningScrolls.some(({ frame }) => frame % 4 === 0));
 
@@ -1034,14 +1405,16 @@ test("cadence preview plots source-derived warning, launch, and world-scroll tim
   assert.deepEqual([inspectPng(png).width, inspectPng(png).height], [1280, 256]);
 });
 
-test("broadside state, charset, collision capture, and fixed loops remain bounded", () => {
+test("broadside state, charset, software collision, and fixed loops remain bounded", () => {
   const graphics = readGameGraphicsSource(source, definition);
   assert.equal(graphics.charset.length, 1024);
   assert.ok(graphics.constants.get("BROAD_STATE_END") - graphics.constants.get("BROAD_STATE_BASE") <= 64);
   assert.equal(labels.get("__BROADSIDE_RUN__"), 0x5e10);
-  assert.ok(labels.get("__BROADSIDE_SIZE__") <= 0x1200);
-  assert.match(routine("handle_collisions", "add_ten_points"),
-    /lda M0PL[\s\S]+lda P0PL[\s\S]+lda M1PL,x[\s\S]+jsr update_broadside[\s\S]+sta HITCLR/);
+  assert.ok(labels.get("__BROADSIDE_SIZE__") <= 0x1a00);
+  const collisions = routine("handle_collisions", "update_score_display");
+  assert.doesNotMatch(collisions, /lda M0PL|lda P0PL|lda M1PL/,
+    "software envelopes, not star-contaminated GTIA latches, own collisions");
+  assert.match(collisions, /jsr update_broadside[\s\S]+jsr resolve_enemy_damage[\s\S]+sta HITCLR/);
   assert.match(routine("update_broadside", "schedule_broadside"),
     /ldx #\$00[\s\S]+cpx #BROADSIDE_SLOT_COUNT/);
   assert.doesNotMatch(routine("update_broadside", "schedule_broadside"), /VDSLST|WSYNC|NMIEN/);

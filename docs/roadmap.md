@@ -37,7 +37,7 @@ PMG, pamięć obrazu, charset i zero page mają być raportowane osobno.
 - samowystarczalne XEX i bootowalny ATR;
 - techniczny gameplay ANTIC 4 z joystickiem, FIRE, jednym przeciwnikiem,
   kolizją, wynikiem, przewijaniem i POKEY;
-- loader ANTIC F 320 px z footerem ANTIC E 160 px, PackBits, dwa LMS, dwa DLI
+- loader ANTIC F 320 px z footerem ANTIC E 160 px, LZ-10/5, dwa LMS, dwa DLI
   i dokładnie 250 pełnych ramek PAL;
 - czyste przejście z loadera do wspólnego ekranu ANTIC 4 bez kosztu loadera
   w gameplayowej pętli lub VBI.
@@ -58,8 +58,8 @@ Brak; to istniejąca podstawa.
 
 Pełna karta dowodów obowiązuje także dla każdej przyszłej korekty tego
 kamienia. Zaakceptowany build ma payload 6193 B, 49 boot sectors, 27 B zero
-page, aktywne PMG od `$3B00`, bitmapę przejściową 7680 B i strumień PackBits
-3370 B. Przewijanie tła ma już udokumentowane przybliżenie około 19 000 cykli
+page, aktywne PMG od `$3B00`, bitmapę przejściową 7680 B i strumień LZ-10/5
+2027 B. Przewijanie tła ma już udokumentowane przybliżenie około 19 000 cykli
 raz na cztery ramki; pozostałe ścieżki gameplayu nadal wymagają pełnego
 pomiaru przed rozbudową.
 
@@ -77,7 +77,8 @@ over, fale, sektory capital ships, debris, repair drone, broadside i boss.
 - menu `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` ze sterowaniem
   joystickiem portu 1, zawijaniem i neutral-release gating;
 - sesyjna opcja `SOUND: ON/OFF`;
-- dziesięciowierszowa domyślna tabela wyników bez zapisu i inicjałów;
+- dziesięciowierszowa tabela z sesyjnym TOP w pierwszym wierszu, bez zapisu
+  i inicjałów;
 - bezpieczne Atari-specific EXIT pozostające na ekranie do RESET;
 - jedna ścieżka resetu uruchamiająca istniejący vertical slice;
 - mieszany playfield: ANTIC 7 dla tytułu, ANTIC 6 dla opcji, ANTIC 4 dla
@@ -96,7 +97,8 @@ Kamień 1, zaakceptowany loader i istniejąca infrastruktura ANTIC 4.
 - przytrzymany FIRE nie wraca natychmiast z ekranu ani nie tworzy pierwszego
   pocisku po `START GAME`;
 - SOUND domyślnie jest ON, wybór trwa w RAM, a OFF wycisza wszystkie kanały;
-- TOP SCORES ma dokładnie dziesięć wierszy i wraca przez FIRE;
+- TOP SCORES ma dokładnie dziesięć wierszy, zachowuje sesyjny rekord między
+  grami i wraca przez FIRE;
 - EXIT domyślnie wybiera NO, a YES nie skacze do DOS-u;
 - testy kontraktowe, build, preview i verify przechodzą; gameplay preview
   pozostaje byte-for-byte zgodny z zaakceptowanym obrazem.
@@ -175,6 +177,18 @@ nowych grafik, nowych pocisków, level loadera i overlayów.
 - rozdzielenie aktywnej gry od animacji/odliczania zniszczenia;
 - zachowanie startu oraz przejść maszyny stanów.
 
+### Implemented checkpoint — Game Over
+
+- terminal `PLAYER_GAME_OVER` is entered once after the existing 24-frame
+  death explosion, with `LIFE` saturated at zero;
+- the transition leaves the gameplay loop, stopping control, weapons, damage,
+  collision, spawning, world updates, and scoring;
+- the resident frontend charset renders `GAME OVER`, final `SCORE`, session
+  `TOP SCORE`, and `FIRE TO CONTINUE` without a bitmap allocation;
+- held FIRE is ignored until release, then a fresh press returns to main menu;
+- Game Over adds no state RAM and no steady-frame, VBI, or DLI work. The
+  one-time packed-BCD formatter costs approximately 216 cycles with DMA off.
+
 ### Zależności
 
 Kamienie 1–3 i zaakceptowany format player/entity state.
@@ -198,12 +212,44 @@ oddzielony od visible-frame cost.
 Bez debris instant-kill, repair drone, nowych archetypów, fal, sektorów capital
 ships, broadside, bossa i pauzy.
 
-## 5. Deskryptory przeciwników i pierwsze cztery zachowania
+## 5. Deskryptory przeciwników i pierwsze zachowania — fundament rosteru pass 1
+
+Pass 1 dostarcza wspólny indeksowany renderer/descriptors, dziesięć stabilnych
+ID i trzy finalne maski: release `RAIDER` oraz review-only `TALON` i
+`SCYTHE_BOMBER`. Nie uruchamia jeszcze nowej kompozycji fal ani ich docelowych
+AI/weapons. Kolejne siedem wpisów — `TRIDENT_GUNSHIP`, `WRAITH_SCOUT`,
+`HUNTER`, `LEECH_DRONE`, `AEGIS_ESCORT`, `CROWN_RAIDER`, `HYDRA_CARRIER` — ma
+wyłącznie manifest referencji i kontrakt przyszłej roli; nie może się spawnować
+i nie aliasuje Raidera.
+
+Bieżąca korekta pass 1 nadaje release Raiderowi pierwszy profile-driven
+`WEAPON_SINGLE_PULSE`: burst 10 strzałów co 4 ramki PAL, 10 damage,
+5 scanlines/rama i pauza 60/50/40 dla EASY/MEDIUM/HARD. Dziewięć stałych
+slotów ANTIC 4 zachowuje swept collision bez użycia M2. Talon oraz Scythe pozostają
+`WEAPON_NONE` i nie wchodzą do release waves. Pozostałych siedem typów, Level 1
+waves, bossy i ich finalne bronie nadal pozostają poza zakresem.
+
+Korekta języka pocisków daje Viperowi literalne żółte 1×2 `COLPF2=$1E` i
+Raiderowi czerwone 2×3 `COLPF3=$46`; obie pule są przywracanymi overlayami
+ANTIC 4. Viper ma 10 strzałów co 3 ramki, prędkość 6 i pauzę 12 ramek.
+Flying capital fire pozostaje dwukomórkowym 8×6 overlayem: Colonial `$1E`,
+Cylon `$46`, więc nadal jest materialnie dłuższy od fighter fire.
+Wspólna ścieżka enemy damage/resolve czyta HP i BCD score z deskryptora:
+player projectile oraz contact dają pełny score, Colonial capital zero, a
+Cylon capital friendly fire pełny score. Spatial sweep konsumuje capital shell
+na pierwszym celu i zapobiega double hit/double score.
+
+Każdy lethal fighter hit przechodzi teraz przez `ACTIVE → EXPLODING →
+INACTIVE`. Raider i Viper współdzielą sześć masek 8×8 po cztery ramki; dwa
+stałe sloty pozwalają im eksplodować równocześnie. Po `DRAIN` cleanup jest
+wykonywany atomowo tylko raz, dzięki czemu świeże i trzymane FIRE uruchamia
+broń Vipera w pierwszej legalnej ramce po `COMPLETE`. Respawn rozpoczyna 250
+ramek invulnerability dopiero po pełnych 24 ramkach eksplozji.
 
 ### Zakres
 
 - data-driven enemy descriptors;
-- Scout, Interceptor, Line fighter i Hunter jako pierwsze cztery zachowania;
+- Raider, Talon/interceptor, Scythe/bomber i Hunter jako pierwsze zachowania;
 - współdzielone sylwetki oraz parametry prędkości, ognia, odporności, kolizji
   i punktów;
 - ograniczona pula enemy/projectile slots;
@@ -395,10 +441,10 @@ pakowanych map, 32 B codebooków, 14 B metadanych, 8 B harmonogramu, 268 B
 modułów/sekwencji/masek, 128 B profili/granic prow oraz 576 B map runtime.
 Nie przechowuje surowej mapy
 240×16.
-Po korekcie pacingu world i hull używają osobnych bounded kopii: world event
-kosztuje konserwatywnie około 15 300 cykli i występuje 20/22,5/25 razy na
-sekundę, hull event około 11 600 cykli i występuje 10/11,25/12,5 razy na
-sekundę. PMG pozostaje bez zmian; dwa gameplay DLI należą wyłącznie do
+Po korekcie pacingu hull zachowuje 100% legacy world rate i występuje
+20/22,5/25 razy na sekundę. Near event używa 50%, a far 25% tej częstości;
+najcięższa kopia near kosztuje konserwatywnie około 15 300 cykli, a hull event
+około 11 600 cykli. PMG pozostaje bez zmian; dwa gameplay DLI należą wyłącznie do
 mieszanej warstwy HUD z kamienia 11.
 
 ### Wykluczenia
@@ -411,7 +457,8 @@ bonus i wybór następnego sektora pozostają późniejszą pracą.
 ### Zakres
 
 - source-derived controller dla deterministycznych salw;
-- M0 pozostaje pociskiem gracza, a M1–M3 tworzą stałą pulę heavy projectile;
+- M0 pozostaje wyłącznie zarezerwowane dla broni gracza, bieżący burst Vipera
+  używa puli ANTIC 4, a M1–M3 tworzą stałą pulę warning/impact;
 - 25-ramkowe warningi compact/medium/hot przy rzeczywistych wylotach i
   czytelne linie ognia;
 - wspólne collision/damage resolution dla Vipera, Cylon fighters
@@ -421,7 +468,7 @@ bonus i wybór następnego sektora pozostają późniejszą pracą.
 - brak faction immunity;
 - pięcioramkowe impact states, 20 punktów damage gracza i możliwość zwabienia
   przeciwnika w ogień burtowy;
-- 3/4-scanline bitmapowy puls lecącego sluga w starej obwiedni i czteroramkowy
+- dwufazowy 8×6 ANTIC 4 lozenge lecącego sluga i czteroramkowy
   niekolizyjny flash przy realnym wylocie;
 - skończony 240-wierszowy sektor od banków silników do terminalnych bow tips,
   z combat-only batteries, `DRAIN` i deterministycznym `COMPLETE`;
@@ -447,14 +494,14 @@ menu. Sektor udostępnia czysty stan `COMPLETE` przyszłemu encounter director.
 - `EASY/MEDIUM/HARD` przesuwają pełny wiersz dokładnie 8/9/10 razy na 20
   ramek (160/180/200 scanlines/s); `HARD` zachowuje zaakceptowany szybki
   kandydat, warning nie ma niewidocznej fazy, a gwiazdy nie wywołują kontaktu;
-- osobny hull stream wykonuje w długim oknie dokładnie połowę tych zdarzeń
-  (80/90/100 scanlines/s), bez zmiany ruchu świata, fighterów i pocisków;
+- hull stream wykonuje 100% tych zdarzeń (160/180/200 scanlines/s), near
+  dokładnie 50%, a far 25%, bez zmiany ruchu fighter fire i capital slugs;
 - segment zawiera po jednej funkcjonalnej baterii na stronę zamiast dwóch,
   usunięte pozycje mają nieinteraktywną strukturę, a scheduler wybiera
   najstarszy bezpieczny widoczny emplacement żądanej strony;
 - scheduler pracuje w ramkach PAL niezależnie od scrollu i nadal używa
-  odstępów 68/126/68/138. W pojedynczym skończonym sektorze realizuje
-  po cztery warningi i launchy na każdym poziomie trudności, po czym
+  odstępów 68/126/68/138. Przy szybszym skończonym sektorze realizuje
+  odpowiednio 3/2/2 warningi i launchy na EASY/MEDIUM/HARD, po czym
   `DRAIN` blokuje nowe źródła bez anulowania rozpoczętych efektów.
 
 ### Dowody pamięci i wydajności
@@ -464,17 +511,30 @@ Trudność zajmuje 1 B odzyskanego RAM, a tabela rates 3 B.
 Harmonogram ma 8 B, maski missile 6 B, tabele szerokości 6 B, offsety rekordów
 2 B, dwa rekordy wylotów 14 B, 6 B stawek world/hull, 3 B granic bezpiecznego
 warningu, a wygenerowane granice kontaktu 64 B. Runtime broadside wraz z
-procedurami HUD, sektora, eksplozji i POKEY zajmuje 4605 B w odzyskanym RAM,
-a jego 3749-bajtowy pakowany ogon daje payload 11 941 B. Rozdzielenie scrollu
+procedurami HUD, sektora, eksplozji, POKEY, fundamentem rosteru i pierwszym
+profilem Raider burst, korektą transition i wspólną fighter explosion zajmował
+w zaakceptowanym checkpointcie 5630/5632 B w odzyskanym RAM, a jego
+4714-bajtowy pakowany ogon dawał payload 12 906 B. Starfield candidate przenosi
+176 B wspólnych procedur z tego bloku bez zmiany ich zachowania. The current
+Game Over checkpoint occupies 5594/5632 B in BROADSIDE and 1146/2230 B in
+STARFIELD. Sam
+zaakceptowany broadside przed rosterem zajmował 4605/3749 B i
+payload 11 941 B. Rozdzielenie scrollu
 dodało 47 B resident state i 560 B payloadu względem kandydata 9834 B;
 eksplozje i audio dodały 27 B trwałego stanu. Detektor z
 clampem ma około 333 cykli, a konserwatywny worst case systemu broadside około
 1795–1820 cykli na ramkę. VBI ma delta 0; dwa gameplay DLI HUD-u dodają
 121 cykli ciał rutyn na ramkę bez `WSYNC` (konserwatywnie do 349).
-Rozdzielone bounded kopie kosztują około 15 300 cykli dla world eventu i
+Rozdzielone bounded kopie kosztują około 15 300 cykli dla near eventu i
 około 12 050 dla hull eventu z lookupem modułu; konserwatywny wspólny worst
 case z trzema slotami, flashami, dwiema eksplozjami, POKEY, kolizją, profilem
-prow i clampem to około 32 950 cykli. Zero-page delta wynosi 0 B.
+prow, per-type clampem i nowym Raiderem to około 33 420 cykli bez fighter
+explosion. Po odzyskaniu 23. wiersza wspólny world+hull step finalizuje
+boundary/muzzles tylko raz; wynik zaakceptowanego checkpointu z oboma slotami
+explosion wynosił około 33 380 i zostawiał około 2120 cykli. Po dodaniu dwóch
+faz starfield, akumulatora Raidera i ograniczonej obsługi TOP bieżący source
+bound wynosi około 34 230 cykli, z około 1270 cykli zapasu;
+zero-page delta wynosi 0 B.
 
 ### Wykluczenia
 
@@ -494,13 +554,13 @@ zmiany z ANTIC 4 wyłącznie dla dekoracji i nie jest częścią bieżącej kore
 
 ### Zakres
 
-- dwa kompletne 40-kolumnowe wiersze HUD ANTIC 2 nad zachowanymi 22 wierszami
-  playfieldu ANTIC 4;
+- jeden 40-kolumnowy wiersz HUD ANTIC 2 nad 23 wierszami playfieldu ANTIC 4;
+  ósmy scanline fontu tworzy separator bez osobnego wiersza ekranu;
 - dedykowany 1024-bajtowy charset `$5000-$53FF`, budowany z czystych glifów
   6×7 przy wyłączonym DMA;
-- tekstowe `SCORE`, `FUEL`, `ARM` i `LIFE` pozostają na bieżących pozycjach,
-  a dynamiczne score i zdrowie `100/080/060/040/020/000` są kodami znaków w
-  screen RAM; kanoniczne nazewnictwo `HULL` pozostaje późniejszą decyzją UI;
+- tekstowe `SCORE`, `LIFE` i `HULL` mają niezależne kanoniczne źródła, a
+  dynamiczne score, cyfra całkowitych żyć i zdrowie `100/090/.../000` są
+  kodami znaków w screen RAM; placeholdery `ARM`/`FUEL` usunięto;
 - dwa ograniczone DLI przełączają `CHBASE=$50/$44` oraz paletę dokładnie na
   granicach HUD/playfield.
 
@@ -526,6 +586,36 @@ ma delta 0. Ostateczna stabilność granicy trybów wymaga Atari800 i 65XE PAL.
 ### Wykluczenia
 
 Bez nowych weapons, enemies, debris, repair drone lub zmian salwy.
+
+## 11A. Dwuwarstwowy PAL starfield — ukończone i zweryfikowane przez ownera
+
+### Zakres
+
+- near layer z trzema zwartymi glifami, dokładnym rate `1/2` względem hull i
+  średnią gęstością 8,625 znaków w 23-wierszowym viewporcie;
+- 24-rekordowy far layer z trzema stalowo-niebieskimi glifami i dokładnym
+  rate `1/4` względem hull, czyli połową prędkości near;
+- osobny deterministyczny seed `$A7`, generacja tylko w odsłanianym górnym
+  wierszu oraz pojedynczy bezpieczny twinkle co 16 PAL frames;
+- jawna kolejność background/overlays i backing fighter/capital projectiles;
+- clipping broadside do kolumn 9–30 i stopniowa rekonstrukcja pełnej szerokości
+  po `COMPLETE`.
+
+### Dowody pamięci i wydajności
+
+Starfield dodaje 48 B glyphów, 102 B własnego stanu oraz współdzieli blok bez
+zero page z obsługą TOP; 1146 B kodu/tabel leży pod `$555A-$59D3`, a 2 B
+sesyjnego TOP pod `$4ED7-$4ED8`. Część bloku odzyskuje 176 B z wcześniej
+prawie pełnego BROADSIDE. PMG delta wynosi 0. The accepted starfield checkpoint
+had a 989 B packed tail, 13,829 B payload, 13,841 B XEX, and 92,176 B ATR.
+Bounded far pass skanuje
+24 rekordy wyłącznie przy zdarzeniu warstwy, nie cały ekran co ramkę; source
+bound pozostawia około 1270 cykli do konserwatywnej ramki PAL 35 500.
+
+### Wykluczenia
+
+Bez nebuli, planet, księżyców, distant battle, debris, asteroid, wrecks,
+obstacles, nowych przeciwników i zmian timingu broni.
 
 ## 12. Zaawansowani enemies: Minelayer, Rammer, Heavy i Ace
 

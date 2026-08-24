@@ -1,0 +1,244 @@
+{
+  "formatVersion": 1,
+  "runtime": {
+    "releaseArchetype": "RAIDER",
+    "frameStride": 16,
+    "accentFrames": 3,
+    "animationPhaseFrames": 8,
+    "movementPolicy": {
+      "raiderSoftPursuit": {
+        "targetSamplingIntervalFrames": 8,
+        "deadZoneHpos": 3,
+        "horizontalAccelerationHpos": 1,
+        "maximumHorizontalVelocityHpos": 1,
+        "viperReferenceSpeedHposPerFrame": 2,
+        "movementStepHpos": 2,
+        "maximumSpeedRatioNumerator": 4,
+        "maximumSpeedRatioDenominator": 5,
+        "weaveAmplitudeHpos": 4,
+        "weavePeriodFrames": 32,
+        "attackActiveTop": 16,
+        "attackActiveBottomExclusive": 200
+      }
+    },
+    "corridor": {
+      "leftHpos": 80,
+      "rightHposExclusive": 176
+    },
+    "colourPolicy": {
+      "bodyRegister": "COLPM1",
+      "bodyValue": 68,
+      "accentRegister": "COLPM2",
+      "accentValue": 70,
+      "candidates": [
+        { "id": "CYLON_OXBLOOD", "value": 66 },
+        { "id": "CYLON_BURGUNDY", "value": 68 },
+        { "id": "CYLON_SCARLET", "value": 72 }
+      ],
+      "selected": "CYLON_BURGUNDY",
+      "note": "P1 uses Cylon-family burgundy $44, distinct in luminance from the Cylon hull $46; P2 remains the brighter red $46 scanner. Fighter pulses use the independent ANTIC 4 playfield pool, so broadside M1-M3 no longer couple their colours."
+    },
+    "weaponPolicy": {
+      "singlePulse": {
+        "renderer": "ANTIC4_GLYPH_POOL",
+        "poolSlots": 9,
+        "burstCount": 10,
+        "burstIntervalFrames": 4,
+        "postBurstFrames": [60, 50, 40],
+        "speed": 5,
+        "height": 3,
+        "widthHpos": 2,
+        "damage": 10,
+        "lifetimeFrames": 96,
+        "colourRegister": "COLPF3",
+        "colourValue": 70
+      }
+    }
+  },
+  "archetypes": [
+    {
+      "id": "RAIDER",
+      "reference": "assets/graphics/Cylon Raider.png",
+      "implemented": true,
+      "releaseEnabled": true,
+      "role": "Standard fighter",
+      "futureTactics": "Bounded soft pursuit with a readable residual weave",
+      "futureWeapon": "Single pulse",
+      "hardwareWidth": "DOUBLE",
+      "height": 14,
+      "visibleBits": [0, 7],
+      "frames": 3,
+      "body": [
+        "10000001",
+        "11000011",
+        "11100111",
+        "11111111",
+        "11111111",
+        "10000001",
+        "11011011",
+        "11011011",
+        "10011001",
+        "10011001",
+        "00011000",
+        "00011000",
+        "00011000",
+        "00000000"
+      ],
+      "accent": [
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "00011000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"],
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "00111100", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"],
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "01111110", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"]
+      ],
+      "hitPoints": 1,
+      "score": 10,
+      "movementProfile": "CURRENT_RAIDER",
+      "weaponProfile": "SINGLE_PULSE",
+      "flags": ["RELEASE", "SCANNER"]
+    },
+    {
+      "id": "TALON",
+      "reference": "assets/graphics/Talon Interceptor.png",
+      "implemented": true,
+      "releaseEnabled": false,
+      "role": "Fast interceptor",
+      "futureTactics": "Narrow high-speed diagonal pass",
+      "futureWeapon": "Fast needle bolt",
+      "hardwareWidth": "NORMAL",
+      "height": 16,
+      "visibleBits": [1, 6],
+      "frames": 3,
+      "body": [
+        "00011000",
+        "00111100",
+        "00111100",
+        "00011000",
+        "00011000",
+        "00011000",
+        "01100110",
+        "01111110",
+        "01011010",
+        "01011010",
+        "00011000",
+        "00011000",
+        "00011000",
+        "00011000",
+        "00011000",
+        "00000000"
+      ],
+      "accent": [
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00011000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"],
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00001000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"],
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00010000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"]
+      ],
+      "hitPoints": 1,
+      "score": 10,
+      "movementProfile": "FUTURE_TALON",
+      "weaponProfile": "NONE",
+      "flags": ["REVIEW_ONLY", "SCANNER"]
+    },
+    {
+      "id": "SCYTHE_BOMBER",
+      "reference": "assets/graphics/Scythe Bomber.png",
+      "implemented": true,
+      "releaseEnabled": false,
+      "role": "Heavy bomber",
+      "futureTactics": "Slow lane denial and committed approach",
+      "futureWeapon": "Plasma bomb or mine",
+      "hardwareWidth": "DOUBLE",
+      "height": 16,
+      "visibleBits": [0, 7],
+      "frames": 3,
+      "body": [
+        "11000011",
+        "11100111",
+        "11111111",
+        "11111111",
+        "11111111",
+        "11000011",
+        "11011011",
+        "11011011",
+        "11111111",
+        "11111111",
+        "01011010",
+        "01011010",
+        "00111100",
+        "00111100",
+        "00011000",
+        "00000000"
+      ],
+      "accent": [
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "00011000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"],
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "00111100", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"],
+        ["00000000", "00000000", "00000000", "00000000", "00000000", "01111110", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000", "00000000"]
+      ],
+      "hitPoints": 1,
+      "score": 10,
+      "movementProfile": "FUTURE_SCYTHE",
+      "weaponProfile": "NONE",
+      "flags": ["REVIEW_ONLY", "SCANNER", "HEAVY"]
+    },
+    {
+      "id": "TRIDENT_GUNSHIP",
+      "reference": "assets/graphics/Reaper Gunship.png",
+      "implemented": false,
+      "releaseEnabled": false,
+      "role": "Heavy gunship",
+      "futureTactics": "Holds a firing position and pressures several lanes",
+      "futureWeapon": "Three-shot sequence or fan"
+    },
+    {
+      "id": "WRAITH_SCOUT",
+      "reference": "assets/graphics/Specter Scout.png",
+      "implemented": false,
+      "releaseEnabled": false,
+      "role": "Scout",
+      "futureTactics": "Feint, blink or rapid repositioning",
+      "futureWeapon": "Delayed aimed pulse"
+    },
+    {
+      "id": "HUNTER",
+      "reference": "assets/graphics/Stalker Hunter.png",
+      "implemented": false,
+      "releaseEnabled": false,
+      "role": "Pursuit fighter",
+      "futureTactics": "Predicts the player's position and commits to a dive",
+      "futureWeapon": "Aimed burst"
+    },
+    {
+      "id": "LEECH_DRONE",
+      "reference": "assets/graphics/Leech Drone.png",
+      "implemented": false,
+      "releaseEnabled": false,
+      "role": "Swarm drone",
+      "futureTactics": "Closes aggressively in small groups",
+      "futureWeapon": "Contact attack or short pulse"
+    },
+    {
+      "id": "AEGIS_ESCORT",
+      "reference": "assets/graphics/Aegis Escort.png",
+      "implemented": false,
+      "releaseEnabled": false,
+      "role": "Escort",
+      "futureTactics": "Protects a high-value unit and occupies defensive space",
+      "futureWeapon": "Defensive or intercepting fire"
+    },
+    {
+      "id": "CROWN_RAIDER",
+      "reference": "assets/graphics/Nemesis Command Raider.png",
+      "implemented": false,
+      "releaseEnabled": false,
+      "role": "Ace or elite",
+      "futureTactics": "Feints, retreats and re-enters",
+      "futureWeapon": "Accurate multi-shot burst"
+    },
+    {
+      "id": "HYDRA_CARRIER",
+      "reference": "assets/graphics/Hydra Missile Carrier.png",
+      "implemented": false,
+      "releaseEnabled": false,
+      "role": "Missile carrier",
+      "futureTactics": "Stays at range and launches timed salvos",
+      "futureWeapon": "Slowly steering missiles"
+    }
+  ]
+}

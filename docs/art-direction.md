@@ -40,7 +40,8 @@ char-mode oraz oszczędnego nakładania PMG, a nie z pojedynczych pikseli
 widocznych tylko na powiększonym PNG.
 
 Bieżące PMG są w całości zajęte przez Vipera z silnikiem oraz jednego wroga ze
-skanerem; Missile 0 jest pociskiem gracza. To potwierdzony stan vertical slice,
+skanerem; Missile 0 pozostaje wyłącznie zarezerwowany dla broni gracza, lecz
+bieżący żółty burst używa niezależnych glifów ANTIC 4. To potwierdzony stan vertical slice,
 nie obietnica dowolnej liczby wielokolorowych sprite'ów. Przyszłe użycie
 multipleksowania, nakładania players/missiles lub znakowych obiektów wymaga
 pomiaru VBI/DLI, kolizji i real hardware.
@@ -115,11 +116,33 @@ schodzą z 8 do 1 komórki, a ostatnia komórka ma rzeczywisty ukośny kontur
 zamiast płaskiego odcięcia. Stały offset +8 wierszy zapobiega lustrzanemu
 wejściu struktur, lecz obie strony pozostają jednym fizycznym strumieniem.
 
-Zwykły Cylon fighter P1/P2 jest podwójnej szerokości i ma 16 jednostek HPOS
-widocznej obwiedni. Jego wspólne granice to `80..160`: przy minimum zajmuje
-`[80,96)`, przy maksimum `[160,176)`, dokładnie wewnątrz corridor `[80,176)`.
-Spawn, steering i ostateczny zapis HPOSP1/HPOSP2 używają tych samych stałych;
-nie istnieje zwykła klatka lotu, w której fighter nachodzi na side hull.
+Pierwsza baza rosteru zastępuje schematycznego przeciwnika ręcznie poprawionym
+native Atari Raiderem: szeroki crescent, wklęsła dolna krawędź, osobny centralny
+korpus i czerwony slit skanera. `TALON` ma smukły 6-HPOS spine, krótki fin i
+ostry nos, a `SCYTHE_BOMBER` ciężką 16-HPOS masę skrzydeł, boczne pods i gruby
+fuselage. Wszystkie lecą dolnym nosem ku graczowi i pozostają rozpoznawalne w
+monochromatycznej masce; nie są palette aliases.
+
+P1/P2 pozwalają zachować prawdziwy czerwony scanner bez zmniejszania capacity.
+P1 Raidera używa teraz burgundowego `$44`: należy do tej samej rodziny hue
+`$4x` co dominujący pancerz prawej, cylonowej burty `$46`, ale ma niższą
+luminancję. Dzięki temu nie aliasuje ani czarnego tła `$00`, ani cylonowej
+burty `$46`; od lewej, kolonialnej burty `$84` odcina go inny hue. Viper `$0E`
+pozostaje najjaśniejszym statkiem. P2 `$46` niesie trzyfazowy czerwony scanner,
+jaśniejszy od body o jeden krok GTIA; Raider burst używa niezależnie
+`COLPF3=$46`, więc jego kolor się nie zmienia. Kandydaci `$42/$44/$48` są
+renderowani deterministyczną paletą Atari, a `$44` jest domyślnym kompromisem
+czytelności na czerni i przynależności do palety Cylonów. Na 24 ramki eksplozji
+Raidera P1 wraca do zaakceptowanego `$84`, po czym wygaśnięcie efektu
+przywraca body `$44` przed kolejnym spawnem; wejście do nowej gry również
+jawnie przywraca `$44`, jeśli poprzedni efekt został przerwany w frontendzie;
+efekt `$84/$46` pozostaje wizualnie bez zmian.
+
+Obwiednia jest per-type. Raider i Scythe zajmują `[80,96)` przy lewej oraz
+`[160,176)` przy prawej granicy. Talon zajmuje tylko 6 HPOS i porusza się
+logicznie `80..170`; jego PMG byte origin `79..169` kompensuje pusty pierwszy
+bit. Spawn, steering, type change i zapis HPOSP1/HPOSP2 korzystają z jednego
+deskryptora, więc żadna klatka nie nachodzi na side hull.
 
 Dominująca płyta strony sojuszniczej zajmuje 2–4 komórki szerokości i 3–6
 wierszy wysokości. Staggered horizontal seams, czarne grooves i białe lips
@@ -166,17 +189,34 @@ kadłubów. Warning jest widoczny przez wszystkie 25 ramek: przez 8 ramek ma
 2 scanlines i normalną szerokość, przez 9 ramek 4 scanlines i double width,
 a przez ostatnie 8 ramek 6 scanlines oraz dwuramkowy puls double/quad. Rośnie
 od wylotu w stronę corridor i kończy się bez skoku względem przyszłego toru.
-Lecący slug pulsuje co dwie ramki między zwartą sylwetką 3 scanlines i pełną
-4 scanlines, zachowuje podwójną szerokość GTIA i przesuwa się o 2 jednostki
-HPOS na ramkę. Jego fizyczna obwiednia nie przekracza wcześniejszych 4 linii.
+Lecący slug pulsuje co dwie ramki między dwoma zwartymi lozenge glyphs w
+dwóch sąsiednich komórkach ANTIC 4. Zajmuje 8 HPOS × 6 scanlines i około 40
+native pixeli, czyli ma cztery razy większą długość osi lotu niż 2×3 Raider
+pulse i osiem razy większą niż jedno-HPOS Viper fire; przesuwa się logicznie o 2
+HPOS na ramkę. Allied używa
+yellow-gold `COLPF2=$1E`, enemy crimson `COLPF3=$46`, a collision obejmuje
+pełny widoczny 8×6 swept extent.
 Na launch czteroramkowy glif flash łączy realny wylot z pociskiem i pozostaje
 przy wolniejszym strumieniu kadłuba; sam slug natychmiast przechodzi na ruch
 ekranowy. Impact wykorzystuje ten sam slot, rozszerza wysokość
-do 8 scanlines i trwa 5 ramek. M1, M2 i M3 zachowują
-rzeczywiste odziedziczone kolory P1/P2/P3: odpowiednio chłodną biel, hostile
-red i amber. Nie powstaje sztuczny, jaśniejszy kolor tylko dla preview.
-Animacja nie zapisuje `COLPM`, dzięki czemu dzielone z M1–M3 warstwy fighterów
-nie zmieniają koloru.
+do 8 scanlines i trwa 5 ramek. Warning oraz impact zachowują
+rzeczywiste kolory M1–M3; stan `FLYING` zapisuje i przywraca oba znaki playfieldu,
+nie missile bitmapę. Dzięki temu animacja nie zapisuje `COLPM`, a P1–P3,
+scanner i silnik Vipera nie zmieniają koloru.
+
+Język fighter fire pozostaje krótszy: Raider pulse to nasycone czerwone
+`COLPF3=$46`, 2 HPOS × 3 scanlines, a Viper fire literalne żółte
+`COLPF2=$1E`, 1 HPOS × 2 scanlines. Obie bronie używają przywracanych kodów
+ekranu i prekompilowanych glifów fazowych; P0 pozostaje `$0E`, P3 `$28`, a
+P1/P2 `$84/$46`. Burst Vipera ma 10 strzałów co 3 ramki i prędkość 6
+scanlines/rama; Raider ma 8 strzałów co 4 ramki i prędkość 5. Capital slug
+pozostaje co najmniej czterokrotnie dłuższy w osi lotu.
+
+Wspólna fighter explosion korzysta z sześciu oryginalnych masek 8×8:
+zwarty flash, dwa etapy rozszerzenia, nieregularne maksimum, fragmenty i
+embers. Viper renderuje je istniejącą parą P0/P3, a ordinary enemy parą P1/P2;
+kolory pozostają przypisane do statków i nie są przełączane na czas efektu.
+Każdy obraz trwa cztery ramki i jest clipowany do gameplay viewportu.
 
 Trafienie przeciwnego capital hull uruchamia osobny, niekolizyjny overlay
 3×3 znaków. Przez 24 ramki przechodzi od białobursztynowego core przez
@@ -185,13 +225,11 @@ Efekt zapisuje tylko komórki rzeczywistego bandu kadłuba, podąża za jego
 scrollingiem i przywraca dokładnie przechwycony moduł; nie zużywa M0–M3 ani
 nie zmienia kolorów fighterów.
 
-Pełny skok zawsze ma 8 scanlines, bez fine scrollingu. Centralny świat
-wykonuje dokładnie 8/9/10 takich skoków w 20 ramkach: `EASY` daje 20 wierszy
-lub 160 scanlines/s, `MEDIUM` 22,5/180, a `HARD` 25/200. Osobny stream obu
-capital hulls używa mianownika 40, więc w długim oknie zachowuje dokładnie
-połowę tych prędkości: 10/80, 11,25/90 i 12,5/100. Wyloty, warningi i granice
-kontaktowe pozostają przy tej wolniejszej fazie; statki, gwiazdy i lecące
-pociski zachowują dotychczasową energię świata.
+Pełny skok zawsze ma 8 scanlines, bez fine scrollingu. Oba capital hulls
+wykonują dokładnie 8/9/10 takich skoków w 20 ramkach: `EASY` daje 20 wierszy
+lub 160 scanlines/s, `MEDIUM` 22,5/180, a `HARD` 25/200. Jest to 100%
+dotychczasowej prędkości świata. Wyloty, warningi i granice kontaktowe
+pozostają przy tej samej fazie; lecące pociski zachowują własny timing PAL.
 Skalę obu capital ships podkreślają rzadsze, niezależnie planowane sekwencje
 ognia i spokojne odstępy między nimi, nie spowolnienie całego świata. Fizyczna
 krawędź, łącznie z projekcjami turretów, jest też granicą kontaktu gracza.
@@ -215,6 +253,13 @@ Klasy debris mają różne sylwetki, a nie tylko różny kolor:
 - otwarte framework sections;
 - masywne, wolno obracające się wreckage.
 
+Bieżąca neutralna przeszkoda 2×1 używa dwóch sylwetek o pełnym obrysie 16×8:
+armour-shard ma 47 aktywnych pikseli ANTIC i pozostaje zwarty oraz asymetryczny,
+natomiast truss-fragment ma 45 aktywnych pikseli ANTIC, grubsze belki i czytelne
+otwory konstrukcji. Obie
+fazy każdej sylwetki zmieniają orientację. Kolory pola 1/2 odcinają debris od
+białego starfield; renderer i hitbox obejmują te same dwa sąsiednie znaki.
+
 Duży debris natychmiast niszczy Vipera, więc jego rozmiar i zagrożenie muszą
 być bezbłędnie czytelne. Animacja obrotu może używać małej liczby klatek lub
 zmian znaków, ale nie może powodować mylącej zmiany hitboxu.
@@ -234,17 +279,32 @@ wzorcem kompozycji pierwszego gameplay screen: jednowierszowy HUD, czarna
 przestrzeń lotu, stalowo-granatowe struktury, jasny Viper, blade Cylon fighters
 i oszczędne weapon accents.
 
-Bieżący Atari vertical slice pokazuje techniczne napisy `SCORE`, `FUEL`, `ARM`
-i `LIFE` jako prawdziwy, monochromatyczny tekst ANTIC 2 z dedykowanego fontu
-6×7. Dwa górne wiersze są odseparowane od kolorowego ANTIC 4 playfieldu;
-dynamiczne score i trzy cyfry zdrowia pozostają kodami znaków, nie PMG ani
-bitmapowym ornamentem. Te tymczasowe etykiety nie zatwierdzają jeszcze
-mechanik paliwa i uzbrojenia. Docelowe nazewnictwo `HULL nn%` oraz układ
-pozostałych pól będą osobnym testem UI. Graficzny health bar pozostaje
-opcjonalnym testem, nie równoległym wymaganiem.
+Bieżący Atari vertical slice pokazuje `SCORE`, `LIFE` i `HULL` jako prawdziwy,
+monochromatyczny tekst ANTIC 2 z dedykowanego fontu 6×7. Jeden górny wiersz
+kończy się jednoliniowym separatorem i pozostawia 23 wiersze kolorowego ANTIC 4
+playfieldu. Dynamiczne score, całkowite życia i procent zdrowia pozostają
+kodami znaków, nie PMG ani bitmapowym ornamentem; niewyjaśnione placeholdery
+`ARM` i `FUEL` zostały usunięte.
 
 PNG nie ustala rozdzielczości, liczby PMG ani zagęszczenia obiektów. Te wartości
 są adaptowane do ANTIC/GTIA, budżetu PMG i jednej ramki PAL.
+
+## Pierwszy pass starfield
+
+Gameplay zachowuje dużo czarnego negative space. Warstwa far używa 24
+logicznych, przeważnie jednokropkowych znaków `COLPF1=$84`; near generuje
+średnio 8,625 widocznego znaku w 23 wierszach z jasnym `COLPF0=$0E` i tylko
+rzadkim dwupikselowym lub czteroramiennym wariantem. Near porusza się z 50%,
+a far z 25% prędkości kadłubów; zachowują więc czytelny stosunek 2:1, ale
+żadna warstwa nie płynie razem z kadłubami. Co 16 ramek najwyżej jeden
+aktualnie odsłonięty far star
+zmienia spokojnie fazę dim/bright. Gwiazdy nie mogą czytać się jak żółty ogień
+Vipera, czerwony Raider pulse ani poziomy capital slug.
+
+Sześć oryginalnych glyphów zajmuje screen codes 1–6. Far używa wyłącznie
+ANTIC 4 pixel value `10`, near `01`; kształty są bez antyaliasingu i bez
+fragmentów poza zwartym 8×8 polem znaku. W broadside tło pozostaje w kolumnach
+9–30, więc czarne/kolorowe masy kadłubów i ich wyloty zachowują pełną własność.
 
 ## Main menu i frontend
 

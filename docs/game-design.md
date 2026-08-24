@@ -53,6 +53,37 @@ Podstawowa pętla decyzji gracza brzmi: odczytaj zagrożenie, wybierz osiągaln�
 trasę, ustaw Vipera, zdecyduj czy unikać lub strzelać, a następnie reaguj na
 skutek bez przerywania ciągłego lotu.
 
+## Kontrakt rosteru przeciwników
+
+**PLANNED**
+
+| Stabilne ID | Rola | Tożsamość taktyczna | Rodzina broni |
+| --- | --- | --- | --- |
+| `RAIDER` | Standard fighter | Formation flight i czytelny zigzag attack | Single pulse |
+| `TALON` | Fast interceptor | Wąski, szybki diagonal pass | Fast needle bolt |
+| `SCYTHE_BOMBER` | Heavy bomber | Powolne lane denial i committed approach | Plasma bomb lub mine |
+| `TRIDENT_GUNSHIP` | Heavy gunship | Utrzymuje pozycję i naciska kilka lanes | Three-shot sequence lub fan |
+| `WRAITH_SCOUT` | Scout | Feint, blink lub rapid repositioning | Delayed aimed pulse |
+| `HUNTER` | Pursuit fighter | Przewiduje pozycję gracza i nurkuje | Aimed burst |
+| `LEECH_DRONE` | Swarm drone | Agresywnie domyka małą grupą | Contact attack lub short pulse |
+| `AEGIS_ESCORT` | Escort | Chroni high-value unit i zajmuje defensive space | Defensive/intercepting fire |
+| `CROWN_RAIDER` | Ace/elite | Feint, retreat i re-entry | Accurate multi-shot burst |
+| `HYDRA_CARRIER` | Missile carrier | Pozostaje w dystansie i odpala timed salvos | Slowly steering missiles |
+
+Pass 1 implementuje grafikę i wspólny renderer tylko dla pierwszych trzech
+ID. Jedynie `RAIDER` jest aktywny w bieżącym release flow i wybiera przez
+deskryptor `WEAPON_SINGLE_PULSE`: 10 damage, dziesięć strzałów co 4 ramki,
+prędkość 5 scanlines/rama i pauza 60/50/40 ramek PAL dla EASY/MEDIUM/HARD.
+Viper podczas trzymania FIRE emituje 10 żółtych strzałów co 3 ramki,
+z prędkością 6 i 12-ramkową pauzą. `TALON` i `SCYTHE_BOMBER` pozostają
+review-only z `WEAPON_NONE`. Tabela nie autoryzuje jeszcze AI, broni ani
+balansu pozostałych typów.
+
+Boczny ruch Vipera jest wartością odniesienia 100%: 2 HPOS na aktywną ramkę.
+Raider przy ciągłym ruchu wykonuje taki sam krok w dokładnie 4 z 5 ramek,
+czyli osiąga dokładnie `4/5 = 80%` maksimum Vipera. Soft pursuit, dead zone,
+weave i pionowy ruch pozostają bez zmian.
+
 ## Model sektorów
 
 **BINDING**
@@ -98,14 +129,32 @@ W sektorze bitwy:
 Kolizje burtowe mają wynikać z jednej spójnej symulacji, a nie z osobnych
 efektów dekoracyjnych dla każdej frakcji.
 
+Pierwsza warstwa tła jest wyłącznie dekoracyjna i deterministyczna. Capital
+hulls zachowują 100% kanonicznego world rate `8/9/10 ÷ 20`; near stars używają
+dokładnie `1/2`, a far stars `1/4` liczby kroków hull, czyli 50% i 25%.
+W broadside obie warstwy istnieją tylko
+w środkowym korytarzu i nigdy nie należą do collision, damage, score ani
+steering. W `COMPLETE` nowo odsłaniane wiersze wracają do pełnej szerokości;
+po dokładnie 22 krokach ringu stan `OPEN` kontynuuje pełnoszeroki starfield bez
+resetu broni gracza lub dodatkowej pauzy sektorowej.
+
+Punkty za zniszczenie fightera wynikają z archetypu i jawnego źródła damage.
+Pocisk Vipera oraz rzeczywisty contact Vipera dają pełny score nawet, gdy ten
+sam contact rani lub zabija gracza. Colonial capital fire niszczy Cylon fighter
+bez punktów. Cylon capital fire może zniszczyć własny fighter przez friendly
+fire i wtedy daje graczowi pełny score archetypu; trafienie Vipera przez ten
+sam pocisk nie daje punktów. Cleanup/despawn/transition nigdy nie punktują.
+Nieśmiertelny lub nielethal hit nie punktuje, a jeden living→destroyed transition
+może przyznać wynik tylko raz.
+
 Bieżący pierwszy sektor jest skończonym przelotem 240 wierszy na okręt od rufy
 do dziobu: `ENGINES 32`, `AFT 24`, `COMBAT 128`, `FORWARD 24`, `PROW 32`. Strony mają
 stałe przesunięcie treści o osiem wierszy, lecz wspólne tempo. Funkcjonalne
 baterie występują wyłącznie w combat, a jego ostatnie osiem wierszy nie
 rozpoczyna nowej salwy. Po zejściu terminalnych tips `DRAIN` pozwala dokończyć
-już aktywne warningi, flashes, M1–M3 i 24-ramkowe eksplozje kadłuba, po czym udostępnia `COMPLETE` przyszłemu
-encounter director. Nie dodaje jeszcze komunikatu, bonusu ani następnego
-sektora.
+już aktywne warningi, flashes, M1–M3 i 24-ramkowe eksplozje kadłuba. Następnie
+`COMPLETE` odbudowuje pełny ring przez 22 kroki i przechodzi do legalnego
+otwartego gameplayu `OPEN`. Nie dodaje komunikatu, bonusu ani encounter directora.
 
 **PLANNED**
 
@@ -124,6 +173,43 @@ zostanie dodane, zniszczenie baterii daje punkty i musi wejść do wspólnego
 modelu kolizji oraz uszkodzeń.
 
 ## Odłamki
+
+**IMPLEMENTED FOUNDATION SLICE**
+
+Pierwszy neutralny obiekt złomu jest przeszkodą testową wspólnego entity
+engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny jest
+najwyżej jeden. Ma dwie czytelne sylwetki 2×1 znak (16×8 pikseli) — zwartą,
+asymetryczną płytę pancerza i ażurowy fragment kratownicy — po dwie fazy
+tumblingu każda. Cztery fazy używają dokładnie ośmiu glifów 110–117; indeksy
+118–127 pozostają wolne. Płyta i kratownica korzystają z kolorów pola 1/2,
+więc nie są białymi odpowiednikami największych gwiazd. Każda faza wypełnia
+bounding box 16×8; armour ma 47, a truss 45 aktywnych pikseli ANTIC.
+Niezależny RNG entity deterministycznie wybiera sylwetkę, fazę początkową,
+profil `straight`/`slight-left`/`slight-right` oraz bezpieczną kolumnę spawnu
+18..20. Ten wąski zakres uwzględnia szerokość dwóch komórek i pełne dziewięć
+możliwych kroków bocznych do despawnu, więc nie wymaga odbicia od krawędzi.
+Debris spawnuje się na Y=24, a Y, faza i ewentualny ruch X zmieniają się
+wyłącznie przy prawdziwym `WORLD_ROW_ADVANCED`. Pionowy akumulator wykonuje +8
+w trzech z każdych pięciu takich zdarzeń; profile boczne przesuwają obiekt o jeden
+znak co cztery takie zdarzenia i nie wymagają odbicia od krawędzi. Kontakt
+zdejmuje jedną jednostkę HULL (10 punktów procentowych) przez wspólną damage
+gate i usuwa złom tylko wtedy, gdy obrażenie zostało przyjęte; invulnerability
+nie zużywa przeszkody. Hitbox obejmuje widoczne 16×8 pikseli, bez kolizji z
+pociskami i bez punktacji. Slice nie zmienia logiki spawn/despawn,
+nie podnosi limitów pul i nie dodaje dropów, boosterów, fragmentów ani
+transient effects.
+
+World zachowuje 20/22,5/25 wiersza/s dla EASY/MEDIUM/HARD. Near stars mają
+10/11,25/12,5, far stars 5/5,625/6,25, a debris 12/13,5/15 wiersza/s.
+Dokładna kolejność pozostaje `far < near < debris < world`. Trace mierzy od
+spawnu Y=24 do despawnu odpowiednio 91/82/74 ramek
+(1,82/1,64/1,48 s). Odrzucony kandydat 3/4 world potrzebował 73/66/60 ramek
+(1,46/1,32/1,20 s), zatem nowa wersja jest rzeczywiście wolniejsza.
+
+Scheduler nie tworzy nowych debris podczas `DRAIN` ani `COMPLETE`. Przejście
+do `COMPLETE` uzbraja osobny wysoki licznik 22 rzeczywistych obrotów A2; po
+pełnym odbudowaniu ringu stan `OPEN` ponownie ustawia normalne opóźnienie 32
+klatek. Nie czyści bezwarunkowo puli i nie zużywa RNG entity podczas blokady.
 
 **BINDING**
 
@@ -154,6 +240,10 @@ zdarzeń wymagają testów czytelności i czasu reakcji.
 
 - Viper ma stan kadłuba od 0% do 100%.
 - HUD pokazuje wartość liczbową, na przykład `HULL 80%`.
+- `LIFE` pokazuje wszystkie pozostałe grywalne Vipery, łącznie z aktualnie
+  aktywnym; gra z trzema życiami przechodzi `3 → 2 → 1 → 0 / Game Over`.
+- `HULL` jest wyprowadzany z kanonicznych dziesięciu jednostek health przez
+  dokładne `units × 10`; nie istnieje drugi licznik zdrowia ani zaokrąglanie.
 - Zwykły ogień przeciwnika i ciężkie pociski obniżają stan kadłuba.
 - Osiągnięcie 0% niszczy Vipera.
 - Duży odłamek niszczy Vipera natychmiast zamiast zadawać zwykłe obrażenia.
@@ -317,28 +407,37 @@ neutralnym puszczeniem, więc przytrzymany kierunek nie wykonuje autorepeatu,
 a FIRE nie przechodzi na następny ekran ani do pierwszego strzału w gameplayu.
 Gameplay i jego timery nie działają w stanach frontendu.
 
-`OPTIONS` zawiera `SOUND: ON/OFF`, `DIFFICULTY: EASY/MEDIUM/HARD` oraz `BACK`.
-Dźwięk jest domyślnie włączony, trudność domyślnie ma wartość `MEDIUM`, a oba
-ustawienia pozostają w RAM podczas sesji i nie muszą przetrwać RESET ani
-wyłączenia zasilania. UP/DOWN wybiera wiersz, LEFT/RIGHT zawija trudność między
-trzema wartościami, a FIRE na `BACK` wraca do menu. Trudności nie można
-zmieniać podczas aktywnego gameplayu. OFF wycisza wszystkie kanały POKEY.
+`OPTIONS` contains `SOUND: ON/OFF`, `GAME MUSIC: ON/OFF`,
+`DIFFICULTY: EASY/MEDIUM/HARD`, and `BACK`. SOUND and GAME MUSIC default to ON,
+while difficulty defaults to `MEDIUM`. All three settings remain in RAM during
+the session and need not survive RESET or power-off. UP/DOWN selects a row;
+LEFT/RIGHT or FIRE toggles either audio row, LEFT/RIGHT wraps difficulty across
+its three values, and FIRE on `BACK` returns to the menu. Settings cannot be
+changed while the world is running. During `PAUSED`, the shared
+`GAME_MUSIC_ENABLED` value can be changed through `GAME MUSIC: ON/OFF`. SOUND
+OFF silences all POKEY output. GAME MUSIC OFF suppresses only the gameplay
+score; it does not affect the menu score or any SFX.
 
-Trudność ustala pełnowierszowy ruch świata: `EASY` to dokładnie 20
+Trudność ustala pełnowierszowy ruch capital hulls: `EASY` to dokładnie 20
 wierszy/160 scanlines na sekundę, `MEDIUM` 22,5/180, a `HARD` 25/200.
-Side hulls używają osobnego akumulatora z tymi samymi licznikami i mianownikiem
-40, więc poruszają się dokładnie o połowę wolniej: odpowiednio 10/80,
-11,25/90 i 12,5/100. `EASY` jest 80% prędkości `HARD`. Harmonogram broadside,
+Side hulls używają tych samych liczników i mianownika 20, czyli 100% dawnego
+world rate. `EASY` jest 80% prędkości `HARD`. Harmonogram broadside,
 25-ramkowy warning, prędkość pocisków, sterowanie i kolizje pozostają oparte
-na ramkach PAL i nie są skalowane przez ten wybór. `HARD` pozostawia
-zaakceptowaną prędkość świata, a tylko masa capital ships otrzymuje wolniejszy
-strumień wzdłużny.
+na ramkach PAL i nie są skalowane przez ten wybór. Near i far zachowują wobec
+tej stawki dokładne proporcje 50% i 25%, a debris 60%.
 
-`TOP SCORES` pokazuje dziesięć ponumerowanych wierszy domyślnej tabeli
-`--- 000000`. FIRE wraca do menu. Tabela nie jest jeszcze połączona z wynikami
-zakończonych gier; wpisywanie inicjałów i wstawianie score powstaną razem
-z integracją game over i scoringu. Tabela nie jest zapisywana na dysk i nie
-definiuje trwałego formatu high scores.
+`TOP SCORES` pokazuje dziesięć ponumerowanych wierszy. Pierwszy wiersz
+`--- 000000` jest sesyjnym TOP: po każdej punktacji przyjmuje
+`max(TOP, SCORE)`, nie maleje i jest zachowywany przez śmierć, respawn, game
+over oraz rozpoczęcie nowej gry. Pełny restart programu zeruje TOP. Pozostałe
+wiersze są nadal szablonami `--- 000000`; FIRE wraca do menu. Tabela nie jest
+zapisywana na dysk, nie obsługuje inicjałów i nie definiuje trwałego formatu
+high scores.
+
+SCORE obejmuje całą bieżącą grę i wszystkie życia gracza. Damage, śmierć,
+eksplozja, zmniejszenie LIFE i respawn nie zmieniają SCORE. Licznik wraca do
+zera wyłącznie przy rozpoczęciu zupełnie nowej gry; końcowy SCORE pozostaje
+dostępny podczas game over, a TOP jest zachowany przy kolejnym `START GAME`.
 
 `EXIT` najpierw pokazuje `EXIT GAME?`, z `NO` wybranym domyślnie. `NO` wraca do
 menu. `YES` wycisza POKEY, wyłącza gameplay i pozostawia stabilny ekran
@@ -347,16 +446,41 @@ emulatorowego RESET. Bootowalny ATR nie ma uniwersalnego desktopu ani DOS-u,
 do którego można bezpiecznie wrócić, dlatego EXIT nie skacze do `DOSVEC` i nie
 wywołuje nieudokumentowanej procedury OS.
 
-Docelowa maszyna gameplayu nadal ma objąć aktywną grę, zniszczenie gracza,
-game over oraz restart. Wejście w każdy stan ma być jawne i deterministyczne;
-zniszczenie nie może być wyłącznie krótką zmianą koloru jak w bieżącym
-vertical slice. Powrót z gameplayu do menu zostanie połączony z tymi stanami,
-a nie dodany jako niezależny skrót w bieżącym milestone.
+The implemented player lifecycle is
+`ALIVE → DYING → RESPAWN_INVULNERABLE` or
+`ALIVE → DYING → GAME_OVER`. `DYING` retains the existing 24-frame fighter
+explosion. Lethal damage decrements `LIFE` once with a zero floor. When the
+last life is lost, the transition enters `GAME_OVER` exactly once after the
+final explosion frame and leaves the gameplay loop, so player control, both
+weapons, damage, collision, enemy spawning, world updates, and scoring stop.
 
-**OPTIONAL BACKLOG**
+The text-mode Game Over screen uses the resident frontend charset and shows
+`GAME OVER`, the final six-column `SCORE`, the session `TOP SCORE`, and
+`FIRE TO CONTINUE`. Entry clears the frontend input gate. Held FIRE is ignored
+until the button is released; a later fresh press returns to the main menu.
+The final score remains intact on this screen and in the menu. Only a new
+`START GAME` resets `SCORE`; session `TOP` persists.
 
-Pauza może zostać dodana w późniejszym kamieniu milowym. Nie blokuje pierwszej
-kompletnej wersji, jeżeli nadal nie jest zaimplementowana.
+Physical Atari `OPTION` enters `PAUSED` before the next gameplay-frame mutation.
+The pause menu contains `RESUME`, `GAME MUSIC: ON/OFF`, and `QUIT TO MENU`.
+UP/DOWN changes the selected row, FIRE activates it, and a fresh OPTION press
+is a quick resume. OPTION and FIRE both require release before another action.
+No player input, world/star scroll, AI, spawn, projectile movement, collision,
+damage, score, gameplay animation, death, respawn, invulnerability, SFX timer,
+or music transport timer advances while paused.
+
+Pause entry mutes gameplay audio while preserving its logical state. RESUME
+continues the current song position when GAME MUSIC remains ON. Switching ON
+to OFF clears gameplay music immediately without changing SFX; switching OFF
+to ON starts the song from row zero only after resume. The main OPTIONS screen
+and pause menu always display the same session value.
+
+`QUIT TO MENU` opens a `QUIT TO MENU?` confirmation with `NO` selected by
+default. NO returns to PAUSED. YES clears projectiles, enemies, effects,
+collision latches, and gameplay state, then returns directly to the main menu
+without Game Over. Main-menu music starts from its beginning. TOP remains
+unchanged; the abandoned SCORE need not be cleared by quit, but the next
+`START GAME` always resets SCORE to zero.
 
 ## Wymagany zakres pierwszej kompletnej wersji
 

@@ -12,7 +12,9 @@ Zaakceptowany koncept ekranu łączy nieruchomy HUD, przewijane konstrukcje bocz
 - Tło ma efektywną szerokość 160 color clocks i paletę: czerń, chłodna biel, stalowy granat, bursztyn oraz przełączany czerwony akcent.
 - Player 0 i Player 3 składają się na statek gracza.
 - Player 1 i Player 2 składają się na przeciwnika oraz jego ruchomy czerwony sensor.
-- Missile 0 pozostaje pociskiem gracza.
+- Missile 0 pozostaje wyłącznie zarezerwowane dla broni gracza. Bieżący
+  żółty burst korzysta z przywracanych glifów ANTIC 4, aby nie dziedziczyć
+  białego `COLPM0` Vipera i nie ograniczać go do jednego strzału.
 - Kolejne statki przeciwnika będą multipleksowane albo realizowane znakami dopiero po pomiarze czasu i testach kolizji na sprzęcie.
 
 ## Konsekwencje

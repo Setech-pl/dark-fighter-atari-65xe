@@ -58,7 +58,7 @@ function routine(label) {
   return lines.slice(start + 1, end).join("\n");
 }
 
-test("boot enters an explicit seven-state frontend/game state machine", () => {
+test("boot enters an explicit ten-state frontend/game state machine", () => {
   assert.match(source, /STATE_LOADER\s*=\s*0/);
   assert.match(source, /STATE_MAIN_MENU\s*=\s*1/);
   assert.match(source, /STATE_OPTIONS\s*=\s*2/);
@@ -66,6 +66,9 @@ test("boot enters an explicit seven-state frontend/game state machine", () => {
   assert.match(source, /STATE_EXIT_CONFIRM\s*=\s*4/);
   assert.match(source, /STATE_EXITED\s*=\s*5/);
   assert.match(source, /STATE_GAMEPLAY\s*=\s*6/);
+  assert.match(source, /STATE_GAME_OVER\s*=\s*7/);
+  assert.match(source, /STATE_PAUSED\s*=\s*8/);
+  assert.match(source, /STATE_PAUSE_QUIT_CONFIRM\s*=\s*9/);
   assert.match(source, /jsr show_loader[\s\S]+jsr enter_main_menu\s+jmp frontend_loop/);
 });
 
@@ -82,7 +85,7 @@ test("main menu labels are exact, ordered, and default to START GAME", () => {
     ["DARK FIGHTER", 4, 0],
   );
   assert.equal(frontend.defaultSelection, 0);
-  assert.equal(frontend.markerAddresses.length, 9);
+  assert.equal(frontend.markerAddresses.length, 13);
 });
 
 test("frontend uses distinct clean 6x7 glyphs within ANTIC 6/7 indices", () => {
@@ -105,7 +108,7 @@ test("frontend uses distinct clean 6x7 glyphs within ANTIC 6/7 indices", () => {
 
 test("UP and DOWN move once per neutral release and wrap at both bounds", () => {
   assert.match(
-    routine("frontend_loop"),
+    routine("frontend_input_poll"),
     /cmp #\$0F[\s\S]+lda TRIG0[\s\S]+sta frontend_input_armed/,
   );
   assert.match(
@@ -153,7 +156,7 @@ test("menu actions use explicit transitions and one gameplay reset path", () => 
 
   const startGameplay = routine("start_gameplay");
   for (const resetCall of [
-    "silence_audio",
+    "music_stop",
     "clear_pmg",
     "clear_screen",
     "init_state",
@@ -172,10 +175,12 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   assert.match(routine("toggle_sound"), /eor #\$01\s+sta sound_enabled/);
   assert.match(routine("toggle_sound"), /jsr silence_audio/);
   const silence = routine("silence_audio");
-  for (const register of ["AUDC1", "AUDC2", "AUDC3", "AUDC4", "AUDCTL"]) {
+  for (const register of [
+    "AUDF1", "AUDC1", "AUDF2", "AUDC2", "AUDF3", "AUDC3", "AUDF4", "AUDC4", "AUDCTL",
+  ]) {
     assert.match(silence, new RegExp(`sta ${register}`));
   }
-  assert.match(routine("fire_bullet"), /lda sound_enabled\s+beq @done/);
+  assert.match(routine("allocate_viper_projectile"), /lda sound_enabled\s+beq @accepted/);
   assert.match(routine("play_hit_sound"), /lda sound_enabled\s+beq @done/);
   assert.match(
     routine("update_sound"),
@@ -184,7 +189,7 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   );
 });
 
-test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => {
+test("OPTIONS persists GAME MUSIC and a MEDIUM-default difficulty", () => {
   const constants = readFrontendGraphicsSource(source).constants;
   const difficultyAddress = constants.get("DIFFICULTY_SETTING");
   assert.equal(difficultyAddress, 0x4e70);
@@ -193,10 +198,11 @@ test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => 
       constants.get("DIFFICULTY_HARD"), constants.get("DIFFICULTY_DEFAULT")],
     [0, 1, 2, 1],
   );
-  assert.match(source, /options_screen_data:[\s\S]+"SOUND: OFF"[\s\S]+"DIFFICULTY: MEDIUM"[\s\S]+"BACK"/);
+  assert.match(source,
+    /options_screen_data:[\s\S]+"SOUND: OFF"[\s\S]+"GAME MUSIC: OFF"[\s\S]+"DIFFICULTY: MEDIUM"[\s\S]+"BACK"/);
   assert.match(routine("handle_options_input"), /jmp handle_options_input_resident/);
   assert.match(routine("handle_options_input_resident"),
-    /ldx #\$02[\s\S]+beq @sound_row[\s\S]+beq @difficulty_row[\s\S]+jmp enter_main_menu/);
+    /ldx #\$03[\s\S]+beq @sound_row[\s\S]+beq @game_music_row[\s\S]+beq @difficulty_row[\s\S]+jmp enter_main_menu/);
   assert.match(routine("handle_options_input_resident"),
     /and #\$04[\s\S]+select_previous_difficulty[\s\S]+and #\$08[\s\S]+select_next_difficulty/);
   assert.match(routine("select_previous_difficulty"),
@@ -205,7 +211,7 @@ test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => 
     /cmp #DIFFICULTY_HARD[\s\S]+lda #DIFFICULTY_EASY[\s\S]+adc #\$01/);
   assert.match(routine("set_difficulty"), /sta DIFFICULTY_SETTING[\s\S]+jmp draw_difficulty_value/);
   assert.match(routine("render_frontend_state"),
-    /jsr draw_sound_value[\s\S]+jsr draw_difficulty_value[\s\S]+jmp update_frontend_marker/);
+    /jsr draw_sound_value[\s\S]+jsr draw_game_music_value[\s\S]+jsr draw_difficulty_value[\s\S]+jmp update_frontend_marker/);
 
   const startBytes = readXexBytes(labels.get("start"), 160);
   assert.notEqual(startBytes.indexOf(Buffer.from([
@@ -219,14 +225,18 @@ test("OPTIONS persists a MEDIUM-default difficulty and wraps LEFT/RIGHT", () => 
   assert.doesNotMatch(routine("init_state"), /DIFFICULTY_SETTING/);
 });
 
-test("TOP SCORES renders exactly ten default rows and returns only on FIRE", () => {
+test("TOP SCORES renders ten rows with the session record first and returns only on FIRE", () => {
   assert.match(
     source,
     /top_score_row_template:[\s\S]+CH_FRONT_DASH,CH_FRONT_DASH,CH_FRONT_DASH/,
   );
   assert.match(routine("draw_top_score_rows"), /cpx #10\s+bne @row/);
   assert.match(routine("draw_top_score_rows"), /cpx #\$09\s+beq @ten/);
-  assert.match(routine("handle_top_scores_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
+  assert.match(routine("draw_top_score_rows"), /jmp draw_session_top_score/);
+  assert.match(source,
+    /draw_session_top_score:[\s\S]+TOP_SCORE_BCD_HI[\s\S]+TOP_SCORE_BCD_LO[\s\S]+CH_FRONT_ZERO/);
+  assert.match(routine("handle_top_scores_input"), /jmp handle_game_over_input/);
+  assert.match(routine("handle_game_over_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
   assert.doesNotMatch(source, /jsr SIOV|initials_entry|save_high_scores/i);
 });
 
@@ -327,7 +337,7 @@ test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => 
     0,
   );
   const exited = routine("enter_exited_state");
-  assert.match(exited, /jsr silence_audio/);
+  assert.match(exited, /jsr music_stop/);
   assert.match(exited, /@wait:\s+jsr wait_frame\s+jmp @wait/);
   assert.match(source, /\.byte "DARK FIGHTER ENDED",0/);
   assert.match(source, /\.byte "PRESS RESET TO RESTART",0/);
@@ -355,8 +365,8 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
   assert.ok(Number.parseInt(zeroPage[2], 16) < 0x0100);
   assert.ok(labels.get("draw_main_menu_hangar") < charsetStart);
   assert.ok(labels.get("frontend_glyph_rows") >= frontendStart);
-  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_packbits"));
-  assert.ok(labels.get("loader_bitmap_packbits") < labels.get("loader_display_list"));
+  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_lzss"));
+  assert.ok(labels.get("loader_bitmap_lzss") < labels.get("loader_display_list"));
   assert.ok(labels.get("loader_display_list") < 0x4000);
 
   const constants = readFrontendGraphicsSource(source).constants;
@@ -477,12 +487,12 @@ test("menu PMG craft is bounded, main-menu-only, and gameplay setup is restored"
   assert.match(frontendEntry, /cpx #STATE_MAIN_MENU[\s\S]+lda #\$02[\s\S]+sta GRACTL[\s\S]+sta NMIEN/);
   assert.equal(hardwareState.get("SIZEP0"), 1);
   assert.equal(hardwareState.get("SIZEP3"), 1);
-  assert.equal(hardwareState.get("COLPF2"), 0x28);
-  assert.equal(hardwareState.get("COLPF3"), 0x44);
+  assert.equal(hardwareState.get("COLPF2"), 0x1e);
+  assert.equal(hardwareState.get("COLPF3"), 0x46);
   assert.match(routine("start_gameplay"), /jsr clear_pmg/);
   assert.match(
     routine("start_gameplay"),
-    /sta NMIEN[\s\S]+lda #<display_list[\s\S]+sta DLISTL[\s\S]+lda #<gameplay_dli[\s\S]+lda #>HUD_CHARSET[\s\S]+sta CHBASE/,
+    /sta NMIEN[\s\S]+jsr init_playfield_display_lists[\s\S]+lda PLAYFIELD_ACTIVE_DLIST_LO[\s\S]+sta DLISTL[\s\S]+lda #<gameplay_dli[\s\S]+lda #>HUD_CHARSET[\s\S]+sta CHBASE/,
   );
   assert.match(
     routine("gameplay_dli"),

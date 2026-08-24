@@ -13,6 +13,43 @@ import {
   loadCapitalHullsDefinition,
 } from "./capital-hulls.mjs";
 import {
+  compileEnemyRoster,
+  loadEnemyRosterDefinition,
+} from "./enemy-roster.mjs";
+import {
+  compileFighterWeapons,
+  createSharedFighterExplosion,
+  createViperBurstState,
+  loadFighterWeaponsDefinition,
+  simulateViperBurst,
+  stepSharedFighterExplosion,
+  stepViperBurst,
+} from "./fighter-weapons.mjs";
+import {
+  compileStarfield,
+  createStarfieldState,
+  loadStarfieldDefinition,
+  composeStarfield,
+  stepStarfieldWorld,
+} from "./starfield.mjs";
+import {
+  compileEntityEffects,
+  loadEntityEffectsDefinition,
+} from "./entity-effects.mjs";
+import {
+  beginEnemyDamageFrame,
+  createEnemyCombatState,
+  createEnemyDamageState,
+  ENEMY_DAMAGE_SOURCES,
+  enemyPulseSpawnPosition,
+  projectileVisualMetrics,
+  queueEnemyDamage,
+  resolveEnemyDamage,
+  simulateNaturalRaiderFire,
+  stepEnemyCombatFrame,
+  sweptHorizontalProjectileTargets,
+} from "./enemy-combat.mjs";
+import {
   buildCapitalHullsAntic2Charset,
   compileCapitalHullsAntic2Prototype,
   loadCapitalHullsAntic2Prototype,
@@ -43,7 +80,7 @@ const ANTIC_PIXELS_PER_BYTE = 4;
 const HIGH_RES_PIXELS_PER_COLOR_CLOCK = 2;
 const PREVIEW_SCALE = 2;
 const PMG_LEFT_EDGE = 48;
-const PMG_SCREEN_TOP = 32;
+const PMG_SCREEN_TOP = 8;
 
 const SOURCE_WIDTH =
   SCREEN_COLUMNS * ANTIC_PIXELS_PER_BYTE * HIGH_RES_PIXELS_PER_COLOR_CLOCK;
@@ -177,17 +214,149 @@ export const DEFAULT_ENEMY_FIGHTER_LIMITS_PREVIEW_PATH = path.join(
   "previews",
   "enemy-fighter-corridor-limits.png",
 );
+export const DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-reference-inventory.png",
+);
+export const DEFAULT_ENEMY_ANCHOR_COMPARISON_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-anchor-comparison.png",
+);
+export const DEFAULT_ENEMY_NATIVE_SPRITES_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-native-sprites.png",
+);
+export const DEFAULT_ENEMY_REVIEW_HARNESS_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-review-harness-sequence.png",
+);
+export const DEFAULT_ENEMY_SCANNER_COMPARISON_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-scanner-techniques.png",
+);
+export const DEFAULT_ENEMY_BEFORE_AFTER_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-raider-before-after.png",
+);
+export const DEFAULT_ENEMY_PALETTE_CYLON_OXBLOOD_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-palette-cylon-oxblood.png",
+);
+export const DEFAULT_ENEMY_PALETTE_CYLON_BURGUNDY_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-raider-cylon-burgundy-comparison.png",
+);
+export const DEFAULT_ENEMY_PALETTE_CYLON_SCARLET_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-palette-cylon-scarlet.png",
+);
+export const DEFAULT_ENEMY_COMBAT_SEQUENCE_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-single-pulse-combat-sequence.png",
+);
+export const DEFAULT_PROJECTILE_VISUAL_LANGUAGE_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "projectile-visual-language.png",
+);
+export const DEFAULT_PROJECTILE_COLLISION_SCORING_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "projectile-collision-scoring-sequence.png",
+);
+export const DEFAULT_RAIDER_NATURAL_FIRE_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "raider-natural-fire-trace.csv",
+);
+export const DEFAULT_FIGHTER_BURST_RUNTIME_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "fighter-burst-runtime-trace.csv",
+);
+export const DEFAULT_FIGHTER_WEAPON_TRANSITION_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "fighter-weapon-transition-trace.csv",
+);
+export const DEFAULT_SHARED_FIGHTER_EXPLOSION_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "shared-fighter-explosion-sequence.png",
+);
+export const DEFAULT_SHARED_FIGHTER_EXPLOSION_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "shared-fighter-explosion-trace.csv",
+);
+export const DEFAULT_DEBRIS_REVIEW_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "debris-visual-polish-review.png",
+);
+export const DEFAULT_DEBRIS_REVIEW_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "debris-visual-polish-trace.csv",
+);
 const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   rootDirectory,
   "assets",
   "graphics",
   "capital-hulls.json",
 );
+const DEFAULT_ENEMY_ROSTER_DEFINITION_PATH = path.join(
+  rootDirectory,
+  "assets",
+  "graphics",
+  "enemy-roster.json",
+);
 const DEFAULT_CAPITAL_HULLS_ANTIC2_DEFINITION_PATH = path.join(
   rootDirectory,
   "assets",
   "graphics",
   "capital-hulls-antic2-prototype.json",
+);
+const DEFAULT_STARFIELD_DEFINITION_PATH = path.join(
+  rootDirectory,
+  "assets",
+  "graphics",
+  "starfield.json",
+);
+const DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH = path.join(
+  rootDirectory,
+  "assets",
+  "graphics",
+  "entity-effects.json",
 );
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -460,6 +629,7 @@ function buildGameplayHudCharset(frontendGlyphRows, constants) {
       frontendGlyphRows.subarray(sourceIndex * 7, sourceIndex * 7 + 7),
       destinationIndex * CHARACTER_HEIGHT,
     );
+    charset[destinationIndex * CHARACTER_HEIGHT + 7] = 0xff;
   };
   for (let digit = 0; digit < 10; digit += 1) {
     copyGlyph(digit, requireValue(constants, "CH_ZERO") + digit);
@@ -467,15 +637,32 @@ function buildGameplayHudCharset(frontendGlyphRows, constants) {
   for (let letter = 0; letter < 26; letter += 1) {
     copyGlyph(10 + letter, requireValue(constants, "CH_HUD_A") + letter);
   }
-  charset[requireValue(constants, "CH_SEPARATOR") * CHARACTER_HEIGHT + 7] = 0xff;
+  const percent = requireValue(constants, "CH_PERCENT");
+  charset.set(
+    [0xcc, 0xd8, 0x18, 0x30, 0x60, 0x6c, 0xcc, 0x00],
+    percent * CHARACTER_HEIGHT,
+  );
+  charset[7] = 0xff;
+  charset[percent * CHARACTER_HEIGHT + 7] = 0xff;
   return charset;
 }
 
 export function readGameGraphicsSource(
   source,
   capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+  enemyRosterDefinition = loadEnemyRosterDefinition(DEFAULT_ENEMY_ROSTER_DEFINITION_PATH),
 ) {
   const capitalHulls = compileCapitalHulls(capitalHullsDefinition);
+  const enemyRoster = compileEnemyRoster(enemyRosterDefinition, rootDirectory);
+  const fighterWeapons = compileFighterWeapons(loadFighterWeaponsDefinition(
+    path.join(rootDirectory, "assets", "graphics", "fighter-weapons.json"),
+  ), enemyRoster);
+  const starfield = compileStarfield(loadStarfieldDefinition(
+    DEFAULT_STARFIELD_DEFINITION_PATH,
+  ));
+  const releaseEnemy = enemyRoster.implemented.find(
+    ({ id }) => id === enemyRoster.runtime.releaseArchetype,
+  );
   const constants = parseConstants(source);
   for (const [name, value] of [
     ["CAPITAL_HULL_GLYPH_BASE", capitalHulls.definition.charsetBaseIndex],
@@ -484,9 +671,48 @@ export function readGameGraphicsSource(
     ["CAPITAL_HULL_PREVIEW_START_PHASE", capitalHulls.previewStartPhase],
     ["CAPITAL_HULL_MAP_COLUMNS", capitalHulls.mapColumns],
     ["CAPITAL_HULL_PACKED_ROW_BYTES", capitalHulls.packedRowBytes],
+    ["ENEMY_IMPLEMENTED_COUNT", enemyRoster.implemented.length],
+    ["ENEMY_RELEASE_ARCHETYPE", releaseEnemy.index],
+    ["ENEMY_FRAME_STRIDE", enemyRoster.runtime.frameStride],
+    ["ENEMY_ACCENT_FRAME_COUNT", enemyRoster.runtime.accentFrames],
+    ["ENEMY_ANIMATION_PHASE_FRAMES", enemyRoster.runtime.animationPhaseFrames],
+    ["ENEMY_ANIMATION_CYCLE_FRAMES",
+      enemyRoster.runtime.accentFrames * enemyRoster.runtime.animationPhaseFrames],
+    ["ENEMY_RELEASE_VISIBLE_WIDTH", releaseEnemy.visibleWidth],
+    ["ENEMY_RELEASE_FRAME_HEIGHT", releaseEnemy.height],
+    ["ENEMY_BODY_COLOR", enemyRoster.runtime.colourPolicy.bodyValue],
+    ["ENEMY_RUNTIME_BODY_COLOR", enemyRoster.runtime.colourPolicy.bodyValue],
+    ["ENEMY_SCANNER_COLOR", enemyRoster.runtime.colourPolicy.accentValue],
+    ["HUD_TOP", fighterWeapons.viewport.hudTop],
+    ["HUD_BOTTOM", fighterWeapons.viewport.hudBottom],
+    ["GAMEPLAY_TOP", fighterWeapons.viewport.gameplayTop],
+    ["GAMEPLAY_BOTTOM", fighterWeapons.viewport.gameplayBottom],
+    ["PLAYER_RESPAWN_Y", fighterWeapons.viewport.gameplayBottom - 16],
+    ["VIPER_PROJECTILE_COLOR", fighterWeapons.viper.colourValue],
+    ["RAIDER_PROJECTILE_COLOR", fighterWeapons.raider.colourValue],
+    ["GAMEPLAY_COLPF2", fighterWeapons.viper.colourValue],
+    ["GAMEPLAY_COLPF3", fighterWeapons.raider.colourValue],
+    ["STAR_FAR_CAPACITY", starfield.farLayer.population],
+    ["STAR_FAR_STEP_RATIO", starfield.farLayer.stepRatio],
+    ["STAR_NEAR_STEP_RATIO", starfield.nearLayer.stepRatio],
+    ["STAR_NEAR_DENSITY_NUMERATOR", starfield.nearLayer.densityNumerator],
+    ["STAR_DENSITY_DENOMINATOR", starfield.nearLayer.densityDenominator],
+    ["STAR_SPECIAL_FREQUENCY", starfield.nearLayer.specialFrequency],
+    ["STAR_TWINKLE_INTERVAL", starfield.twinkle.intervalFrames],
+    ["STAR_GENERATION_SEED", starfield.generationSeed],
   ]) {
     constants.set(name, value);
   }
+  enemyRoster.inventory.forEach(({ id }, index) => constants.set(`ENEMY_ARCHETYPE_${id}`, index));
+  constants.set("ENEMY_X_MIN", releaseEnemy.logicalBounds[0]);
+  constants.set("ENEMY_X_MAX", releaseEnemy.logicalBounds[1]);
+  constants.set("ENEMY_VISIBLE_WIDTH", releaseEnemy.visibleWidth);
+  constants.set("ENEMY_X_RANGE", releaseEnemy.logicalBounds[1] - releaseEnemy.logicalBounds[0]);
+  constants.set(
+    "ENEMY_SPAWN_X",
+    releaseEnemy.logicalBounds[0] +
+      Math.floor((releaseEnemy.logicalBounds[1] - releaseEnemy.logicalBounds[0]) / 2),
+  );
   const initialState = extractConstantStores(extractRoutine(source, "init_state"), constants);
   const frontendHardwareState = extractConstantStores(
     extractRoutine(source, "start"),
@@ -502,10 +728,10 @@ export function readGameGraphicsSource(
     constants,
   );
   for (const register of ["COLPF0", "COLPF1", "COLPF2", "COLPF3"]) {
-    gameplayHardwareState.set(
-      register,
-      requireValue(gameplayDliState, register),
-    );
+    const value = gameplayDliState.get(register) ?? gameplayEntryState.get(register) ??
+      gameplayHardwareState.get(register);
+    if (value === undefined) throw new Error(`Gameplay palette does not define ${register}`);
+    gameplayHardwareState.set(register, value);
   }
   for (const register of ["SIZEP0", "SIZEP3"]) {
     gameplayHardwareState.set(
@@ -539,18 +765,25 @@ export function readGameGraphicsSource(
     frontendGlyphRows,
     capitalHulls.definition.charsetBaseIndex * CHARACTER_HEIGHT + capitalHulls.glyphBytes.length,
   );
+  const sourceCharset = Uint8Array.from(charset);
+  charset.set(starfield.glyphBytes, starfield.glyphs[0].screenCode * CHARACTER_HEIGHT);
 
   const hudHardwareState = new Map(gameplayHardwareState);
   for (const register of ["COLPF1", "COLPF2", "COLBK"]) {
     hudHardwareState.set(register, requireValue(gameplayEntryState, register));
   }
 
-  const gameplayDisplayList = extractLabeledData(
-    source,
-    "display_list",
-    constants,
-    "display_list_jvb",
-  );
+  // Runtime A2 keeps HUD and divider LMS operands fixed, then maps the 22-row
+  // ring. Preview uses the exact accepted head-zero address sequence.
+  const screenAddress = requireValue(constants, "SCREEN");
+  const gameplayDisplayList = Uint8Array.from([
+    0xc2, screenAddress & 0xff, screenAddress >>> 8,
+    0x44, (screenAddress + 40) & 0xff, (screenAddress + 40) >>> 8,
+    ...Array.from({ length: 22 }, (_, row) => {
+      const address = screenAddress + (row + 2) * 40;
+      return [row === 21 ? 0xc4 : 0x44, address & 0xff, address >>> 8];
+    }).flat(),
+  ]);
   const gameplayLayout = decodeMainMenuDisplayList(
     gameplayDisplayList,
     requireValue(constants, "SCREEN"),
@@ -588,14 +821,19 @@ export function readGameGraphicsSource(
     hud: extractLabeledData(source, "hud_ascii", constants),
     playerShape: extractLabeledData(source, "player_shape", constants),
     playerEngineShape: extractLabeledData(source, "player_engine_shape", constants),
-    enemyShape: extractLabeledData(source, "enemy_shape", constants),
-    scannerShape: extractLabeledData(source, "scanner_shape", constants),
+    enemyRoster,
+    fighterWeapons,
+    starfield,
+    releaseEnemy,
+    enemyShape: releaseEnemy.bodyRows,
+    scannerShape: releaseEnemy.accentFrameBytes,
     capitalHulls,
     alliedHullRows: capitalHulls.decodedMaps.get("allied"),
     enemyHullRows: capitalHulls.decodedMaps.get("enemy"),
     alliedSectorRows: capitalHulls.sector.sectorScreenRowsBySide.get("allied"),
     enemySectorRows: capitalHulls.sector.sectorScreenRowsBySide.get("enemy"),
     charset,
+    sourceCharset,
     hudCharset,
     gameplayDisplayList,
     gameplayLayout,
@@ -613,18 +851,22 @@ export function readGameGraphicsSource(
     graphics.playerEngineShape,
     requireValue(constants, "PLAYER_H"),
   );
-  requireLength("enemy_shape", graphics.enemyShape, requireValue(constants, "ENEMY_H"));
-  requireLength("scanner_shape", graphics.scannerShape, 16);
+  requireLength("release enemy body", graphics.enemyShape, releaseEnemy.height);
+  requireLength(
+    "release enemy scanner frames",
+    graphics.scannerShape,
+    enemyRoster.runtime.frameStride * enemyRoster.runtime.accentFrames,
+  );
   requireLength("charset_data", graphics.charset, 1024);
   requireLength("HUD charset", graphics.hudCharset, 1024);
 
   const gameplayModes = graphics.gameplayLayout.rows.map(({ mode }) => mode);
   if (
     gameplayModes.length !== SCREEN_ROWS ||
-    gameplayModes[0] !== 2 || gameplayModes[1] !== 2 ||
-    gameplayModes.slice(2).some((mode) => mode !== 4)
+    gameplayModes[0] !== 2 ||
+    gameplayModes.slice(1).some((mode) => mode !== 4)
   ) {
-    throw new Error("Preview source does not contain the expected ANTIC 2 HUD and ANTIC 4 playfield");
+    throw new Error("Preview source does not contain one ANTIC 2 HUD row and 23 ANTIC 4 playfield rows");
   }
 
   return graphics;
@@ -762,7 +1004,7 @@ export function readFrontendGraphicsSource(source) {
   }
   const graphicsBase = requireValue(graphics.constants, "FRONTEND_GRAPHICS_BASE");
   frontendCharset.set(
-    graphics.charset.subarray(0, 16 * CHARACTER_HEIGHT),
+    graphics.sourceCharset.subarray(0, 16 * CHARACTER_HEIGHT),
     graphicsBase * CHARACTER_HEIGHT,
   );
   const markerBytes = extractLabeledData(
@@ -770,7 +1012,7 @@ export function readFrontendGraphicsSource(source) {
     "frontend_marker_positions",
     graphics.constants,
   );
-  requireLength("frontend_marker_positions", markerBytes, 18);
+  requireLength("frontend_marker_positions", markerBytes, 26);
 
   const markerAddresses = [];
   for (let offset = 0; offset < markerBytes.length; offset += 2) {
@@ -852,27 +1094,29 @@ function createCanonicalScreenRuntimeState(
   for (let index = 0; index < graphics.hud.length && graphics.hud[index] !== 0; index += 1) {
     screen[index] = (graphics.hud[index] - 0x20) & 0xff;
   }
-  screen.fill(
-    requireValue(constants, "CH_SEPARATOR"),
-    SCREEN_COLUMNS,
-    SCREEN_COLUMNS * 2,
-  );
-
   let rngState = requireValue(initialState, "rng_state");
+  const starfieldState = createStarfieldState(graphics.starfield);
+  const starfieldScreen = composeStarfield(graphics.starfield, starfieldState);
   const corridorPhase = sectorPhase;
+  const gameplayFirstRow = requireValue(constants, "GAMEPLAY_FIRST_SCREEN_ROW");
+  const visibleRowCount = graphics.capitalHulls.sector.visibleRows;
 
-  for (let row = 2; row < SCREEN_ROWS; row += 1) {
-    rngState = writeCanonicalCorridorRow(screen, row, null, graphics, rngState);
+  for (let row = gameplayFirstRow; row < SCREEN_ROWS; row += 1) {
+    const starRow = row - gameplayFirstRow;
+    screen.set(
+      starfieldScreen.subarray(starRow * SCREEN_COLUMNS, (starRow + 1) * SCREEN_COLUMNS),
+      row * SCREEN_COLUMNS,
+    );
   }
 
   const hullBase = requireValue(constants, "CAPITAL_HULL_GLYPH_BASE");
   const hullEnd = hullBase + requireValue(constants, "CAPITAL_HULL_GLYPH_COUNT");
   const space = requireValue(constants, "CH_SPACE");
-  const boundaryLeft = new Uint8Array(22);
-  const boundaryRight = new Uint8Array(22);
-  for (let offset = 0; offset < 22; offset += 1) {
-    const left = screen[(offset + 2) * SCREEN_COLUMNS + 8];
-    const right = screen[(offset + 2) * SCREEN_COLUMNS + 31];
+  const boundaryLeft = new Uint8Array(visibleRowCount);
+  const boundaryRight = new Uint8Array(visibleRowCount);
+  for (let offset = 0; offset < visibleRowCount; offset += 1) {
+    const left = screen[(offset + gameplayFirstRow) * SCREEN_COLUMNS + 8];
+    const right = screen[(offset + gameplayFirstRow) * SCREEN_COLUMNS + 31];
     const leftIndex = left & 0x7f;
     const rightIndex = right & 0x7f;
     boundaryLeft[offset] = leftIndex >= hullBase && leftIndex < hullEnd ? space : left;
@@ -881,8 +1125,8 @@ function createCanonicalScreenRuntimeState(
 
   const zero = requireValue(constants, "CH_ZERO");
   screen.set([zero, zero, zero, zero, zero], 6);
-  const visibleScrolls = Math.min(22, sectorPhase);
-  const visibleRows = Array.from({ length: 22 }, (_, offset) =>
+  const visibleScrolls = Math.min(visibleRowCount, sectorPhase);
+  const visibleRows = Array.from({ length: visibleRowCount }, (_, offset) =>
     offset < visibleScrolls ? sectorPhase - 1 - offset : null);
   const state = {
     screen,
@@ -894,6 +1138,7 @@ function createCanonicalScreenRuntimeState(
     boundaryRight,
     visibleRows,
     drainRows: 0,
+    starfieldState,
   };
   renderCanonicalHulls(state, graphics);
   return state;
@@ -916,8 +1161,9 @@ function writeCanonicalStarRow(screen, row, graphics, rngState) {
 }
 
 function renderCanonicalHulls(state, graphics) {
-  for (let offset = 0; offset < 22; offset += 1) {
-    const rowStart = (offset + 2) * SCREEN_COLUMNS;
+  const gameplayFirstRow = requireValue(graphics.constants, "GAMEPLAY_FIRST_SCREEN_ROW");
+  for (let offset = 0; offset < graphics.capitalHulls.sector.visibleRows; offset += 1) {
+    const rowStart = (offset + gameplayFirstRow) * SCREEN_COLUMNS;
     state.screen[rowStart + 8] = state.boundaryLeft[offset];
     state.screen[rowStart + 31] = state.boundaryRight[offset];
     state.screen.fill(0, rowStart, rowStart + 8);
@@ -943,17 +1189,22 @@ function renderCanonicalHulls(state, graphics) {
 }
 
 function advanceCanonicalScreenRuntimeState(state, graphics) {
-  for (let row = 23; row >= 3; row -= 1) {
+  const gameplayFirstRow = requireValue(graphics.constants, "GAMEPLAY_FIRST_SCREEN_ROW");
+  state.starfieldState = stepStarfieldWorld(graphics.starfield, state.starfieldState);
+  const composed = composeStarfield(graphics.starfield, state.starfieldState);
+  for (let row = gameplayFirstRow; row < SCREEN_ROWS; row += 1) {
+    const starRow = row - gameplayFirstRow;
     for (let column = 9; column <= 30; column += 1) {
       state.screen[row * SCREEN_COLUMNS + column] =
-        state.screen[(row - 1) * SCREEN_COLUMNS + column];
+        composed[starRow * SCREEN_COLUMNS + column];
     }
   }
-  state.boundaryLeft.copyWithin(1, 0, 21);
-  state.boundaryRight.copyWithin(1, 0, 21);
-  state.rngState = writeCanonicalStarRow(state.screen, 2, graphics, state.rngState);
-  state.boundaryLeft[0] = state.screen[2 * SCREEN_COLUMNS + 8];
-  state.boundaryRight[0] = state.screen[2 * SCREEN_COLUMNS + 31];
+  const priorRows = graphics.capitalHulls.sector.visibleRows - 1;
+  state.boundaryLeft.copyWithin(1, 0, priorRows);
+  state.boundaryRight.copyWithin(1, 0, priorRows);
+  state.rngState = state.starfieldState.rng;
+  state.boundaryLeft[0] = composed[8];
+  state.boundaryRight[0] = composed[31];
   renderCanonicalHulls(state, graphics);
   state.advances += 1;
 }
@@ -965,7 +1216,8 @@ function advanceCanonicalHullRuntimeState(state, graphics) {
     state.corridorPhase += 1;
   } else {
     state.visibleRows.unshift(null);
-    state.drainRows = Math.min(22, (state.drainRows ?? 0) + 1);
+    state.drainRows = Math.min(graphics.capitalHulls.sector.visibleRows,
+      (state.drainRows ?? 0) + 1);
   }
   state.hullAdvances += 1;
   renderCanonicalHulls(state, graphics);
@@ -1130,8 +1382,9 @@ function drawGameplayMixedScreen(colorRegisters, screen, graphics) {
     charset: graphics.hudCharset,
     registers: graphics.hudHardwareState,
     firstCharacterRow: 0,
-    characterRows: 2,
+    characterRows: 1,
   });
+  pixels.fill(0x0e, 7 * SOURCE_WIDTH, 8 * SOURCE_WIDTH);
   return pixels;
 }
 
@@ -1220,13 +1473,25 @@ function playerWidthInColorClocks(sizeValue) {
   throw new Error(`Unsupported GTIA player size in preview source: ${sizeValue}`);
 }
 
-function drawPlayer(pixels, shape, horizontalPosition, verticalPosition, size, color) {
+function drawPlayer(
+  pixels,
+  shape,
+  horizontalPosition,
+  verticalPosition,
+  size,
+  color,
+  screenTop = PMG_SCREEN_TOP,
+  clipTop = Number.NEGATIVE_INFINITY,
+  clipBottom = Number.POSITIVE_INFINITY,
+) {
   const colorClockWidth = playerWidthInColorClocks(size);
   const pixelWidth = colorClockWidth * HIGH_RES_PIXELS_PER_COLOR_CLOCK;
   const left = (horizontalPosition - PMG_LEFT_EDGE) * HIGH_RES_PIXELS_PER_COLOR_CLOCK;
-  const top = verticalPosition - PMG_SCREEN_TOP;
+  const top = verticalPosition - screenTop;
 
   for (let row = 0; row < shape.length; row += 1) {
+    const hardwareY = verticalPosition + row;
+    if (hardwareY < clipTop || hardwareY >= clipBottom) continue;
     const y = top + row;
     if (y < 0 || y >= SOURCE_HEIGHT) {
       continue;
@@ -1252,16 +1517,32 @@ function overlayCanonicalPmg(pixels, graphics, {
   playerY: playerYOverride,
   enemyX: enemyXOverride,
   enemyY: enemyYOverride,
+  enemyArchetype: enemyArchetypeOverride,
+  scannerPhase: scannerPhaseOverride,
+  enemyBodyColor: enemyBodyColorOverride,
+  enemyAccentColor: enemyAccentColorOverride,
   showPlayer = true,
 } = {}) {
-  const { hardwareState, initialState } = graphics;
+  const { hardwareState, initialState, constants } = graphics;
+  const gameplayTop = requireValue(constants, "GAMEPLAY_TOP");
+  const gameplayBottom = requireValue(constants, "GAMEPLAY_BOTTOM");
   const playerX = playerXOverride ?? requireValue(initialState, "player_x");
   const playerY = playerYOverride ?? requireValue(initialState, "player_y");
   const enemyX = enemyXOverride ?? requireValue(initialState, "enemy_x");
   const enemyY = enemyYOverride ?? requireValue(initialState, "enemy_y");
-  const scannerPhase = requireValue(initialState, "scanner_phase") & 0x0f;
-  const scannerFrame = new Uint8Array(requireValue(graphics.constants, "ENEMY_H"));
-  scannerFrame[5] = graphics.scannerShape[scannerPhase];
+  const enemy = enemyArchetypeOverride ?? graphics.releaseEnemy;
+  const scannerPhase = (scannerPhaseOverride ?? requireValue(initialState, "scanner_phase")) %
+    (graphics.enemyRoster.runtime.accentFrames *
+      graphics.enemyRoster.runtime.animationPhaseFrames);
+  const scannerFrameIndex = Math.floor(
+    scannerPhase / graphics.enemyRoster.runtime.animationPhaseFrames,
+  );
+  const scannerFrameOffset = scannerFrameIndex * graphics.enemyRoster.runtime.frameStride;
+  const scannerFrame = enemy.accentFrameBytes.subarray(
+    scannerFrameOffset,
+    scannerFrameOffset + enemy.height,
+  );
+  const enemyHpos = enemyX - enemy.visibleLeftInset;
 
   // PRIOR=0 gives lower-numbered players priority. Paint from P3 to P0.
   if (showPlayer) {
@@ -1277,18 +1558,24 @@ function overlayCanonicalPmg(pixels, graphics, {
   drawPlayer(
     pixels,
     scannerFrame,
-    enemyX,
+    enemyHpos,
     enemyY,
-    requireValue(hardwareState, "SIZEP2"),
-    requireValue(hardwareState, "COLPM2"),
+    enemy.sizeCode,
+    enemyAccentColorOverride ?? requireValue(hardwareState, "COLPM2"),
+    PMG_SCREEN_TOP,
+    gameplayTop,
+    gameplayBottom,
   );
   drawPlayer(
     pixels,
-    graphics.enemyShape,
-    enemyX,
+    enemy.bodyRows,
+    enemyHpos,
     enemyY,
-    requireValue(hardwareState, "SIZEP1"),
-    requireValue(hardwareState, "COLPM1"),
+    enemy.sizeCode,
+    enemyBodyColorOverride ?? requireValue(hardwareState, "COLPM1"),
+    PMG_SCREEN_TOP,
+    gameplayTop,
+    gameplayBottom,
   );
   if (showPlayer) {
     drawPlayer(
@@ -1316,6 +1603,44 @@ function drawMissileSpan(pixels, horizontalPosition, verticalPosition, height, c
   }
 }
 
+function drawTopAnchoredMissileSpan(
+  pixels,
+  horizontalPosition,
+  verticalPosition,
+  height,
+  color,
+  size = 0,
+) {
+  const left = (horizontalPosition - PMG_LEFT_EDGE) * HIGH_RES_PIXELS_PER_COLOR_CLOCK;
+  const top = verticalPosition - PMG_SCREEN_TOP;
+  const width = missileWidth(size) * HIGH_RES_PIXELS_PER_COLOR_CLOCK;
+  for (let yOffset = 0; yOffset < height; yOffset += 1) {
+    const y = top + yOffset;
+    if (y < 0 || y >= SOURCE_HEIGHT) continue;
+    for (let xOffset = 0; xOffset < width; xOffset += 1) {
+      const x = left + xOffset;
+      if (x >= 0 && x < SOURCE_WIDTH) pixels[y * SOURCE_WIDTH + x] = color;
+    }
+  }
+}
+
+function applyCapitalShellVisualToScreen(screen, asset, visual) {
+  if (visual.renderer !== "ANTIC4_PLAYFIELD_OVERLAY") return null;
+  const screenRow = Math.floor((visual.y - PMG_SCREEN_TOP) / CHARACTER_HEIGHT);
+  const screenColumn = Math.floor((visual.x - PMG_LEFT_EDGE) / ANTIC_PIXELS_PER_BYTE);
+  if (screenRow < 1 || screenRow >= SCREEN_ROWS ||
+      screenColumn < 0 || screenColumn >= SCREEN_COLUMNS) return null;
+  const screenIndex = screenRow * SCREEN_COLUMNS + screenColumn;
+  const cellCount = visual.width / ANTIC_PIXELS_PER_BYTE;
+  const code = (asset.definition.charsetBaseIndex + 18 + visual.phase) | visual.attribute;
+  const previousCodes = [];
+  for (let cell = 0; cell < cellCount; cell += 1) {
+    previousCodes.push(screen[screenIndex + cell]);
+    screen[screenIndex + cell] = code;
+  }
+  return { screenRow, screenColumn, screenIndex, previousCodes, code, cellCount };
+}
+
 function overlayStartMenuPmg(pixels, graphics) {
   const { constants, mainMenuHardwareState } = graphics;
   const verticalScale = requireValue(constants, "MAIN_MENU_PLAYER_VERTICAL_SCALE");
@@ -1332,6 +1657,7 @@ function overlayStartMenuPmg(pixels, graphics) {
     playerY,
     requireValue(mainMenuHardwareState, "SIZEP3"),
     requireValue(mainMenuHardwareState, "COLPM3"),
+    32,
   );
   drawPlayer(
     pixels,
@@ -1343,6 +1669,7 @@ function overlayStartMenuPmg(pixels, graphics) {
     requireValue(constants, "MAIN_MENU_RED_LIGHT_Y"),
     requireValue(mainMenuHardwareState, "SIZEP2"),
     requireValue(mainMenuHardwareState, "COLPM2"),
+    32,
   );
   drawPlayer(
     pixels,
@@ -1351,6 +1678,7 @@ function overlayStartMenuPmg(pixels, graphics) {
     playerY,
     requireValue(mainMenuHardwareState, "SIZEP0"),
     requireValue(mainMenuHardwareState, "COLPM0"),
+    32,
   );
 }
 
@@ -1396,19 +1724,20 @@ function scaleAndConvertToRgb(
   registerPixels,
   sourceWidth = SOURCE_WIDTH,
   sourceHeight = SOURCE_HEIGHT,
+  outputScale = PREVIEW_SCALE,
 ) {
-  const outputWidth = sourceWidth * PREVIEW_SCALE;
-  const outputHeight = sourceHeight * PREVIEW_SCALE;
+  const outputWidth = sourceWidth * outputScale;
+  const outputHeight = sourceHeight * outputScale;
   const rgb = Buffer.alloc(outputWidth * outputHeight * 3);
   const palette = Array.from({ length: 256 }, (_, value) => atariPalRegisterToRgb(value));
 
   for (let sourceY = 0; sourceY < sourceHeight; sourceY += 1) {
     for (let sourceX = 0; sourceX < sourceWidth; sourceX += 1) {
       const color = palette[registerPixels[sourceY * sourceWidth + sourceX]];
-      for (let scaleY = 0; scaleY < PREVIEW_SCALE; scaleY += 1) {
-        const outputY = sourceY * PREVIEW_SCALE + scaleY;
-        for (let scaleX = 0; scaleX < PREVIEW_SCALE; scaleX += 1) {
-          const outputX = sourceX * PREVIEW_SCALE + scaleX;
+      for (let scaleY = 0; scaleY < outputScale; scaleY += 1) {
+        const outputY = sourceY * outputScale + scaleY;
+        for (let scaleX = 0; scaleX < outputScale; scaleX += 1) {
+          const outputX = sourceX * outputScale + scaleX;
           const outputOffset = (outputY * outputWidth + outputX) * 3;
           rgb[outputOffset] = color[0];
           rgb[outputOffset + 1] = color[1];
@@ -1466,6 +1795,133 @@ function encodePng(rgb, width = PREVIEW_WIDTH, height = PREVIEW_HEIGHT) {
     makePngChunk("IDAT", compressed),
     makePngChunk("IEND", Buffer.alloc(0)),
   ]);
+}
+
+function decodeRgbaReferencePng(png) {
+  if (!png.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+    throw new Error("Invalid reference PNG signature");
+  }
+  let offset = PNG_SIGNATURE.length;
+  let header;
+  const data = [];
+  while (offset < png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const chunk = png.subarray(offset + 8, offset + 8 + length);
+    if (type === "IHDR") header = chunk;
+    if (type === "IDAT") data.push(chunk);
+    offset += length + 12;
+    if (type === "IEND") break;
+  }
+  if (!header || header[8] !== 8 || header[9] !== 6 || header[12] !== 0) {
+    throw new Error("Enemy references must be non-interlaced eight-bit RGBA PNGs");
+  }
+  const width = header.readUInt32BE(0);
+  const height = header.readUInt32BE(4);
+  const bytesPerPixel = 4;
+  const stride = width * bytesPerPixel;
+  const raw = zlib.inflateSync(Buffer.concat(data));
+  if (raw.length !== (stride + 1) * height) {
+    throw new Error("Enemy reference PNG has an unexpected decoded size");
+  }
+  const rgba = Buffer.alloc(width * height * bytesPerPixel);
+  const paeth = (left, above, upperLeft) => {
+    const prediction = left + above - upperLeft;
+    const leftDistance = Math.abs(prediction - left);
+    const aboveDistance = Math.abs(prediction - above);
+    const upperLeftDistance = Math.abs(prediction - upperLeft);
+    if (leftDistance <= aboveDistance && leftDistance <= upperLeftDistance) return left;
+    if (aboveDistance <= upperLeftDistance) return above;
+    return upperLeft;
+  };
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x += 1) {
+      const encoded = raw[y * (stride + 1) + 1 + x];
+      const left = x >= bytesPerPixel ? rgba[y * stride + x - bytesPerPixel] : 0;
+      const above = y > 0 ? rgba[(y - 1) * stride + x] : 0;
+      const upperLeft = y > 0 && x >= bytesPerPixel
+        ? rgba[(y - 1) * stride + x - bytesPerPixel]
+        : 0;
+      const value = [
+        encoded,
+        encoded + left,
+        encoded + above,
+        encoded + Math.floor((left + above) / 2),
+        encoded + paeth(left, above, upperLeft),
+      ][filter];
+      if (value === undefined) throw new Error(`Unsupported PNG filter ${filter}`);
+      rgba[y * stride + x] = value & 0xff;
+    }
+  }
+  return { width, height, rgba };
+}
+
+function isReferenceForeground(red, green, blue, alpha) {
+  if (alpha < 24) return false;
+  const chromaGreen = green > 96 && green > red * 1.28 && green > blue * 1.28;
+  return !chromaGreen;
+}
+
+function referenceBounds(image) {
+  let left = image.width;
+  let top = image.height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const index = (y * image.width + x) * 4;
+      if (!isReferenceForeground(
+        image.rgba[index], image.rgba[index + 1], image.rgba[index + 2], image.rgba[index + 3],
+      )) continue;
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x);
+      bottom = Math.max(bottom, y);
+    }
+  }
+  if (right < left || bottom < top) throw new Error("Enemy reference contains no ship foreground");
+  return { left, top, right, bottom, width: right - left + 1, height: bottom - top + 1 };
+}
+
+function drawRgbLabel(rgb, width, text, x, y, frontend, color = [232, 232, 232]) {
+  for (let character = 0; character < text.length; character += 1) {
+    const screenCode = encodeFrontendAscii(text.charCodeAt(character), frontend.constants);
+    const characterIndex = screenCode & 0x7f;
+    for (let line = 0; line < CHARACTER_HEIGHT; line += 1) {
+      const pattern = frontend.frontendCharset[characterIndex * CHARACTER_HEIGHT + line];
+      for (let bit = 0; bit < 8; bit += 1) {
+        if ((pattern & (0x80 >>> bit)) === 0) continue;
+        const output = ((y + line) * width + x + character * 8 + bit) * 3;
+        rgb[output] = color[0];
+        rgb[output + 1] = color[1];
+        rgb[output + 2] = color[2];
+      }
+    }
+  }
+}
+
+function blitReference(rgb, outputWidth, image, bounds, x, y, width, height) {
+  for (let outputY = 0; outputY < height; outputY += 1) {
+    const sourceY = bounds.top + Math.min(
+      bounds.height - 1,
+      Math.floor(outputY * bounds.height / height),
+    );
+    for (let outputX = 0; outputX < width; outputX += 1) {
+      const sourceX = bounds.left + Math.min(
+        bounds.width - 1,
+        Math.floor(outputX * bounds.width / width),
+      );
+      const source = (sourceY * image.width + sourceX) * 4;
+      if (!isReferenceForeground(
+        image.rgba[source], image.rgba[source + 1], image.rgba[source + 2], image.rgba[source + 3],
+      )) continue;
+      const output = ((y + outputY) * outputWidth + x + outputX) * 3;
+      rgb[output] = image.rgba[source];
+      rgb[output + 1] = image.rgba[source + 1];
+      rgb[output + 2] = image.rgba[source + 2];
+    }
+  }
 }
 
 export function readGameplayRuntimeState(
@@ -1559,7 +2015,7 @@ export function readCapitalHullsStripRuntimeState(
 function createBroadsideAntic2Screen(graphics, prototype) {
   const screen = createCanonicalScreen(graphics);
   let phase = requireValue(graphics.initialState, "corridor_phase");
-  for (let characterRow = 2; characterRow < SCREEN_ROWS; characterRow += 1) {
+  for (let characterRow = 1; characterRow < SCREEN_ROWS; characterRow += 1) {
     const segmentRow = phase & (prototype.segmentRows - 1);
     const rowStart = characterRow * SCREEN_COLUMNS;
     screen.set(prototype.decodedMaps.get("allied")[segmentRow], rowStart);
@@ -1622,7 +2078,7 @@ export function readBroadsideAntic2PrototypeState(
   const screen = createBroadsideAntic2Screen(graphics, prototype);
 
   // Runtime already owns a dedicated ANTIC 2 HUD. The rejected spike changes
-  // only rows 2-23 to the optional monochrome playfield for comparison.
+  // only rows 1-23 to the optional monochrome playfield for comparison.
   const registerPixels = drawGameplayMixedScreen(graphics.hardwareState, screen, graphics);
   drawAntic2Rows({
     pixels: registerPixels,
@@ -1630,8 +2086,8 @@ export function readBroadsideAntic2PrototypeState(
     screen,
     charset,
     registers: prototype.palette,
-    firstCharacterRow: 2,
-    characterRows: SCREEN_ROWS - 2,
+    firstCharacterRow: 1,
+    characterRows: SCREEN_ROWS - 1,
   });
   overlayCanonicalPmg(registerPixels, graphics);
   return { graphics, prototype, charset, screen, registerPixels };
@@ -1788,10 +2244,10 @@ export function readBroadsideFireSequenceRuntimeState(
   const enemy = turretById.get("enemy_turret_a");
   const color = (missile) => requireValue(graphics.hardwareState, `COLPM${missile}`);
   const visibleCannonRow = (turret) => {
-    for (let offset = 0; offset < 22; offset += 1) {
+    for (let offset = 0; offset < asset.sector.visibleRows; offset += 1) {
       const leftRow = asset.sector.previewSectorRow - 1 - offset;
       const sideRow = sectorRowForSide(asset, turret.side, leftRow);
-      if (asset.sector.cannonRowsBySide.get(turret.side).includes(sideRow)) return 2 + offset;
+      if (asset.sector.cannonRowsBySide.get(turret.side).includes(sideRow)) return 1 + offset;
     }
     throw new Error(`${turret.id} is not visible at the source-derived preview phase`);
   };
@@ -1813,6 +2269,10 @@ export function readBroadsideFireSequenceRuntimeState(
     }, asset);
     return { missile, x: visual.x, y: visual.y, height: visual.height, size: visual.size };
   };
+  const shellSpan = (missile, owner, x, y, frame = 0) => ({
+    missile,
+    ...heavyShellVisual({ state: BROADSIDE_STATES.FLYING, missile, owner, x, y }, asset, frame),
+  });
 
   const panelDefinitions = [
     {
@@ -1826,13 +2286,12 @@ export function readBroadsideFireSequenceRuntimeState(
     {
       label: "THREE SHELL CROSSING",
       spans: [
-        { missile: 1, x: enemyMuzzle.x - asset.broadside.projectileSpeed * 12, y: enemyMuzzle.y,
-          height: asset.broadside.flyingHeight },
-        { missile: 2, x: alliedMuzzle.x + asset.broadside.projectileSpeed * 18, y: alliedMuzzle.y,
-          height: asset.broadside.flyingHeight },
-        { missile: 3, x: enemySecondMuzzle.x - asset.broadside.projectileSpeed * 8,
-          y: enemySecondMuzzle.y,
-          height: asset.broadside.flyingHeight },
+        shellSpan(1, "enemy", enemyMuzzle.x - asset.broadside.projectileSpeed * 12,
+          enemyMuzzle.y, 24),
+        shellSpan(2, "allied", alliedMuzzle.x + asset.broadside.projectileSpeed * 18,
+          alliedMuzzle.y, 36),
+        shellSpan(3, "enemy", enemySecondMuzzle.x - asset.broadside.projectileSpeed * 8,
+          enemySecondMuzzle.y, 16),
       ],
     },
     {
@@ -1860,8 +2319,12 @@ export function readBroadsideFireSequenceRuntimeState(
   const frontend = readFrontendGraphicsSource(source);
 
   panelDefinitions.forEach((panel, index) => {
-    const panelPixels = Uint8Array.from(base.registerPixels);
+    const screen = Uint8Array.from(base.screen);
+    for (const span of panel.spans) applyCapitalShellVisualToScreen(screen, asset, span);
+    const panelPixels = drawGameplayMixedScreen(graphics.hardwareState, screen, graphics);
+    overlayCanonicalPmg(panelPixels, graphics);
     for (const span of panel.spans) {
+      if (span.renderer === "ANTIC4_PLAYFIELD_OVERLAY") continue;
       drawMissileSpan(panelPixels, span.x, span.y, span.height, color(span.missile), span.size ?? 1);
     }
     const column = index % columns;
@@ -1893,11 +2356,11 @@ export function createBroadsideFireSequencePreview(
 
 function visibleSectorCannon(asset, side, sectorPhase) {
   const turret = asset.turrets.find((candidate) => candidate.side === side);
-  for (let offset = 0; offset < 22; offset += 1) {
+  for (let offset = 0; offset < asset.sector.visibleRows; offset += 1) {
     const leftRow = sectorPhase - 1 - offset;
     const sideRow = sectorRowForSide(asset, side, leftRow);
     if (asset.sector.cannonRowsBySide.get(side).includes(sideRow)) {
-      return { turret, leftRow, sideRow, screenRow: 2 + offset };
+      return { turret, leftRow, sideRow, screenRow: 1 + offset };
     }
   }
   throw new Error(`${side} cannon is not visible at sector phase ${sectorPhase}`);
@@ -1916,8 +2379,8 @@ export function readFlagshipSectorSequenceRuntimeState(
     { label: "FORWARD  ROWS 184-207", phase: 206, state: "FORWARD" },
     { label: "PROW  ROWS 208-239", phase: 230, state: "PROW" },
     { label: "TERMINAL TIPS  THEN EMPTY", phase: 240, state: "PROW" },
-    { label: "DRAIN  11 OF 22 ROWS", phase: asset.sector.streamRows, drainRows: 11, state: "DRAIN" },
-    { label: "COMPLETE  ALL EFFECTS CLEAR", phase: asset.sector.streamRows, drainRows: 22, state: "COMPLETE" },
+    { label: "DRAIN  12 OF 23 ROWS", phase: asset.sector.streamRows, drainRows: 12, state: "DRAIN" },
+    { label: "COMPLETE  ALL EFFECTS CLEAR", phase: asset.sector.streamRows, drainRows: 23, state: "COMPLETE" },
   ];
   const columns = 3;
   const rows = 3;
@@ -2125,6 +2588,1201 @@ export function createEnemyFighterLimitsPreview(
   );
 }
 
+function drawEnemyRaster(registerPixels, width, height, archetype, x, y, phase = 0, {
+  scale = 1,
+  accent = true,
+  bodyColor = 0x44,
+  accentColor = 0x46,
+} = {}) {
+  const bitWidth = archetype.hposPerBit * HIGH_RES_PIXELS_PER_COLOR_CLOCK * scale;
+  const frameOffset = (phase % archetype.frames) * archetype.bodyBytes.length;
+  const drawLayer = (rows, color) => {
+    for (let row = 0; row < archetype.height; row += 1) {
+      const pattern = rows[row];
+      for (let bit = 0; bit < 8; bit += 1) {
+        if ((pattern & (0x80 >>> bit)) === 0) continue;
+        for (let dy = 0; dy < scale; dy += 1) {
+          for (let dx = 0; dx < bitWidth; dx += 1) {
+            const targetX = x + bit * bitWidth + dx;
+            const targetY = y + row * scale + dy;
+            if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
+              registerPixels[targetY * width + targetX] = color;
+            }
+          }
+        }
+      }
+    }
+  };
+  if (accent) {
+    drawLayer(
+      archetype.accentFrameBytes.subarray(frameOffset, frameOffset + archetype.bodyBytes.length),
+      accentColor,
+    );
+  }
+  // PRIOR=0 makes P1 body cover P2 wherever both masks contain a pixel.
+  drawLayer(archetype.bodyRows, bodyColor);
+}
+
+function loadEnemyRosterPreviewAsset() {
+  return compileEnemyRoster(
+    loadEnemyRosterDefinition(DEFAULT_ENEMY_ROSTER_DEFINITION_PATH),
+    rootDirectory,
+  );
+}
+
+export function createEnemyReferenceInventoryPreview(source) {
+  const roster = loadEnemyRosterPreviewAsset();
+  const frontend = readFrontendGraphicsSource(source);
+  const columns = 5;
+  const cellWidth = 160;
+  const cellHeight = 170;
+  const width = columns * cellWidth;
+  const height = 2 * cellHeight;
+  const rgb = Buffer.alloc(width * height * 3, 6);
+  roster.inventory.forEach((entry, index) => {
+    const image = decodeRgbaReferencePng(fs.readFileSync(path.join(rootDirectory, entry.reference)));
+    const bounds = referenceBounds(image);
+    const maxWidth = 132;
+    const maxHeight = 132;
+    const scale = Math.min(maxWidth / bounds.width, maxHeight / bounds.height);
+    const renderWidth = Math.max(1, Math.floor(bounds.width * scale));
+    const renderHeight = Math.max(1, Math.floor(bounds.height * scale));
+    const originX = (index % columns) * cellWidth;
+    const originY = Math.floor(index / columns) * cellHeight;
+    blitReference(
+      rgb,
+      width,
+      image,
+      bounds,
+      originX + Math.floor((cellWidth - renderWidth) / 2),
+      originY + 24 + Math.floor((maxHeight - renderHeight) / 2),
+      renderWidth,
+      renderHeight,
+    );
+    drawRgbLabel(rgb, width, entry.id.replaceAll("_", " "), originX + 8, originY + 7, frontend);
+  });
+  return encodePng(rgb, width, height);
+}
+
+function nativeEnemyPanel(archetype, { width = 160, height = 132 } = {}) {
+  const registers = new Uint8Array(width * height);
+  drawEnemyRaster(registers, width, height, archetype, 8, 26, 0, { scale: 1 });
+  for (let phase = 0; phase < archetype.frames; phase += 1) {
+    drawEnemyRaster(registers, width, height, archetype, 24 + phase * 44, 52, phase, { scale: 3 });
+  }
+  drawEnemyRaster(registers, width, height, archetype, 48, 106, 0, {
+    scale: 2,
+    accent: false,
+  });
+  return registers;
+}
+
+export function createEnemyNativeSpritesPreview(source) {
+  const roster = loadEnemyRosterPreviewAsset();
+  const frontend = readFrontendGraphicsSource(source);
+  const cellWidth = 320;
+  const width = cellWidth * roster.implemented.length;
+  const height = 170;
+  const registers = new Uint8Array(width * height);
+  roster.implemented.forEach((archetype, index) => {
+    const originX = index * cellWidth;
+    drawComparisonLabel(registers, width, `${archetype.id.replaceAll("_", " ")} NATIVE 1X`, originX + 8, 8, frontend);
+    drawEnemyRaster(registers, width, height, archetype, originX + 20, 32, 0, { scale: 1 });
+    for (let phase = 0; phase < archetype.frames; phase += 1) {
+      drawEnemyRaster(registers, width, height, archetype, originX + 72 + phase * 76, 34, phase, {
+        scale: 4,
+      });
+      drawComparisonLabel(registers, width, `P${phase}`, originX + 82 + phase * 76, 110, frontend);
+    }
+    drawComparisonLabel(registers, width,
+      `${archetype.visibleWidth} HPOS  AREA ${archetype.occupiedArea}`,
+      originX + 8, 138, frontend);
+  });
+  return encodePng(scaleAndConvertToRgb(registers, width, height, 1), width, height);
+}
+
+export function createEnemyAnchorComparisonPreview(source) {
+  const roster = loadEnemyRosterPreviewAsset();
+  const frontend = readFrontendGraphicsSource(source);
+  const cellWidth = 320;
+  const width = cellWidth * roster.implemented.length;
+  const height = 220;
+  const rgb = Buffer.alloc(width * height * 3, 6);
+  roster.implemented.forEach((archetype, index) => {
+    const originX = index * cellWidth;
+    const image = decodeRgbaReferencePng(fs.readFileSync(path.join(rootDirectory, archetype.reference)));
+    const bounds = referenceBounds(image);
+    const referenceScale = Math.min(136 / bounds.width, 136 / bounds.height);
+    const referenceWidth = Math.floor(bounds.width * referenceScale);
+    const referenceHeight = Math.floor(bounds.height * referenceScale);
+    blitReference(rgb, width, image, bounds, originX + 8, 34, referenceWidth, referenceHeight);
+    const panel = nativeEnemyPanel(archetype);
+    const panelRgb = scaleAndConvertToRgb(panel, 160, 132, 1);
+    for (let y = 0; y < 132; y += 1) {
+      panelRgb.copy(
+        rgb,
+        ((34 + y) * width + originX + 152) * 3,
+        y * 160 * 3,
+        (y + 1) * 160 * 3,
+      );
+    }
+    drawRgbLabel(rgb, width, `${archetype.id.replaceAll("_", " ")} REFERENCE  NATIVE`,
+      originX + 8, 10, frontend);
+    drawRgbLabel(rgb, width, `BODY ${archetype.hardwareWidth}  ${archetype.height} ROWS`,
+      originX + 8, 192, frontend, [184, 206, 232]);
+  });
+  return encodePng(rgb, width, height);
+}
+
+export function readEnemyReviewHarnessRuntimeState(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const panelDefinitions = [];
+  for (const archetype of graphics.enemyRoster.implemented) {
+    const positions = [
+      ["LEFT", archetype.logicalBounds[0], 0],
+      ["CENTER", Math.floor((archetype.logicalBounds[0] + archetype.logicalBounds[1]) / 2), 1],
+      ["RIGHT", archetype.logicalBounds[1], 2],
+    ];
+    for (const [positionName, enemyX, phase] of positions) {
+      const screenState = createCanonicalScreenRuntimeState(graphics, {
+        sectorPhase: graphics.capitalHulls.sector.previewSectorRow,
+      });
+      const pixels = drawGameplayMixedScreen(graphics.hardwareState, screenState.screen, graphics);
+      overlayCanonicalPmg(pixels, graphics, {
+        enemyX,
+        enemyY: 112,
+        enemyArchetype: archetype,
+        scannerPhase: phase * graphics.enemyRoster.runtime.animationPhaseFrames,
+      });
+      panelDefinitions.push({
+        label: `${archetype.id.replaceAll("_", " ")} ${positionName} P${phase}`,
+        archetype,
+        enemyX,
+        phase,
+        pixels,
+      });
+    }
+  }
+  return {
+    graphics,
+    panelDefinitions,
+    ...renderLabeledGameplayPanels(readFrontendGraphicsSource(source), panelDefinitions),
+  };
+}
+
+export function createEnemyReviewHarnessPreview(source, definition) {
+  const state = readEnemyReviewHarnessRuntimeState(source, definition);
+  return encodePng(
+    scaleAndConvertToRgb(state.registerPixels, state.width, state.height),
+    state.width * PREVIEW_SCALE,
+    state.height * PREVIEW_SCALE,
+  );
+}
+
+export function createEnemyScannerComparisonPreview(source) {
+  const roster = loadEnemyRosterPreviewAsset();
+  const frontend = readFrontendGraphicsSource(source);
+  const raider = roster.implemented[0];
+  const width = 720;
+  const height = 150;
+  const registers = new Uint8Array(width * height);
+  const panels = [
+    ["P1 ONLY NO RED", false, 0],
+    ["P1 PLUS P2 COMPACT", true, 0],
+    ["P1 PLUS P2 HOT", true, 2],
+  ];
+  panels.forEach(([label, accent, phase], index) => {
+    const originX = index * 240;
+    drawComparisonLabel(registers, width, label, originX + 12, 10, frontend);
+    drawEnemyRaster(registers, width, height, raider, originX + 74, 42, phase, {
+      scale: 6,
+      accent,
+    });
+  });
+  return encodePng(scaleAndConvertToRgb(registers, width, height, 1), width, height);
+}
+
+export function createEnemyRaiderBeforeAfterPreview(source) {
+  const roster = loadEnemyRosterPreviewAsset();
+  const frontend = readFrontendGraphicsSource(source);
+  const raider = roster.implemented[0];
+  const legacy = {
+    ...raider,
+    height: 12,
+    frames: 1,
+    bodyRows: Uint8Array.of(0x81, 0xc3, 0xe7, 0x7e, 0x3c, 0x7e, 0xff, 0x7e, 0xdb, 0xc3, 0x81, 0x81),
+    bodyBytes: new Uint8Array(16),
+    accentFrameBytes: new Uint8Array(16),
+  };
+  legacy.bodyBytes.set(legacy.bodyRows);
+  legacy.accentFrameBytes[5] = 0x80;
+  const width = 480;
+  const height = 150;
+  const registers = new Uint8Array(width * height);
+  drawComparisonLabel(registers, width, "SCHEMATIC BASELINE", 28, 10, frontend);
+  drawComparisonLabel(registers, width, "FINAL NATIVE RAIDER", 274, 10, frontend);
+  drawEnemyRaster(registers, width, height, legacy, 68, 42, 0, { scale: 6 });
+  drawEnemyRaster(registers, width, height, raider, 306, 42, 2, { scale: 6 });
+  return encodePng(scaleAndConvertToRgb(registers, width, height, 1), width, height);
+}
+
+export function readEnemyPaletteCandidateRuntimeState(
+  source,
+  candidateId,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const candidate = graphics.enemyRoster.runtime.colourPolicy.candidates.find(
+    ({ id }) => id === candidateId,
+  );
+  if (!candidate) throw new Error(`Unknown enemy palette candidate ${candidateId}`);
+  const raider = graphics.releaseEnemy;
+  const enemyY = 96;
+  const pulsePolicy = graphics.enemyRoster.runtime.weaponPolicy.singlePulse;
+  const positionSpecs = [
+    ["LEFT BOUND BESIDE ALLIED HULL", raider.logicalBounds[0]],
+    ["CENTER WITH VIPER AND M0", Math.floor((raider.logicalBounds[0] + raider.logicalBounds[1]) / 2)],
+    ["RIGHT BOUND BESIDE ENEMY HULL", raider.logicalBounds[1]],
+  ];
+  const panelDefinitions = [];
+
+  const blackPixels = new Uint8Array(SOURCE_WIDTH * SOURCE_HEIGHT);
+  overlayCanonicalPmg(blackPixels, graphics, {
+    enemyX: 100,
+    enemyY,
+    enemyBodyColor: candidate.value,
+    enemyAccentColor: graphics.enemyRoster.runtime.colourPolicy.accentValue,
+  });
+  drawEnemyRaster(blackPixels, SOURCE_WIDTH, SOURCE_HEIGHT, raider, 186, 58, 2, {
+    scale: 4,
+    bodyColor: candidate.value,
+    accentColor: graphics.enemyRoster.runtime.colourPolicy.accentValue,
+  });
+  panelDefinitions.push({
+    label: `${candidateId.replaceAll("_", " ")} REG ${candidate.value.toString(16).toUpperCase()} NATIVE PLUS 4X`,
+    pixels: blackPixels,
+  });
+
+  for (const [label, enemyX] of positionSpecs) {
+    const screenState = createCanonicalScreenRuntimeState(graphics, {
+      sectorPhase: graphics.capitalHulls.sector.previewSectorRow,
+    });
+    const pixels = drawGameplayMixedScreen(graphics.hardwareState, screenState.screen, graphics);
+    overlayCanonicalPmg(pixels, graphics, {
+      enemyX,
+      enemyY,
+      scannerPhase: 16,
+      enemyBodyColor: candidate.value,
+      enemyAccentColor: graphics.enemyRoster.runtime.colourPolicy.accentValue,
+    });
+    const pulse = enemyPulseSpawnPosition(raider, enemyX, enemyY, pulsePolicy);
+    drawTopAnchoredMissileSpan(
+      pixels,
+      pulse.x,
+      pulse.y + 20,
+      pulsePolicy.height,
+      graphics.enemyRoster.runtime.colourPolicy.accentValue,
+    );
+    if (label.includes("CENTER")) {
+      drawTopAnchoredMissileSpan(
+        pixels,
+        requireValue(graphics.initialState, "player_x") + 8,
+        requireValue(graphics.initialState, "player_y") - 20,
+        1,
+        requireValue(graphics.hardwareState, "COLPM0"),
+      );
+    }
+    if (label.includes("RIGHT")) {
+      drawMissileSpan(pixels, 118, 132, 4, candidate.value, 1);
+    }
+    panelDefinitions.push({ label, enemyX, pixels, screen: screenState.screen });
+  }
+  return {
+    graphics,
+    candidate,
+    panelDefinitions,
+    ...renderLabeledGameplayPanels(readFrontendGraphicsSource(source), panelDefinitions, 2),
+  };
+}
+
+export function createEnemyPaletteCandidatePreview(
+  source,
+  candidateId,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const state = readEnemyPaletteCandidateRuntimeState(source, candidateId, capitalHullsDefinition);
+  return encodePng(
+    scaleAndConvertToRgb(state.registerPixels, state.width, state.height),
+    state.width * PREVIEW_SCALE,
+    state.height * PREVIEW_SCALE,
+  );
+}
+
+export function readEnemyCombatSequenceRuntimeState(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const roster = graphics.enemyRoster;
+  const raider = graphics.releaseEnemy;
+  const policy = roster.runtime.weaponPolicy.singlePulse;
+  const enemyX = Math.floor((raider.logicalBounds[0] + raider.logicalBounds[1]) / 2);
+  const enemyY = 72;
+  const origin = enemyPulseSpawnPosition(raider, enemyX, enemyY, policy);
+  const playerX = requireValue(graphics.initialState, "player_x");
+  const playerY = requireValue(graphics.initialState, "player_y");
+  const panelSpecs = [
+    { label: "RAIDER READY  RED SCANNER", pulse: null },
+    { label: "RED BURST SHOT 1  PLAYFIELD", pulse: { ...origin } },
+    { label: "RED BURST PLUS YELLOW VIPER FIRE", pulse: { x: origin.x, y: origin.y + 20 }, playerShot: true },
+    { label: "PULSE APPROACH  FIVE LINES PER FRAME", pulse: { x: origin.x, y: playerY - 12 } },
+    { label: "VIPER HIT  10 DAMAGE  HEALTH 090", pulse: { x: playerX + 3, y: playerY }, health: 90 },
+    { label: "INVULNERABLE INTERSECTION  NO DAMAGE", pulse: { x: playerX + 3, y: playerY + 4 }, hidePlayer: true },
+    { label: "CAPITAL SHELL PLUS RAIDER BURST", pulse: { x: origin.x, y: 132 }, capital: true },
+    { label: "ALLIED CAPITAL SHELL DESTROYS RAIDER", capitalHit: true },
+    { label: "CLEAN POOL  NO GHOST PIXELS", cleanup: true },
+  ];
+  const panelDefinitions = panelSpecs.map((spec) => {
+    const screenState = createCanonicalScreenRuntimeState(graphics, {
+      sectorPhase: graphics.capitalHulls.sector.previewSectorRow,
+    });
+    if (spec.health === 90) {
+      const zero = requireValue(graphics.constants, "CH_ZERO");
+      screenState.screen.set([zero, zero + 9, zero], 33);
+    }
+    if (spec.capital) {
+      applyCapitalShellVisualToScreen(screenState.screen, graphics.capitalHulls,
+        heavyShellVisual({ state: BROADSIDE_STATES.FLYING, missile: 1,
+          owner: "allied", x: 112, y: 118 }, graphics.capitalHulls, 0));
+    }
+    if (spec.capitalHit) {
+      applyCapitalShellVisualToScreen(screenState.screen, graphics.capitalHulls,
+        heavyShellVisual({ state: BROADSIDE_STATES.FLYING, missile: 1,
+          owner: "allied", x: enemyX + 8, y: enemyY + 8 }, graphics.capitalHulls, 2));
+    }
+    const pixels = drawGameplayMixedScreen(graphics.hardwareState, screenState.screen, graphics);
+    if (!spec.cleanup) {
+      overlayCanonicalPmg(pixels, graphics, {
+        enemyX,
+        enemyY,
+        scannerPhase: 16,
+        showPlayer: !spec.hidePlayer,
+      });
+    }
+    if (spec.pulse) {
+      drawTopAnchoredMissileSpan(
+        pixels,
+        spec.pulse.x,
+        spec.pulse.y,
+        policy.height,
+        roster.runtime.colourPolicy.accentValue,
+      );
+    }
+    if (spec.playerShot) {
+      drawTopAnchoredMissileSpan(
+        pixels,
+        playerX + 8,
+        playerY - 28,
+        graphics.capitalHulls.broadside.projectileVisuals.player.height,
+        requireValue(graphics.constants, "GAMEPLAY_COLPF2"),
+      );
+    }
+    return { ...spec, pixels, screen: screenState.screen };
+  });
+
+  let simulation = { ...createEnemyCombatState(roster, { difficulty: 1 }), fireTimer: 0 };
+  simulation = stepEnemyCombatFrame(roster, simulation, { archetype: raider, enemyX, enemyY });
+  const spawnedPulse = simulation.pool.find(Boolean);
+  return {
+    graphics,
+    origin,
+    spawnedPulse,
+    panelDefinitions,
+    ...renderLabeledGameplayPanels(readFrontendGraphicsSource(source), panelDefinitions),
+  };
+}
+
+export function createEnemyCombatSequencePreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const state = readEnemyCombatSequenceRuntimeState(source, capitalHullsDefinition);
+  return encodePng(
+    scaleAndConvertToRgb(state.registerPixels, state.width, state.height),
+    state.width * PREVIEW_SCALE,
+    state.height * PREVIEW_SCALE,
+  );
+}
+
+export function createRaiderNaturalFireTrace(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const scenarios = [
+    ["OPEN_MEDIUM", simulateNaturalRaiderFire(graphics.enemyRoster, {
+      difficulty: 1,
+      frameCount: 120,
+    })],
+    ["BROADSIDE_HARD", simulateNaturalRaiderFire(graphics.enemyRoster, {
+      difficulty: 2,
+      frameCount: 100,
+      initialSizeM: 0x44,
+    })],
+  ];
+  const header = [
+    "scenario", "frame", "enemy_slot", "archetype", "visibility", "enemy_y",
+    "burst_state", "shot_index", "timer_before", "timer", "pool_occupancy",
+    "allocation_result", "projectile_owner", "render_slot", "hpos", "y", "sizem",
+    "active_playfield_projectiles",
+  ].join(",");
+  const rows = [header];
+  for (const [scenario, simulation] of scenarios) {
+    for (const entry of simulation.trace) {
+      rows.push([
+        scenario,
+        entry.frame,
+        entry.enemySlot,
+        entry.archetype,
+        Number(entry.visibility),
+        entry.enemyY,
+        entry.burstState,
+        entry.shotIndex,
+        entry.cooldownBefore,
+        entry.cooldown,
+        entry.poolOccupancy.join("|"),
+        entry.allocationResult,
+        entry.projectileOwner,
+        entry.renderSlot,
+        entry.hpos ?? "",
+        entry.y ?? "",
+        `$${entry.sizeM.toString(16).padStart(2, "0").toUpperCase()}`,
+        entry.activePlayfieldProjectiles.map(({ renderSlot, x, previousY, y, width, height }) =>
+          `PF${renderSlot}:${x}:${previousY}>${y}:${width}x${height}`).join("|"),
+      ].join(","));
+    }
+  }
+  return `${rows.join("\n")}\n`;
+}
+
+export function createFighterBurstRuntimeTrace(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const viper = simulateViperBurst(graphics.fighterWeapons, 70, {
+    fireHeld: true,
+    playerX: requireValue(graphics.initialState, "player_x"),
+    playerY: requireValue(graphics.initialState, "player_y"),
+  });
+  const raider = simulateNaturalRaiderFire(graphics.enemyRoster, {
+    difficulty: 1,
+    frameCount: 100,
+    enemyX: 120,
+    player: { x: 124, y: 184, width: 8, height: 16 },
+  });
+  const header = [
+    "weapon", "frame", "source_slot", "burst_state", "shot_index",
+    "burst_interval", "post_burst_timer", "allocation_result", "projectile_slot",
+    "previous_x", "previous_y", "current_x", "current_y", "visible_width",
+    "visible_height", "colour_source", "colour_value", "collision_result",
+    "viper_energy_before", "viper_energy_after",
+  ].join(",");
+  const rows = [header];
+  for (const entry of viper.trace) {
+    const allocated = entry.allocationResult === "ALLOCATED";
+    const shot = allocated ? entry.active.at(-1) : null;
+    rows.push([
+      "VIPER", entry.frame, 0, entry.burstState, entry.shotsEmitted,
+      graphics.fighterWeapons.viper.burstIntervalFrames, entry.timer,
+      entry.allocationResult, shot ? entry.active.length - 1 : "",
+      shot?.x ?? "", shot?.previousY ?? "", shot?.x ?? "", shot?.y ?? "",
+      shot?.width ?? "", shot?.height ?? "", "COLPF2",
+      `$${graphics.fighterWeapons.viper.colourValue.toString(16).padStart(2, "0").toUpperCase()}`,
+      "NONE", 100, 100,
+    ].join(","));
+  }
+  for (const entry of raider.trace) {
+    const pulse = entry.activePlayfieldProjectiles.at(-1);
+    rows.push([
+      "RAIDER", entry.frame, entry.enemySlot, entry.burstState, entry.shotIndex,
+      graphics.fighterWeapons.raider.burstIntervalFrames, entry.cooldown,
+      entry.allocationResult, pulse?.renderSlot ?? "", pulse?.x ?? "",
+      pulse?.previousY ?? "", pulse?.x ?? "", pulse?.y ?? "", pulse?.width ?? "",
+      pulse?.height ?? "", "COLPF3",
+      `$${graphics.fighterWeapons.raider.colourValue.toString(16).padStart(2, "0").toUpperCase()}`,
+      entry.collisionResult, entry.playerHealthBefore, entry.playerHealth,
+    ].join(","));
+  }
+  return `${rows.join("\n")}\n`;
+}
+
+export function createFighterWeaponTransitionTrace(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const header = [
+    "scenario", "frame", "sector_type", "sector_position", "broadside_phase",
+    "sector_state", "player_lifecycle", "invulnerability_frames", "raw_fire",
+    "previous_fire", "fire_interpretation", "weapon_controller_calls",
+    "burst_state", "shot_index", "interval_timer", "reload_cooldown_timer",
+    "projectile_pool_occupancy", "viper_projectile_slots_occupied",
+    "render_slot_owner", "allocation_requested", "allocation_result",
+    "rejection_reason", "projectile_created", "projectile_rendered",
+  ].join(",");
+  const rows = [header];
+  const phaseAt = (frame, transition) => {
+    if (!transition) return {
+      sectorType: "OPEN_SPACE", sectorPosition: 239, broadsidePhase: "NONE", sectorState: "ACTIVE",
+      drain: false, complete: false,
+    };
+    if (frame < 0) return {
+      sectorType: "BROADSIDE", sectorPosition: Math.min(239, 225 + Math.floor((frame + 60) / 4)),
+      broadsidePhase: "PROW", sectorState: "ACTIVE", drain: false, complete: false,
+    };
+    if (frame < 92) return {
+      sectorType: "BROADSIDE", sectorPosition: 240 + Math.floor(frame / 4),
+      broadsidePhase: "DRAIN", sectorState: "DRAIN", drain: true, complete: false,
+    };
+    return {
+      sectorType: "OPEN_SPACE", sectorPosition: 263, broadsidePhase: "COMPLETE",
+      sectorState: "COMPLETE", drain: false, complete: true,
+    };
+  };
+  const freshFrames = new Set([20, 95, 100]);
+  const fireFor = (scenario, frame) => scenario === "TRANSITION_FRESH"
+    ? freshFrames.has(frame)
+    : true;
+  for (const [scenario, transition] of [
+    ["ORDINARY_HELD_CONTROL", false],
+    ["TRANSITION_HELD", true],
+    ["TRANSITION_FRESH", true],
+  ]) {
+    let state = createViperBurstState(graphics.fighterWeapons);
+    let previousFire = 1;
+    for (let frame = -60; frame <= 120; frame += 1) {
+      const phase = phaseAt(frame, transition);
+      const fireHeld = fireFor(scenario, frame);
+      const before = state;
+      const shotsBefore = state.shotsEmitted;
+      state = stepViperBurst(graphics.fighterWeapons, state, {
+        fireHeld,
+        drain: phase.drain,
+        sectorComplete: phase.complete,
+        playerX: requireValue(graphics.initialState, "player_x"),
+        playerY: requireValue(graphics.initialState, "player_y"),
+      });
+      const allocated = state.shotsEmitted > shotsBefore;
+      const occupancy = state.pool.filter(Boolean).length;
+      const allocationDue = fireHeld && (before.burstState === "WAITING" || before.timer <= 1);
+      const interpretation = fireHeld
+        ? previousFire ? "FRESH_PRESS" : "HELD"
+        : "RELEASED";
+      const shotIndex = state.burstState === "WAITING"
+        ? 0
+        : graphics.fighterWeapons.viper.burstCount - state.burstRemaining;
+      rows.push([
+        scenario, frame, phase.sectorType, phase.sectorPosition, phase.broadsidePhase,
+        phase.sectorState, "ALIVE", 0, fireHeld ? 0 : 1, previousFire,
+        interpretation, 1, state.burstState, shotIndex,
+        state.burstState === "FIRING_BURST" ? state.timer : 0,
+        state.burstState === "POST_BURST_COOLDOWN" ? state.timer : 0,
+        occupancy, occupancy, occupancy ? "ANTIC4_FIXED_POOL" : "FREE",
+        Number(allocationDue), allocated ? "ALLOCATED" : allocationDue ? "REJECTED" : "NONE",
+        allocationDue && !allocated ? "POOL_FULL" : "NONE", Number(allocated), Number(occupancy > 0),
+      ].join(","));
+      previousFire = fireHeld ? 0 : 1;
+    }
+  }
+  return `${rows.join("\n")}\n`;
+}
+
+export function createSharedFighterExplosionTrace(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const explosion = graphics.fighterWeapons.sharedFighterExplosion;
+  const rows = [[
+    "owner", "visible_frame", "animation_frame", "timer", "x", "y",
+    "outer_mask", "core_mask", "active",
+  ].join(",")];
+  for (const [owner, x, y] of [["VIPER", 124, 188], ["RAIDER", 120, 91]]) {
+    let state = createSharedFighterExplosion(graphics.fighterWeapons, { owner, x, y });
+    for (let visibleFrame = 0; visibleFrame < explosion.totalFrames; visibleFrame += 1) {
+      const offset = state.frame * explosion.heightScanlines;
+      rows.push([
+        owner,
+        visibleFrame,
+        state.frame,
+        state.timer,
+        state.x,
+        state.y,
+        [...explosion.outerBytes.subarray(offset, offset + explosion.heightScanlines)]
+          .map((byte) => byte.toString(16).padStart(2, "0")).join("|"),
+        explosion.coreMasks[state.frame].toString(16).padStart(2, "0"),
+        Number(state.active),
+      ].join(","));
+      state = stepSharedFighterExplosion(graphics.fighterWeapons, state);
+    }
+  }
+  return `${rows.join("\n")}\n`;
+}
+
+export function createSharedFighterExplosionPreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const explosion = graphics.fighterWeapons.sharedFighterExplosion;
+  const cellWidth = 56;
+  const cellHeight = 40;
+  const labelHeight = 12;
+  const width = cellWidth * explosion.frameCount;
+  const height = cellHeight * 2;
+  const registerPixels = new Uint8Array(width * height);
+  const frontend = readFrontendGraphicsSource(source);
+  const owners = [
+    { label: "VIPER", outer: 0x28, core: 0x0e },
+    { label: "RAIDER", outer: 0x46, core: 0x84 },
+  ];
+  for (const [ownerIndex, owner] of owners.entries()) {
+    for (let frame = 0; frame < explosion.frameCount; frame += 1) {
+      const originX = frame * cellWidth;
+      const originY = ownerIndex * cellHeight;
+      drawComparisonLabel(registerPixels, width, `${owner.label} F${frame + 1}`,
+        originX + 2, originY + 2, frontend);
+      const offset = frame * explosion.heightScanlines;
+      const coreMask = explosion.coreMasks[frame];
+      for (let row = 0; row < explosion.heightScanlines; row += 1) {
+        const outerMask = explosion.outerBytes[offset + row];
+        for (let bit = 0; bit < explosion.widthBits; bit += 1) {
+          const mask = 0x80 >>> bit;
+          if ((outerMask & mask) === 0) continue;
+          const colour = (outerMask & coreMask & mask) !== 0 ? owner.core : owner.outer;
+          const pixelX = originX + 12 + bit * 4;
+          const pixelY = originY + labelHeight + 8 + row;
+          registerPixels.fill(colour, pixelY * width + pixelX,
+            pixelY * width + pixelX + 4);
+        }
+      }
+    }
+  }
+  return encodePng(
+    scaleAndConvertToRgb(registerPixels, width, height),
+    width * PREVIEW_SCALE,
+    height * PREVIEW_SCALE,
+  );
+}
+
+function simulateDebrisTrajectory(asset, trajectoryId, {
+  variant = 0,
+  initialPhase = 0,
+  startColumn = 20,
+  initialRingHead = 20,
+} = {}) {
+  const trajectory = asset.debrisMotion.trajectories.find(({ id }) => id === trajectoryId);
+  if (!trajectory) throw new Error(`Unknown debris trajectory ${trajectoryId}`);
+  const states = [];
+  let column = startColumn;
+  let phase = initialPhase;
+  let horizontalAccumulator = 0;
+  let verticalAccumulator = asset.archetypes[0].lifetime;
+  let nearAccumulator = 0;
+  let ringHead = initialRingHead;
+  let yScanline = asset.coordinateSystem.gameplayTopScanline;
+  let event = 0;
+  const append = (active) => {
+    const logicalRow = Math.floor(
+      (yScanline - asset.coordinateSystem.gameplayTopScanline) / 8,
+    );
+    const physicalRow = (ringHead + logicalRow) % asset.coordinateSystem.logicalRows;
+    states.push({
+      event,
+      active,
+      worldRowAdvanced: event > 0,
+      nearRowAdvanced: event > 0 && nearAccumulator === 0,
+      variant,
+      phase,
+      trajectory: trajectoryId,
+      vxSignedHpos: trajectory.vxSignedHpos,
+      xHpos: 48 + column * 4,
+      column,
+      yScanline,
+      logicalRow,
+      ringHead,
+      physicalAddress: 0x4050 + physicalRow * 40 + column,
+      horizontalAccumulator,
+      verticalAccumulator,
+    });
+  };
+  append(true);
+  while (states.at(-1).active) {
+    event += 1;
+    nearAccumulator += 1;
+    if (nearAccumulator >= 2) {
+      nearAccumulator -= 2;
+      ringHead = (ringHead + 1) % asset.coordinateSystem.logicalRows;
+    }
+    verticalAccumulator += asset.debrisMotion.verticalStepNumerator;
+    if (verticalAccumulator >= asset.debrisMotion.verticalStepDenominator) {
+      verticalAccumulator -= asset.debrisMotion.verticalStepDenominator;
+      yScanline += asset.archetypes[0].initialVy;
+      if (yScanline >= asset.coordinateSystem.gameplayBottomExclusive) {
+        append(false);
+        break;
+      }
+    }
+    phase ^= 1;
+    if (trajectory.vxSignedHpos !== 0) {
+      horizontalAccumulator += 1;
+      if (horizontalAccumulator === asset.debrisMotion.horizontalStepWorldRows) {
+        horizontalAccumulator = 0;
+        column += Math.sign(trajectory.vxSignedHpos);
+      }
+    }
+    append(true);
+  }
+  return states;
+}
+
+function fillRgb(rgb, color) {
+  for (let offset = 0; offset < rgb.length; offset += 3) {
+    rgb[offset] = color[0];
+    rgb[offset + 1] = color[1];
+    rgb[offset + 2] = color[2];
+  }
+}
+
+function fillRgbRect(rgb, width, height, x, y, boxWidth, boxHeight, color) {
+  for (let row = Math.max(0, y); row < Math.min(height, y + boxHeight); row += 1) {
+    for (let column = Math.max(0, x); column < Math.min(width, x + boxWidth); column += 1) {
+      const offset = (row * width + column) * 3;
+      rgb[offset] = color[0];
+      rgb[offset + 1] = color[1];
+      rgb[offset + 2] = color[2];
+    }
+  }
+}
+
+function strokeRgbRect(rgb, width, height, x, y, boxWidth, boxHeight, color) {
+  fillRgbRect(rgb, width, height, x, y, boxWidth, 1, color);
+  fillRgbRect(rgb, width, height, x, y + boxHeight - 1, boxWidth, 1, color);
+  fillRgbRect(rgb, width, height, x, y, 1, boxHeight, color);
+  fillRgbRect(rgb, width, height, x + boxWidth - 1, y, 1, boxHeight, color);
+}
+
+function drawDebrisGlyphRgb(rgb, width, height, glyph, x, y, scaleX, scaleY) {
+  const palette = [0x00, 0x0e, 0x84, 0x1e].map(atariPalRegisterToRgb);
+  for (let row = 0; row < 8; row += 1) {
+    for (let pixel = 0; pixel < 4; pixel += 1) {
+      const value = glyph[row] >> (6 - pixel * 2) & 3;
+      if (value === 0) continue;
+      fillRgbRect(rgb, width, height, x + pixel * scaleX, y + row * scaleY,
+        scaleX, scaleY, palette[value]);
+    }
+  }
+}
+
+function drawDebrisPhaseRgb(rgb, width, height, glyphs, x, y, scaleX, scaleY) {
+  glyphs.forEach((glyph, cell) => {
+    drawDebrisGlyphRgb(rgb, width, height, glyph, x + cell * 4 * scaleX, y, scaleX, scaleY);
+  });
+}
+
+const PREVIOUS_DEBRIS_REVIEW_VARIANTS = [
+  [
+    [[8, 46, 191, 251, 191, 46, 8, 0], [0, 128, 224, 254, 235, 184, 32, 8]],
+    [[0, 128, 224, 254, 235, 184, 32, 8], [8, 46, 191, 251, 191, 46, 8, 0]],
+  ],
+  [
+    [[8, 42, 136, 251, 191, 46, 8, 0], [0, 128, 224, 254, 235, 184, 32, 8]],
+    [[0, 128, 224, 254, 235, 184, 32, 8], [8, 42, 136, 251, 191, 46, 8, 0]],
+  ],
+];
+
+export function createDebrisReviewTrace(
+  definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const asset = compileEntityEffects(definition);
+  const rows = [[
+    "scenario", "event", "world_row_advanced", "near_row_advanced", "active", "variant", "phase",
+    "trajectory", "vx_signed_hpos", "move_accumulator", "vertical_accumulator",
+    "x_hpos", "y_scanline",
+    "logical_row", "ring_head", "left_physical_address", "right_physical_address",
+    "left_backing_before", "right_backing_before", "left_glyph_offset", "right_glyph_offset",
+    "left_backing_after_erase", "right_backing_after_erase",
+    "contact", "hull_before", "hull_after",
+  ].join(",")];
+  for (const [index, trajectory] of asset.debrisMotion.trajectories.entries()) {
+    for (const state of simulateDebrisTrajectory(asset, trajectory.id, {
+      variant: index & 1,
+      initialPhase: index >> 1,
+    })) {
+      rows.push([
+        `FULL_PASS_${trajectory.id.toUpperCase()}`,
+        state.event,
+        Number(state.worldRowAdvanced),
+        Number(state.nearRowAdvanced),
+        Number(state.active),
+        state.variant,
+        state.phase,
+        state.trajectory,
+        state.vxSignedHpos,
+        state.horizontalAccumulator,
+        state.verticalAccumulator,
+        state.xHpos,
+        state.yScanline,
+        state.logicalRow,
+        state.ringHead,
+        `$${state.physicalAddress.toString(16).toUpperCase()}`,
+        `$${(state.physicalAddress + 1).toString(16).toUpperCase()}`,
+        "$91",
+        "$92",
+        state.variant * 4 + state.phase * 2,
+        state.variant * 4 + state.phase * 2 + 1,
+        "$91",
+        "$92",
+        "NONE",
+        10,
+        10,
+      ].join(","));
+    }
+  }
+  for (const [contact, hullAfter, active] of [
+    ["DAMAGE_ACCEPTED", 9, 0], ["INVULNERABLE", 10, 1],
+  ]) {
+    rows.push([
+      "PLAYER_CONTACT", 0, 0, 0, active, 0, 0, "straight", 0, 0, 0, 124, 184,
+      20, 0, "$4383", "$4384", "$66", "$67", 0, 1, "$66", "$67",
+      contact, 10, hullAfter,
+    ].join(","));
+  }
+  return `${rows.join("\n")}\n`;
+}
+
+export function createDebrisReviewPreview(
+  source,
+  definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const asset = compileEntityEffects(definition);
+  const starfield = compileStarfield(loadStarfieldDefinition(DEFAULT_STARFIELD_DEFINITION_PATH));
+  const frontend = readFrontendGraphicsSource(source);
+  const width = 1280;
+  const height = 880;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const steel = atariPalRegisterToRgb(0x84);
+  const gold = atariPalRegisterToRgb(0x1e);
+  const white = atariPalRegisterToRgb(0x0e);
+  const red = atariPalRegisterToRgb(0x46);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "DEBRIS OWNER RETEST  PREVIOUS VERSUS LARGER", 24, 18, frontend, white);
+  drawRgbLabel(rgb, width, "SAME 2X1 RENDERER  SAME GLYPHS  SAME HITBOX", 24, 34,
+    frontend, steel);
+
+  const phaseLabels = ["ARMOUR SHARD P0", "ARMOUR SHARD P1",
+    "TRUSS FRAGMENT P0", "TRUSS FRAGMENT P1"];
+  fillRgbRect(rgb, width, height, 34, 52, 1212, 112, panel);
+  strokeRgbRect(rgb, width, height, 34, 52, 1212, 112, steel);
+  drawRgbLabel(rgb, width, "NATIVE 1X", 48, 62, frontend, gold);
+  const nearStar = [starfield.nearLayer.glyphs.find(({ id }) => id === "SPARKLE").bytes];
+  drawRgbLabel(rgb, width, "MAX NEAR STAR", 62, 100, frontend, white);
+  drawDebrisPhaseRgb(rgb, width, height, nearStar, 180, 98, 2, 1);
+  for (let phaseIndex = 0; phaseIndex < phaseLabels.length; phaseIndex += 1) {
+    const x = 278 + phaseIndex * 230;
+    const variant = phaseIndex >> 1;
+    const phase = phaseIndex & 1;
+    drawRgbLabel(rgb, width, phaseLabels[phaseIndex], x, 62, frontend,
+      variant === 0 ? gold : steel);
+    drawRgbLabel(rgb, width, "OLD", x, 88, frontend, white);
+    drawDebrisPhaseRgb(rgb, width, height,
+      PREVIOUS_DEBRIS_REVIEW_VARIANTS[variant][phase], x + 52, 86, 2, 1);
+    drawRgbLabel(rgb, width, "NEW", x, 124, frontend, gold);
+    drawDebrisPhaseRgb(rgb, width, height,
+      asset.debrisVisuals.variants[variant].phases[phase], x + 52, 122, 2, 1);
+  }
+
+  drawRgbLabel(rgb, width, "ENLARGED OLD AND NEW", 48, 178, frontend, gold);
+  strokeRgbRect(rgb, width, height, 34, 194, 226, 86, steel);
+  drawRgbLabel(rgb, width, "MAX NEAR STAR", 46, 202, frontend, white);
+  drawDebrisPhaseRgb(rgb, width, height, nearStar, 114, 216, 8, 6);
+  drawRgbLabel(rgb, width, "REFERENCE", 92, 266, frontend, steel);
+  for (let phaseIndex = 0; phaseIndex < 4; phaseIndex += 1) {
+    const x = 276 + phaseIndex * 242;
+    const variant = phaseIndex >> 1;
+    const phase = phaseIndex & 1;
+    strokeRgbRect(rgb, width, height, x, 194, 226, 86, steel);
+    drawRgbLabel(rgb, width, phaseLabels[phaseIndex], x + 12, 202, frontend,
+      variant === 0 ? gold : steel);
+    drawDebrisPhaseRgb(rgb, width, height,
+      PREVIOUS_DEBRIS_REVIEW_VARIANTS[variant][phase], x + 8, 216, 8, 6);
+    drawDebrisPhaseRgb(rgb, width, height,
+      asset.debrisVisuals.variants[variant].phases[phase], x + 132, 216, 8, 6);
+    drawRgbLabel(rgb, width, "OLD", x + 18, 266, frontend, white);
+    drawRgbLabel(rgb, width, "NEW", x + 142, 266, frontend, gold);
+  }
+
+  const trajectoryLabels = ["STRAIGHT", "SLIGHT LEFT", "SLIGHT RIGHT"];
+  for (let trajectoryIndex = 0; trajectoryIndex < 3; trajectoryIndex += 1) {
+    const panelX = 34 + trajectoryIndex * 414;
+    const panelY = 300;
+    const panelWidth = 380;
+    const panelHeight = 334;
+    fillRgbRect(rgb, width, height, panelX, panelY, panelWidth, panelHeight, panel);
+    strokeRgbRect(rgb, width, height, panelX, panelY, panelWidth, panelHeight, steel);
+    drawRgbLabel(rgb, width, trajectoryLabels[trajectoryIndex], panelX + 12, panelY + 12,
+      frontend, white);
+    drawRgbLabel(rgb, width, "SPAWN Y24", panelX + 250, panelY + 12, frontend, gold);
+    const corridorX = panelX + 78;
+    const pathTop = panelY + 42;
+    const columnWidth = 10;
+    const rowHeight = 12;
+    strokeRgbRect(rgb, width, height, corridorX, pathTop,
+      22 * columnWidth + 1, 22 * rowHeight + 1, steel);
+    const states = simulateDebrisTrajectory(asset,
+      asset.debrisMotion.trajectories[trajectoryIndex].id, {
+        variant: trajectoryIndex & 1,
+        initialPhase: trajectoryIndex >> 1,
+      });
+    const visibleRows = new Map();
+    for (const state of states.filter(({ active }) => active)) {
+      visibleRows.set(state.logicalRow, state);
+    }
+    for (const state of visibleRows.values()) {
+      drawDebrisPhaseRgb(rgb, width, height,
+        asset.debrisVisuals.variants[state.variant].phases[state.phase],
+        corridorX + (state.column - 9) * columnWidth + 1,
+        pathTop + state.logicalRow * rowHeight + 2, 2, 1);
+    }
+    const finalState = states.at(-2);
+    drawRgbLabel(rgb, width,
+      `X ${states[0].xHpos} TO ${finalState.xHpos}`, panelX + 12, panelY + 306,
+      frontend, gold);
+    drawRgbLabel(rgb, width, "DESPAWN Y200", panelX + 240, panelY + 306, frontend, white);
+  }
+
+  fillRgbRect(rgb, width, height, 34, 658, 590, 196, panel);
+  strokeRgbRect(rgb, width, height, 34, 658, 590, 196, steel);
+  drawRgbLabel(rgb, width, "PLAYER CONTACT AND SHARED DAMAGE GATE", 48, 672, frontend, white);
+  drawRgbLabel(rgb, width, "VULNERABLE  HULL 100 TO 090  DEBRIS REMOVED", 48, 700,
+    frontend, gold);
+  drawDebrisPhaseRgb(rgb, width, height,
+    asset.debrisVisuals.variants[0].phases[0], 54, 724, 6, 4);
+  fillRgbRect(rgb, width, height, 130, 724, 48, 32, white);
+  fillRgbRect(rgb, width, height, 144, 716, 20, 48, white);
+  fillRgbRect(rgb, width, height, 210, 736, 72, 3, gold);
+  drawRgbLabel(rgb, width, "DAMAGE 1", 294, 728, frontend, gold);
+  drawRgbLabel(rgb, width, "INVULNERABLE  HULL 100  DEBRIS REMAINS", 48, 792,
+    frontend, steel);
+  drawDebrisPhaseRgb(rgb, width, height,
+    asset.debrisVisuals.variants[0].phases[1], 474, 780, 6, 4);
+
+  fillRgbRect(rgb, width, height, 656, 658, 590, 196, panel);
+  strokeRgbRect(rgb, width, height, 656, 658, 590, 196, steel);
+  drawRgbLabel(rgb, width, "A2 RING WRAP AND BYTE-EXACT BACKING", 670, 672, frontend, white);
+  for (const [index, head] of [20, 21, 0, 1].entries()) {
+    const x = 680 + index * 138;
+    strokeRgbRect(rgb, width, height, x, 706, 118, 82, index === 2 ? gold : steel);
+    drawRgbLabel(rgb, width, `HEAD ${head.toString().padStart(2, "0")}`,
+      x + 14, 716, frontend, index === 2 ? gold : white);
+    drawDebrisPhaseRgb(rgb, width, height,
+      asset.debrisVisuals.variants[index >> 1].phases[index & 1], x + 18, 736, 8, 4);
+  }
+  drawRgbLabel(rgb, width, "LOWER 91  ENTITY  RESTORE 91  NO GHOST", 670, 810,
+    frontend, red);
+  drawRgbLabel(rgb, width, "FULL 22-ROW PASSES AND ALL WRAPS IN CSV TRACE", 670, 828,
+    frontend, steel);
+  return encodePng(rgb, width, height);
+}
+
+export function readProjectileVisualLanguageRuntimeState(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const asset = graphics.capitalHulls;
+  const metrics = projectileVisualMetrics(asset);
+  const raider = graphics.releaseEnemy;
+  const playerX = requireValue(graphics.initialState, "player_x");
+  const playerY = requireValue(graphics.initialState, "player_y");
+  const enemyX = requireValue(graphics.initialState, "enemy_x");
+  const enemyY = 72;
+  const projectileY = 124;
+  const specs = [
+    { label: "VIPER PLAYFIELD  BRIGHT YELLOW  1X2", playerShot: true },
+    { label: "RAIDER PLAYFIELD  SATURATED RED  2X3", raiderPulse: true },
+    { label: "COLONIAL CAPITAL  YELLOW GOLD  8X6", capitalOwner: "allied", phase: 0 },
+    { label: "CYLON CAPITAL  CRIMSON  8X6", capitalOwner: "enemy", phase: 1 },
+    { label: "ALL FOUR  SAME NATIVE SCALE", all: true },
+    { label: "MONO FORM  FIGHTER SHORT  CAPITAL HEAVY", all: true, monochrome: true },
+  ];
+  const panelDefinitions = specs.map((spec) => {
+    const screenState = createCanonicalScreenRuntimeState(graphics, {
+      sectorPhase: asset.sector.previewSectorRow,
+    });
+    const hardwareState = new Map(graphics.hardwareState);
+    if (spec.monochrome) {
+      screenState.screen.fill(0);
+      for (const register of ["COLPF0", "COLPF1", "COLPF2", "COLPF3"]) {
+        hardwareState.set(register, 0x0e);
+      }
+    }
+    const capitalVisuals = [];
+    if (spec.capitalOwner || spec.all) {
+      const owners = spec.all ? ["allied", "enemy"] : [spec.capitalOwner];
+      owners.forEach((owner, index) => {
+        const visual = heavyShellVisual({
+          state: BROADSIDE_STATES.FLYING,
+          missile: owner === "allied" ? 1 : 3,
+          owner,
+          x: spec.all ? 130 + index * 36 : 128,
+          y: spec.all ? projectileY + index * 24 : projectileY,
+        }, asset, spec.phase ?? index * 2);
+        const overlay = applyCapitalShellVisualToScreen(screenState.screen, asset, visual);
+        capitalVisuals.push({ ...visual, overlay });
+      });
+    }
+    const pixels = drawGameplayMixedScreen(hardwareState, screenState.screen, graphics);
+    if (!spec.monochrome) {
+      overlayCanonicalPmg(pixels, graphics, { enemyX, enemyY, scannerPhase: 16 });
+    }
+    if (spec.playerShot || spec.all) {
+      drawTopAnchoredMissileSpan(pixels, playerX + 8, playerY - 28,
+        metrics.player.height, spec.monochrome ? 0x0e : metrics.player.color);
+    }
+    if (spec.raiderPulse || spec.all) {
+      drawTopAnchoredMissileSpan(pixels, enemyX + 7, projectileY,
+        metrics.raider.height, spec.monochrome ? 0x0e : metrics.raider.color);
+    }
+    return { ...spec, pixels, screen: screenState.screen, capitalVisuals };
+  });
+  return {
+    graphics,
+    metrics,
+    panelDefinitions,
+    ...renderLabeledGameplayPanels(readFrontendGraphicsSource(source), panelDefinitions, 2),
+  };
+}
+
+export function createProjectileVisualLanguagePreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const state = readProjectileVisualLanguageRuntimeState(source, capitalHullsDefinition);
+  return encodePng(
+    scaleAndConvertToRgb(state.registerPixels, state.width, state.height),
+    state.width * PREVIEW_SCALE,
+    state.height * PREVIEW_SCALE,
+  );
+}
+
+export function readProjectileCollisionScoringRuntimeState(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const asset = graphics.capitalHulls;
+  const raider = graphics.releaseEnemy;
+  const enemyX = 124;
+  const enemyY = 104;
+  const playerY = requireValue(graphics.initialState, "player_y");
+  const resolved = (sourceId) => {
+    const enemy = createEnemyDamageState(raider);
+    beginEnemyDamageFrame(enemy);
+    queueEnemyDamage(enemy, raider.hitPoints, sourceId);
+    return resolveEnemyDamage(enemy);
+  };
+  const firstTarget = sweptHorizontalProjectileTargets({
+    previousX: 142,
+    x: 120,
+    y: 108,
+    width: asset.broadside.projectileVisuals.capital.widthHpos,
+    height: asset.broadside.projectileVisuals.capital.height,
+    velocityX: -2,
+  }, [
+    { id: "RAIDER", active: true, x: enemyX, y: enemyY,
+      width: raider.visibleWidth, height: raider.height, priority: 0 },
+    { id: "VIPER", active: true, x: 104, y: enemyY,
+      width: 8, height: 16, priority: 1 },
+  ]);
+  const specs = [
+    { label: "M0 DESTROYS RAIDER  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE,
+      playerShot: true },
+    { label: "VIPER CONTACT  DAMAGE AND SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
+      contact: true },
+    { label: "LETHAL CONTACT  VIPER ZERO  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
+      contact: true, lethalPlayer: true },
+    { label: "COLONIAL SHELL KILL  SCORE UNCHANGED", source: ENEMY_DAMAGE_SOURCES.CAPITAL_COLONIAL,
+      capitalOwner: "allied" },
+    { label: "CYLON FRIENDLY FIRE  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON,
+      capitalOwner: "enemy" },
+    { label: "CYLON SHELL STOPS AT FIRST RAIDER", source: ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON,
+      capitalOwner: "enemy", firstTarget: firstTarget?.id },
+    { label: "CLEANUP AND DRAIN  SCORE UNCHANGED", source: ENEMY_DAMAGE_SOURCES.CLEANUP,
+      cleanup: true },
+    { label: "DESTROY RESOLVES ONCE  NO DOUBLE SCORE", source: ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE,
+      resolveTwice: true },
+  ];
+  const panelDefinitions = specs.map((spec) => {
+    const screenState = createCanonicalScreenRuntimeState(graphics, {
+      sectorPhase: asset.sector.previewSectorRow,
+    });
+    const result = resolved(spec.source);
+    const secondResult = spec.resolveTwice
+      ? resolveEnemyDamage({ ...createEnemyDamageState(raider), alive: false })
+      : null;
+    if (result.score > 0) {
+      const zero = requireValue(graphics.constants, "CH_ZERO");
+      screenState.screen.set([zero, zero, zero, zero + 1, zero], 6);
+    }
+    let capitalVisual = null;
+    if (spec.capitalOwner) {
+      capitalVisual = heavyShellVisual({ state: BROADSIDE_STATES.FLYING,
+        missile: spec.capitalOwner === "allied" ? 1 : 3,
+        owner: spec.capitalOwner, x: spec.capitalOwner === "allied" ? 116 : 144,
+        y: enemyY + 4 }, asset, 2);
+      applyCapitalShellVisualToScreen(screenState.screen, asset, capitalVisual);
+    }
+    const pixels = drawGameplayMixedScreen(graphics.hardwareState, screenState.screen, graphics);
+    if (!spec.cleanup) overlayCanonicalPmg(pixels, graphics, {
+      enemyX,
+      enemyY,
+      playerX: spec.contact ? enemyX + 4 : undefined,
+      playerY: spec.contact ? enemyY : playerY,
+      scannerPhase: 16,
+      showPlayer: !spec.lethalPlayer,
+    });
+    if (spec.playerShot) drawTopAnchoredMissileSpan(pixels, enemyX + 8, enemyY + 8,
+      asset.broadside.projectileVisuals.player.height,
+      asset.broadside.projectileVisuals.player.coreValue);
+    return { ...spec, result, secondResult, capitalVisual, pixels, screen: screenState.screen };
+  });
+  return {
+    graphics,
+    firstTarget,
+    panelDefinitions,
+    ...renderLabeledGameplayPanels(readFrontendGraphicsSource(source), panelDefinitions, 2),
+  };
+}
+
+export function createProjectileCollisionScoringPreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const state = readProjectileCollisionScoringRuntimeState(source, capitalHullsDefinition);
+  return encodePng(
+    scaleAndConvertToRgb(state.registerPixels, state.width, state.height),
+    state.width * PREVIEW_SCALE,
+    state.height * PREVIEW_SCALE,
+  );
+}
+
 export function readHeavyShellDetailSequenceRuntimeState(
   source,
   capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
@@ -2199,9 +3857,11 @@ export function readHeavyShellDetailSequenceRuntimeState(
       screen[panel.flash.screenRow * SCREEN_COLUMNS + panel.flash.turret.muzzleColumn] =
         panel.flash.code;
     }
+    for (const span of panel.spans) applyCapitalShellVisualToScreen(screen, asset, span);
     const panelPixels = drawGameplayMixedScreen(graphics.hardwareState, screen, graphics);
     overlayCanonicalPmg(panelPixels, graphics);
     for (const span of panel.spans) {
+      if (span.renderer === "ANTIC4_PLAYFIELD_OVERLAY") continue;
       drawMissileSpan(
         panelPixels,
         span.x,
@@ -2362,7 +4022,7 @@ export function readBroadsideAcceptanceSequenceRuntimeState(
   const turretById = new Map(asset.turrets.map((turret) => [turret.id, turret]));
   const allied = turretById.get("allied_turret_a");
   const enemy = turretById.get("enemy_turret_a");
-  const visibleRows = Array.from({ length: 22 }, (_, offset) =>
+  const visibleRows = Array.from({ length: asset.sector.visibleRows }, (_, offset) =>
     asset.sector.previewSectorRow - 1 - offset);
   const cannonScreenRow = (turret) => {
     const offset = visibleRows.findIndex((leftRow) => {
@@ -2370,7 +4030,7 @@ export function readBroadsideAcceptanceSequenceRuntimeState(
       return asset.sector.cannonRowsBySide.get(turret.side).includes(sideRow);
     });
     if (offset < 0) throw new Error(`${turret.id} is missing from the preview sector phase`);
-    return 2 + offset;
+    return 1 + offset;
   };
   const alliedMuzzle = muzzlePosition(allied, cannonScreenRow(allied));
   const enemyMuzzle = muzzlePosition(enemy, cannonScreenRow(enemy));
@@ -2385,6 +4045,10 @@ export function readBroadsideAcceptanceSequenceRuntimeState(
     }, asset);
     return { missile, x: visual.x, y: visual.y, height: visual.height, size: visual.size };
   };
+  const shellSpan = (missile, owner, x, y, frame = 0) => ({
+    missile,
+    ...heavyShellVisual({ state: BROADSIDE_STATES.FLYING, missile, owner, x, y }, asset, frame),
+  });
   const envelope = combinedPlayerEnvelope(graphics.playerShape, graphics.playerEngineShape);
   const contactState = { visibleRows, envelope };
   const alliedContact = playerHullContact(asset, {
@@ -2403,13 +4067,7 @@ export function readBroadsideAcceptanceSequenceRuntimeState(
     { label: "ALLIED HOT WARNING", spans: [warningSpan(allied, alliedMuzzle, 2, 8)] },
     {
       label: "ALLIED LAUNCH SAME PATH",
-      spans: [{
-        missile: 2,
-        x: alliedMuzzle.x,
-        y: alliedMuzzle.y,
-        height: asset.broadside.flyingHeight,
-        size: 1,
-      }],
+      spans: [shellSpan(2, "allied", alliedMuzzle.x, alliedMuzzle.y, 0)],
     },
     { label: "ENEMY EARLY WARNING", spans: [warningSpan(enemy, enemyMuzzle, 1, 25)] },
     { label: "ENEMY HOT WARNING", spans: [warningSpan(enemy, enemyMuzzle, 1, 8)] },
@@ -2449,13 +4107,18 @@ export function readBroadsideAcceptanceSequenceRuntimeState(
     const playfield = panel.backgroundColor === undefined
       ? base
       : readGameplayPlayfieldRuntimeState(source, capitalHullsDefinition, panel.backgroundColor);
-    const panelPixels = Uint8Array.from(playfield.registerPixels);
+    const screen = Uint8Array.from(playfield.screen);
+    for (const span of panel.spans ?? []) applyCapitalShellVisualToScreen(screen, asset, span);
+    const panelHardwareState = new Map(graphics.hardwareState);
+    if (panel.backgroundColor !== undefined) panelHardwareState.set("COLBK", panel.backgroundColor);
+    const panelPixels = drawGameplayMixedScreen(panelHardwareState, screen, graphics);
     overlayCanonicalPmg(panelPixels, graphics, {
       playerX: panel.player?.x,
       playerY: panel.player?.y,
       showPlayer: panel.player?.visible !== false,
     });
     for (const span of panel.spans ?? []) {
+      if (span.renderer === "ANTIC4_PLAYFIELD_OVERLAY") continue;
       drawMissileSpan(panelPixels, span.x, span.y, span.height, color(span.missile), span.size ?? 1);
     }
     const column = index % columns;
@@ -2493,7 +4156,7 @@ export function readPlayerRespawnSequenceRuntimeState(
   const { graphics } = base;
   const asset = graphics.capitalHulls;
   const frontend = readFrontendGraphicsSource(source);
-  const visibleRows = Array.from({ length: 22 }, (_, offset) =>
+  const visibleRows = Array.from({ length: asset.sector.visibleRows }, (_, offset) =>
     asset.sector.previewSectorRow - 1 - offset);
   const envelope = combinedPlayerEnvelope(graphics.playerShape, graphics.playerEngineShape);
   const playerX = requireValue(graphics.constants, "PLAYER_RESPAWN_X");
@@ -2606,6 +4269,12 @@ export function readBroadsideSpeedSequenceRuntimeState(
       throw new Error("Speed preview screen and world simulation lost their corridor phase");
     }
     const screen = Uint8Array.from(screenState.screen);
+    const projectileVisual = heavyShellVisual({
+      state: BROADSIDE_STATES.FLYING,
+      missile: 1,
+      ...snapshot.projectile,
+    }, graphics.capitalHulls, snapshot.frame);
+    applyCapitalShellVisualToScreen(screen, graphics.capitalHulls, projectileVisual);
     const panelPixels = drawGameplayMixedScreen(graphics.hardwareState, screen, graphics);
     overlayCanonicalPmg(panelPixels, graphics);
     const warning = snapshot.warning.visual;
@@ -2616,14 +4285,6 @@ export function readBroadsideSpeedSequenceRuntimeState(
       warning.height,
       requireValue(graphics.hardwareState, `COLPM${snapshot.warning.missile}`),
       warning.size,
-    );
-    drawMissileSpan(
-      panelPixels,
-      snapshot.projectile.x,
-      snapshot.projectile.y,
-      graphics.capitalHulls.broadside.flyingHeight,
-      requireValue(graphics.hardwareState, `COLPM${snapshot.projectile.missile}`),
-      1,
     );
 
     const column = index % columns;
@@ -2706,6 +4367,12 @@ export function readDifficultySpeedComparisonRuntimeState(
       throw new Error(`${difficulty} preview lost its source-derived corridor phase`);
     }
     const screen = Uint8Array.from(screenState.screen);
+    const projectileVisual = heavyShellVisual({
+      state: BROADSIDE_STATES.FLYING,
+      missile: 1,
+      ...final.projectile,
+    }, graphics.capitalHulls, final.frame);
+    applyCapitalShellVisualToScreen(screen, graphics.capitalHulls, projectileVisual);
     const panelPixels = drawGameplayMixedScreen(graphics.hardwareState, screen, graphics);
     overlayCanonicalPmg(panelPixels, graphics);
     const warning = final.warning.visual;
@@ -2716,14 +4383,6 @@ export function readDifficultySpeedComparisonRuntimeState(
       warning.height,
       requireValue(graphics.hardwareState, `COLPM${final.warning.missile}`),
       warning.size,
-    );
-    drawMissileSpan(
-      panelPixels,
-      final.projectile.x,
-      final.projectile.y,
-      graphics.capitalHulls.broadside.flyingHeight,
-      requireValue(graphics.hardwareState, `COLPM${final.projectile.missile}`),
-      1,
     );
 
     const originX = index * SOURCE_WIDTH;
@@ -3311,6 +4970,231 @@ export function generateEnemyFighterLimitsPreview({
   return { outputPath, bytes: png.length, ...inspectPng(png) };
 }
 
+function writeEnemyReviewPreview(outputPath, png) {
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, png);
+  return { outputPath, bytes: png.length, ...inspectPng(png) };
+}
+
+export function generateDebrisReviewPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DEBRIS_REVIEW_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createDebrisReviewPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadEntityEffectsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateDebrisReviewTrace({
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DEBRIS_REVIEW_TRACE_PATH,
+} = {}) {
+  const trace = createDebrisReviewTrace(loadEntityEffectsDefinition(definitionPath));
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateEnemyReferenceInventoryPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyReferenceInventoryPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateEnemyAnchorComparisonPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_ENEMY_ANCHOR_COMPARISON_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyAnchorComparisonPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateEnemyNativeSpritesPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_ENEMY_NATIVE_SPRITES_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyNativeSpritesPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateEnemyReviewHarnessPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_ENEMY_REVIEW_HARNESS_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyReviewHarnessPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateEnemyScannerComparisonPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_ENEMY_SCANNER_COMPARISON_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyScannerComparisonPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateEnemyRaiderBeforeAfterPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_ENEMY_BEFORE_AFTER_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyRaiderBeforeAfterPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateEnemyPaletteCandidatePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  candidateId,
+  outputPath,
+} = {}) {
+  if (!candidateId || !outputPath) {
+    throw new Error("Enemy palette preview requires candidateId and outputPath");
+  }
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyPaletteCandidatePreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      candidateId,
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateEnemyCombatSequencePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_ENEMY_COMBAT_SEQUENCE_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createEnemyCombatSequencePreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateRaiderNaturalFireTrace({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_RAIDER_NATURAL_FIRE_TRACE_PATH,
+} = {}) {
+  const trace = createRaiderNaturalFireTrace(
+    fs.readFileSync(sourcePath, "utf8"),
+    loadCapitalHullsDefinition(definitionPath),
+  );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateFighterBurstRuntimeTrace({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_FIGHTER_BURST_RUNTIME_TRACE_PATH,
+} = {}) {
+  const trace = createFighterBurstRuntimeTrace(
+    fs.readFileSync(sourcePath, "utf8"),
+    loadCapitalHullsDefinition(definitionPath),
+  );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateFighterWeaponTransitionTrace({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_FIGHTER_WEAPON_TRANSITION_TRACE_PATH,
+} = {}) {
+  const trace = createFighterWeaponTransitionTrace(
+    fs.readFileSync(sourcePath, "utf8"),
+    loadCapitalHullsDefinition(definitionPath),
+  );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateSharedFighterExplosionPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_SHARED_FIGHTER_EXPLOSION_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createSharedFighterExplosionPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateSharedFighterExplosionTrace({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_SHARED_FIGHTER_EXPLOSION_TRACE_PATH,
+} = {}) {
+  const trace = createSharedFighterExplosionTrace(
+    fs.readFileSync(sourcePath, "utf8"),
+    loadCapitalHullsDefinition(definitionPath),
+  );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateProjectileVisualLanguagePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_PROJECTILE_VISUAL_LANGUAGE_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createProjectileVisualLanguagePreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateProjectileCollisionScoringPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_PROJECTILE_COLLISION_SCORING_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createProjectileCollisionScoringPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const gameplayResult = generateGameplayPreview();
@@ -3445,6 +5329,72 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(
       `  size: ${fighterLimitsResult.width}x${fighterLimitsResult.height}, ${fighterLimitsResult.bytes} bytes`,
     );
+
+    for (const [name, result] of [
+      ["Enemy reference inventory", generateEnemyReferenceInventoryPreview()],
+      ["Enemy anchor comparison", generateEnemyAnchorComparisonPreview()],
+      ["Enemy native sprites", generateEnemyNativeSpritesPreview()],
+      ["Enemy review harness", generateEnemyReviewHarnessPreview()],
+      ["Enemy scanner comparison", generateEnemyScannerComparisonPreview()],
+      ["Enemy Raider before/after", generateEnemyRaiderBeforeAfterPreview()],
+      ["Enemy palette Cylon oxblood", generateEnemyPaletteCandidatePreview({
+        candidateId: "CYLON_OXBLOOD",
+        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_OXBLOOD_PREVIEW_PATH,
+      })],
+      ["Enemy palette Cylon burgundy comparison", generateEnemyPaletteCandidatePreview({
+        candidateId: "CYLON_BURGUNDY",
+        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_BURGUNDY_PREVIEW_PATH,
+      })],
+      ["Enemy palette Cylon scarlet", generateEnemyPaletteCandidatePreview({
+        candidateId: "CYLON_SCARLET",
+        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_SCARLET_PREVIEW_PATH,
+      })],
+      ["Enemy single-pulse combat", generateEnemyCombatSequencePreview()],
+      ["Projectile visual language", generateProjectileVisualLanguagePreview()],
+      ["Projectile collision scoring", generateProjectileCollisionScoringPreview()],
+    ]) {
+      console.log(`${name} generated successfully`);
+      console.log(`  PNG : ${path.relative(rootDirectory, result.outputPath)}`);
+      console.log(`  size: ${result.width}x${result.height}, ${result.bytes} bytes`);
+    }
+
+    const raiderNaturalFireTrace = generateRaiderNaturalFireTrace();
+    console.log(`Raider natural-fire runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, raiderNaturalFireTrace.outputPath)}`);
+    console.log(`  rows: ${raiderNaturalFireTrace.rows}, ${raiderNaturalFireTrace.bytes} bytes`);
+
+    const fighterBurstRuntimeTrace = generateFighterBurstRuntimeTrace();
+    console.log(`Fighter burst runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, fighterBurstRuntimeTrace.outputPath)}`);
+    console.log(`  rows: ${fighterBurstRuntimeTrace.rows}, ${fighterBurstRuntimeTrace.bytes} bytes`);
+
+    const fighterTransitionTrace = generateFighterWeaponTransitionTrace();
+    console.log(`Fighter weapon-transition trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, fighterTransitionTrace.outputPath)}`);
+    console.log(`  rows: ${fighterTransitionTrace.rows}, ${fighterTransitionTrace.bytes} bytes`);
+
+    const sharedExplosionResult = generateSharedFighterExplosionPreview();
+    console.log(`Shared fighter-explosion sequence generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, sharedExplosionResult.outputPath)}`);
+    console.log(
+      `  size: ${sharedExplosionResult.width}x${sharedExplosionResult.height}, ${sharedExplosionResult.bytes} bytes`,
+    );
+
+    const sharedExplosionTrace = generateSharedFighterExplosionTrace();
+    console.log(`Shared fighter-explosion trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, sharedExplosionTrace.outputPath)}`);
+    console.log(`  rows: ${sharedExplosionTrace.rows}, ${sharedExplosionTrace.bytes} bytes`);
+
+    const debrisReviewResult = generateDebrisReviewPreview();
+    console.log(`Debris visual-polish owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, debrisReviewResult.outputPath)}`);
+    console.log(
+      `  size: ${debrisReviewResult.width}x${debrisReviewResult.height}, ${debrisReviewResult.bytes} bytes`,
+    );
+    const debrisReviewTrace = generateDebrisReviewTrace();
+    console.log(`Debris visual-polish trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, debrisReviewTrace.outputPath)}`);
+    console.log(`  rows: ${debrisReviewTrace.rows}, ${debrisReviewTrace.bytes} bytes`);
 
     const startMenuResult = generateStartMenuPreview();
     console.log(`Start-menu preview generated successfully`);

@@ -16,7 +16,7 @@ ekran gameplayu. Obecnie zawiera:
 
 - sterowanie joystickiem w porcie 1 i strzelanie pojedynczym FIRE;
 - jednego przeciwnika z czerwonym skanerem, sprzętowe PMG, kolizje i score;
-- przewijany playfield ANTIC 4, czytelny dwuwierszowy HUD ANTIC 2 z osobnym
+- przewijany playfield ANTIC 4, czytelny kompaktowy HUD ANTIC 2 z osobnym
   fontem oraz efekty POKEY;
 - oryginalne 32-wierszowe kadłuby boczne ANTIC 4 w układzie nominalnym
   `8 + 24 + 8`, z jedną funkcjonalną, wielokomórkową baterią na stronę w
@@ -39,6 +39,11 @@ ekran gameplayu. Obecnie zawiera:
 - czyste przejście z loadera do menu, a następnie przez `START GAME` do
   istniejącego gameplayu, bez kosztu loadera w gameplay main loop lub
   gameplay VBI.
+- a complete last-life Game Over lifecycle after the 24-frame Viper explosion,
+  with saturated `LIFE 0`, frozen gameplay, final `SCORE`, session `TOP SCORE`,
+  and release-gated `FIRE TO CONTINUE` back to the main menu.
+- a physical-OPTION pause lifecycle with frozen simulation, release-gated
+  `RESUME`, synchronized `GAME MUSIC: ON/OFF`, and confirmed `QUIT TO MENU`.
 
 ## Docelowa gra
 
@@ -148,6 +153,8 @@ XEX nie tworzy mapowania wejścia.
 6. Sprawdź nawigację menu, ekrany podrzędne i uruchomienie gry przez
    `START GAME`.
 7. Sprawdź ruch we wszystkich kierunkach oraz FIRE w gameplayu.
+8. Press physical `OPTION`, verify the PAUSED menu and frozen world, then test
+   quick resume, GAME MUSIC switching, and confirmed QUIT TO MENU.
 
 Emulator jest koniecznym, ale niewystarczającym testem. Procedura raportowania
 real hardware znajduje się w

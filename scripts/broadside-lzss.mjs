@@ -1,47 +1,68 @@
 // Literal runs use commands $01-$7F. Match commands are 1LLLLLDD followed by
 // the low distance byte: length=L+3, distance=((DD<<8)|low)+1. Zero terminates.
 export function packBroadsideLzss(bytes) {
-  const output = [];
-  let input = 0;
-  let literals = [];
-  const flushLiterals = () => {
-    for (let offset = 0; offset < literals.length; offset += 127) {
-      const run = literals.slice(offset, offset + 127);
-      output.push(run.length, ...run);
-    }
-    literals = [];
-  };
+  const byteCount = bytes.length;
+  const cost = new Uint32Array(byteCount + 1);
+  const choiceLength = new Uint8Array(byteCount);
+  const choiceDistance = new Uint16Array(byteCount);
 
-  while (input < bytes.length) {
-    let bestLength = 0;
+  for (let input = byteCount - 1; input >= 0; input -= 1) {
+    let bestCost = Number.MAX_SAFE_INTEGER;
+    let bestLength = 1;
     let bestDistance = 0;
+
+    const maximumLiteralLength = Math.min(127, byteCount - input);
+    for (let length = 1; length <= maximumLiteralLength; length += 1) {
+      const candidateCost = 1 + length + cost[input + length];
+      if (candidateCost < bestCost) {
+        bestCost = candidateCost;
+        bestLength = length;
+      }
+    }
+
+    const matchDistance = new Uint16Array(35);
     const windowStart = Math.max(0, input - 1024);
     for (let candidate = input - 1; candidate >= windowStart; candidate -= 1) {
       if (bytes[candidate] !== bytes[input]) continue;
       let length = 1;
-      while (length < 34 && input + length < bytes.length &&
+      while (length < 34 && input + length < byteCount &&
         bytes[candidate + length] === bytes[input + length]) {
         length += 1;
       }
-      if (length > bestLength) {
-        bestLength = length;
-        bestDistance = input - candidate;
+      for (let matched = 3; matched <= length; matched += 1) {
+        if (matchDistance[matched] === 0) matchDistance[matched] = input - candidate;
       }
     }
-    if (bestLength >= 3) {
-      flushLiterals();
-      const distance = bestDistance - 1;
+    for (let length = 3; length <= 34; length += 1) {
+      if (matchDistance[length] === 0) continue;
+      const candidateCost = 2 + cost[input + length];
+      if (candidateCost < bestCost) {
+        bestCost = candidateCost;
+        bestLength = length;
+        bestDistance = matchDistance[length];
+      }
+    }
+
+    cost[input] = bestCost;
+    choiceLength[input] = bestLength;
+    choiceDistance[input] = bestDistance;
+  }
+
+  const output = [];
+  for (let input = 0; input < byteCount;) {
+    const length = choiceLength[input];
+    const matchDistance = choiceDistance[input];
+    if (matchDistance === 0) {
+      output.push(length, ...bytes.subarray(input, input + length));
+    } else {
+      const distance = matchDistance - 1;
       output.push(
-        0x80 | ((bestLength - 3) << 2) | (distance >>> 8),
+        0x80 | ((length - 3) << 2) | (distance >>> 8),
         distance & 0xff,
       );
-      input += bestLength;
-    } else {
-      literals.push(bytes[input++]);
-      if (literals.length === 127) flushLiterals();
     }
+    input += length;
   }
-  flushLiterals();
   output.push(0);
   return Buffer.from(output);
 }
