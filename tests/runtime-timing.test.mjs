@@ -26,9 +26,9 @@ test("linked release replay covers every reviewed runtime timing scenario", () =
   assert.equal(timing.scenarios.maximumProjectilePool.projectileOccupancy, 19);
   assert.equal(timing.scenarios.threeBroadside.broadsideOccupancy, 3);
   assert.equal(timing.legalHeavyCombination.origin, "deterministic legal replay");
-  assert.ok(timing.legalHeavyCombination.events.includes("world-copy"));
   assert.ok(timing.legalHeavyCombination.events.includes("hull-copy"));
   assert.ok(timing.legalHeavyCombination.events.includes("music+sfx"));
+  assert.ok(timing.legalHeavyCombination.events.includes("active-debris"));
 });
 
 test("DMA-off CPU comparison stays below its executable comparison gate", () => {

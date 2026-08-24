@@ -34,15 +34,19 @@ test("wall trace is artifact-bound and adds no guest timing work", () => {
   assert.equal(report.instrumentation.production_nmi_en, 0x80);
 });
 
-test("wall trace covers 9040 legal frames and a separate targeted replay", () => {
+test("wall trace covers 9040 legal frames, targeted replay and E/M/H cadence traces", () => {
   assert.equal(report.replay.baseline_measured_frames, 9_040);
   assert.equal(report.replay.targeted_measured_frames, 920);
+  assert.equal(report.replay.parallax_cadence_measured_frames, 1_200);
   assert.equal(report.replay.sessions
     .filter((session) => session.kind === "baseline-9040")
     .reduce((sum, session) => sum + session.measured_frames, 0), 9_040);
   assert.equal(report.replay.sessions
     .filter((session) => session.kind === "targeted-heavy-coincidence")
     .reduce((sum, session) => sum + session.measured_frames, 0), 920);
+  assert.equal(report.replay.sessions
+    .filter((session) => session.kind === "parallax-cadence")
+    .reduce((sum, session) => sum + session.measured_frames, 0), 1_200);
   assert.equal(report.ten_heaviest_frames_in_9040_replay.length, 10);
   assert.equal(report.five_heaviest_frames.length, 5);
   assert.equal(report.replay.targeted_heaviest.frame,
@@ -82,36 +86,88 @@ test("wall trace records the required legal runtime coverage without incoherent 
     "debris_contact",
     "debris_despawn",
     "debris_bottom_despawn",
+    "debris_post_capital_sector",
   ]) {
     assert.equal(report.coverage[name].observed, true, `${name} was not observed`);
   }
+  assert.deepEqual(report.coverage.debris_visual_variants,
+    { observed: true, values: [0, 1] });
+  assert.deepEqual(report.coverage.debris_tumbling_phases,
+    { observed: true, values: [0, 1] });
+  assert.deepEqual(report.coverage.debris_trajectories,
+    { observed: true, vx_signed_hpos: [-4, 0, 4] });
+  assert.equal(report.coverage.debris_vertical_cadence.observed, true);
+  assert.equal(report.coverage.debris_vertical_cadence.invalid_transitions, 0);
+  assert.ok(report.coverage.debris_vertical_cadence.vertical_steps > 0);
+  assert.ok(report.coverage.debris_vertical_cadence.held_events > 0);
+  assert.deepEqual(report.coverage.parallax_cadence.map((entry) =>
+    entry.measured_rows_per_second), [
+    { world: 20, near: 10, far: 5, debris: 12 },
+    { world: 22.5, near: 11.25, far: 5.625, debris: 13.5 },
+    { world: 25, near: 12.5, far: 6.25, debris: 15 },
+  ]);
+  assert.deepEqual(report.coverage.parallax_cadence.map((entry) =>
+    [...new Set(entry.full_debris_flight_frames)]), [[91], [82], [74]]);
+  assert.deepEqual(report.coverage.post_capital_transition, {
+    session: "2-neutral-fire0",
+    open_gameplay_frame: 0,
+    drain_frame: 496,
+    complete_frame: 565,
+    next_open_frame: 652,
+    post_capital_spawn_frame: 682,
+    post_capital_spawn_active_frame: 683,
+    configured_spawn_delay_scheduler_ticks: 32,
+    observable_open_to_spawn_frame_delta: 30,
+  });
 });
 
-test("entity/effects feature budget preserves history and passes its explicit PAL gate", () => {
+test("debris visual polish preserves foundation history and passes its +256 PAL gate", () => {
   const historical = report.gate.historical_runtime_headroom_gate;
-  const feature = report.gate.entity_effects_foundation;
+  const foundation = report.gate.entity_effects_foundation;
+  const feature = report.gate.debris_visual_polish;
   assert.deepEqual([
     historical.maximum_wall_cycles,
     historical.preserved_for_history,
     historical.replaced,
   ], [31_568, true, false]);
   assert.deepEqual([
+    foundation.baseline_wall_cycles,
+    foundation.baseline_physical_headroom,
+    foundation.approved_delta_cycles,
+    foundation.maximum_wall_cycles,
+    foundation.minimum_physical_headroom,
+  ], [31_440, 4_128, 600, 32_040, 3_528]);
+  assert.deepEqual([
+    foundation.measured_wall_cycles,
+    foundation.measured_physical_headroom,
+    foundation.actual_delta_cycles,
+    foundation.remaining_approved_cycles,
+    foundation.passed,
+  ], [32_025, 3_543, 585, 15, true]);
+  assert.deepEqual([
     feature.baseline_wall_cycles,
     feature.baseline_physical_headroom,
     feature.approved_delta_cycles,
     feature.maximum_wall_cycles,
     feature.minimum_physical_headroom,
-  ], [31_440, 4_128, 600, 32_040, 3_528]);
+  ], [32_025, 3_543, 256, 32_281, 3_287]);
   assert.equal(feature.actual_delta_cycles,
     report.gate.measured_wall_cycles_dma_on - feature.baseline_wall_cycles);
   assert.equal(feature.remaining_approved_cycles,
     feature.maximum_wall_cycles - report.gate.measured_wall_cycles_dma_on);
+  assert.deepEqual([
+    feature.empty_path.delta_from_baseline,
+    feature.one_active_debris.delta_from_baseline,
+    feature.spawn_path.delta_from_baseline,
+    feature.contact_path.delta_from_baseline,
+  ], [-917, 56, -3_813, -5_896]);
   assert.ok(feature.actual_delta_cycles <= feature.approved_delta_cycles);
   assert.ok(report.gate.measured_physical_headroom >= feature.minimum_physical_headroom);
   assert.equal(feature.budget_overrun_frames, 0);
   assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 100, true);
-  assert.equal(manifest.entityEffects.runtimeBudget.actualDeltaCycles,
+  assert.equal(manifest.entityEffects.runtimeBudget.debrisVisualPolish.actualDeltaCycles,
     feature.actual_delta_cycles);
+  assert.equal(report.gate.maximum_wall_cycles, 32_281);
 });
 
 test("ten heaviest frames retain exact clock positions, VBI IDs and state", () => {

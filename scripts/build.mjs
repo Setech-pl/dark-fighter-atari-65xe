@@ -76,12 +76,20 @@ const acceptedRuntimeHeadroomPayloadBytes = 15759;
 const entityEffectsFoundationPayloadBudget = 1024;
 const entityEffectsFoundationPayloadLimit =
   acceptedRuntimeHeadroomPayloadBytes + entityEffectsFoundationPayloadBudget;
+const debrisVisualPolishPayloadLimitBytes = 16384;
+const debrisVisualPolishEntityCodeBaselineBytes = 564;
+const debrisVisualPolishEntityCodeBudgetBytes = 512;
 const runtimeHeadroomHistoricalWallGate = 31568;
 const entityEffectsBaselineWallCycles = 31440;
 const entityEffectsBaselinePhysicalHeadroom = 4128;
 const entityEffectsApprovedWallDelta = 600;
 const entityEffectsFeatureWallLimit = 32040;
 const entityEffectsFeatureMinimumHeadroom = 3528;
+const debrisVisualPolishBaselineWallCycles = 32025;
+const debrisVisualPolishBaselineHeadroomCycles = 3543;
+const debrisVisualPolishApprovedWallDelta = 256;
+const debrisVisualPolishWallLimit = 32281;
+const debrisVisualPolishMinimumHeadroom = 3287;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -387,6 +395,10 @@ async function build() {
     entityCodeBytes < 1 || entityCodeBytes > 0x0f00) {
     throw new Error("ENTITY_CODE lies outside its reviewed $9100-$9FFF runtime range");
   }
+  if (!isReviewVariant && entityCodeBytes >
+    debrisVisualPolishEntityCodeBaselineBytes + debrisVisualPolishEntityCodeBudgetBytes) {
+    throw new Error("Debris visual polish exceeds its +512 B ENTITY_CODE budget");
+  }
   if (entityStateRunAddress !== 0x8000 || entityStateBytes !== 0x0100) {
     throw new Error("Entity/effects BSS must occupy exactly $8000-$80FF");
   }
@@ -471,6 +483,16 @@ async function build() {
       `${entityEffectsFoundationPayloadBudget} approved bytes)`,
     );
   }
+  if (!isReviewVariant && rawPayload.length > debrisVisualPolishPayloadLimitBytes) {
+    throw new Error(
+      `Debris visual polish payload is ${rawPayload.length} bytes and exceeds ` +
+      `the owner-approved 16384-byte / 128-sector boot limit by ` +
+      `${rawPayload.length - debrisVisualPolishPayloadLimitBytes} bytes ` +
+      `(resident ${residentMain.length}, broadside ${packedBroadsideRuntime.length}, ` +
+      `starfield ${packedStarfieldRuntime.length}, A2 ${a2KernelRuntime.length}, ` +
+      `entity ${packedEntityCodeRuntime.length}/${entityCodeRuntime.length} packed/raw)`,
+    );
+  }
 
   const bootSectors = Math.ceil(rawPayload.length / 128);
   if (bootSectors < 1 || bootSectors > 255) {
@@ -540,6 +562,8 @@ async function build() {
       replay: {
         baseline_measured_frames: wallTrace.replay.baseline_measured_frames,
         targeted_measured_frames: wallTrace.replay.targeted_measured_frames,
+        parallax_cadence_measured_frames:
+          wallTrace.replay.parallax_cadence_measured_frames,
       },
     },
   };
@@ -575,6 +599,12 @@ async function build() {
         actualDeltaBytes: rawPayload.length - acceptedRuntimeHeadroomPayloadBytes,
         limitBytes: entityEffectsFoundationPayloadLimit,
         remainingBytes: entityEffectsFoundationPayloadLimit - rawPayload.length,
+      },
+      debrisVisualPolish: {
+        limitBytes: debrisVisualPolishPayloadLimitBytes,
+        actualBytes: rawPayload.length,
+        remainingBytes: debrisVisualPolishPayloadLimitBytes - rawPayload.length,
+        maximumBootSectors: 128,
       },
     },
     broadsideRuntime: {
@@ -618,6 +648,15 @@ async function build() {
       codeRunAddress: entityCodeRunAddress,
       codeBytes: entityCodeBytes,
       codeReservedBytes: entityEffectsAsset.pools.codeReservedBytes,
+      codeBudget: {
+        baselineBytes: debrisVisualPolishEntityCodeBaselineBytes,
+        approvedDeltaBytes: debrisVisualPolishEntityCodeBudgetBytes,
+        actualDeltaBytes: entityCodeBytes - debrisVisualPolishEntityCodeBaselineBytes,
+        limitBytes: debrisVisualPolishEntityCodeBaselineBytes +
+          debrisVisualPolishEntityCodeBudgetBytes,
+        remainingBytes: debrisVisualPolishEntityCodeBaselineBytes +
+          debrisVisualPolishEntityCodeBudgetBytes - entityCodeBytes,
+      },
       packedBytes: packedEntityCodeRuntime.length,
       packedSourceAddress: entityPackedSourceAddress,
       compression: "LZ-10/5",
@@ -627,8 +666,10 @@ async function build() {
       logicalRows: entityEffectsAsset.coordinateSystem.logicalRows,
       archetypeCount: entityEffectsAsset.archetypes.length,
       descriptorBytes: entityEffectsAsset.descriptor.length,
-      glyphBytes: entityEffectsAsset.glyph.length,
-      glyphIndex: labels.get("ENTITY_DEBRIS_GLYPH"),
+      glyphBytes: entityEffectsAsset.glyphs.length,
+      glyphIndex: labels.get("ENTITY_DEBRIS_GLYPH_BASE"),
+      glyphCount: entityEffectsAsset.glyphs.length / 8,
+      newGlyphsFromFoundation: entityEffectsAsset.glyphs.length / 8 - 1,
       runtimeBudget: {
         historicalGateWallCycles: runtimeHeadroomHistoricalWallGate,
         historicalGatePreserved: true,
@@ -637,13 +678,30 @@ async function build() {
         approvedFeatureDeltaCycles: entityEffectsApprovedWallDelta,
         featureWallLimitCycles: entityEffectsFeatureWallLimit,
         minimumPhysicalHeadroomCycles: entityEffectsFeatureMinimumHeadroom,
-        measuredWallCycles: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
-        actualDeltaCycles: wallTrace === null ? null :
-          wallTrace.semantics.measured_wall_cycles_dma_on - entityEffectsBaselineWallCycles,
-        remainingApprovedCycles: wallTrace === null ? null :
-          entityEffectsFeatureWallLimit - wallTrace.semantics.measured_wall_cycles_dma_on,
+        measuredWallCycles:
+          wallTrace?.gate.entity_effects_foundation?.measured_wall_cycles ?? null,
+        actualDeltaCycles:
+          wallTrace?.gate.entity_effects_foundation?.actual_delta_cycles ?? null,
+        remainingApprovedCycles:
+          wallTrace?.gate.entity_effects_foundation?.remaining_approved_cycles ?? null,
         missedSynchronization: wallTrace?.gate.missed_frames ?? null,
         deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        passed: wallTrace?.gate.entity_effects_foundation?.passed ?? null,
+        debrisVisualPolish: {
+          baselineWallCycles: debrisVisualPolishBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: debrisVisualPolishBaselineHeadroomCycles,
+          approvedFeatureDeltaCycles: debrisVisualPolishApprovedWallDelta,
+          featureWallLimitCycles: debrisVisualPolishWallLimit,
+          minimumPhysicalHeadroomCycles: debrisVisualPolishMinimumHeadroom,
+          measuredWallCycles: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
+          actualDeltaCycles: wallTrace === null ? null :
+            wallTrace.semantics.measured_wall_cycles_dma_on -
+              debrisVisualPolishBaselineWallCycles,
+          remainingApprovedCycles: wallTrace === null ? null :
+            debrisVisualPolishWallLimit - wallTrace.semantics.measured_wall_cycles_dma_on,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
       },
     },
     loaderScreen: {

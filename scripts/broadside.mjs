@@ -22,6 +22,7 @@ export const CAPITAL_SECTOR_STATES = Object.freeze({
   PROW: 4,
   DRAIN: 5,
   COMPLETE: 6,
+  OPEN: 7,
 });
 export const PLAYER_LIFECYCLE_STATES = Object.freeze({
   ALIVE: 0,

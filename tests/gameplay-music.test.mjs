@@ -146,8 +146,8 @@ test("600-frame ON/OFF watchdog advances frame, world, stars, and spawn scheduli
     assert.deepEqual(snapshot, {
       frameCounter: 88,
       worldSteps: 600,
-      nearSteps: 420,
-      farSteps: 210,
+      nearSteps: 300,
+      farSteps: 150,
       scrollFrames: 270,
       scheduleAttempts: 54,
       spawns: 2,

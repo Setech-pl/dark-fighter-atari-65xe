@@ -94,6 +94,9 @@ const starfieldRuntime = fs.readFileSync(
 const a2KernelRuntime = fs.readFileSync(
   path.join(rootDirectory, "build", "a2-kernel-runtime.bin"),
 );
+const entityCodeRuntime = fs.readFileSync(
+  path.join(rootDirectory, "build", "entity-code-runtime.bin"),
+);
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -167,6 +170,7 @@ function createLinkedRuntimeMemory() {
   memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
   memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
   memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
+  memory.set(entityCodeRuntime, manifest.entityEffects.codeRunAddress);
   const rowLo = labels.get("PLAYFIELD_ROW_LO");
   const rowHi = labels.get("PLAYFIELD_ROW_HI");
   for (let row = 0; row < 22; row += 1) {

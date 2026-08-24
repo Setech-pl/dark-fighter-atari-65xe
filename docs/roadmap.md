@@ -442,7 +442,7 @@ modułów/sekwencji/masek, 128 B profili/granic prow oraz 576 B map runtime.
 Nie przechowuje surowej mapy
 240×16.
 Po korekcie pacingu hull zachowuje 100% legacy world rate i występuje
-20/22,5/25 razy na sekundę. Near event używa 70%, a far 35% tej częstości;
+20/22,5/25 razy na sekundę. Near event używa 50%, a far 25% tej częstości;
 najcięższa kopia near kosztuje konserwatywnie około 15 300 cykli, a hull event
 około 11 600 cykli. PMG pozostaje bez zmian; dwa gameplay DLI należą wyłącznie do
 mieszanej warstwy HUD z kamienia 11.
@@ -495,7 +495,7 @@ menu. Sektor udostępnia czysty stan `COMPLETE` przyszłemu encounter director.
   ramek (160/180/200 scanlines/s); `HARD` zachowuje zaakceptowany szybki
   kandydat, warning nie ma niewidocznej fazy, a gwiazdy nie wywołują kontaktu;
 - hull stream wykonuje 100% tych zdarzeń (160/180/200 scanlines/s), near
-  dokładnie 70%, a far 35%, bez zmiany ruchu fighter fire i capital slugs;
+  dokładnie 50%, a far 25%, bez zmiany ruchu fighter fire i capital slugs;
 - segment zawiera po jednej funkcjonalnej baterii na stronę zamiast dwóch,
   usunięte pozycje mają nieinteraktywną strukturę, a scheduler wybiera
   najstarszy bezpieczny widoczny emplacement żądanej strony;
@@ -591,10 +591,10 @@ Bez nowych weapons, enemies, debris, repair drone lub zmian salwy.
 
 ### Zakres
 
-- near layer z trzema zwartymi glifami, dokładnym rate `7/10` względem hull i
+- near layer z trzema zwartymi glifami, dokładnym rate `1/2` względem hull i
   średnią gęstością 8,625 znaków w 23-wierszowym viewporcie;
 - 24-rekordowy far layer z trzema stalowo-niebieskimi glifami i dokładnym
-  rate `7/20` względem hull, czyli połową prędkości near;
+  rate `1/4` względem hull, czyli połową prędkości near;
 - osobny deterministyczny seed `$A7`, generacja tylko w odsłanianym górnym
   wierszu oraz pojedynczy bezpieczny twinkle co 16 PAL frames;
 - jawna kolejność background/overlays i backing fighter/capital projectiles;

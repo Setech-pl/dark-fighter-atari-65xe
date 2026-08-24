@@ -253,6 +253,13 @@ Klasy debris mają różne sylwetki, a nie tylko różny kolor:
 - otwarte framework sections;
 - masywne, wolno obracające się wreckage.
 
+Bieżąca neutralna przeszkoda 2×1 używa dwóch sylwetek o pełnym obrysie 16×8:
+armour-shard ma 47 aktywnych pikseli ANTIC i pozostaje zwarty oraz asymetryczny,
+natomiast truss-fragment ma 45 aktywnych pikseli ANTIC, grubsze belki i czytelne
+otwory konstrukcji. Obie
+fazy każdej sylwetki zmieniają orientację. Kolory pola 1/2 odcinają debris od
+białego starfield; renderer i hitbox obejmują te same dwa sąsiednie znaki.
+
 Duży debris natychmiast niszczy Vipera, więc jego rozmiar i zagrożenie muszą
 być bezbłędnie czytelne. Animacja obrotu może używać małej liczby klatek lub
 zmian znaków, ale nie może powodować mylącej zmiany hitboxu.
@@ -287,8 +294,8 @@ są adaptowane do ANTIC/GTIA, budżetu PMG i jednej ramki PAL.
 Gameplay zachowuje dużo czarnego negative space. Warstwa far używa 24
 logicznych, przeważnie jednokropkowych znaków `COLPF1=$84`; near generuje
 średnio 8,625 widocznego znaku w 23 wierszach z jasnym `COLPF0=$0E` i tylko
-rzadkim dwupikselowym lub czteroramiennym wariantem. Near porusza się z 70%,
-a far z 35% prędkości kadłubów; zachowują więc czytelny stosunek 2:1, ale
+rzadkim dwupikselowym lub czteroramiennym wariantem. Near porusza się z 50%,
+a far z 25% prędkości kadłubów; zachowują więc czytelny stosunek 2:1, ale
 żadna warstwa nie płynie razem z kadłubami. Co 16 ramek najwyżej jeden
 aktualnie odsłonięty far star
 zmienia spokojnie fazę dim/bright. Gwiazdy nie mogą czytać się jak żółty ogień

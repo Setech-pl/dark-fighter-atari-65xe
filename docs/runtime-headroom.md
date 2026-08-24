@@ -46,7 +46,8 @@ The report keeps five meanings separate:
 
 The baseline replay contains 9,040 active frames in ten HARD and MEDIUM
 neutral/sweep/evasive sessions. A separate 920-frame HARD sweep replay targets
-the known heavy coincidence. Both enter gameplay through production frontend
+the known heavy coincidence. Three additional 400-frame EASY/MEDIUM/HARD
+sessions measure world, near, far and active-debris cadence. All enter gameplay through production frontend
 handlers and use deterministic normal input. Legal coverage includes the full
 19-slot fighter-projectile pool, production broadside lifecycle, a live Raider,
 both explosion types, both tracked muzzles, gameplay music and overlapping
@@ -209,6 +210,52 @@ every ring head 0..21, including reverse overlay restoration. Thus ring wrap,
 spawn, hit and bottom despawn are all covered without manually seeding the
 DMA-on timing result.
 
+## Debris visual-polish feature gate
+
+The visual-polish checkpoint uses the measured foundation result as its
+baseline: 32,025 wall cycles and 3,543 cycles of physical headroom. Its
+owner-revised contract permits at most +256 cycles, caps the final wall at
+32,281, and requires at least 3,287 cycles of physical headroom. Effects remain at
+active limit zero, so no active-effects path is admitted to the result.
+
+| Metric/path | Measured value | Delta from 32,025 foundation |
+| --- | ---: | ---: |
+| Linked empty skeleton, DMA off | 78 CPU | n/a |
+| One-active-debris wrapper, DMA off | 356 CPU | n/a |
+| Spawn wrapper, DMA off | 405 CPU | n/a |
+| Successful-contact wrapper, DMA off | 446 CPU | n/a |
+| Heaviest empty-path wall frame | 31,108 | -917 |
+| Heaviest one-active-debris wall frame | 32,081 | +56 |
+| Heaviest spawn wall frame | 28,212 | -3,813 |
+| Heaviest contact wall frame | 26,129 | -5,896 |
+
+Final measured physical headroom is 3,487 cycles. The measured delta is +56,
+leaving the result 200 cycles below the wall gate. The 9,040-frame baseline,
+920-frame targeted replay and three 400-frame cadence replays record zero
+missed synchronisations, zero extra VBI boundaries and zero deadline overruns.
+The heaviest legal frame still includes one active debris together with a live
+Raider, 16 fighter projectiles, 22 far stars, one tracked muzzle, a capital
+explosion, gameplay music and overlapping fire/capital SFX.
+
+The trace observes 74 spawns, 10 successful contacts, 71 despawns and 61 natural
+bottom despawns. Across 5,441 active-debris frames it observes both visual
+variants, both tumbling phases and all signed trajectories -4/0/+4 HPOS. The
+same trace contains 1,509 active-debris frames after the capital sector in
+`OPEN`, so late-game timing is not inferred from an empty pool. The
+active transitions contain 2,598 true world events: 1,514 vertical steps,
+1,084 intentional holds and zero invalid transitions, matching the
+deterministic three-of-five accumulator. Cadence traces measure exact
+world/near/far/debris rates of 20/10/5/12, 22.5/11.25/5.625/13.5 and
+25/12.5/6.25/15 rows/s for EASY/MEDIUM/HARD. Complete debris flights take
+91/82/74 frames (1.82/1.64/1.48 s).
+
+The linked-byte suite separately exhausts all 255 nonzero entity RNG seeds,
+all four 2×1 phases at every A2 ring head, byte-exact two-cell backing, exact
+four-event lateral accumulation, half-open 16×8 collision boundaries, safe
+full paths and reverse layer erasure. The production transition replay reaches
+`DRAIN` at frame 496, `COMPLETE` at 565, the next `OPEN` at 652 and a new
+post-capital spawn event at 682 after the normal scheduler delay.
+
 ## Size and memory checkpoints
 
 | Checkpoint | Payload | XEX | ATR |
@@ -221,16 +268,28 @@ DMA-on timing result.
 | Final A2 kernel pass | 15,754 B | 15,766 B | 92,176 B |
 | Pre-foundation / Raider `4/5` + Cylon `$44` | 15,759 B | 15,771 B | 92,176 B |
 | Entity/effects foundation + one debris | 16,299 B | 16,311 B | 92,176 B |
+| Debris visual polish + owner retest glyphs | 16,384 B | 16,396 B | 92,176 B |
 
-Final protected use is MAIN 8,170/8,192 B, PROJECTILES 202/298 B,
-STARFIELD 2,168/2,278 B, BROADSIDE 6,653/6,656 B, A2 kernel 226/256 B,
-ENTITY_STATE 256/256 B and ENTITY_CODE 564/3,840 B. Packed staging uses
-1,721/1,792 B until unpacking. A2 display/ring state owns
+The final payload occupies exactly 128 boot sectors and leaves 0 B of padding.
+The on-disk header can technically encode up to 255 sectors, but the build now
+enforces the owner-approved 128-sector feature limit; neither loader nor format
+was changed. The dynamic-programming encoder produces a globally minimal parse
+for the existing LZ-10/5 stream, recovering enough bytes without changing its
+decoder contract.
+
+Final protected use is MAIN 8,140/8,192 B, PROJECTILES 202/298 B,
+STARFIELD 2,178/2,278 B, BROADSIDE 6,652/6,656 B, A2 kernel 226/256 B,
+ENTITY_STATE 256/256 B and ENTITY_CODE 714/3,840 B. Packed staging uses
+1,718/1,792 B until unpacking; the separate ENTITY_CODE boot tail is 639 B.
+A2 display/ring state owns
 203 B at `$7F10-$7FDA`. The kernel is copied identically by XEX and cold-boot
 ATR startup into unconditional 64 KiB RAM at `$9000-$90E1`; `$90E2-$90FF`
 remains free. Startup explicitly clears every byte `$8000-$80FF` and loads
-ENTITY_CODE at `$9100-$9333`; `$8100-$8FFF` and `$9334-$9FFF` remain reserved
+ENTITY_CODE at `$9100-$93C9`; `$8100-$8FFF` and `$93CA-$9FFF` remain reserved
 and untouched. `$A000-$BFFF` is excluded.
+ENTITY_CODE grows from the 564 B foundation checkpoint to 714 B (+150 B),
+well inside the approved +512 B budget. Debris uses exactly eight glyphs
+110–117 (seven new from foundation), leaving ten free glyphs 118–127.
 
 ## Limitations
 

@@ -43,7 +43,12 @@ typedef struct {
 	unsigned difficulty;
 	unsigned active_muzzles;
 	unsigned entity_active;
+	unsigned entity_x;
 	unsigned entity_y;
+	unsigned entity_vx;
+	unsigned entity_move_accumulator;
+	unsigned entity_vertical_accumulator;
+	unsigned entity_render_id;
 } DFTraceFrame;
 
 enum {
@@ -56,7 +61,9 @@ enum {
 	DFTRACE_EVENT_MUSIC_TICK = 1u << 6,
 	DFTRACE_EVENT_ENTITY_SPAWN = 1u << 7,
 	DFTRACE_EVENT_ENTITY_CONTACT = 1u << 8,
-	DFTRACE_EVENT_ENTITY_DESPAWN = 1u << 9
+	DFTRACE_EVENT_ENTITY_DESPAWN = 1u << 9,
+	DFTRACE_EVENT_NEAR_STEP = 1u << 10,
+	DFTRACE_EVENT_FAR_STEP = 1u << 11
 };
 
 static int dftrace_initialised;
@@ -76,7 +83,9 @@ static unsigned dftrace_pc_end;
 static unsigned dftrace_pc_frontend_poll;
 static unsigned dftrace_pc_dli;
 static unsigned dftrace_pc_world;
+static unsigned dftrace_pc_near;
 static unsigned dftrace_pc_far_erase;
+static unsigned dftrace_pc_far_step;
 static unsigned dftrace_pc_hull;
 static unsigned dftrace_pc_broadside;
 static unsigned dftrace_pc_fighter_explosion;
@@ -108,7 +117,12 @@ static unsigned dftrace_difficulty_setting;
 static unsigned dftrace_gameplay_frame;
 static unsigned dftrace_muzzle_screen_hi;
 static unsigned dftrace_entity_active_count;
+static unsigned dftrace_entity_x;
 static unsigned dftrace_entity_y;
+static unsigned dftrace_entity_vx;
+static unsigned dftrace_entity_move_accumulator;
+static unsigned dftrace_entity_vertical_accumulator;
+static unsigned dftrace_entity_render_id;
 
 static unsigned dftrace_env_u(const char *name)
 {
@@ -250,7 +264,12 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->difficulty = MEMORY_mem[dftrace_difficulty_setting];
 	frame->active_muzzles = dftrace_count_nonzero(dftrace_muzzle_screen_hi, 2);
 	frame->entity_active = MEMORY_mem[dftrace_entity_active_count];
+	frame->entity_x = MEMORY_mem[dftrace_entity_x];
 	frame->entity_y = MEMORY_mem[dftrace_entity_y];
+	frame->entity_vx = MEMORY_mem[dftrace_entity_vx];
+	frame->entity_move_accumulator = MEMORY_mem[dftrace_entity_move_accumulator];
+	frame->entity_vertical_accumulator = MEMORY_mem[dftrace_entity_vertical_accumulator];
+	frame->entity_render_id = MEMORY_mem[dftrace_entity_render_id];
 }
 
 static void dftrace_write(void)
@@ -262,7 +281,7 @@ static void dftrace_write(void)
 		perror("darkfighter trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_y,events\n");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,events\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -271,7 +290,7 @@ static void dftrace_write(void)
 		unsigned extra_boundaries = host_boundaries > 1 ? host_boundaries - 1 : 0;
 		unsigned missed_frames = cadence_frames > 1 ? cadence_frames - 1 : 0;
 		fprintf(file,
-			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
 			dftrace_session, index,
 			(unsigned long long) frame->start_clock,
 			(unsigned long long) frame->end_clock,
@@ -286,7 +305,9 @@ static void dftrace_write(void)
 			frame->hit_sfx, frame->capital_sfx, frame->sound_enabled,
 			frame->player_lifecycle, frame->sector_state, frame->gameplay_frame,
 			frame->difficulty, frame->active_muzzles, frame->entity_active,
-			frame->entity_y, frame->events);
+			frame->entity_x, frame->entity_y, frame->entity_vx,
+			frame->entity_move_accumulator, frame->entity_vertical_accumulator,
+			frame->entity_render_id, frame->events);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -321,7 +342,9 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_frontend_poll, "DFTRACE_PC_FRONTEND_POLL");
 	DFTRACE_ADDRESS(dftrace_pc_dli, "DFTRACE_PC_DLI");
 	DFTRACE_ADDRESS(dftrace_pc_world, "DFTRACE_PC_WORLD");
+	DFTRACE_ADDRESS(dftrace_pc_near, "DFTRACE_PC_NEAR");
 	DFTRACE_ADDRESS(dftrace_pc_far_erase, "DFTRACE_PC_FAR_ERASE");
+	DFTRACE_ADDRESS(dftrace_pc_far_step, "DFTRACE_PC_FAR_STEP");
 	DFTRACE_ADDRESS(dftrace_pc_hull, "DFTRACE_PC_HULL");
 	DFTRACE_ADDRESS(dftrace_pc_broadside, "DFTRACE_PC_BROADSIDE");
 	DFTRACE_ADDRESS(dftrace_pc_fighter_explosion, "DFTRACE_PC_FIGHTER_EXPLOSION");
@@ -352,7 +375,12 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_gameplay_frame, "DFTRACE_GAMEPLAY_FRAME");
 	DFTRACE_ADDRESS(dftrace_muzzle_screen_hi, "DFTRACE_MUZZLE_SCREEN_HI");
 	DFTRACE_ADDRESS(dftrace_entity_active_count, "DFTRACE_ENTITY_ACTIVE_COUNT");
+	DFTRACE_ADDRESS(dftrace_entity_x, "DFTRACE_ENTITY_X");
 	DFTRACE_ADDRESS(dftrace_entity_y, "DFTRACE_ENTITY_Y");
+	DFTRACE_ADDRESS(dftrace_entity_vx, "DFTRACE_ENTITY_VX");
+	DFTRACE_ADDRESS(dftrace_entity_move_accumulator, "DFTRACE_ENTITY_MOVE_ACCUMULATOR");
+	DFTRACE_ADDRESS(dftrace_entity_vertical_accumulator, "DFTRACE_ENTITY_VERTICAL_ACCUMULATOR");
+	DFTRACE_ADDRESS(dftrace_entity_render_id, "DFTRACE_ENTITY_RENDER_ID");
 #undef DFTRACE_ADDRESS
 	dftrace_initialised = 1;
 }
@@ -400,8 +428,12 @@ static void DFTrace_Observe(unsigned pc)
 		++dftrace_current.dli_nmis;
 	if (pc == dftrace_pc_world)
 		dftrace_current.events |= DFTRACE_EVENT_WORLD;
+	else if (pc == dftrace_pc_near)
+		dftrace_current.events |= DFTRACE_EVENT_NEAR_STEP;
 	else if (pc == dftrace_pc_far_erase)
 		dftrace_current.events |= DFTRACE_EVENT_FAR_ERASE;
+	else if (pc == dftrace_pc_far_step)
+		dftrace_current.events |= DFTRACE_EVENT_FAR_STEP;
 	else if (pc == dftrace_pc_hull)
 		dftrace_current.events |= DFTRACE_EVENT_HULL;
 	else if (pc == dftrace_pc_broadside)

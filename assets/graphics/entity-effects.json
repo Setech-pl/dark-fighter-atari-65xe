@@ -18,29 +18,75 @@
   "spawn": {
     "initialDelayFrames": 32,
     "repeatDelayFrames": 64,
-    "rngSeed": 101
+    "rngSeed": 101,
+    "corridorFirstColumn": 9,
+    "corridorEndColumnExclusive": 31,
+    "safeFirstColumn": 18,
+    "safeEndColumnExclusive": 21
+  },
+  "debrisMotion": {
+    "verticalStepNumerator": 3,
+    "verticalStepDenominator": 5,
+    "horizontalStepWorldRows": 4,
+    "maximumHorizontalSteps": 9,
+    "trajectorySelector": ["straight", "slight-left", "slight-right", "straight"],
+    "trajectories": [
+      { "id": "straight", "vxSignedHpos": 0 },
+      { "id": "slight-left", "vxSignedHpos": -4 },
+      { "id": "slight-right", "vxSignedHpos": 4 }
+    ]
+  },
+  "debrisVisuals": {
+    "tumbleWorldRowsPerPhase": 1,
+    "variants": [
+      {
+        "id": "armour-shard",
+        "phases": [
+          [
+            [43, 47, 191, 255, 191, 47, 11, 10],
+            [192, 224, 248, 254, 255, 250, 232, 128]
+          ],
+          [
+            [192, 224, 248, 254, 255, 250, 232, 128],
+            [43, 47, 191, 255, 191, 47, 11, 10]
+          ]
+        ]
+      },
+      {
+        "id": "truss-fragment",
+        "phases": [
+          [
+            [43, 47, 191, 176, 240, 178, 62, 42],
+            [192, 224, 248, 254, 255, 250, 232, 128]
+          ],
+          [
+            [192, 224, 248, 254, 255, 250, 232, 128],
+            [43, 47, 191, 176, 240, 178, 62, 42]
+          ]
+        ]
+      }
+    ]
   },
   "archetypes": [
     {
       "id": "neutral-debris",
       "type": 1,
       "initialState": 1,
-      "flags": 53,
+      "flags": 55,
       "updateProfile": 1,
       "renderProfile": 1,
       "collisionCategory": 1,
-      "widthHpos": 4,
+      "widthHpos": 8,
       "heightScanlines": 8,
       "contactDamageUnits": 1,
       "initialVx": 0,
       "initialVy": 8,
-      "movementNumerator": 1,
-      "movementDenominator": 1,
+      "movementNumerator": 3,
+      "movementDenominator": 5,
       "lifetime": 0,
       "hitPoints": 1,
       "spawnPolicy": 1,
-      "sfxEventId": 0,
-      "glyphRows": [0, 24, 60, 126, 219, 126, 36, 0]
+      "sfxEventId": 0
     }
   ]
 }

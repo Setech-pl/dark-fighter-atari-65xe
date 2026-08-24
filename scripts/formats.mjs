@@ -9,6 +9,11 @@ const ACCEPTED_MENU_MUSIC_PAYLOAD_BYTES = 14314;
 const RUNTIME_HEADROOM_PAYLOAD_LIMIT = 1536;
 const ACCEPTED_RUNTIME_HEADROOM_PAYLOAD_BYTES = 15759;
 const ENTITY_EFFECTS_FOUNDATION_PAYLOAD_BUDGET = 1024;
+const ENTITY_CODE_FOUNDATION_BYTES = 564;
+const DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT = 16384;
+const DEBRIS_VISUAL_POLISH_CODE_BUDGET = 512;
+const DEBRIS_VISUAL_POLISH_GLYPH_COUNT = 8;
+const DEBRIS_VISUAL_POLISH_NEW_GLYPHS = 7;
 
 function invariant(condition, message) {
   if (!condition) {
@@ -151,10 +156,28 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.stateBytes === 0x0100 &&
     manifest.entityEffects.initializedBytes === 0x0100,
   "Entity/effects BSS must be exactly and explicitly initialised at $8000-$80FF");
+  invariant(manifest.entityEffects.interactiveSlots === 4 &&
+    manifest.entityEffects.interactiveActiveLimit === 1 &&
+    manifest.entityEffects.effectSlots === 6 &&
+    manifest.entityEffects.effectActiveLimit === 0,
+  "Entity/effects release pool limits differ from the reviewed contract");
   invariant(manifest.entityEffects?.codeRunAddress === 0x9100 &&
     manifest.entityEffects.codeBytes > 0 &&
     manifest.entityEffects.codeBytes <= manifest.entityEffects.codeReservedBytes,
   "ENTITY_CODE exceeds its $9100-$9FFF runtime reservation");
+  invariant(manifest.entityEffects.codeBytes <=
+    ENTITY_CODE_FOUNDATION_BYTES + DEBRIS_VISUAL_POLISH_CODE_BUDGET &&
+    manifest.entityEffects.codeBudget?.baselineBytes === ENTITY_CODE_FOUNDATION_BYTES &&
+    manifest.entityEffects.codeBudget?.approvedDeltaBytes === DEBRIS_VISUAL_POLISH_CODE_BUDGET,
+  "Debris visual polish exceeds its +512 B ENTITY_CODE budget");
+  invariant(manifest.entityEffects.glyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
+    manifest.entityEffects.newGlyphsFromFoundation === DEBRIS_VISUAL_POLISH_NEW_GLYPHS,
+  "Debris visual polish must use eight glyphs, exactly seven new from foundation");
+  invariant(manifest.payloadBytes <= DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
+    manifest.bootSectors <= 128 &&
+    manifest.payloadBudget?.debrisVisualPolish?.limitBytes ===
+      DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT,
+  "Debris visual polish exceeds the owner-approved 16384-byte / 128-sector boot limit");
   invariant(boot.length === 0x2000 + manifest.broadsideRuntime.packedBytes +
     manifest.starfieldRuntime.packedBytes + manifest.a2Kernel.bytes +
     manifest.entityEffects.packedBytes,

@@ -33,6 +33,10 @@ import {
   stepStarfieldWorld,
 } from "./starfield.mjs";
 import {
+  compileEntityEffects,
+  loadEntityEffectsDefinition,
+} from "./entity-effects.mjs";
+import {
   beginEnemyDamageFrame,
   createEnemyCombatState,
   createEnemyDamageState,
@@ -312,6 +316,18 @@ export const DEFAULT_SHARED_FIGHTER_EXPLOSION_TRACE_PATH = path.join(
   "previews",
   "shared-fighter-explosion-trace.csv",
 );
+export const DEFAULT_DEBRIS_REVIEW_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "debris-visual-polish-review.png",
+);
+export const DEFAULT_DEBRIS_REVIEW_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "debris-visual-polish-trace.csv",
+);
 const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   rootDirectory,
   "assets",
@@ -335,6 +351,12 @@ const DEFAULT_STARFIELD_DEFINITION_PATH = path.join(
   "assets",
   "graphics",
   "starfield.json",
+);
+const DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH = path.join(
+  rootDirectory,
+  "assets",
+  "graphics",
+  "entity-effects.json",
 );
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -3257,6 +3279,328 @@ export function createSharedFighterExplosionPreview(
   );
 }
 
+function simulateDebrisTrajectory(asset, trajectoryId, {
+  variant = 0,
+  initialPhase = 0,
+  startColumn = 20,
+  initialRingHead = 20,
+} = {}) {
+  const trajectory = asset.debrisMotion.trajectories.find(({ id }) => id === trajectoryId);
+  if (!trajectory) throw new Error(`Unknown debris trajectory ${trajectoryId}`);
+  const states = [];
+  let column = startColumn;
+  let phase = initialPhase;
+  let horizontalAccumulator = 0;
+  let verticalAccumulator = asset.archetypes[0].lifetime;
+  let nearAccumulator = 0;
+  let ringHead = initialRingHead;
+  let yScanline = asset.coordinateSystem.gameplayTopScanline;
+  let event = 0;
+  const append = (active) => {
+    const logicalRow = Math.floor(
+      (yScanline - asset.coordinateSystem.gameplayTopScanline) / 8,
+    );
+    const physicalRow = (ringHead + logicalRow) % asset.coordinateSystem.logicalRows;
+    states.push({
+      event,
+      active,
+      worldRowAdvanced: event > 0,
+      nearRowAdvanced: event > 0 && nearAccumulator === 0,
+      variant,
+      phase,
+      trajectory: trajectoryId,
+      vxSignedHpos: trajectory.vxSignedHpos,
+      xHpos: 48 + column * 4,
+      column,
+      yScanline,
+      logicalRow,
+      ringHead,
+      physicalAddress: 0x4050 + physicalRow * 40 + column,
+      horizontalAccumulator,
+      verticalAccumulator,
+    });
+  };
+  append(true);
+  while (states.at(-1).active) {
+    event += 1;
+    nearAccumulator += 1;
+    if (nearAccumulator >= 2) {
+      nearAccumulator -= 2;
+      ringHead = (ringHead + 1) % asset.coordinateSystem.logicalRows;
+    }
+    verticalAccumulator += asset.debrisMotion.verticalStepNumerator;
+    if (verticalAccumulator >= asset.debrisMotion.verticalStepDenominator) {
+      verticalAccumulator -= asset.debrisMotion.verticalStepDenominator;
+      yScanline += asset.archetypes[0].initialVy;
+      if (yScanline >= asset.coordinateSystem.gameplayBottomExclusive) {
+        append(false);
+        break;
+      }
+    }
+    phase ^= 1;
+    if (trajectory.vxSignedHpos !== 0) {
+      horizontalAccumulator += 1;
+      if (horizontalAccumulator === asset.debrisMotion.horizontalStepWorldRows) {
+        horizontalAccumulator = 0;
+        column += Math.sign(trajectory.vxSignedHpos);
+      }
+    }
+    append(true);
+  }
+  return states;
+}
+
+function fillRgb(rgb, color) {
+  for (let offset = 0; offset < rgb.length; offset += 3) {
+    rgb[offset] = color[0];
+    rgb[offset + 1] = color[1];
+    rgb[offset + 2] = color[2];
+  }
+}
+
+function fillRgbRect(rgb, width, height, x, y, boxWidth, boxHeight, color) {
+  for (let row = Math.max(0, y); row < Math.min(height, y + boxHeight); row += 1) {
+    for (let column = Math.max(0, x); column < Math.min(width, x + boxWidth); column += 1) {
+      const offset = (row * width + column) * 3;
+      rgb[offset] = color[0];
+      rgb[offset + 1] = color[1];
+      rgb[offset + 2] = color[2];
+    }
+  }
+}
+
+function strokeRgbRect(rgb, width, height, x, y, boxWidth, boxHeight, color) {
+  fillRgbRect(rgb, width, height, x, y, boxWidth, 1, color);
+  fillRgbRect(rgb, width, height, x, y + boxHeight - 1, boxWidth, 1, color);
+  fillRgbRect(rgb, width, height, x, y, 1, boxHeight, color);
+  fillRgbRect(rgb, width, height, x + boxWidth - 1, y, 1, boxHeight, color);
+}
+
+function drawDebrisGlyphRgb(rgb, width, height, glyph, x, y, scaleX, scaleY) {
+  const palette = [0x00, 0x0e, 0x84, 0x1e].map(atariPalRegisterToRgb);
+  for (let row = 0; row < 8; row += 1) {
+    for (let pixel = 0; pixel < 4; pixel += 1) {
+      const value = glyph[row] >> (6 - pixel * 2) & 3;
+      if (value === 0) continue;
+      fillRgbRect(rgb, width, height, x + pixel * scaleX, y + row * scaleY,
+        scaleX, scaleY, palette[value]);
+    }
+  }
+}
+
+function drawDebrisPhaseRgb(rgb, width, height, glyphs, x, y, scaleX, scaleY) {
+  glyphs.forEach((glyph, cell) => {
+    drawDebrisGlyphRgb(rgb, width, height, glyph, x + cell * 4 * scaleX, y, scaleX, scaleY);
+  });
+}
+
+const PREVIOUS_DEBRIS_REVIEW_VARIANTS = [
+  [
+    [[8, 46, 191, 251, 191, 46, 8, 0], [0, 128, 224, 254, 235, 184, 32, 8]],
+    [[0, 128, 224, 254, 235, 184, 32, 8], [8, 46, 191, 251, 191, 46, 8, 0]],
+  ],
+  [
+    [[8, 42, 136, 251, 191, 46, 8, 0], [0, 128, 224, 254, 235, 184, 32, 8]],
+    [[0, 128, 224, 254, 235, 184, 32, 8], [8, 42, 136, 251, 191, 46, 8, 0]],
+  ],
+];
+
+export function createDebrisReviewTrace(
+  definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const asset = compileEntityEffects(definition);
+  const rows = [[
+    "scenario", "event", "world_row_advanced", "near_row_advanced", "active", "variant", "phase",
+    "trajectory", "vx_signed_hpos", "move_accumulator", "vertical_accumulator",
+    "x_hpos", "y_scanline",
+    "logical_row", "ring_head", "left_physical_address", "right_physical_address",
+    "left_backing_before", "right_backing_before", "left_glyph_offset", "right_glyph_offset",
+    "left_backing_after_erase", "right_backing_after_erase",
+    "contact", "hull_before", "hull_after",
+  ].join(",")];
+  for (const [index, trajectory] of asset.debrisMotion.trajectories.entries()) {
+    for (const state of simulateDebrisTrajectory(asset, trajectory.id, {
+      variant: index & 1,
+      initialPhase: index >> 1,
+    })) {
+      rows.push([
+        `FULL_PASS_${trajectory.id.toUpperCase()}`,
+        state.event,
+        Number(state.worldRowAdvanced),
+        Number(state.nearRowAdvanced),
+        Number(state.active),
+        state.variant,
+        state.phase,
+        state.trajectory,
+        state.vxSignedHpos,
+        state.horizontalAccumulator,
+        state.verticalAccumulator,
+        state.xHpos,
+        state.yScanline,
+        state.logicalRow,
+        state.ringHead,
+        `$${state.physicalAddress.toString(16).toUpperCase()}`,
+        `$${(state.physicalAddress + 1).toString(16).toUpperCase()}`,
+        "$91",
+        "$92",
+        state.variant * 4 + state.phase * 2,
+        state.variant * 4 + state.phase * 2 + 1,
+        "$91",
+        "$92",
+        "NONE",
+        10,
+        10,
+      ].join(","));
+    }
+  }
+  for (const [contact, hullAfter, active] of [
+    ["DAMAGE_ACCEPTED", 9, 0], ["INVULNERABLE", 10, 1],
+  ]) {
+    rows.push([
+      "PLAYER_CONTACT", 0, 0, 0, active, 0, 0, "straight", 0, 0, 0, 124, 184,
+      20, 0, "$4383", "$4384", "$66", "$67", 0, 1, "$66", "$67",
+      contact, 10, hullAfter,
+    ].join(","));
+  }
+  return `${rows.join("\n")}\n`;
+}
+
+export function createDebrisReviewPreview(
+  source,
+  definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const asset = compileEntityEffects(definition);
+  const starfield = compileStarfield(loadStarfieldDefinition(DEFAULT_STARFIELD_DEFINITION_PATH));
+  const frontend = readFrontendGraphicsSource(source);
+  const width = 1280;
+  const height = 880;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const steel = atariPalRegisterToRgb(0x84);
+  const gold = atariPalRegisterToRgb(0x1e);
+  const white = atariPalRegisterToRgb(0x0e);
+  const red = atariPalRegisterToRgb(0x46);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "DEBRIS OWNER RETEST  PREVIOUS VERSUS LARGER", 24, 18, frontend, white);
+  drawRgbLabel(rgb, width, "SAME 2X1 RENDERER  SAME GLYPHS  SAME HITBOX", 24, 34,
+    frontend, steel);
+
+  const phaseLabels = ["ARMOUR SHARD P0", "ARMOUR SHARD P1",
+    "TRUSS FRAGMENT P0", "TRUSS FRAGMENT P1"];
+  fillRgbRect(rgb, width, height, 34, 52, 1212, 112, panel);
+  strokeRgbRect(rgb, width, height, 34, 52, 1212, 112, steel);
+  drawRgbLabel(rgb, width, "NATIVE 1X", 48, 62, frontend, gold);
+  const nearStar = [starfield.nearLayer.glyphs.find(({ id }) => id === "SPARKLE").bytes];
+  drawRgbLabel(rgb, width, "MAX NEAR STAR", 62, 100, frontend, white);
+  drawDebrisPhaseRgb(rgb, width, height, nearStar, 180, 98, 2, 1);
+  for (let phaseIndex = 0; phaseIndex < phaseLabels.length; phaseIndex += 1) {
+    const x = 278 + phaseIndex * 230;
+    const variant = phaseIndex >> 1;
+    const phase = phaseIndex & 1;
+    drawRgbLabel(rgb, width, phaseLabels[phaseIndex], x, 62, frontend,
+      variant === 0 ? gold : steel);
+    drawRgbLabel(rgb, width, "OLD", x, 88, frontend, white);
+    drawDebrisPhaseRgb(rgb, width, height,
+      PREVIOUS_DEBRIS_REVIEW_VARIANTS[variant][phase], x + 52, 86, 2, 1);
+    drawRgbLabel(rgb, width, "NEW", x, 124, frontend, gold);
+    drawDebrisPhaseRgb(rgb, width, height,
+      asset.debrisVisuals.variants[variant].phases[phase], x + 52, 122, 2, 1);
+  }
+
+  drawRgbLabel(rgb, width, "ENLARGED OLD AND NEW", 48, 178, frontend, gold);
+  strokeRgbRect(rgb, width, height, 34, 194, 226, 86, steel);
+  drawRgbLabel(rgb, width, "MAX NEAR STAR", 46, 202, frontend, white);
+  drawDebrisPhaseRgb(rgb, width, height, nearStar, 114, 216, 8, 6);
+  drawRgbLabel(rgb, width, "REFERENCE", 92, 266, frontend, steel);
+  for (let phaseIndex = 0; phaseIndex < 4; phaseIndex += 1) {
+    const x = 276 + phaseIndex * 242;
+    const variant = phaseIndex >> 1;
+    const phase = phaseIndex & 1;
+    strokeRgbRect(rgb, width, height, x, 194, 226, 86, steel);
+    drawRgbLabel(rgb, width, phaseLabels[phaseIndex], x + 12, 202, frontend,
+      variant === 0 ? gold : steel);
+    drawDebrisPhaseRgb(rgb, width, height,
+      PREVIOUS_DEBRIS_REVIEW_VARIANTS[variant][phase], x + 8, 216, 8, 6);
+    drawDebrisPhaseRgb(rgb, width, height,
+      asset.debrisVisuals.variants[variant].phases[phase], x + 132, 216, 8, 6);
+    drawRgbLabel(rgb, width, "OLD", x + 18, 266, frontend, white);
+    drawRgbLabel(rgb, width, "NEW", x + 142, 266, frontend, gold);
+  }
+
+  const trajectoryLabels = ["STRAIGHT", "SLIGHT LEFT", "SLIGHT RIGHT"];
+  for (let trajectoryIndex = 0; trajectoryIndex < 3; trajectoryIndex += 1) {
+    const panelX = 34 + trajectoryIndex * 414;
+    const panelY = 300;
+    const panelWidth = 380;
+    const panelHeight = 334;
+    fillRgbRect(rgb, width, height, panelX, panelY, panelWidth, panelHeight, panel);
+    strokeRgbRect(rgb, width, height, panelX, panelY, panelWidth, panelHeight, steel);
+    drawRgbLabel(rgb, width, trajectoryLabels[trajectoryIndex], panelX + 12, panelY + 12,
+      frontend, white);
+    drawRgbLabel(rgb, width, "SPAWN Y24", panelX + 250, panelY + 12, frontend, gold);
+    const corridorX = panelX + 78;
+    const pathTop = panelY + 42;
+    const columnWidth = 10;
+    const rowHeight = 12;
+    strokeRgbRect(rgb, width, height, corridorX, pathTop,
+      22 * columnWidth + 1, 22 * rowHeight + 1, steel);
+    const states = simulateDebrisTrajectory(asset,
+      asset.debrisMotion.trajectories[trajectoryIndex].id, {
+        variant: trajectoryIndex & 1,
+        initialPhase: trajectoryIndex >> 1,
+      });
+    const visibleRows = new Map();
+    for (const state of states.filter(({ active }) => active)) {
+      visibleRows.set(state.logicalRow, state);
+    }
+    for (const state of visibleRows.values()) {
+      drawDebrisPhaseRgb(rgb, width, height,
+        asset.debrisVisuals.variants[state.variant].phases[state.phase],
+        corridorX + (state.column - 9) * columnWidth + 1,
+        pathTop + state.logicalRow * rowHeight + 2, 2, 1);
+    }
+    const finalState = states.at(-2);
+    drawRgbLabel(rgb, width,
+      `X ${states[0].xHpos} TO ${finalState.xHpos}`, panelX + 12, panelY + 306,
+      frontend, gold);
+    drawRgbLabel(rgb, width, "DESPAWN Y200", panelX + 240, panelY + 306, frontend, white);
+  }
+
+  fillRgbRect(rgb, width, height, 34, 658, 590, 196, panel);
+  strokeRgbRect(rgb, width, height, 34, 658, 590, 196, steel);
+  drawRgbLabel(rgb, width, "PLAYER CONTACT AND SHARED DAMAGE GATE", 48, 672, frontend, white);
+  drawRgbLabel(rgb, width, "VULNERABLE  HULL 100 TO 090  DEBRIS REMOVED", 48, 700,
+    frontend, gold);
+  drawDebrisPhaseRgb(rgb, width, height,
+    asset.debrisVisuals.variants[0].phases[0], 54, 724, 6, 4);
+  fillRgbRect(rgb, width, height, 130, 724, 48, 32, white);
+  fillRgbRect(rgb, width, height, 144, 716, 20, 48, white);
+  fillRgbRect(rgb, width, height, 210, 736, 72, 3, gold);
+  drawRgbLabel(rgb, width, "DAMAGE 1", 294, 728, frontend, gold);
+  drawRgbLabel(rgb, width, "INVULNERABLE  HULL 100  DEBRIS REMAINS", 48, 792,
+    frontend, steel);
+  drawDebrisPhaseRgb(rgb, width, height,
+    asset.debrisVisuals.variants[0].phases[1], 474, 780, 6, 4);
+
+  fillRgbRect(rgb, width, height, 656, 658, 590, 196, panel);
+  strokeRgbRect(rgb, width, height, 656, 658, 590, 196, steel);
+  drawRgbLabel(rgb, width, "A2 RING WRAP AND BYTE-EXACT BACKING", 670, 672, frontend, white);
+  for (const [index, head] of [20, 21, 0, 1].entries()) {
+    const x = 680 + index * 138;
+    strokeRgbRect(rgb, width, height, x, 706, 118, 82, index === 2 ? gold : steel);
+    drawRgbLabel(rgb, width, `HEAD ${head.toString().padStart(2, "0")}`,
+      x + 14, 716, frontend, index === 2 ? gold : white);
+    drawDebrisPhaseRgb(rgb, width, height,
+      asset.debrisVisuals.variants[index >> 1].phases[index & 1], x + 18, 736, 8, 4);
+  }
+  drawRgbLabel(rgb, width, "LOWER 91  ENTITY  RESTORE 91  NO GHOST", 670, 810,
+    frontend, red);
+  drawRgbLabel(rgb, width, "FULL 22-ROW PASSES AND ALL WRAPS IN CSV TRACE", 670, 828,
+    frontend, steel);
+  return encodePng(rgb, width, height);
+}
+
 export function readProjectileVisualLanguageRuntimeState(
   source,
   capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
@@ -4632,6 +4976,30 @@ function writeEnemyReviewPreview(outputPath, png) {
   return { outputPath, bytes: png.length, ...inspectPng(png) };
 }
 
+export function generateDebrisReviewPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DEBRIS_REVIEW_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createDebrisReviewPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadEntityEffectsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateDebrisReviewTrace({
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DEBRIS_REVIEW_TRACE_PATH,
+} = {}) {
+  const trace = createDebrisReviewTrace(loadEntityEffectsDefinition(definitionPath));
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateEnemyReferenceInventoryPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   outputPath = DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH,
@@ -5016,6 +5384,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Shared fighter-explosion trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, sharedExplosionTrace.outputPath)}`);
     console.log(`  rows: ${sharedExplosionTrace.rows}, ${sharedExplosionTrace.bytes} bytes`);
+
+    const debrisReviewResult = generateDebrisReviewPreview();
+    console.log(`Debris visual-polish owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, debrisReviewResult.outputPath)}`);
+    console.log(
+      `  size: ${debrisReviewResult.width}x${debrisReviewResult.height}, ${debrisReviewResult.bytes} bytes`,
+    );
+    const debrisReviewTrace = generateDebrisReviewTrace();
+    console.log(`Debris visual-polish trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, debrisReviewTrace.outputPath)}`);
+    console.log(`  rows: ${debrisReviewTrace.rows}, ${debrisReviewTrace.bytes} bytes`);
 
     const startMenuResult = generateStartMenuPreview();
     console.log(`Start-menu preview generated successfully`);

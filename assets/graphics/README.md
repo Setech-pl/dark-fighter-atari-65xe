@@ -126,7 +126,13 @@ ramkę.
 `build/previews/difficulty-speed-comparison.png` pokazuje z jednego źródła
 8/9/10 zdarzeń zarówno world, jak i hull scrolla w 20 ramkach, przy identycznym
 warning timerze i ruchu pocisku. Osobny preview starfieldu zachowuje względem
-tej bazowej prędkości dokładnie 7/10 dla bliskich oraz 7/20 dla dalekich gwiazd.
+tej bazowej prędkości dokładnie 1/2 dla bliskich oraz 1/4 dla dalekich gwiazd.
+`build/previews/debris-visual-polish-review.png` zestawia poprzedni i większy
+obrys obu faz armour-shard oraz truss-fragment w skali natywnej obok największej
+near star i w powiększeniu, a dalej pokazuje pełne tory
+straight/slight-left/slight-right. Towarzyszący
+`debris-visual-polish-trace.csv` zapisuje obie komórki, backing, A2 ring head,
+fazę, akumulatory, kontakt i pełny spawn-to-despawn pass.
 `build/previews/flagship-sector-sequence.png` pokazuje source-derived ENGINES,
 AFT, COMBAT, FORWARD, PROW, terminal tips, DRAIN i COMPLETE z jednego 240-wierszowego
 modelu. `build/previews/heavy-shell-detail-sequence.png` pokazuje końcowy hot

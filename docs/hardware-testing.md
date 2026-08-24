@@ -96,8 +96,14 @@
   FIRE działa normalnie;
 - tytuł oraz gwiazdy są stabilne;
 - w gameplayu widać rzadką warstwę jasnych near stars i liczniejszą,
-  stalowo-niebieską warstwę far; w długim oknie near wykonuje dokładnie 70%,
-  a far 35% kroków kadłubów na każdej trudności;
+  stalowo-niebieską warstwę far; w długim oknie near wykonuje dokładnie 50%,
+  a far 25% kroków kadłubów na każdej trudności;
+- neutralny debris zajmuje dwa sąsiednie znaki (16×8 pikseli), obie fazy
+  armour-shard i truss-fragment są czytelne oraz różne od największych gwiazd,
+  a ruch pionowy wykonuje dokładnie 60% kroków świata;
+- podczas `DRAIN/COMPLETE` nie pojawia się nowy debris; po pełnych 22 krokach
+  rekonstrukcji i normalnym opóźnieniu `OPEN` spawn wraca bez pierwszoklatkowego
+  obiektu ani resetu pozostałych systemów;
 - najwyżej pojedynczy far star subtelnie zmienia fazę co 16 ramek; nie ma
   pełnoekranowego flashu, regularnych siatek ani wzorów podobnych do pocisków;
 - pociski Vipera i Raidera oraz capital slug chwilowo zakrywają gwiazdy, po

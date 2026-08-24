@@ -36,10 +36,10 @@ export function compileStarfield(definition) {
   const near = definition.nearLayer;
   invariant(Number.isInteger(far?.population) && far.population >= 18 && far.population <= 30,
     "Far population must remain in the sparse visual range 18-30");
-  invariant(far.rateNumerator === 7 && far.rateDenominator === 20,
-    "Far layer must preserve the exact 35% hull-speed ratio");
-  invariant(near?.rateNumerator === 7 && near.rateDenominator === 10,
-    "Near layer must preserve the exact 70% hull-speed ratio");
+  invariant(far.rateNumerator === 1 && far.rateDenominator === 4,
+    "Far layer must preserve the exact 25% hull-speed ratio");
+  invariant(near?.rateNumerator === 1 && near.rateDenominator === 2,
+    "Near layer must preserve the exact 50% hull-speed ratio");
   invariant(Number.isInteger(near.densityDenominator) && near.densityDenominator > 0 &&
     (near.densityDenominator & (near.densityDenominator - 1)) === 0,
   "Near density denominator must be a positive power of two");

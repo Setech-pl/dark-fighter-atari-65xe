@@ -170,7 +170,7 @@ GAMEPLAY_RESIDENT_END       = ENEMY_PENDING_SOURCE+$01
 
 ; Sparse far stars are decorative overlays above the authoritative near-layer
 ; cells.  Their row is logical and their column physical within that row, so a
-; 70%-rate LMS rotation cannot accidentally drag the independent 35%-rate
+; 50%-rate LMS rotation cannot accidentally drag the independent 25%-rate
 ; layer.  The existing four byte arrays keep the state footprint unchanged.
 STAR_FAR_ACTIVE              = $54CA
 STAR_FAR_ROW                 = STAR_FAR_ACTIVE+STAR_FAR_CAPACITY
@@ -478,7 +478,9 @@ ENTITY_CORRIDOR_END_COLUMN = CORRIDOR_CENTRAL_END-1
 ENTITY_CORRIDOR_COLUMNS = ENTITY_CORRIDOR_END_COLUMN-ENTITY_CORRIDOR_FIRST_COLUMN
 ENTITY_CORRIDOR_LEFT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_CORRIDOR_FIRST_COLUMN*4
 ENTITY_CORRIDOR_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_CORRIDOR_END_COLUMN*4
-ENTITY_DEBRIS_GLYPH = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
+ENTITY_SAFE_SPAWN_LEFT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_FIRST_COLUMN*4
+ENTITY_SAFE_SPAWN_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_END_COLUMN*4
+ENTITY_DEBRIS_GLYPH_BASE = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
 .assert CAPITAL_HULL_TURRET_COUNT = 2, error, "tracked muzzle records require exactly one turret per side"
@@ -495,10 +497,21 @@ ENTITY_DEBRIS_GLYPH = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
 .assert ENTITY_CORRIDOR_RIGHT_HPOS = CORRIDOR_RIGHT_HPOS-4, error, "entity corridor must exclude the Cylon boundary column"
 .assert ENTITY_CORRIDOR_COLUMNS = CORRIDOR_CENTRAL_END-CORRIDOR_CENTRAL_FIRST-2, error, "entity spawn columns must derive from the central corridor"
 .assert ENTITY_CORRIDOR_COLUMNS = 22, error, "debris RNG reduction assumes 22 interior corridor columns"
+.assert ENTITY_CORRIDOR_FIRST_COLUMN = ENTITY_CORRIDOR_SOURCE_FIRST_COLUMN, error, "entity source corridor left edge diverged"
+.assert ENTITY_CORRIDOR_END_COLUMN = ENTITY_CORRIDOR_SOURCE_END_COLUMN, error, "entity source corridor right edge diverged"
+.assert ENTITY_SAFE_SPAWN_COLUMNS = 3, error, "two-cell debris RNG reduction assumes three safe spawn columns"
+.assert ENTITY_SAFE_SPAWN_LEFT_HPOS-ENTITY_MAX_HORIZONTAL_STEPS*4 = ENTITY_CORRIDOR_LEFT_HPOS, error, "slight-left path exits the inner corridor"
+.assert ENTITY_SAFE_SPAWN_RIGHT_HPOS+ENTITY_MAX_HORIZONTAL_STEPS*4+(ENTITY_DEBRIS_GLYPHS_PER_PHASE-1)*4 = ENTITY_CORRIDOR_RIGHT_HPOS, error, "two-cell slight-right path exits the inner corridor"
+.assert ENTITY_VERTICAL_STEP_NUMERATOR = 3, error, "debris vertical cadence numerator changed"
+.assert ENTITY_VERTICAL_STEP_DENOMINATOR = 5, error, "debris vertical cadence denominator changed"
 .assert ENTITY_GAMEPLAY_TOP = GAMEPLAY_TOP+8, error, "entity gameplay must begin below the fixed divider"
 .assert ENTITY_GAMEPLAY_BOTTOM = GAMEPLAY_BOTTOM, error, "entity gameplay bottom must match the visible viewport"
 .assert ENTITY_LOGICAL_ROWS = PLAYFIELD_RING_ROWS, error, "entities must address exactly the 22 rotating rows"
-.assert ENTITY_DEBRIS_GLYPH < 128, error, "debris glyph exceeds the ANTIC 4 charset"
+.assert ENTITY_DEBRIS_VARIANT_COUNT = 2, error, "debris must retain two visual variants"
+.assert ENTITY_DEBRIS_PHASE_COUNT = 2, error, "debris must retain two tumbling phases"
+.assert ENTITY_DEBRIS_GLYPHS_PER_PHASE = 2, error, "debris renderer must remain exactly 2x1"
+.assert ENTITY_DEBRIS_GLYPH_COUNT = 8, error, "debris must use exactly eight glyphs"
+.assert ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT <= 128, error, "debris glyphs exceed the ANTIC 4 charset"
 .assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
 .assert HUD_BOTTOM = GAMEPLAY_TOP, error, "gameplay must begin immediately below the HUD"
 .assert GAMEPLAY_BOTTOM-GAMEPLAY_TOP = CAPITAL_HULL_VISIBLE_ROWS*8, error, "gameplay viewport height changed"
@@ -1802,6 +1815,7 @@ start_gameplay:
     jmp main_loop              ; BROADSIDE is non-contiguous: never fall through
 
 start_gameplay_end:
+
 .segment "BROADSIDE"
 
 main_loop:
@@ -4350,8 +4364,10 @@ update_starfield:
 
 ; The legacy world clock is now the 100% hull reference. Near and far layers
 ; use independent exact fixed-point ratios against each hull/world event:
-; 7/10 (70%) and 7/20 (35%). Both remain bounded to at most one row per event.
+; 1/2 (50%) and 1/4 (25%). Both remain bounded to at most one row per event.
 advance_starfield_layers:
+    lda #ENTITY_EVENT_WORLD_ROW_ADVANCED
+    sta ENTITY_FRAME_EVENTS
     lda #$00
     sta STAR_GENERATION_FLAGS
     lda STAR_NEAR_PHASE
@@ -4399,7 +4415,8 @@ advance_starfield_layers:
 @done:
     rts
 
-; A near/world step is always coincident with the 100%-rate hull clock. Keep
+; A near/ring step is selected from, and always coincident with, the 100%-rate
+; hull/world clock. Keep
 ; logical row zero at the fixed divider LMS, rotate the 22 rows below it, copy
 ; the prior divider into logical row one, then regenerate logical row zero.
 ; Hull generation follows; hull-only events retain their side-band copy path.
@@ -4407,6 +4424,11 @@ scroll_world_columns:
     lda #$01
     sta PLAYFIELD_RING_FLAGS
     jsr rotate_playfield_rows
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_COMPLETE
+    bne :+
+    jsr entity_complete_scroll_tick
+:
 
     ldx #(CAPITAL_HULL_VISIBLE_ROWS-1)
 @shift_boundaries:
@@ -4549,8 +4571,6 @@ rotate_playfield_table_shift_end:
     pla
     sta PLAYFIELD_NEXT_DLIST_LO
     inc PLAYFIELD_PREBUILD_PENDING
-    lda #ENTITY_EVENT_WORLD_ROW_ADVANCED
-    sta ENTITY_FRAME_EVENTS
     rts
 
 ; Scalar state is reset before the initial near rows are generated. Sparse far
@@ -4586,7 +4606,7 @@ build_star_glyphs:
 
 ; Initial setup distributes exactly 24 logical far stars over the 23 gameplay
 ; rows. Cells already occupied by a near star remain logically present but are
-; not drawn until their next 35%-rate step reaches clear background.
+; not drawn until their next 25%-rate step reaches clear background.
 init_far_star_population:
     ldx #$00
 @slot:
@@ -4642,7 +4662,7 @@ choose_star_column:
     jsr star_random_byte
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_COMPLETE
-    bne @corridor
+    bcc @corridor
     lda STAR_RNG_STATE
     and #$3F
     cmp #40
@@ -4670,7 +4690,7 @@ choose_far_star_column:
     jsr star_random_byte
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_COMPLETE
-    bne @corridor
+    bcc @corridor
     lda STAR_RNG_STATE
     and #$3F
     cmp #40
@@ -5157,7 +5177,8 @@ EMIT_GAMEPLAY_MUSIC_DATA
 scroll_hull_columns:
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_COMPLETE
-    bne :+
+    bcc :+
+scroll_hull_complete_done:
     lda #$00
     sta PLAYFIELD_RING_FLAGS
     rts
@@ -5170,25 +5191,19 @@ scroll_hull_columns_copy:
     ; The fixed divider is logical source row zero. Table indices 0..21 map
     ; logical rows 1..22, so the descending copy needs no general mapper calls.
     ldx #(PLAYFIELD_RING_ROWS-1)
-@copy_hull_row:
+scroll_hull_copy_row:
     stx row_counter
     lda PLAYFIELD_ROW_LO,x
     sta dst_ptr
     lda PLAYFIELD_ROW_HI,x
     sta dst_ptr+1
     dex
-    bmi @divider_source
+    bmi scroll_hull_divider_source
     lda PLAYFIELD_ROW_LO,x
     sta src_ptr
     lda PLAYFIELD_ROW_HI,x
     sta src_ptr+1
-    bpl @copy_bands
-@divider_source:
-    lda #<GAMEPLAY_DIVIDER_SCREEN
-    sta src_ptr
-    lda #>GAMEPLAY_DIVIDER_SCREEN
-    sta src_ptr+1
-@copy_bands:
+scroll_hull_copy_source_ready:
     ldx row_counter
     ldy #(CORRIDOR_ALLIED_COLUMNS-1)
 @copy_allied:
@@ -5211,7 +5226,7 @@ scroll_hull_columns_copy:
     bne @copy_enemy
 
     dex
-    bpl @copy_hull_row
+    bpl scroll_hull_copy_row
 
 scroll_hull_columns_advance_scene:
     jsr advance_tracked_muzzles
@@ -5243,6 +5258,13 @@ scroll_hull_columns_advance_scene:
     lda #$00
     sta PLAYFIELD_RING_FLAGS
     rts
+
+scroll_hull_divider_source:
+    lda #<GAMEPLAY_DIVIDER_SCREEN
+    sta src_ptr
+    lda #>GAMEPLAY_DIVIDER_SCREEN
+    sta src_ptr+1
+    jmp scroll_hull_copy_source_ready
 
 clear_top_hull_row:
     lda #CH_SPACE
@@ -5328,25 +5350,23 @@ advance_tracked_muzzles:
     bcs @deactivate
     lda PLAYFIELD_RING_FLAGS
     bne @next                    ; the retained physical row moved through LMS
-    stx BROAD_WORK_SLOT
-    lda MUZZLE_VISIBLE_ROW,x
-    jsr set_gameplay_row_ptr
-    ldx BROAD_WORK_SLOT
-    lda dst_ptr
-    cpx #$00
-    bne :+
     clc
-    adc #CORRIDOR_CENTRAL_FIRST
-    jmp @store_pointer
-:
-    clc
-    adc #(CORRIDOR_CENTRAL_END-1)
-@store_pointer:
+    lda MUZZLE_SCREEN_LO,x
+    adc #40
     sta MUZZLE_SCREEN_LO,x
-    lda dst_ptr+1
+    lda MUZZLE_SCREEN_HI,x
     adc #$00
     sta MUZZLE_SCREEN_HI,x
-    jmp @next
+    cmp #>GAMEPLAY_SCREEN_END
+    bcc @next
+    lda MUZZLE_SCREEN_LO,x
+    cmp #<GAMEPLAY_SCREEN_END
+    bcc @next
+    sbc #<(PLAYFIELD_RING_ROWS*40)
+    sta MUZZLE_SCREEN_LO,x
+    lda #>GAMEPLAY_RING_SCREEN
+    sta MUZZLE_SCREEN_HI,x
+    bne @next
 @deactivate:
     lda #$00
     sta MUZZLE_VISIBLE_ROW,x
@@ -5456,13 +5476,13 @@ generate_starfield_row:
     ldy #$00
     ldx CAPITAL_SECTOR_STATE
     cpx #CAPITAL_HULL_STATE_COMPLETE
-    beq @clear_central
+    bcs @clear_central
     ldy #CORRIDOR_CENTRAL_FIRST
 @clear_central:
     sta (dst_ptr),y
     iny
     cpx #CAPITAL_HULL_STATE_COMPLETE
-    beq @full_limit
+    bcs @full_limit
     cpy #CORRIDOR_CENTRAL_END
     bne @clear_central
     jmp generate_near_star_row
@@ -6938,8 +6958,7 @@ update_sector_completion:
     lda FIGHTER_EXPLOSION_TIMER
     ora FIGHTER_EXPLOSION_TIMER+1
     bne @done
-    lda #CAPITAL_HULL_STATE_COMPLETE
-    sta CAPITAL_SECTOR_STATE
+    jsr entity_begin_sector_complete
     ; Fighter fire remains ordinary gameplay state in ACTIVE, DRAIN and
     ; COMPLETE. Collision, expiry, death/respawn, and actual gameplay teardown
     ; own projectile release; a sector phase cannot reset the burst controller.
@@ -7993,13 +8012,15 @@ erase_interactive_entity_overlays:
     ; three reserved physical slots on the visible-frame path.
     .assert ENTITY_ACTIVE_LIMIT = 1, error, "slot-zero erase requires active limit one"
     lda ENTITY_DRAWN_MASK
-    and #$01
     beq @clear_slot
     lda ENTITY_SCREEN_LO
     sta dst_ptr
     lda ENTITY_SCREEN_HI
     sta dst_ptr+1
-    ldy #$00
+    ldy #$01
+    lda ENTITY_BACKING1
+    sta (dst_ptr),y
+    dey
     lda ENTITY_BACKING0
     sta (dst_ptr),y
 @clear_slot:
@@ -8009,21 +8030,22 @@ erase_interactive_entity_overlays:
     sta ENTITY_RENDERED_MASK
     rts
 
-; Snapshot and clear the one-frame A2 event before the fast empty test. A
+; The only entity event bit is consumed in place on the active path. A
 ; non-zero spawn timer is the ordinary empty path and stays below 100 linked
 ; CPU cycles together with erase and render.
 entity_effects_update:
-    lda ENTITY_FRAME_EVENTS
-    sta ENTITY_SCRATCH0
-    lda #$00
-    sta ENTITY_FRAME_EVENTS
     lda ENTITY_ACTIVE_MASK
     bne @active
+    lda #$00
+    sta ENTITY_FRAME_EVENTS
     dec ENTITY_SPAWN_TIMER_LO
     bne @done
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
-    bcs @defer_spawn
+    bcc @spawn
+    cmp #CAPITAL_HULL_STATE_OPEN
+    bne @defer_spawn
+@spawn:
     jmp entity_spawn_debris
 @defer_spawn:
     lda #ENTITY_REPEAT_SPAWN_DELAY
@@ -8032,9 +8054,17 @@ entity_effects_update:
     rts
 
 @active:
-    lda ENTITY_SCRATCH0
-    and #ENTITY_EVENT_WORLD_ROW_ADVANCED
-    beq @collision
+    lsr ENTITY_FRAME_EVENTS
+    bcc @collision
+    lda ENTITY_TIMER
+    clc
+    adc #ENTITY_VERTICAL_STEP_NUMERATOR
+    cmp #ENTITY_VERTICAL_STEP_DENOMINATOR
+    bcc :+
+    sbc #ENTITY_VERTICAL_STEP_DENOMINATOR
+:
+    sta ENTITY_TIMER
+    bcc @tumble
     lda ENTITY_Y
     clc
     adc ENTITY_VY
@@ -8043,6 +8073,26 @@ entity_effects_update:
     jmp entity_despawn_debris
 :
     sta ENTITY_Y
+@tumble:
+    ; The left glyph bases are 110,112,114,116. With carry clear on both
+    ; incoming paths, this toggles 110<->112 and 114<->116 without a table.
+    lda ENTITY_RENDER_ID
+    adc #$02
+    eor #$02
+    adc #$FE
+    sta ENTITY_RENDER_ID
+    lda ENTITY_VX
+    beq @collision
+    inc ENTITY_MOVE_ACCUMULATOR
+    lda ENTITY_MOVE_ACCUMULATOR
+    cmp #ENTITY_HORIZONTAL_STEP_WORLD_ROWS
+    bcc @collision
+    lda #$00
+    sta ENTITY_MOVE_ACCUMULATOR
+    lda ENTITY_X
+    clc
+    adc ENTITY_VX
+    sta ENTITY_X
 @collision:
     ; Active update has already proved that Y remains in gameplay. Direct
     ; calls retain the guarded public entry below for boundary tests.
@@ -8056,42 +8106,46 @@ entity_spawn_debris:
     cmp #ENTITY_ACTIVE_LIMIT
     bcs @done
     jsr entity_next_rng
-    and #$1F
-    cmp #ENTITY_CORRIDOR_COLUMNS
-    bcc :+
-    sec
-    sbc #ENTITY_CORRIDOR_COLUMNS
+    sta ENTITY_SCRATCH1
+    and #$03
+    asl
+    adc #ENTITY_DEBRIS_GLYPH_BASE
+    sta ENTITY_RENDER_ID
+    lda ENTITY_SCRATCH1
+    lsr
+    lsr
+    and #$03
+    tax
+    lda entity_trajectory_vx,x
+    sta ENTITY_VX
+    jsr entity_next_rng
+    and #$03
+    cmp #ENTITY_SAFE_SPAWN_COLUMNS
+    bne :+
+    lsr
 :
     asl
     asl
-    clc
-    adc #ENTITY_CORRIDOR_LEFT_HPOS
+    adc #ENTITY_SAFE_SPAWN_LEFT_HPOS
     sta ENTITY_X
     lda #ENTITY_GAMEPLAY_TOP
     sta ENTITY_Y
-    lda #ENTITY_TYPE_DEBRIS
+    lda #ENTITY_TYPE_DEBRIS       ; type and active state are both one
     sta ENTITY_TYPE
-    lda entity_archetype_descriptors+ENTITY_DESC_INITIAL_STATE
     sta ENTITY_STATE
-    lda entity_archetype_descriptors+ENTITY_DESC_FLAGS
+    lda #ENTITY_DEBRIS_INITIAL_FLAGS
     sta ENTITY_FLAGS
-    lda entity_archetype_descriptors+ENTITY_DESC_INITIAL_VX
-    sta ENTITY_VX
-    lda entity_archetype_descriptors+ENTITY_DESC_INITIAL_VY
+    lda #ENTITY_DEBRIS_VY
     sta ENTITY_VY
-    lda entity_archetype_descriptors+ENTITY_DESC_LIFETIME
+    lda #$00
+    sta ENTITY_MOVE_ACCUMULATOR
     sta ENTITY_TIMER
-    lda #ENTITY_DEBRIS_GLYPH
-    sta ENTITY_RENDER_ID
-    lda entity_archetype_descriptors+ENTITY_DESC_COLLISION_CATEGORY
+    lda #ENTITY_COLLISION_PLAYER_DAMAGE
     sta ENTITY_COLLISION_CATEGORY
-    lda entity_archetype_descriptors+ENTITY_DESC_HIT_POINTS
     sta ENTITY_HP
-    lda #$01
     sta ENTITY_ACTIVE_MASK
     sta ENTITY_ACTIVE_COUNT
     sta ENTITY_ALLOCATION_RESULT
-    inc ENTITY_SPAWN_PHASE
 @done:
     rts
 
@@ -8102,6 +8156,29 @@ entity_next_rng:
     eor #$1D
 :
     sta ENTITY_RNG_STATE
+    rts
+
+; COMPLETE lasts for exactly one full 22-row reconstruction pass. No debris
+; can spawn in DRAIN or COMPLETE. The post-pass OPEN state keeps the same
+; full-width starfield and combat behavior, but gives the entity scheduler a
+; deterministic legal boundary and restores the normal initial spawn delay.
+entity_begin_sector_complete:
+    lda #PLAYFIELD_RING_ROWS
+    sta ENTITY_SPAWN_TIMER_HI
+    inc CAPITAL_SECTOR_STATE
+    rts
+
+; COMPLETE receives exactly one full 22-rotation reconstruction pass. The
+; following OPEN frame starts with the normal delayed entity scheduler. This
+; helper stays in the feature-owned ENTITY_CODE budget rather than consuming
+; the protected resident CODE tail.
+entity_complete_scroll_tick:
+    dec ENTITY_SPAWN_TIMER_HI
+    bne @done
+    inc CAPITAL_SECTOR_STATE
+    lda #ENTITY_INITIAL_SPAWN_DELAY
+    sta ENTITY_SPAWN_TIMER_LO
+@done:
     rts
 
 ; Half-open X and inclusive visible-row tests mirror the existing projectile
@@ -8125,7 +8202,7 @@ entity_collide_player_active:
     bcc entity_collision_miss
     lda ENTITY_X
     clc
-    adc #4
+    adc #8
     cmp player_x
     bcc entity_collision_miss
     beq entity_collision_miss
@@ -8161,14 +8238,9 @@ entity_despawn_debris:
 ; reverse erase at the beginning of the next active frame.
 entity_effects_render:
     lda ENTITY_ACTIVE_MASK
-    beq @effects
+    beq @done
     .assert EFFECT_ACTIVE_LIMIT = 0, error, "active entity fast path assumes disabled effects"
     jmp render_interactive_entity_overlays
-@effects:
-    lda EFFECT_ACTIVE_MASK
-    beq @done
-    ; EFFECT_ACTIVE_LIMIT is zero in this feature. Keeping the branch explicit
-    ; makes the disabled pool's empty path observable without activating it.
 @done:
     rts
 
@@ -8186,7 +8258,6 @@ render_interactive_entity_overlays:
     lsr
     lsr
     lsr
-    clc
     adc #$01                    ; mapper row zero is the fixed divider
     jsr set_gameplay_row_ptr
     lda ENTITY_X
@@ -8194,7 +8265,6 @@ render_interactive_entity_overlays:
     sbc #GAMEPLAY_LEFT_HPOS
     lsr
     lsr
-    clc
     adc dst_ptr
     sta dst_ptr
     sta ENTITY_SCREEN_LO
@@ -8207,7 +8277,13 @@ render_interactive_entity_overlays:
     sta ENTITY_BACKING0
     lda ENTITY_RENDER_ID
     sta (dst_ptr),y
-    lda #$01
+    iny
+    lda (dst_ptr),y
+    sta ENTITY_BACKING1
+    lda ENTITY_RENDER_ID
+    ora #$01
+    sta (dst_ptr),y
+    lda #$03
     sta ENTITY_DRAWN_MASK
     sta ENTITY_RENDERED_MASK
 @done:
@@ -8234,10 +8310,10 @@ init_entity_effects:
 ; rebuilt after the loader. Keep this copy separate so state initialisation has
 ; the strict write footprint $8000-$80FF on startup, XEX and cold-boot ATR.
 install_entity_effects_glyph:
-    ldx #$07
+    ldx #(ENTITY_DEBRIS_GLYPH_BYTES-1)
 @copy_glyph:
     lda entity_debris_glyph,x
-    sta CHARSET+ENTITY_DEBRIS_GLYPH*8,x
+    sta CHARSET+ENTITY_DEBRIS_GLYPH_BASE*8,x
     dex
     bpl @copy_glyph
     rts
@@ -8246,19 +8322,23 @@ entity_archetype_descriptors:
     EMIT_ENTITY_ARCHETYPE_DESCRIPTORS
 entity_archetype_descriptors_end:
 entity_debris_glyph:
-    EMIT_ENTITY_DEBRIS_GLYPH
+    EMIT_ENTITY_DEBRIS_GLYPHS
 entity_debris_glyph_end:
 
 entity_slot_bit_masks:
     .byte $01,$02,$04,$08,$10,$20
+entity_trajectory_vx:
+    EMIT_ENTITY_TRAJECTORY_VX
 
 .assert entity_archetype_descriptors_end-entity_archetype_descriptors = ENTITY_ARCHETYPE_DESCRIPTOR_BYTES, error, "entity descriptor size changed"
-.assert entity_debris_glyph_end-entity_debris_glyph = 8, error, "debris glyph must remain one character"
+.assert entity_debris_glyph_end-entity_debris_glyph = ENTITY_DEBRIS_GLYPH_BYTES, error, "debris glyph bank size changed"
 .assert *-__ENTITY_CODE_RUN__ <= ENTITY_CODE_RESERVED_BYTES, error, "ENTITY_CODE exceeds its unconditional RAM reservation"
 
 .export init_entity_effects, install_entity_effects_glyph
+.export ENTITY_DEBRIS_GLYPH_BASE
 .export entity_effects_erase, entity_effects_update, entity_effects_render
 .export entity_spawn_debris, entity_damage_applied, entity_despawn_debris
+.export entity_begin_sector_complete, entity_complete_scroll_tick
 .export erase_transient_effect_overlays, erase_interactive_entity_overlays
 .export render_interactive_entity_overlays
-.export entity_archetype_descriptors, entity_debris_glyph
+.export entity_archetype_descriptors, entity_debris_glyph, entity_trajectory_vx

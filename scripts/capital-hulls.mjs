@@ -1074,6 +1074,7 @@ export function renderCapitalHullsCa65Include(asset) {
     "CAPITAL_HULL_STATE_PROW = 4",
     "CAPITAL_HULL_STATE_DRAIN = 5",
     "CAPITAL_HULL_STATE_COMPLETE = 6",
+    "CAPITAL_HULL_STATE_OPEN = 7",
     "CAPITAL_HULL_TURRET_RECORD_BYTES = 7",
     `BROADSIDE_SCHEDULE_COUNT = ${asset.schedule.length}`,
     "BROADSIDE_SCHEDULE_RECORD_BYTES = 2",

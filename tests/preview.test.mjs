@@ -9,6 +9,8 @@ import {
   createFighterWeaponTransitionTrace,
   createSharedFighterExplosionPreview,
   createSharedFighterExplosionTrace,
+  createDebrisReviewPreview,
+  createDebrisReviewTrace,
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   createGameplayPreview,
@@ -18,12 +20,16 @@ import {
   readGameGraphicsSource,
 } from "../scripts/preview.mjs";
 import { loadCapitalHullsDefinition } from "../scripts/capital-hulls.mjs";
+import { loadEntityEffectsDefinition } from "../scripts/entity-effects.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 const capitalHullsDefinition = loadCapitalHullsDefinition(
   path.join(rootDirectory, "assets", "graphics", "capital-hulls.json"),
+);
+const entityEffectsDefinition = loadEntityEffectsDefinition(
+  path.join(rootDirectory, "assets", "graphics", "entity-effects.json"),
 );
 
 function replaceOnce(text, original, replacement) {
@@ -209,4 +215,27 @@ test("shared fighter-explosion preview and trace use all six runtime phases", ()
       [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
         3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]);
   }
+});
+
+test("debris owner review is deterministic and covers visuals, trajectories, contact and wrap", () => {
+  const first = createDebrisReviewPreview(source, entityEffectsDefinition);
+  const second = createDebrisReviewPreview(source, entityEffectsDefinition);
+  assert.deepEqual(first, second);
+  assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [1280, 880]);
+
+  const trace = createDebrisReviewTrace(entityEffectsDefinition);
+  assert.equal(trace, createDebrisReviewTrace(entityEffectsDefinition));
+  const rows = trace.trimEnd().split("\n");
+  assert.equal(rows.length, 1 + 38 * 3 + 2);
+  for (const profile of ["STRAIGHT", "SLIGHT-LEFT", "SLIGHT-RIGHT"]) {
+    const pass = rows.filter((row) => row.startsWith(`FULL_PASS_${profile},`));
+    assert.equal(pass.length, 38);
+    assert.ok(pass.some((row) => row.includes(",200,")), `${profile} lacks bottom despawn`);
+  }
+  assert.ok(rows.some((row) => row.includes(",DAMAGE_ACCEPTED,10,9")));
+  assert.ok(rows.some((row) => row.includes(",INVULNERABLE,10,10")));
+  assert.ok(rows.some((row) => row.includes(",$91,$92,") &&
+    row.endsWith(",$91,$92,NONE,10,10")));
+  const ringHeads = new Set(rows.slice(1, 39).map((row) => Number(row.split(",")[14])));
+  assert.ok(ringHeads.has(21) && ringHeads.has(0), "preview pass must cross the A2 ring wrap");
 });

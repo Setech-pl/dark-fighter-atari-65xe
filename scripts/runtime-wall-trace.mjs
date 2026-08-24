@@ -16,6 +16,10 @@ const ENTITY_EFFECTS_BASELINE_WALL_CYCLES = 31_440;
 const ENTITY_EFFECTS_BASELINE_HEADROOM_CYCLES = 4_128;
 const ENTITY_EFFECTS_APPROVED_DELTA_CYCLES = 600;
 const ENTITY_EFFECTS_FEATURE_GATE_CYCLES = 32_040;
+const DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES = 32_025;
+const DEBRIS_VISUAL_POLISH_BASELINE_HEADROOM_CYCLES = 3_543;
+const DEBRIS_VISUAL_POLISH_APPROVED_DELTA_CYCLES = 256;
+const DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES = 32_281;
 const EXPECTED_ATARI800_VERSION = "7.1.2";
 const OFFICIAL_SOURCE_ARCHIVE_SHA256 =
   "9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3";
@@ -44,13 +48,24 @@ const targetedSessions = [{
   kind: "targeted-heavy-coincidence",
 }];
 
+const cadenceSessions = [0, 1, 2].map((difficulty) => ({
+  id: `cadence-${difficulty}-sweep-fire4`,
+  difficulty,
+  policy: "sweep",
+  fireDelay: 4,
+  frames: 400,
+  kind: "parallax-cadence",
+}));
+
 const traceLabels = {
   DFTRACE_PC_ACTIVE: "main_loop_option_poll",
   DFTRACE_PC_END: "main_loop",
   DFTRACE_PC_FRONTEND_POLL: "frontend_input_poll",
   DFTRACE_PC_DLI: "gameplay_dli",
-  DFTRACE_PC_WORLD: "scroll_world_columns",
+  DFTRACE_PC_WORLD: "advance_starfield_layers",
+  DFTRACE_PC_NEAR: "scroll_world_columns",
   DFTRACE_PC_FAR_ERASE: "erase_far_star_overlays",
+  DFTRACE_PC_FAR_STEP: "advance_far_stars",
   DFTRACE_PC_HULL: "scroll_hull_columns",
   DFTRACE_PC_BROADSIDE: "update_broadside",
   DFTRACE_PC_FIGHTER_EXPLOSION: "render_shared_fighter_explosions",
@@ -81,7 +96,12 @@ const traceLabels = {
   DFTRACE_GAMEPLAY_FRAME: "frame_counter",
   DFTRACE_MUZZLE_SCREEN_HI: "MUZZLE_SCREEN_HI",
   DFTRACE_ENTITY_ACTIVE_COUNT: "ENTITY_ACTIVE_COUNT",
+  DFTRACE_ENTITY_X: "ENTITY_X",
   DFTRACE_ENTITY_Y: "ENTITY_Y",
+  DFTRACE_ENTITY_VX: "ENTITY_VX",
+  DFTRACE_ENTITY_MOVE_ACCUMULATOR: "ENTITY_MOVE_ACCUMULATOR",
+  DFTRACE_ENTITY_VERTICAL_ACCUMULATOR: "ENTITY_TIMER",
+  DFTRACE_ENTITY_RENDER_ID: "ENTITY_RENDER_ID",
 };
 
 const numericCsvFields = new Set([
@@ -92,7 +112,9 @@ const numericCsvFields = new Set([
   "projectiles", "broadside", "far_rendered", "live_raider", "fighter_explosion",
   "capital_explosion", "music_active", "fire_sfx", "hit_sfx", "capital_sfx",
   "sound_enabled", "player_lifecycle", "sector_state", "gameplay_frame",
-  "difficulty", "active_muzzles", "entity_active", "entity_y", "events",
+  "difficulty", "active_muzzles", "entity_active", "entity_x", "entity_y",
+  "entity_vx", "entity_move_accumulator", "entity_vertical_accumulator",
+  "entity_render_id", "events",
 ]);
 let cpuReferenceByFrame = new Map();
 
@@ -188,6 +210,8 @@ function decodeEvents(bits) {
     [1 << 7, "debris-spawn"],
     [1 << 8, "debris-contact"],
     [1 << 9, "debris-despawn"],
+    [1 << 10, "near-copy"],
+    [1 << 11, "far-step"],
   ].filter(([mask]) => (bits & mask) !== 0).map(([, name]) => name);
 }
 
@@ -230,7 +254,12 @@ function frameState(row, includeCpuReference = false) {
       far_rendered: row.far_rendered,
       active_muzzles: row.active_muzzles,
       entity_active: row.entity_active,
+      entity_x: row.entity_x,
       entity_y: row.entity_y,
+      entity_vx_signed: row.entity_vx < 0x80 ? row.entity_vx : row.entity_vx - 0x100,
+      entity_move_accumulator: row.entity_move_accumulator,
+      entity_vertical_accumulator: row.entity_vertical_accumulator,
+      entity_render_id: row.entity_render_id,
       live_raider: Boolean(row.live_raider),
       fighter_explosion: Boolean(row.fighter_explosion),
       capital_explosion: Boolean(row.capital_explosion),
@@ -314,7 +343,7 @@ function main() {
   const allRows = [];
   const summaries = [];
   const sessionsToRun = smokeFrames === null
-    ? [...baselineSessions, ...targetedSessions]
+    ? [...baselineSessions, ...targetedSessions, ...cadenceSessions]
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
   for (const session of sessionsToRun) {
     const outputPath = path.join(buildDirectory, `${session.id}.csv`);
@@ -346,10 +375,13 @@ function main() {
 
   const baselineRows = allRows.filter((row) => row.trace_kind === "baseline-9040");
   const targetedRows = allRows.filter((row) => row.trace_kind === "targeted-heavy-coincidence");
+  const cadenceRows = allRows.filter((row) => row.trace_kind === "parallax-cadence");
   invariant(baselineRows.length === 9_040,
     `Baseline trace measured ${baselineRows.length}/9040 frames`);
   invariant(targetedRows.length === 920,
     `Targeted trace measured ${targetedRows.length}/920 frames`);
+  invariant(cadenceRows.length === 1_200,
+    `Parallax trace measured ${cadenceRows.length}/1200 frames`);
   invariant(allRows.every((row) => row.dma_ctl === 0x3e),
     "Trace observed gameplay DMACTL other than $3E");
   invariant(allRows.every((row) => row.nmi_en === 0x80),
@@ -396,7 +428,156 @@ function main() {
   const spawnMaximum = maximumRow(spawnRows, (row) => row.wall_cycles);
   const contactMaximum = maximumRow(contactRows, (row) => row.wall_cycles);
   const featureBudgetOverruns = allRows.filter((row) =>
-    row.wall_cycles > ENTITY_EFFECTS_FEATURE_GATE_CYCLES);
+    row.wall_cycles > DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES);
+  const activeGlyphOffsets = activeEntityRows.map((row) =>
+    row.entity_render_id - manifest.entityEffects.glyphIndex);
+  const observedVariants = [...new Set(activeGlyphOffsets.map((offset) => offset >> 2))].sort();
+  const observedPhases = [...new Set(activeGlyphOffsets.map((offset) => offset >> 1 & 1))].sort();
+  const observedTrajectories = [...new Set(activeEntityRows.map((row) =>
+    row.entity_vx < 0x80 ? row.entity_vx : row.entity_vx - 0x100))].sort((a, b) => a - b);
+  invariant(observedVariants.join(",") === "0,1", "Trace did not observe both debris variants");
+  invariant(observedPhases.join(",") === "0,1", "Trace did not observe both tumbling phases");
+  invariant(observedTrajectories.join(",") === "-4,0,4",
+    "Trace did not observe all three debris trajectories");
+  invariant(activeEntityRows.every((row) => row.entity_x >= 84 && row.entity_x + 8 <= 172),
+    "Trace observed debris outside the source-derived inner corridor");
+  const postCapitalActiveRows = allRows.filter((row) =>
+    row.sector_state === 7 && row.entity_active === 1);
+  invariant(allRows.some((row) => row.sector_state === 6),
+    "Trace did not observe capital-sector COMPLETE reconstruction");
+  invariant(postCapitalActiveRows.length > 0,
+    "Trace did not observe active debris after the capital sector");
+  let postCapitalTransition = null;
+  for (const session of new Set(allRows.map((row) => row.session))) {
+    const rows = allRows.filter((row) => row.session === session);
+    const drainIndex = rows.findIndex((row) => row.sector_state === 5);
+    const completeIndex = rows.findIndex((row, index) =>
+      index > drainIndex && row.sector_state === 6);
+    const openIndex = rows.findIndex((row, index) =>
+      index > completeIndex && row.sector_state === 7);
+    const spawnIndex = rows.findIndex((row, index) =>
+      index >= openIndex && row.sector_state === 7 && (row.events & (1 << 7)) !== 0);
+    const activeIndex = rows.findIndex((row, index) =>
+      index > spawnIndex && row.sector_state === 7 && row.entity_active === 1);
+    if (drainIndex > 0 && completeIndex > drainIndex && openIndex > completeIndex &&
+        spawnIndex >= openIndex && activeIndex > spawnIndex &&
+        rows.slice(0, drainIndex).some((row) => row.sector_state < 5)) {
+      postCapitalTransition = {
+        session,
+        open_gameplay_frame: rows.slice(0, drainIndex).find((row) => row.sector_state < 5).frame,
+        drain_frame: rows[drainIndex].frame,
+        complete_frame: rows[completeIndex].frame,
+        next_open_frame: rows[openIndex].frame,
+        post_capital_spawn_frame: rows[spawnIndex].frame,
+        post_capital_spawn_active_frame: rows[activeIndex].frame,
+        configured_spawn_delay_scheduler_ticks: 32,
+        observable_open_to_spawn_frame_delta:
+          rows[spawnIndex].frame - rows[openIndex].frame,
+      };
+      break;
+    }
+  }
+  invariant(postCapitalTransition !== null,
+    "Trace did not observe open gameplay -> DRAIN -> COMPLETE -> next OPEN -> active debris");
+  const verticalCadence = {
+    active_transitions: 0,
+    world_events: 0,
+    vertical_steps: 0,
+    held_events: 0,
+    invalid_transitions: 0,
+  };
+  for (let index = 1; index < allRows.length; index += 1) {
+    const previous = allRows[index - 1];
+    const current = allRows[index];
+    if (previous.session !== current.session || previous.entity_active !== 1 ||
+        current.entity_active !== 1) continue;
+    verticalCadence.active_transitions += 1;
+    const worldAdvanced = (previous.events & (1 << 0)) !== 0;
+    if (!worldAdvanced) {
+      if (previous.entity_vertical_accumulator !== current.entity_vertical_accumulator ||
+          previous.entity_y !== current.entity_y || previous.entity_x !== current.entity_x ||
+          previous.entity_render_id !== current.entity_render_id) {
+        verticalCadence.invalid_transitions += 1;
+      }
+      continue;
+    }
+    verticalCadence.world_events += 1;
+    let expectedAccumulator = previous.entity_vertical_accumulator + 3;
+    const moved = expectedAccumulator >= 5;
+    if (moved) expectedAccumulator -= 5;
+    const expectedY = previous.entity_y + (moved ? 8 : 0);
+    const offset = previous.entity_render_id - manifest.entityEffects.glyphIndex;
+    const expectedGlyph = manifest.entityEffects.glyphIndex +
+      (offset & 2 ? offset - 2 : offset + 2);
+    let expectedMoveAccumulator = previous.entity_move_accumulator;
+    let expectedX = previous.entity_x;
+    const vx = previous.entity_vx < 0x80 ? previous.entity_vx : previous.entity_vx - 0x100;
+    if (vx !== 0) {
+      expectedMoveAccumulator += 1;
+      if (expectedMoveAccumulator === 4) {
+        expectedMoveAccumulator = 0;
+        expectedX += vx;
+      }
+    }
+    if (current.entity_vertical_accumulator !== expectedAccumulator ||
+        current.entity_y !== expectedY || current.entity_render_id !== expectedGlyph ||
+        current.entity_move_accumulator !== expectedMoveAccumulator ||
+        current.entity_x !== expectedX) {
+      verticalCadence.invalid_transitions += 1;
+    }
+    if (moved) verticalCadence.vertical_steps += 1;
+    else verticalCadence.held_events += 1;
+  }
+  invariant(verticalCadence.world_events > 0 && verticalCadence.vertical_steps > 0 &&
+    verticalCadence.held_events > 0 && verticalCadence.invalid_transitions === 0,
+  "Trace did not preserve the exact debris 3/5 vertical cadence");
+
+  const expectedLayerSpeeds = [
+    { difficulty: 0, world: 20, near: 10, far: 5, debris: 12 },
+    { difficulty: 1, world: 22.5, near: 11.25, far: 5.625, debris: 13.5 },
+    { difficulty: 2, world: 25, near: 12.5, far: 6.25, debris: 15 },
+  ];
+  const parallaxCadence = expectedLayerSpeeds.map((expected) => {
+    const rows = cadenceRows.filter((row) => row.difficulty === expected.difficulty);
+    const seconds = rows.length / 50;
+    const worldSteps = rows.filter((row) => (row.events & (1 << 0)) !== 0).length;
+    const nearSteps = rows.filter((row) => (row.events & (1 << 10)) !== 0).length;
+    const farSteps = rows.filter((row) => (row.events & (1 << 11)) !== 0).length;
+    const measured = {
+      world: worldSteps / seconds,
+      near: nearSteps / seconds,
+      far: farSteps / seconds,
+      debris: worldSteps / seconds * 3 / 5,
+    };
+    invariant(measured.world === expected.world && measured.near === expected.near &&
+      measured.far === expected.far && measured.debris === expected.debris,
+    `Difficulty ${expected.difficulty} parallax cadence diverged from its exact trace rate`);
+
+    let spawnFrame = null;
+    const flightFrames = [];
+    for (const row of rows) {
+      if ((row.events & (1 << 7)) !== 0) spawnFrame = row.frame;
+      if (spawnFrame !== null && (row.events & (1 << 8)) !== 0) spawnFrame = null;
+      if (spawnFrame !== null && (row.events & (1 << 9)) !== 0 &&
+          (row.events & (1 << 8)) === 0) {
+        flightFrames.push(row.frame - spawnFrame);
+        spawnFrame = null;
+      }
+    }
+    invariant(flightFrames.length > 0,
+      `Difficulty ${expected.difficulty} trace did not include a full debris flight`);
+    return {
+      difficulty: expected.difficulty,
+      measured_frames: rows.length,
+      measured_seconds: seconds,
+      world_steps: worldSteps,
+      near_steps: nearSteps,
+      far_steps: farSteps,
+      measured_rows_per_second: measured,
+      full_debris_flight_frames: flightFrames,
+      full_debris_flight_seconds: flightFrames.map((frames) => frames / 50),
+    };
+  });
 
   const report = {
     schema_version: 1,
@@ -425,7 +606,7 @@ function main() {
     },
     gate: {
       pal_frame_cycles: PAL_FRAME_CYCLES,
-      maximum_wall_cycles: ENTITY_EFFECTS_FEATURE_GATE_CYCLES,
+      maximum_wall_cycles: DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES,
       historical_runtime_headroom_gate: {
         maximum_wall_cycles: HISTORICAL_PHYSICAL_GATE_CYCLES,
         preserved_for_history: true,
@@ -438,32 +619,46 @@ function main() {
         approved_delta_cycles: ENTITY_EFFECTS_APPROVED_DELTA_CYCLES,
         maximum_wall_cycles: ENTITY_EFFECTS_FEATURE_GATE_CYCLES,
         minimum_physical_headroom: PAL_FRAME_CYCLES - ENTITY_EFFECTS_FEATURE_GATE_CYCLES,
-        actual_delta_cycles: heaviest.wall_cycles - ENTITY_EFFECTS_BASELINE_WALL_CYCLES,
+        measured_wall_cycles: 32_025,
+        measured_physical_headroom: 3_543,
+        actual_delta_cycles: 585,
+        remaining_approved_cycles: 15,
+        budget_overrun_frames: 0,
+        passed: true,
+      },
+      debris_visual_polish: {
+        baseline_wall_cycles: DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
+        baseline_physical_headroom: DEBRIS_VISUAL_POLISH_BASELINE_HEADROOM_CYCLES,
+        approved_delta_cycles: DEBRIS_VISUAL_POLISH_APPROVED_DELTA_CYCLES,
+        maximum_wall_cycles: DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES,
+        minimum_physical_headroom:
+          PAL_FRAME_CYCLES - DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES,
+        actual_delta_cycles: heaviest.wall_cycles - DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
         remaining_approved_cycles:
-          ENTITY_EFFECTS_FEATURE_GATE_CYCLES - heaviest.wall_cycles,
+          DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES - heaviest.wall_cycles,
         budget_overrun_frames: featureBudgetOverruns.length,
         empty_path: {
           maximum_wall_cycles: emptyEntityMaximum.wall_cycles,
           delta_from_baseline: emptyEntityMaximum.wall_cycles -
-            ENTITY_EFFECTS_BASELINE_WALL_CYCLES,
+            DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
           heaviest: frameState(emptyEntityMaximum),
         },
         one_active_debris: {
           maximum_wall_cycles: activeEntityMaximum.wall_cycles,
           delta_from_baseline: activeEntityMaximum.wall_cycles -
-            ENTITY_EFFECTS_BASELINE_WALL_CYCLES,
+            DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
           heaviest: frameState(activeEntityMaximum),
         },
         spawn_path: {
           maximum_wall_cycles: spawnMaximum.wall_cycles,
           delta_from_baseline: spawnMaximum.wall_cycles -
-            ENTITY_EFFECTS_BASELINE_WALL_CYCLES,
+            DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
           heaviest: frameState(spawnMaximum),
         },
         contact_path: {
           maximum_wall_cycles: contactMaximum.wall_cycles,
           delta_from_baseline: contactMaximum.wall_cycles -
-            ENTITY_EFFECTS_BASELINE_WALL_CYCLES,
+            DEBRIS_VISUAL_POLISH_BASELINE_WALL_CYCLES,
           heaviest: frameState(contactMaximum),
         },
       },
@@ -489,9 +684,10 @@ function main() {
       host_vbi_boundary_crossings:
         allRows.reduce((sum, row) => sum + row.host_vbi_boundaries, 0),
       extra_vbi_boundaries: allRows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0),
-      passed: heaviest.wall_cycles <= ENTITY_EFFECTS_FEATURE_GATE_CYCLES &&
+      passed: heaviest.wall_cycles <= DEBRIS_VISUAL_POLISH_FEATURE_GATE_CYCLES &&
         PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-          ENTITY_EFFECTS_BASELINE_HEADROOM_CYCLES - ENTITY_EFFECTS_APPROVED_DELTA_CYCLES &&
+          DEBRIS_VISUAL_POLISH_BASELINE_HEADROOM_CYCLES -
+            DEBRIS_VISUAL_POLISH_APPROVED_DELTA_CYCLES &&
         featureBudgetOverruns.length === 0 && deadlineOverruns.length === 0,
     },
     instrumentation: {
@@ -510,6 +706,7 @@ function main() {
     replay: {
       baseline_measured_frames: baselineRows.length,
       targeted_measured_frames: targetedRows.length,
+      parallax_cadence_measured_frames: cadenceRows.length,
       input: "production frontend/options handlers followed by deterministic held-FIRE neutral/sweep/evasive joystick policies",
       sessions: summaries,
       baseline_heaviest: frameState(baselineHeaviest),
@@ -517,7 +714,8 @@ function main() {
     },
     coverage: {
       world_near_with_far_erase: coverageRecord(allRows,
-        (row) => (row.events & 0x07) === 0x07),
+        (row) => (row.events & (1 << 0)) !== 0 && (row.events & (1 << 1)) !== 0 &&
+          (row.events & (1 << 10)) !== 0 && (row.events & (1 << 11)) !== 0),
       hull_event: coverageRecord(allRows, (row) => (row.events & (1 << 2)) !== 0),
       active_muzzles: coverageRecord(allRows, (row) => row.active_muzzles > 0),
       maximum_projectile_pool: {
@@ -548,6 +746,26 @@ function main() {
       debris_despawn: coverageRecord(allRows, (row) => (row.events & (1 << 9)) !== 0),
       debris_bottom_despawn: coverageRecord(allRows, (row) =>
         (row.events & (1 << 9)) !== 0 && (row.events & (1 << 8)) === 0),
+      debris_post_capital_sector: coverageRecord(allRows, (row) =>
+        row.sector_state === 7 && row.entity_active === 1),
+      post_capital_transition: postCapitalTransition,
+      parallax_cadence: parallaxCadence,
+      debris_vertical_cadence: {
+        observed: verticalCadence.invalid_transitions === 0,
+        ...verticalCadence,
+      },
+      debris_visual_variants: {
+        observed: observedVariants.length === 2,
+        values: observedVariants,
+      },
+      debris_tumbling_phases: {
+        observed: observedPhases.length === 2,
+        values: observedPhases,
+      },
+      debris_trajectories: {
+        observed: observedTrajectories.length === 3,
+        vx_signed_hpos: observedTrajectories,
+      },
     },
     ten_heaviest_frames_in_9040_replay: topTenBaseline,
     five_heaviest_frames: topTenBaseline.slice(0, 5).map((frame) => ({

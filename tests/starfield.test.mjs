@@ -124,6 +124,9 @@ function executeRateDispatcher(memory, startAddress, externalCalls) {
         accumulator = setZero(difference);
         break;
       }
+      case 0xd0: // BNE rel
+        branch(!zero);
+        break;
       case 0xf0: // BEQ rel
         branch(zero);
         break;
@@ -161,8 +164,8 @@ test("starfield source is compact, table-driven, and assembled byte-for-byte", (
   }, {
     seed: 0xa7,
     farPopulation: 24,
-    farRate: [7, 20],
-    nearRate: [7, 10],
+    farRate: [1, 4],
+    nearRate: [1, 2],
     nearDensity: [3, 8],
     twinkle: 16,
     glyphBytes: 48,
@@ -198,7 +201,7 @@ test("deterministic seed reproduces layouts while a different seed changes them"
   assert.deepEqual(counts(first), { far: 20, near: 6 });
 });
 
-test("hulls keep the legacy world rate while stars hold exact 70% and 35% ratios", () => {
+test("hulls keep the legacy world rate while stars hold exact 50% and 25% ratios", () => {
   for (const [difficulty, rate] of [["easy", 8], ["medium", 9], ["hard", 10]]) {
     let state = createStarfieldState(asset);
     let accumulator = 0;
@@ -211,12 +214,12 @@ test("hulls keep the legacy world rate while stars hold exact 70% and 35% ratios
       worldSteps += 1;
     }
     assert.equal(state.worldSteps, worldSteps, `${difficulty} hull follows legacy world events`);
-    assert.equal(state.nearSteps, Math.floor(worldSteps * 7 / 10),
-      `${difficulty} near layer remains exactly 70% of hull speed`);
-    assert.equal(state.farSteps, Math.floor(worldSteps * 7 / 20),
-      `${difficulty} far layer remains exactly 35% of hull speed`);
-    assert.equal(state.nearPhase, worldSteps * 7 % 10);
-    assert.equal(state.farPhase, worldSteps * 7 % 20);
+    assert.equal(state.nearSteps, Math.floor(worldSteps / 2),
+      `${difficulty} near layer remains exactly 50% of hull speed`);
+    assert.equal(state.farSteps, Math.floor(worldSteps / 4),
+      `${difficulty} far layer remains exactly 25% of hull speed`);
+    assert.equal(state.nearPhase, worldSteps % 2);
+    assert.equal(state.farPhase, worldSteps % 4);
     assert.equal(state.nearSteps * 2, state.farSteps * 4,
       `${difficulty} complete rate windows preserve the 2:1 parallax split`);
   }
@@ -225,10 +228,10 @@ test("hulls keep the legacy world rate while stars hold exact 70% and 35% ratios
     manifest.starfield.nearLayer.rateDenominator,
     manifest.starfield.farLayer.rateNumerator,
     manifest.starfield.farLayer.rateDenominator,
-  ], [7, 10, 7, 20]);
+  ], [1, 2, 1, 4]);
 });
 
-test("assembled 6502 phases execute one complete 100/70/35 rate period", () => {
+test("assembled 6502 phases execute one complete 100/50/25 rate period", () => {
   const memory = new Uint8Array(0x10000);
   memory.set(starRuntime, manifest.starfieldRuntime.runAddress);
   const addresses = {
@@ -261,9 +264,9 @@ test("assembled 6502 phases execute one complete 100/70/35 rate period", () => {
   const hullSteps = period;
   const nearSteps = calls.get(addresses.nearStep);
   const farSteps = calls.get(addresses.farStep);
-  assert.deepEqual([hullSteps, nearSteps, farSteps], [20, 14, 7]);
+  assert.deepEqual([hullSteps, nearSteps, farSteps], [4, 2, 1]);
   assert.deepEqual([hullSteps * 100 / hullSteps, nearSteps * 100 / hullSteps,
-    farSteps * 100 / hullSteps], [100, 70, 35]);
+    farSteps * 100 / hullSteps], [100, 50, 25]);
   assert.deepEqual(phaseTrace.at(-1), [0, 0],
     "both assembled accumulators close exactly over the common period");
   assert.ok(phaseTrace.every(([near, far]) =>

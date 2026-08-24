@@ -131,11 +131,12 @@ efektów dekoracyjnych dla każdej frakcji.
 
 Pierwsza warstwa tła jest wyłącznie dekoracyjna i deterministyczna. Capital
 hulls zachowują 100% kanonicznego world rate `8/9/10 ÷ 20`; near stars używają
-dokładnie `7/10`, a far stars `7/20` liczby kroków hull, czyli 70% i 35%.
+dokładnie `1/2`, a far stars `1/4` liczby kroków hull, czyli 50% i 25%.
 W broadside obie warstwy istnieją tylko
 w środkowym korytarzu i nigdy nie należą do collision, damage, score ani
-steering. Po `COMPLETE` nowo odsłaniane wiersze wracają do pełnej szerokości,
-bez resetu broni gracza lub dodatkowej pauzy sektorowej.
+steering. W `COMPLETE` nowo odsłaniane wiersze wracają do pełnej szerokości;
+po dokładnie 22 krokach ringu stan `OPEN` kontynuuje pełnoszeroki starfield bez
+resetu broni gracza lub dodatkowej pauzy sektorowej.
 
 Punkty za zniszczenie fightera wynikają z archetypu i jawnego źródła damage.
 Pocisk Vipera oraz rzeczywisty contact Vipera dają pełny score nawet, gdy ten
@@ -151,9 +152,9 @@ do dziobu: `ENGINES 32`, `AFT 24`, `COMBAT 128`, `FORWARD 24`, `PROW 32`. Strony
 stałe przesunięcie treści o osiem wierszy, lecz wspólne tempo. Funkcjonalne
 baterie występują wyłącznie w combat, a jego ostatnie osiem wierszy nie
 rozpoczyna nowej salwy. Po zejściu terminalnych tips `DRAIN` pozwala dokończyć
-już aktywne warningi, flashes, M1–M3 i 24-ramkowe eksplozje kadłuba, po czym udostępnia `COMPLETE` przyszłemu
-encounter director. Nie dodaje jeszcze komunikatu, bonusu ani następnego
-sektora.
+już aktywne warningi, flashes, M1–M3 i 24-ramkowe eksplozje kadłuba. Następnie
+`COMPLETE` odbudowuje pełny ring przez 22 kroki i przechodzi do legalnego
+otwartego gameplayu `OPEN`. Nie dodaje komunikatu, bonusu ani encounter directora.
 
 **PLANNED**
 
@@ -175,14 +176,40 @@ modelu kolizji oraz uszkodzeń.
 
 **IMPLEMENTED FOUNDATION SLICE**
 
-Pierwszy neutralny obiekt złomu jest małą przeszkodą testową wspólnego
-entity engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny
-jest najwyżej jeden. Spawnuje się na górze gameplayu w centralnym korytarzu,
-porusza wyłącznie razem z krokiem świata i można go ominąć. Kontakt zdejmuje
-jedną jednostkę HULL (10 punktów procentowych) przez wspólną damage gate i
-usuwa złom tylko wtedy, gdy obrażenie zostało przyjęte; invulnerability nie
-zużywa przeszkody. Slice nie dodaje dropów, boosterów, fragmentów ani
+Pierwszy neutralny obiekt złomu jest przeszkodą testową wspólnego entity
+engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny jest
+najwyżej jeden. Ma dwie czytelne sylwetki 2×1 znak (16×8 pikseli) — zwartą,
+asymetryczną płytę pancerza i ażurowy fragment kratownicy — po dwie fazy
+tumblingu każda. Cztery fazy używają dokładnie ośmiu glifów 110–117; indeksy
+118–127 pozostają wolne. Płyta i kratownica korzystają z kolorów pola 1/2,
+więc nie są białymi odpowiednikami największych gwiazd. Każda faza wypełnia
+bounding box 16×8; armour ma 47, a truss 45 aktywnych pikseli ANTIC.
+Niezależny RNG entity deterministycznie wybiera sylwetkę, fazę początkową,
+profil `straight`/`slight-left`/`slight-right` oraz bezpieczną kolumnę spawnu
+18..20. Ten wąski zakres uwzględnia szerokość dwóch komórek i pełne dziewięć
+możliwych kroków bocznych do despawnu, więc nie wymaga odbicia od krawędzi.
+Debris spawnuje się na Y=24, a Y, faza i ewentualny ruch X zmieniają się
+wyłącznie przy prawdziwym `WORLD_ROW_ADVANCED`. Pionowy akumulator wykonuje +8
+w trzech z każdych pięciu takich zdarzeń; profile boczne przesuwają obiekt o jeden
+znak co cztery takie zdarzenia i nie wymagają odbicia od krawędzi. Kontakt
+zdejmuje jedną jednostkę HULL (10 punktów procentowych) przez wspólną damage
+gate i usuwa złom tylko wtedy, gdy obrażenie zostało przyjęte; invulnerability
+nie zużywa przeszkody. Hitbox obejmuje widoczne 16×8 pikseli, bez kolizji z
+pociskami i bez punktacji. Slice nie zmienia logiki spawn/despawn,
+nie podnosi limitów pul i nie dodaje dropów, boosterów, fragmentów ani
 transient effects.
+
+World zachowuje 20/22,5/25 wiersza/s dla EASY/MEDIUM/HARD. Near stars mają
+10/11,25/12,5, far stars 5/5,625/6,25, a debris 12/13,5/15 wiersza/s.
+Dokładna kolejność pozostaje `far < near < debris < world`. Trace mierzy od
+spawnu Y=24 do despawnu odpowiednio 91/82/74 ramek
+(1,82/1,64/1,48 s). Odrzucony kandydat 3/4 world potrzebował 73/66/60 ramek
+(1,46/1,32/1,20 s), zatem nowa wersja jest rzeczywiście wolniejsza.
+
+Scheduler nie tworzy nowych debris podczas `DRAIN` ani `COMPLETE`. Przejście
+do `COMPLETE` uzbraja osobny wysoki licznik 22 rzeczywistych obrotów A2; po
+pełnym odbudowaniu ringu stan `OPEN` ponownie ustawia normalne opóźnienie 32
+klatek. Nie czyści bezwarunkowo puli i nie zużywa RNG entity podczas blokady.
 
 **BINDING**
 
@@ -397,7 +424,7 @@ Side hulls używają tych samych liczników i mianownika 20, czyli 100% dawnego
 world rate. `EASY` jest 80% prędkości `HARD`. Harmonogram broadside,
 25-ramkowy warning, prędkość pocisków, sterowanie i kolizje pozostają oparte
 na ramkach PAL i nie są skalowane przez ten wybór. Near i far zachowują wobec
-tej stawki dokładne proporcje 70% i 35%.
+tej stawki dokładne proporcje 50% i 25%, a debris 60%.
 
 `TOP SCORES` pokazuje dziesięć ponumerowanych wierszy. Pierwszy wiersz
 `--- 000000` jest sesyjnym TOP: po każdej punktacji przyjmuje

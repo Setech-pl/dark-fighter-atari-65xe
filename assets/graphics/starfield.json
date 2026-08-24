@@ -7,8 +7,8 @@
   },
   "farLayer": {
     "population": 24,
-    "rateNumerator": 7,
-    "rateDenominator": 20,
+    "rateNumerator": 1,
+    "rateDenominator": 4,
     "colourRegister": "COLPF1",
     "glyphs": [
       { "id": "DIM", "screenCode": 1, "bytes": [0, 0, 0, 32, 0, 0, 0, 0] },
@@ -17,8 +17,8 @@
     ]
   },
   "nearLayer": {
-    "rateNumerator": 7,
-    "rateDenominator": 10,
+    "rateNumerator": 1,
+    "rateDenominator": 2,
     "densityNumerator": 3,
     "densityDenominator": 8,
     "specialFrequency": 8,
