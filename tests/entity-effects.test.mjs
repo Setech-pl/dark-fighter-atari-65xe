@@ -11,6 +11,7 @@ import {
 } from "../scripts/entity-effects.mjs";
 import { parseAtr, parseXex } from "../scripts/formats.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
+import { installRuntimeSegments } from "../scripts/runtime-image.mjs";
 import {
   assertDebrisDestructionTraceParity,
   assertRaiderBreakupTraceParity,
@@ -29,6 +30,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.j
 const xex = fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"));
 const atr = fs.readFileSync(path.join(root, "dist", "dark-fighter.atr"));
 const broadsideRuntime = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
+const residentRuntime = fs.readFileSync(path.join(root, "build", "resident-runtime.bin"));
 const starfieldRuntime = fs.readFileSync(path.join(root, "build", "starfield-runtime.bin"));
 const a2KernelRuntime = fs.readFileSync(path.join(root, "build", "a2-kernel-runtime.bin"));
 const entityCodeRuntime = fs.readFileSync(path.join(root, "build", "entity-code-runtime.bin"));
@@ -124,11 +126,7 @@ const addresses = {
 };
 
 function loadRuntime(memory) {
-  for (const segment of parseXex(xex).segments) memory.set(segment.data, segment.start);
-  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
-  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
-  memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
-  memory.set(entityCodeRuntime, manifest.entityEffects.codeRunAddress);
+  installRuntimeSegments(memory, root);
 }
 
 function createRuntimeMemory(fill = 0) {
@@ -284,18 +282,39 @@ test("$A5 cold RAM is fully and identically initialised for XEX and ATR", () => 
   for (const payload of payloads) {
     const memory = new Uint8Array(0x10000).fill(0xa5);
     memory.set(payload.data, payload.start);
+    runRoutine(memory, "stage_boot_streams");
+    runRoutine(memory, "unpack_boot_broadside_runtime");
+    runRoutine(memory, "unpack_resident_runtime");
+    const residentSuffixOffset = manifest.residentRuntime.suffixAddress -
+      manifest.residentRuntime.runAddress;
+    assert.deepEqual(
+      [...memory.slice(manifest.residentRuntime.suffixAddress,
+        manifest.residentRuntime.runAddress + residentRuntime.length)],
+      [...residentRuntime.subarray(residentSuffixOffset)],
+    );
     runRoutine(memory, "unpack_entity_runtime");
     assert.deepEqual(
       [...memory.slice(manifest.entityEffects.codeRunAddress,
         manifest.entityEffects.codeRunAddress + manifest.entityEffects.codeBytes)],
       [...entityCodeRuntime],
     );
-    runRoutine(memory, "unpack_broadside_runtime");
     assert.deepEqual(
       [...memory.slice(manifest.broadsideRuntime.runAddress,
         manifest.broadsideRuntime.runAddress + broadsideRuntime.length)],
       [...broadsideRuntime],
       "ENTITY_CODE bootstrap must re-arm the shared LZSS decoder for broadside",
+    );
+    runRoutine(memory, "stage_a2_kernel");
+    assert.deepEqual(
+      [...memory.slice(manifest.a2Kernel.runAddress,
+        manifest.a2Kernel.runAddress + a2KernelRuntime.length)],
+      [...a2KernelRuntime],
+    );
+    runRoutine(memory, "unpack_starfield_runtime");
+    assert.deepEqual(
+      [...memory.slice(manifest.starfieldRuntime.runAddress,
+        manifest.starfieldRuntime.runAddress + starfieldRuntime.length)],
+      [...starfieldRuntime],
     );
     const lowerSentinel = memory[0x7fff];
     const upperSentinel = memory[0x8100];

@@ -4,6 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { atrConstants, parseAtr, parseXex, validateBuildDirectory } from "../scripts/formats.mjs";
+import { unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
@@ -43,4 +44,41 @@ test("ATR uses standard single-density geometry", () => {
   assert.equal(atr.length, 92176);
   assert.equal(parsed.boot.sectorCount, 128);
   assert.equal(parsed.body.subarray(0x3ffc, 0x4000).toString("ascii"), "DFB1");
+});
+
+test("resident compaction round-trips and leaves at least 1024 source-owned bytes", () => {
+  const { manifest, boot, parsedXex, parsedAtr } = validateBuildDirectory(rootDirectory);
+  const resident = fs.readFileSync(path.join(rootDirectory, "build", "resident-runtime.bin"));
+  const suffix = fs.readFileSync(
+    path.join(rootDirectory, "build", "resident-runtime-suffix.bin"),
+  );
+  const packed = fs.readFileSync(
+    path.join(rootDirectory, "build", "resident-runtime-suffix-packed.bin"),
+  );
+  const layout = manifest.residentRuntime;
+  const reserve = manifest.payloadBudget.runtimePayloadCompaction;
+
+  assert.deepEqual([
+    resident.length,
+    layout.prefixBytes,
+    suffix.length,
+    packed.length,
+    layout.suffixRawBytes - layout.suffixPackedBytes,
+  ], [8192, 449, layout.suffixRawBytes, layout.suffixPackedBytes, 1218]);
+  assert.deepEqual(unpackBroadsideLzss(packed), suffix);
+  assert.deepEqual(resident.subarray(layout.prefixBytes), suffix);
+  assert.deepEqual(
+    boot.subarray(layout.packedSourceAddress - manifest.loadAddress,
+      layout.packedSourceAddress - manifest.loadAddress + packed.length),
+    packed,
+  );
+  assert.ok(reserve.reserveBytes >= reserve.minimumReserveBytes);
+  assert.equal(reserve.minimumReserveBytes, 1024);
+  assert.equal(reserve.reserveEndAddress, 0x5ffb);
+  assert.equal(boot.subarray(reserve.reserveAddress - manifest.loadAddress,
+    reserve.reserveAddress - manifest.loadAddress + reserve.reserveBytes)
+    .every((byte) => byte === 0), true);
+  assert.deepEqual(parsedXex.segments[0].data, boot);
+  assert.deepEqual(parsedAtr.body.subarray(0, boot.length), boot);
+  assert.ok(manifest.entityEffects.stagedEndAddress < 0xa000);
 });

@@ -430,5 +430,5 @@ test("starfield staging is disjoint from the packed loader and loader bitmap", (
     manifest.broadsideRuntime.reservedBytes);
   assert.ok(stagingStart + manifest.starfieldRuntime.stagingBytes <= 0xc000);
   assert.match(source,
-    /unpack_starfield_runtime:[\s\S]+#<STARFIELD_STAGING[\s\S]+stage_starfield_runtime:[\s\S]+#<STARFIELD_STAGING/);
+    /unpack_starfield_runtime:[\s\S]+#<STARFIELD_STAGING[\s\S]+starfield_packed_source:[\s\S]+\.word STARFIELD_STAGING/);
 });

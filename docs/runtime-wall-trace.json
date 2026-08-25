@@ -4,7 +4,7 @@
   "artifact": {
     "path": "dist/dark-fighter.xex",
     "bytes": 16396,
-    "sha256": "fd10f2e95bcc83e2036e63c8840b4ddd1b29a944b920552694982987fbe970d9"
+    "sha256": "9011208521975092f105ce71800532684812278d63c07d3ccfb402e8b79e856c"
   },
   "emulator": {
     "name": "Atari800",
@@ -48,7 +48,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 16396,
-          "sha256": "fd10f2e95bcc83e2036e63c8840b4ddd1b29a944b920552694982987fbe970d9"
+          "sha256": "9011208521975092f105ce71800532684812278d63c07d3ccfb402e8b79e856c"
         },
         "snapshots": [
           {
@@ -75,7 +75,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 108,
+            "loader_timer": 127,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -86,7 +86,7 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
@@ -94,7 +94,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 58,
+            "loader_timer": 77,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -105,7 +105,7 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
@@ -149,9 +149,9 @@
         ],
         "milestones": {
           "start": 78,
-          "loader": 106,
-          "menu": 362,
-          "frontend_poll": 364,
+          "loader": 125,
+          "menu": 381,
+          "frontend_poll": 383,
           "gameplay_init": 501,
           "main_loop": 505
         },
@@ -196,7 +196,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 16396,
-          "sha256": "fd10f2e95bcc83e2036e63c8840b4ddd1b29a944b920552694982987fbe970d9"
+          "sha256": "9011208521975092f105ce71800532684812278d63c07d3ccfb402e8b79e856c"
         },
         "snapshots": [
           {
@@ -223,7 +223,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 108,
+            "loader_timer": 127,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -234,7 +234,7 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
@@ -242,7 +242,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 58,
+            "loader_timer": 77,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -253,7 +253,7 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
@@ -297,9 +297,9 @@
         ],
         "milestones": {
           "start": 78,
-          "loader": 106,
-          "menu": 362,
-          "frontend_poll": 364,
+          "loader": 125,
+          "menu": 381,
+          "frontend_poll": 383,
           "gameplay_init": 501,
           "main_loop": 505
         },
@@ -344,7 +344,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "e37b35fcec5233a9df45e23cb35f3624db113b8e59002be7ee247e056593a309"
+          "sha256": "65f46c02c8eee92248b92bf8a8bdcce423f2056e71e9ae2ac8f555baab05f22a"
         },
         "snapshots": [
           {
@@ -371,7 +371,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 120,
+            "loader_timer": 139,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -382,7 +382,7 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
@@ -390,7 +390,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 70,
+            "loader_timer": 89,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -401,14 +401,14 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
             "frame": 500,
-            "pc": 9875,
+            "pc": 9878,
             "scanline": 0,
-            "cycle": 9,
+            "cycle": 11,
             "loader_timer": 0,
             "game_state": 1,
             "dlist": 12780,
@@ -445,9 +445,9 @@
         ],
         "milestones": {
           "start": 89,
-          "loader": 118,
-          "menu": 374,
-          "frontend_poll": 376,
+          "loader": 137,
+          "menu": 393,
+          "frontend_poll": 395,
           "gameplay_init": 501,
           "main_loop": 505
         },
@@ -492,7 +492,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "e37b35fcec5233a9df45e23cb35f3624db113b8e59002be7ee247e056593a309"
+          "sha256": "65f46c02c8eee92248b92bf8a8bdcce423f2056e71e9ae2ac8f555baab05f22a"
         },
         "snapshots": [
           {
@@ -519,7 +519,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 120,
+            "loader_timer": 139,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -530,7 +530,7 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
@@ -538,7 +538,7 @@
             "pc": 9888,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 70,
+            "loader_timer": 89,
             "game_state": 0,
             "dlist": 14386,
             "charset_address": 57344,
@@ -549,14 +549,14 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 1948830447,
+            "screen_checksum": 2403084757,
             "frontend_dlist_checksum": 2149079185
           },
           {
             "frame": 500,
-            "pc": 9875,
+            "pc": 9878,
             "scanline": 0,
-            "cycle": 9,
+            "cycle": 11,
             "loader_timer": 0,
             "game_state": 1,
             "dlist": 12780,
@@ -593,9 +593,9 @@
         ],
         "milestones": {
           "start": 89,
-          "loader": 118,
-          "menu": 374,
-          "frontend_poll": 376,
+          "loader": 137,
+          "menu": 393,
+          "frontend_poll": 395,
           "gameplay_init": 501,
           "main_loop": 505
         },
@@ -737,20 +737,20 @@
         "wall_cycles": 28846,
         "physical_headroom": 6722,
         "start": {
-          "clock": 20228403,
-          "host_frame": 568,
+          "clock": 20904195,
+          "host_frame": 587,
           "scanline": 226,
           "cycle": 15
         },
         "end": {
-          "clock": 20257249,
-          "host_frame": 569,
+          "clock": 20933041,
+          "host_frame": 588,
           "scanline": 167,
           "cycle": 19
         },
         "next_start": {
-          "clock": 20263976,
-          "host_frame": 569
+          "clock": 20939768,
+          "host_frame": 588
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1043,20 +1043,20 @@
       "wall_cycles": 32869,
       "physical_headroom": 2699,
       "start": {
-        "clock": 25705880,
-        "host_frame": 722,
+        "clock": 26381672,
+        "host_frame": 741,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 25738749,
-        "host_frame": 723,
+        "clock": 26414541,
+        "host_frame": 742,
         "scanline": 202,
         "cycle": 57
       },
       "next_start": {
-        "clock": 25741443,
-        "host_frame": 723
+        "clock": 26417235,
+        "host_frame": 742
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -1110,20 +1110,20 @@
       "wall_cycles": 32869,
       "physical_headroom": 2699,
       "start": {
-        "clock": 25705880,
-        "host_frame": 722,
+        "clock": 26381672,
+        "host_frame": 741,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 25738749,
-        "host_frame": 723,
+        "clock": 26414541,
+        "host_frame": 742,
         "scanline": 202,
         "cycle": 57
       },
       "next_start": {
-        "clock": 25741443,
-        "host_frame": 723
+        "clock": 26417235,
+        "host_frame": 742
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -1182,20 +1182,20 @@
         "wall_cycles": 32381,
         "physical_headroom": 3187,
         "start": {
-          "clock": 25136787,
-          "host_frame": 706,
+          "clock": 25812579,
+          "host_frame": 725,
           "scanline": 226,
           "cycle": 15
         },
         "end": {
-          "clock": 25169168,
-          "host_frame": 707,
+          "clock": 25844960,
+          "host_frame": 726,
           "scanline": 198,
           "cycle": 20
         },
         "next_start": {
-          "clock": 25172360,
-          "host_frame": 707
+          "clock": 25848152,
+          "host_frame": 726
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1256,20 +1256,20 @@
         "wall_cycles": 32869,
         "physical_headroom": 2699,
         "start": {
-          "clock": 25705880,
-          "host_frame": 722,
+          "clock": 26381672,
+          "host_frame": 741,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25738749,
-          "host_frame": 723,
+          "clock": 26414541,
+          "host_frame": 742,
           "scanline": 202,
           "cycle": 57
         },
         "next_start": {
-          "clock": 25741443,
-          "host_frame": 723
+          "clock": 26417235,
+          "host_frame": 742
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1327,20 +1327,20 @@
         "wall_cycles": 32869,
         "physical_headroom": 2699,
         "start": {
-          "clock": 25705880,
-          "host_frame": 722,
+          "clock": 26381672,
+          "host_frame": 741,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25738749,
-          "host_frame": 723,
+          "clock": 26414541,
+          "host_frame": 742,
           "scanline": 202,
           "cycle": 57
         },
         "next_start": {
-          "clock": 25741443,
-          "host_frame": 723
+          "clock": 26417235,
+          "host_frame": 742
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1405,20 +1405,20 @@
         "wall_cycles": 32381,
         "physical_headroom": 3187,
         "start": {
-          "clock": 25136787,
-          "host_frame": 706,
+          "clock": 25812579,
+          "host_frame": 725,
           "scanline": 226,
           "cycle": 15
         },
         "end": {
-          "clock": 25169168,
-          "host_frame": 707,
+          "clock": 25844960,
+          "host_frame": 726,
           "scanline": 198,
           "cycle": 20
         },
         "next_start": {
-          "clock": 25172360,
-          "host_frame": 707
+          "clock": 25848152,
+          "host_frame": 726
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1484,20 +1484,20 @@
         "wall_cycles": 32869,
         "physical_headroom": 2699,
         "start": {
-          "clock": 25705880,
-          "host_frame": 722,
+          "clock": 26381672,
+          "host_frame": 741,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25738749,
-          "host_frame": 723,
+          "clock": 26414541,
+          "host_frame": 742,
           "scanline": 202,
           "cycle": 57
         },
         "next_start": {
-          "clock": 25741443,
-          "host_frame": 723
+          "clock": 26417235,
+          "host_frame": 742
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1555,20 +1555,20 @@
         "wall_cycles": 31535,
         "physical_headroom": 4033,
         "start": {
-          "clock": 25848152,
-          "host_frame": 726,
+          "clock": 26523944,
+          "host_frame": 745,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25879687,
-          "host_frame": 727,
+          "clock": 26555479,
+          "host_frame": 746,
           "scanline": 190,
           "cycle": 91
         },
         "next_start": {
-          "clock": 25883715,
-          "host_frame": 727
+          "clock": 26559507,
+          "host_frame": 746
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1628,20 +1628,20 @@
         "wall_cycles": 32869,
         "physical_headroom": 2699,
         "start": {
-          "clock": 25705880,
-          "host_frame": 722,
+          "clock": 26381672,
+          "host_frame": 741,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25738749,
-          "host_frame": 723,
+          "clock": 26414541,
+          "host_frame": 742,
           "scanline": 202,
           "cycle": 57
         },
         "next_start": {
-          "clock": 25741443,
-          "host_frame": 723
+          "clock": 26417235,
+          "host_frame": 742
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1699,20 +1699,20 @@
         "wall_cycles": 32869,
         "physical_headroom": 2699,
         "start": {
-          "clock": 25705880,
-          "host_frame": 722,
+          "clock": 26381672,
+          "host_frame": 741,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25738749,
-          "host_frame": 723,
+          "clock": 26414541,
+          "host_frame": 742,
           "scanline": 202,
           "cycle": 57
         },
         "next_start": {
-          "clock": 25741443,
-          "host_frame": 723
+          "clock": 26417235,
+          "host_frame": 742
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1770,20 +1770,20 @@
         "wall_cycles": 31299,
         "physical_headroom": 4269,
         "start": {
-          "clock": 23073848,
-          "host_frame": 648,
+          "clock": 23749640,
+          "host_frame": 667,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 23105147,
-          "host_frame": 649,
+          "clock": 23780939,
+          "host_frame": 668,
           "scanline": 188,
           "cycle": 83
         },
         "next_start": {
-          "clock": 23109416,
-          "host_frame": 649
+          "clock": 23785208,
+          "host_frame": 668
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1844,20 +1844,20 @@
         "wall_cycles": 32869,
         "physical_headroom": 2699,
         "start": {
-          "clock": 25705880,
-          "host_frame": 722,
+          "clock": 26381672,
+          "host_frame": 741,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25738749,
-          "host_frame": 723,
+          "clock": 26414541,
+          "host_frame": 742,
           "scanline": 202,
           "cycle": 57
         },
         "next_start": {
-          "clock": 25741443,
-          "host_frame": 723
+          "clock": 26417235,
+          "host_frame": 742
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1915,20 +1915,20 @@
         "wall_cycles": 28567,
         "physical_headroom": 7001,
         "start": {
-          "clock": 19730456,
-          "host_frame": 554,
+          "clock": 20406248,
+          "host_frame": 573,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 19759023,
-          "host_frame": 555,
+          "clock": 20434815,
+          "host_frame": 574,
           "scanline": 164,
           "cycle": 87
         },
         "next_start": {
-          "clock": 19766024,
-          "host_frame": 555
+          "clock": 20441816,
+          "host_frame": 574
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -1987,20 +1987,20 @@
         "wall_cycles": 27120,
         "physical_headroom": 8448,
         "start": {
-          "clock": 21971240,
-          "host_frame": 617,
+          "clock": 22647032,
+          "host_frame": 636,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 21998360,
-          "host_frame": 618,
+          "clock": 22674152,
+          "host_frame": 637,
           "scanline": 152,
           "cycle": 8
         },
         "next_start": {
-          "clock": 22006803,
-          "host_frame": 618
+          "clock": 22682595,
+          "host_frame": 637
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2065,20 +2065,20 @@
         "wall_cycles": 29501,
         "physical_headroom": 6067,
         "start": {
-          "clock": 22362488,
-          "host_frame": 628,
+          "clock": 23038280,
+          "host_frame": 647,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 22391989,
-          "host_frame": 629,
+          "clock": 23067781,
+          "host_frame": 648,
           "scanline": 172,
           "cycle": 109
         },
         "next_start": {
-          "clock": 22398056,
-          "host_frame": 629
+          "clock": 23073848,
+          "host_frame": 648
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2137,20 +2137,20 @@
         "wall_cycles": 28846,
         "physical_headroom": 6722,
         "start": {
-          "clock": 20228403,
-          "host_frame": 568,
+          "clock": 20904195,
+          "host_frame": 587,
           "scanline": 226,
           "cycle": 15
         },
         "end": {
-          "clock": 20257249,
-          "host_frame": 569,
+          "clock": 20933041,
+          "host_frame": 588,
           "scanline": 167,
           "cycle": 19
         },
         "next_start": {
-          "clock": 20263976,
-          "host_frame": 569
+          "clock": 20939768,
+          "host_frame": 588
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2212,20 +2212,20 @@
         "wall_cycles": 31535,
         "physical_headroom": 4033,
         "start": {
-          "clock": 25848152,
-          "host_frame": 726,
+          "clock": 26523944,
+          "host_frame": 745,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 25879687,
-          "host_frame": 727,
+          "clock": 26555479,
+          "host_frame": 746,
           "scanline": 190,
           "cycle": 91
         },
         "next_start": {
-          "clock": 25883715,
-          "host_frame": 727
+          "clock": 26559507,
+          "host_frame": 746
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2292,20 +2292,20 @@
         "wall_cycles": 30203,
         "physical_headroom": 5365,
         "start": {
-          "clock": 28764728,
-          "host_frame": 808,
+          "clock": 29440520,
+          "host_frame": 827,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 28794931,
-          "host_frame": 809,
+          "clock": 29470723,
+          "host_frame": 828,
           "scanline": 179,
           "cycle": 13
         },
         "next_start": {
-          "clock": 28800296,
-          "host_frame": 809
+          "clock": 29476088,
+          "host_frame": 828
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2374,20 +2374,20 @@
         "wall_cycles": 22456,
         "physical_headroom": 13112,
         "start": {
-          "clock": 38012408,
-          "host_frame": 1068,
+          "clock": 38688200,
+          "host_frame": 1087,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 38034864,
-          "host_frame": 1069,
+          "clock": 38710656,
+          "host_frame": 1088,
           "scanline": 111,
           "cycle": 18
         },
         "next_start": {
-          "clock": 38047976,
-          "host_frame": 1069
+          "clock": 38723768,
+          "host_frame": 1088
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2448,20 +2448,20 @@
         "wall_cycles": 29501,
         "physical_headroom": 6067,
         "start": {
-          "clock": 22362488,
-          "host_frame": 628,
+          "clock": 23038280,
+          "host_frame": 647,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 22391989,
-          "host_frame": 629,
+          "clock": 23067781,
+          "host_frame": 648,
           "scanline": 172,
           "cycle": 109
         },
         "next_start": {
-          "clock": 22398056,
-          "host_frame": 629
+          "clock": 23073848,
+          "host_frame": 648
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2520,20 +2520,20 @@
         "wall_cycles": 28817,
         "physical_headroom": 6751,
         "start": {
-          "clock": 38439224,
-          "host_frame": 1080,
+          "clock": 39115016,
+          "host_frame": 1099,
           "scanline": 226,
           "cycle": 20
         },
         "end": {
-          "clock": 38468041,
-          "host_frame": 1081,
+          "clock": 39143833,
+          "host_frame": 1100,
           "scanline": 166,
           "cycle": 109
         },
         "next_start": {
-          "clock": 38474787,
-          "host_frame": 1081
+          "clock": 39150579,
+          "host_frame": 1100
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -2767,20 +2767,20 @@
       "wall_cycles": 32869,
       "physical_headroom": 2699,
       "start": {
-        "clock": 25705880,
-        "host_frame": 722,
+        "clock": 26381672,
+        "host_frame": 741,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 25738749,
-        "host_frame": 723,
+        "clock": 26414541,
+        "host_frame": 742,
         "scanline": 202,
         "cycle": 57
       },
       "next_start": {
-        "clock": 25741443,
-        "host_frame": 723
+        "clock": 26417235,
+        "host_frame": 742
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -2874,20 +2874,20 @@
       "wall_cycles": 31535,
       "physical_headroom": 4033,
       "start": {
-        "clock": 25848152,
-        "host_frame": 726,
+        "clock": 26523944,
+        "host_frame": 745,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 25879687,
-        "host_frame": 727,
+        "clock": 26555479,
+        "host_frame": 746,
         "scanline": 190,
         "cycle": 91
       },
       "next_start": {
-        "clock": 25883715,
-        "host_frame": 727
+        "clock": 26559507,
+        "host_frame": 746
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -2984,20 +2984,20 @@
       "wall_cycles": 31319,
       "physical_headroom": 4249,
       "start": {
-        "clock": 20015000,
-        "host_frame": 562,
+        "clock": 20690792,
+        "host_frame": 581,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 20046319,
-        "host_frame": 563,
+        "clock": 20722111,
+        "host_frame": 582,
         "scanline": 188,
         "cycle": 103
       },
       "next_start": {
-        "clock": 20050568,
-        "host_frame": 563
+        "clock": 20726360,
+        "host_frame": 582
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -3091,20 +3091,20 @@
       "wall_cycles": 31299,
       "physical_headroom": 4269,
       "start": {
-        "clock": 23073848,
-        "host_frame": 648,
+        "clock": 23749640,
+        "host_frame": 667,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 23105147,
-        "host_frame": 649,
+        "clock": 23780939,
+        "host_frame": 668,
         "scanline": 188,
         "cycle": 83
       },
       "next_start": {
-        "clock": 23109416,
-        "host_frame": 649
+        "clock": 23785208,
+        "host_frame": 668
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -3202,20 +3202,20 @@
       "wall_cycles": 31229,
       "physical_headroom": 4339,
       "start": {
-        "clock": 25919288,
-        "host_frame": 728,
+        "clock": 26595080,
+        "host_frame": 747,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 25950517,
-        "host_frame": 729,
+        "clock": 26626309,
+        "host_frame": 748,
         "scanline": 188,
         "cycle": 13
       },
       "next_start": {
-        "clock": 25954856,
-        "host_frame": 729
+        "clock": 26630648,
+        "host_frame": 748
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -3316,20 +3316,20 @@
       "wall_cycles": 31224,
       "physical_headroom": 4344,
       "start": {
-        "clock": 20228408,
-        "host_frame": 568,
+        "clock": 20904200,
+        "host_frame": 587,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 20259632,
-        "host_frame": 569,
+        "clock": 20935424,
+        "host_frame": 588,
         "scanline": 188,
         "cycle": 8
       },
       "next_start": {
-        "clock": 20263971,
-        "host_frame": 569
+        "clock": 20939763,
+        "host_frame": 588
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -3434,20 +3434,20 @@
       "wall_cycles": 30969,
       "physical_headroom": 4599,
       "start": {
-        "clock": 25634744,
-        "host_frame": 720,
+        "clock": 26310536,
+        "host_frame": 739,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 25665713,
-        "host_frame": 721,
+        "clock": 26341505,
+        "host_frame": 740,
         "scanline": 185,
         "cycle": 95
       },
       "next_start": {
-        "clock": 25670312,
-        "host_frame": 721
+        "clock": 26346104,
+        "host_frame": 740
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -3548,20 +3548,20 @@
       "wall_cycles": 30963,
       "physical_headroom": 4605,
       "start": {
-        "clock": 25990424,
-        "host_frame": 730,
+        "clock": 26666216,
+        "host_frame": 749,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 26021387,
-        "host_frame": 731,
+        "clock": 26697179,
+        "host_frame": 750,
         "scanline": 185,
         "cycle": 89
       },
       "next_start": {
-        "clock": 26025987,
-        "host_frame": 731
+        "clock": 26701779,
+        "host_frame": 750
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -3658,20 +3658,20 @@
       "wall_cycles": 30901,
       "physical_headroom": 4667,
       "start": {
-        "clock": 20512952,
-        "host_frame": 576,
+        "clock": 21188744,
+        "host_frame": 595,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 20543853,
-        "host_frame": 577,
+        "clock": 21219645,
+        "host_frame": 596,
         "scanline": 185,
         "cycle": 27
       },
       "next_start": {
-        "clock": 20548520,
-        "host_frame": 577
+        "clock": 21224312,
+        "host_frame": 596
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,
@@ -3772,20 +3772,20 @@
       "wall_cycles": 30869,
       "physical_headroom": 4699,
       "start": {
-        "clock": 25919288,
-        "host_frame": 728,
+        "clock": 26595080,
+        "host_frame": 747,
         "scanline": 226,
         "cycle": 20
       },
       "end": {
-        "clock": 25950157,
-        "host_frame": 729,
+        "clock": 26625949,
+        "host_frame": 748,
         "scanline": 184,
         "cycle": 109
       },
       "next_start": {
-        "clock": 25954856,
-        "host_frame": 729
+        "clock": 26630648,
+        "host_frame": 748
       },
       "host_vbi_boundaries": 1,
       "extra_vbi_boundaries": 0,

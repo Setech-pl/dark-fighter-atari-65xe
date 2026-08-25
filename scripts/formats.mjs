@@ -21,6 +21,7 @@ const DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BASELINE = 13697;
 const DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET = 768;
 const EXACT_BOOT_PAYLOAD_BYTES = 16384;
 const EXACT_BOOT_SECTORS = 128;
+const MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES = 1024;
 const BOOT_PAYLOAD_TRAILER = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
 
 function invariant(condition, message) {
@@ -213,10 +214,33 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.runtimeCodeBudget.actualDeltaBytes <= DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET &&
     manifest.runtimeCodeBudget.approvedDeltaBytes === DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET,
   "Destructible debris exceeds its payload or linked runtime-code budget");
-  invariant(boot.length === 0x2000 + manifest.broadsideRuntime.packedBytes +
+  const compaction = manifest.payloadBudget?.runtimePayloadCompaction;
+  invariant(compaction?.reserveBytes >= MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    compaction.minimumReserveBytes === MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    compaction.sourceOwned === true && compaction.fillByte === 0,
+  "Runtime payload compaction does not preserve the required source-owned reserve");
+  invariant(manifest.residentRuntime?.loadAddress === 0x2000 &&
+    manifest.residentRuntime.runAddress === 0x2000 &&
+    manifest.residentRuntime.rawBytes === 0x2000 &&
+    manifest.residentRuntime.prefixBytes + manifest.residentRuntime.suffixRawBytes === 0x2000 &&
+    manifest.residentRuntime.suffixPackedBytes < manifest.residentRuntime.suffixRawBytes,
+  "Resident runtime suffix compaction metadata is inconsistent");
+  invariant(boot.length === manifest.residentRuntime.prefixBytes +
+    manifest.residentRuntime.suffixPackedBytes + manifest.broadsideRuntime.packedBytes +
     manifest.starfieldRuntime.packedBytes + manifest.a2Kernel.bytes +
-    manifest.entityEffects.packedBytes + BOOT_PAYLOAD_TRAILER.length,
-  "Boot payload does not contain all packed relocation tails, A2 kernel and ENTITY_CODE");
+    manifest.entityEffects.packedBytes + compaction.reserveBytes +
+    BOOT_PAYLOAD_TRAILER.length,
+  "Boot payload does not contain the compacted runtime, relocation tails and reserve");
+  invariant(compaction.reserveAddress === manifest.loadAddress +
+    manifest.residentRuntime.prefixBytes + manifest.residentRuntime.suffixPackedBytes +
+    manifest.broadsideRuntime.packedBytes + manifest.starfieldRuntime.packedBytes +
+    manifest.a2Kernel.bytes + manifest.entityEffects.packedBytes &&
+    compaction.reserveEndAddress === manifest.bootPayloadTrailer.address - 1,
+  "Runtime payload reserve does not occupy the documented pre-trailer range");
+  const reserveOffset = compaction.reserveAddress - manifest.loadAddress;
+  invariant(boot.subarray(reserveOffset, reserveOffset + compaction.reserveBytes)
+    .every((byte) => byte === compaction.fillByte),
+  "Runtime payload reserve is not the source-owned zero-filled range from the manifest");
 
   const parsedXex = parseXex(xex);
   invariant(parsedXex.segments.length === 2, "XEX must contain the payload and RUNAD segments");

@@ -386,12 +386,20 @@ test("enemy breakup passes the hard PAL gate and executes the five-slot runtime 
     missedSynchronization: 0,
     deadlineOverruns: 0,
   });
-  assert.deepEqual(manifest.runtimeCodeBudget.enemyBreakupEffects, {
-    baselineBytes: 14_184,
-    actualBytes: 14_192,
-    actualDeltaBytes: 8,
-    approvedDeltaBytes: 512,
-    remainingBytes: 504,
+  const runtimeCode = manifest.runtimeCodeBudget.enemyBreakupEffects;
+  assert.equal(runtimeCode.baselineBytes, 14_184);
+  assert.equal(runtimeCode.approvedDeltaBytes, 512);
+  assert.equal(runtimeCode.actualBytes, manifest.runtimeCodeBudget.actualBytes);
+  assert.equal(runtimeCode.actualDeltaBytes,
+    runtimeCode.actualBytes - runtimeCode.baselineBytes);
+  assert.ok(runtimeCode.actualDeltaBytes <= runtimeCode.approvedDeltaBytes);
+  assert.equal(runtimeCode.remainingBytes,
+    runtimeCode.approvedDeltaBytes - runtimeCode.actualDeltaBytes);
+  assert.deepEqual(manifest.runtimeCodeBudget.runtimePayloadCompaction, {
+    baselineBytes: 14_192,
+    actualBytes: 14_316,
+    relocatedColdInitBytes: 124,
+    newGameplayBytes: 0,
   });
 });
 

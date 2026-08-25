@@ -81,6 +81,10 @@ const debrisVisualPolishPayloadLimitBytes = 16384;
 const exactBootPayloadBytes = 16384;
 const bootPayloadTrailer = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
 const bootPayloadCoreBytes = exactBootPayloadBytes - bootPayloadTrailer.length;
+const minimumRuntimeCompactionReserveBytes = 1024;
+const residentRuntimeSuffixAddressExpected = 0x21c1;
+const packedResidentStagingAddress = 0x8100;
+const bootA2StagingAddress = 0x7f10;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
 const runtimeHeadroomHistoricalWallGate = 31568;
@@ -115,6 +119,9 @@ const enemyBreakupHardDeltaCycles = 224;
 const enemyBreakupMinimumHeadroomCycles = 2600;
 const enemyBreakupRuntimeCodeBaselineBytes = 14184;
 const enemyBreakupRuntimeCodeBudgetBytes = 512;
+const runtimePayloadCompactionBaselineLinkedBytes = 14192;
+const runtimePayloadCompactionBaselineEntityCodeBytes = 725;
+const runtimePayloadCompactionBaselinePackedEntityBytes = 651;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -373,10 +380,16 @@ async function build() {
   const codeBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "CODE");
   const rodataBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "RODATA");
   const projectileStateBytes = labels.get("__PROJECTILES_SIZE__");
+  const residentRuntimeSuffixAddress = labels.get("resident_runtime_suffix");
+  const residentPackedSourceOperand = labels.get("resident_packed_source");
+  const residentPackedSizeOperand = labels.get("resident_packed_size");
+  const broadsidePackedSourceOperand = labels.get("broadside_packed_source");
   const starfieldPackedSourceOperand = labels.get("starfield_packed_source");
   const starfieldPackedSizeOperand = labels.get("starfield_packed_size");
   const a2KernelSourceOperand = labels.get("a2_kernel_source");
   const entityPackedSourceOperand = labels.get("entity_packed_source");
+  const entityStagedSourceOperand = labels.get("entity_staged_source");
+  const entityPackedSizeOperand = labels.get("entity_packed_size");
   const loaderPackedAddress = labels.get("loader_bitmap_lzss");
   const musicPlayerStart = labels.get("music_player_start");
   const musicPlayerEnd = labels.get("music_player_end");
@@ -397,9 +410,14 @@ async function build() {
     !Number.isInteger(entityCodeLoadAddress) || !Number.isInteger(entityCodeRunAddress) ||
     !Number.isInteger(entityCodeBytes) || !Number.isInteger(entityStateRunAddress) ||
     !Number.isInteger(entityStateBytes) ||
+    !Number.isInteger(residentRuntimeSuffixAddress) ||
+    !Number.isInteger(residentPackedSourceOperand) ||
+    !Number.isInteger(residentPackedSizeOperand) ||
+    !Number.isInteger(broadsidePackedSourceOperand) ||
     !Number.isInteger(starfieldPackedSourceOperand) ||
     !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(a2KernelSourceOperand) ||
-    !Number.isInteger(entityPackedSourceOperand) ||
+    !Number.isInteger(entityPackedSourceOperand) || !Number.isInteger(entityStagedSourceOperand) ||
+    !Number.isInteger(entityPackedSizeOperand) ||
     !Number.isInteger(loaderPackedAddress) ||
     !Number.isInteger(musicPlayerStart) || !Number.isInteger(musicPlayerEnd) ||
     !Number.isInteger(musicDataStart) || !Number.isInteger(musicDataEnd) ||
@@ -408,6 +426,9 @@ async function build() {
     !Number.isInteger(codeBytes) || !Number.isInteger(rodataBytes) ||
     !Number.isInteger(projectileStateBytes)) {
     throw new Error("ld65 label file is missing entry or resident relocation labels");
+  }
+  if (residentRuntimeSuffixAddress !== residentRuntimeSuffixAddressExpected) {
+    throw new Error(`Resident runtime suffix moved from its reviewed $${residentRuntimeSuffixAddressExpected.toString(16)} boundary`);
   }
   if (broadsideLoadAddress !== 0x4000 || broadsideRunAddress !== 0x5e10 ||
     broadsideRuntimeBytes > broadsideRuntimeReservedBytes) {
@@ -478,7 +499,40 @@ async function build() {
   const residentMain = Buffer.from(
     linkedPayload.subarray(0, broadsideLoadAddress - loadAddress),
   );
-  const packedStarfieldAddress = loadAddress + residentMain.length + packedBroadsideRuntime.length;
+  const residentPrefixBytes = residentRuntimeSuffixAddress - loadAddress;
+  const residentRuntimeSuffix = Buffer.from(residentMain.subarray(residentPrefixBytes));
+  const packedResidentRuntime = packBroadsideLzss(residentRuntimeSuffix);
+  if (!unpackBroadsideLzss(packedResidentRuntime).equals(residentRuntimeSuffix)) {
+    throw new Error("Resident runtime suffix LZSS round trip failed");
+  }
+
+  const residentPackedSourceAddress = loadAddress + residentPrefixBytes;
+  const broadsidePackedSourceAddress = residentPackedSourceAddress + packedResidentRuntime.length;
+  const packedStarfieldAddress = broadsidePackedSourceAddress + packedBroadsideRuntime.length;
+  const a2KernelSourceAddress = packedStarfieldAddress + packedStarfieldRuntime.length;
+  const entityPackedSourceAddress = a2KernelSourceAddress + a2KernelRuntime.length;
+  const entityStagedSourceAddress = packedResidentStagingAddress + packedResidentRuntime.length;
+  const entityStagedEndAddress = entityStagedSourceAddress + packedEntityCodeRuntime.length;
+  if (entityStagedSourceAddress < entityCodeRunAddress + entityCodeBytes ||
+    entityStagedEndAddress > 0xa000) {
+    throw new Error(
+      `Packed resident/entity staging $${packedResidentStagingAddress.toString(16)}-$${(entityStagedEndAddress - 1).toString(16)} ` +
+      "overlaps ENTITY_CODE output or the excluded $A000-$BFFF window",
+    );
+  }
+
+  residentMain.writeUInt16LE(
+    residentPackedSourceAddress,
+    residentPackedSourceOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
+    packedResidentRuntime.length,
+    residentPackedSizeOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
+    broadsidePackedSourceAddress,
+    broadsidePackedSourceOperand - loadAddress,
+  );
   residentMain.writeUInt16LE(
     packedStarfieldAddress,
     starfieldPackedSourceOperand - loadAddress,
@@ -487,34 +541,54 @@ async function build() {
     packedStarfieldRuntime.length,
     starfieldPackedSizeOperand - loadAddress,
   );
-  const a2KernelSourceAddress = loadAddress + residentMain.length +
-    packedBroadsideRuntime.length + packedStarfieldRuntime.length;
   residentMain.writeUInt16LE(
     a2KernelSourceAddress,
     a2KernelSourceOperand - loadAddress,
   );
-  const entityPackedSourceAddress = a2KernelSourceAddress + a2KernelRuntime.length;
   residentMain.writeUInt16LE(
     entityPackedSourceAddress,
     entityPackedSourceOperand - loadAddress,
   );
+  residentMain.writeUInt16LE(
+    entityStagedSourceAddress,
+    entityStagedSourceOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
+    packedEntityCodeRuntime.length,
+    entityPackedSizeOperand - loadAddress,
+  );
+
+  const residentPrefix = Buffer.from(residentMain.subarray(0, residentPrefixBytes));
+  const compactedPayloadBytes = residentPrefix.length + packedResidentRuntime.length +
+    packedBroadsideRuntime.length + packedStarfieldRuntime.length + a2KernelRuntime.length +
+    packedEntityCodeRuntime.length;
+  const runtimeCompactionReserveBytes = bootPayloadCoreBytes - compactedPayloadBytes;
+  if (runtimeCompactionReserveBytes < minimumRuntimeCompactionReserveBytes) {
+    throw new Error(
+      `Runtime compaction preserves only ${runtimeCompactionReserveBytes} B; ` +
+      `at least ${minimumRuntimeCompactionReserveBytes} B of source-owned reserve is required`,
+    );
+  }
+  const runtimeCompactionReserve = Buffer.alloc(runtimeCompactionReserveBytes);
+  const runtimeCompactionReserveAddress = loadAddress + compactedPayloadBytes;
   const bootPayloadCore = Buffer.concat([
-    residentMain,
+    residentPrefix,
+    packedResidentRuntime,
     packedBroadsideRuntime,
     packedStarfieldRuntime,
     a2KernelRuntime,
     packedEntityCodeRuntime,
+    runtimeCompactionReserve,
   ]);
-  if (!isReviewVariant && bootPayloadCore.length !== bootPayloadCoreBytes) {
+  if (bootPayloadCore.length !== bootPayloadCoreBytes) {
     throw new Error(
-      `Release boot payload core is ${bootPayloadCore.length} bytes; expected exactly ` +
-      `${bootPayloadCoreBytes} bytes before the source-owned ${bootPayloadTrailer.length}-byte ` +
-      `trailer (no formatter padding or truncation is permitted)`,
+      `Boot payload core is ${bootPayloadCore.length} bytes; expected exactly ` +
+      `${bootPayloadCoreBytes} bytes before the source-owned ${bootPayloadTrailer.length}-byte trailer`,
     );
   }
   const rawPayload = Buffer.concat([bootPayloadCore, bootPayloadTrailer]);
-  if (!isReviewVariant && rawPayload.length !== exactBootPayloadBytes) {
-    throw new Error(`Release boot payload must be exactly ${exactBootPayloadBytes} bytes`);
+  if (rawPayload.length !== exactBootPayloadBytes) {
+    throw new Error(`Boot payload must be exactly ${exactBootPayloadBytes} bytes`);
   }
   if (!isReviewVariant && rawPayload.length > entityEffectsFoundationPayloadLimit) {
     throw new Error(
@@ -545,6 +619,7 @@ async function build() {
   }
 
   rawPayload[1] = bootSectors;
+  residentMain[1] = bootSectors;
   if (rawPayload.readUInt16LE(2) !== loadAddress) {
     throw new Error("Assembled boot header has an unexpected load address");
   }
@@ -680,6 +755,35 @@ async function build() {
         remainingBytes: exactBootPayloadBytes - rawPayload.length,
         maximumBootSectors: 128,
       },
+      runtimePayloadCompaction: {
+        minimumReserveBytes: minimumRuntimeCompactionReserveBytes,
+        reserveBytes: runtimeCompactionReserveBytes,
+        recoveredReserveBytes: runtimeCompactionReserveBytes,
+        residentSuffixGrossSavingsBytes:
+          residentRuntimeSuffix.length - packedResidentRuntime.length,
+        relocatedColdInitBytes:
+          entityCodeBytes - runtimePayloadCompactionBaselineEntityCodeBytes,
+        relocatedColdInitPackedCostBytes:
+          packedEntityCodeRuntime.length - runtimePayloadCompactionBaselinePackedEntityBytes,
+        reserveAddress: runtimeCompactionReserveAddress,
+        reserveEndAddress: runtimeCompactionReserveAddress + runtimeCompactionReserveBytes - 1,
+        sourceOwned: true,
+        fillByte: 0,
+      },
+    },
+    residentRuntime: {
+      loadAddress,
+      runAddress: loadAddress,
+      rawBytes: residentMain.length,
+      prefixBytes: residentPrefix.length,
+      prefixEndAddress: residentRuntimeSuffixAddress - 1,
+      suffixAddress: residentRuntimeSuffixAddress,
+      suffixRawBytes: residentRuntimeSuffix.length,
+      suffixPackedBytes: packedResidentRuntime.length,
+      packedSourceAddress: residentPackedSourceAddress,
+      stagingAddress: packedResidentStagingAddress,
+      stagedEndAddress: packedResidentStagingAddress + packedResidentRuntime.length - 1,
+      compression: "LZ-10/5",
     },
     broadsideRuntime: {
       loadAddress: broadsideLoadAddress,
@@ -687,6 +791,7 @@ async function build() {
       bytes: broadsideRuntimeBytes,
       reservedBytes: broadsideRuntimeReservedBytes,
       packedBytes: packedBroadsideRuntime.length,
+      packedSourceAddress: broadsidePackedSourceAddress,
       compression: "LZ-10/5",
     },
     starfieldRuntime: {
@@ -695,6 +800,7 @@ async function build() {
       bytes: starfieldRuntimeBytes,
       reservedBytes: 0x08e6,
       packedBytes: packedStarfieldRuntime.length,
+      packedSourceAddress: packedStarfieldAddress,
       stagingAddress: starfieldStagingAddress,
       stagingBytes: starfieldStagingBytes,
       compression: "LZ-10/5",
@@ -703,6 +809,7 @@ async function build() {
       loadAddress: a2KernelLoadAddress,
       runAddress: a2KernelRunAddress,
       sourceAddress: a2KernelSourceAddress,
+      stagingAddress: bootA2StagingAddress,
       bytes: a2KernelBytes,
       reservedBytes: 0x0100,
       availability: "unconditional 64 KB RAM",
@@ -741,6 +848,8 @@ async function build() {
       },
       packedBytes: packedEntityCodeRuntime.length,
       packedSourceAddress: entityPackedSourceAddress,
+      stagedSourceAddress: entityStagedSourceAddress,
+      stagedEndAddress: entityStagedEndAddress - 1,
       compression: "LZ-10/5",
       deterministicFillTestByte: 0xa5,
       gameplayTopScanline: entityEffectsAsset.coordinateSystem.gameplayTopScanline,
@@ -866,6 +975,13 @@ async function build() {
         approvedDeltaBytes: enemyBreakupRuntimeCodeBudgetBytes,
         remainingBytes: enemyBreakupRuntimeCodeBaselineBytes +
           enemyBreakupRuntimeCodeBudgetBytes - destructibleDebrisRuntimeCodeBytes,
+      },
+      runtimePayloadCompaction: {
+        baselineBytes: runtimePayloadCompactionBaselineLinkedBytes,
+        actualBytes: destructibleDebrisRuntimeCodeBytes,
+        relocatedColdInitBytes:
+          destructibleDebrisRuntimeCodeBytes - runtimePayloadCompactionBaselineLinkedBytes,
+        newGameplayBytes: 0,
       },
     },
     loaderScreen: {
@@ -1090,6 +1206,9 @@ async function build() {
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
   writeFile(path.join(buildDirectory, "dark-fighter.bin"), rawPayload);
+  writeFile(path.join(buildDirectory, "resident-runtime.bin"), residentMain);
+  writeFile(path.join(buildDirectory, "resident-runtime-suffix.bin"), residentRuntimeSuffix);
+  writeFile(path.join(buildDirectory, "resident-runtime-suffix-packed.bin"), packedResidentRuntime);
   writeFile(path.join(buildDirectory, "broadside-runtime.bin"), broadsideRuntime);
   writeFile(path.join(buildDirectory, "broadside-runtime-packed.bin"), packedBroadsideRuntime);
   writeFile(path.join(buildDirectory, "starfield-runtime.bin"), starfieldRuntime);
@@ -1120,6 +1239,7 @@ async function build() {
     console.log(`  entry   : $${startAddress.toString(16)}`);
     console.log(`  XEX     : ${xex.length} bytes`);
     console.log(`  ATR     : ${atr.length} bytes`);
+    console.log(`  reserve : ${runtimeCompactionReserveBytes} bytes source-owned @ $${runtimeCompactionReserveAddress.toString(16)}`);
     if (enemyReviewHarness) {
       console.log(`  variant : compile-time enemy review harness`);
       console.log(`  output  : ${path.relative(rootDirectory, artifactDirectory)}`);

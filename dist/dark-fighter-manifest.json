@@ -48,7 +48,33 @@
       "actualBytes": 16384,
       "remainingBytes": 0,
       "maximumBootSectors": 128
+    },
+    "runtimePayloadCompaction": {
+      "minimumReserveBytes": 1024,
+      "reserveBytes": 1097,
+      "recoveredReserveBytes": 1097,
+      "residentSuffixGrossSavingsBytes": 1218,
+      "relocatedColdInitBytes": 124,
+      "relocatedColdInitPackedCostBytes": 121,
+      "reserveAddress": 23475,
+      "reserveEndAddress": 24571,
+      "sourceOwned": true,
+      "fillByte": 0
     }
+  },
+  "residentRuntime": {
+    "loadAddress": 8192,
+    "runAddress": 8192,
+    "rawBytes": 8192,
+    "prefixBytes": 449,
+    "prefixEndAddress": 8640,
+    "suffixAddress": 8641,
+    "suffixRawBytes": 7743,
+    "suffixPackedBytes": 6525,
+    "packedSourceAddress": 8641,
+    "stagingAddress": 33024,
+    "stagedEndAddress": 39548,
+    "compression": "LZ-10/5"
   },
   "broadsideRuntime": {
     "loadAddress": 16384,
@@ -56,6 +82,7 @@
     "bytes": 6655,
     "reservedBytes": 6656,
     "packedBytes": 5612,
+    "packedSourceAddress": 15166,
     "compression": "LZ-10/5"
   },
   "starfieldRuntime": {
@@ -64,6 +91,7 @@
     "bytes": 2160,
     "reservedBytes": 2278,
     "packedBytes": 1699,
+    "packedSourceAddress": 20778,
     "stagingAddress": 30736,
     "stagingBytes": 1792,
     "compression": "LZ-10/5"
@@ -71,7 +99,8 @@
   "a2Kernel": {
     "loadAddress": 27136,
     "runAddress": 36864,
-    "sourceAddress": 23695,
+    "sourceAddress": 22477,
+    "stagingAddress": 32528,
     "bytes": 226,
     "reservedBytes": 256,
     "availability": "unconditional 64 KB RAM"
@@ -89,24 +118,26 @@
     "effectActiveLimit": 5,
     "codeLoadAddress": 27392,
     "codeRunAddress": 37120,
-    "codeBytes": 725,
+    "codeBytes": 849,
     "codeReservedBytes": 3840,
     "codeBudget": {
       "baselineBytes": 564,
       "approvedDeltaBytes": 512,
-      "actualDeltaBytes": 161,
+      "actualDeltaBytes": 285,
       "limitBytes": 1076,
-      "remainingBytes": 351,
+      "remainingBytes": 227,
       "destructibleDebris": {
         "baselineBytes": 714,
         "approvedDeltaBytes": 768,
-        "actualBytes": 725,
-        "actualDeltaBytes": 11,
+        "actualBytes": 849,
+        "actualDeltaBytes": 135,
         "limitBytes": 1482
       }
     },
-    "packedBytes": 651,
-    "packedSourceAddress": 23921,
+    "packedBytes": 772,
+    "packedSourceAddress": 22703,
+    "stagedSourceAddress": 39549,
+    "stagedEndAddress": 40320,
     "compression": "LZ-10/5",
     "deterministicFillTestByte": 165,
     "gameplayTopScanline": 24,
@@ -196,16 +227,22 @@
   "runtimeCodeBudget": {
     "measurement": "linked CODE + STARFIELD + BROADSIDE + A2_KERNEL + ENTITY_CODE bytes",
     "baselineBytes": 13697,
-    "actualBytes": 14192,
-    "actualDeltaBytes": 495,
+    "actualBytes": 14316,
+    "actualDeltaBytes": 619,
     "approvedDeltaBytes": 768,
-    "remainingBytes": 273,
+    "remainingBytes": 149,
     "enemyBreakupEffects": {
       "baselineBytes": 14184,
-      "actualBytes": 14192,
-      "actualDeltaBytes": 8,
+      "actualBytes": 14316,
+      "actualDeltaBytes": 132,
       "approvedDeltaBytes": 512,
-      "remainingBytes": 504
+      "remainingBytes": 380
+    },
+    "runtimePayloadCompaction": {
+      "baselineBytes": 14192,
+      "actualBytes": 14316,
+      "relocatedColdInitBytes": 124,
+      "newGameplayBytes": 0
     }
   },
   "loaderScreen": {
@@ -21565,12 +21602,12 @@
       },
       {
         "name": "ENTITY_CODE",
-        "bytes": 725,
+        "bytes": 849,
         "featureStartBytes": 714,
-        "featureDeltaBytes": 11,
+        "featureDeltaBytes": 135,
         "acceptedMaximumBytes": 1482,
         "reservedMaximumBytes": 3840,
-        "freeReservedBytes": 3115
+        "freeReservedBytes": 2991
       }
     ],
     "memory": {
@@ -21722,11 +21759,11 @@
     "estimated_additive_cycles": 33366,
     "wallTrace": {
       "reportPath": "docs/runtime-wall-trace.json",
-      "reportSha256": "7d2731f3187105c0a8f1d91ca56a12649f205a173ed9fd545e1f2e23114cbce5",
+      "reportSha256": "1b827956bcd2f5ecf70a8b0801e53b00c155c546b7ca3994533b317cf47a5de5",
       "artifact": {
         "path": "dist/dark-fighter.xex",
         "bytes": 16396,
-        "sha256": "fd10f2e95bcc83e2036e63c8840b4ddd1b29a944b920552694982987fbe970d9"
+        "sha256": "9011208521975092f105ce71800532684812278d63c07d3ccfb402e8b79e856c"
       },
       "emulator": {
         "name": "Atari800",
@@ -21843,20 +21880,20 @@
             "wall_cycles": 28846,
             "physical_headroom": 6722,
             "start": {
-              "clock": 20228403,
-              "host_frame": 568,
+              "clock": 20904195,
+              "host_frame": 587,
               "scanline": 226,
               "cycle": 15
             },
             "end": {
-              "clock": 20257249,
-              "host_frame": 569,
+              "clock": 20933041,
+              "host_frame": 588,
               "scanline": 167,
               "cycle": 19
             },
             "next_start": {
-              "clock": 20263976,
-              "host_frame": 569
+              "clock": 20939768,
+              "host_frame": 588
             },
             "host_vbi_boundaries": 1,
             "extra_vbi_boundaries": 0,
@@ -21980,15 +22017,15 @@
   "artifacts": {
     "dark-fighter-boot.bin": {
       "bytes": 16384,
-      "sha256": "7e2cc7db8c86392038d41c61a0cf9709738356ee758ee6c4afe932b25e971d1c"
+      "sha256": "591c3526f0aa8a850a8db3d342792248f8071bf6001b678a4e6cbde05e9ee02c"
     },
     "dark-fighter.xex": {
       "bytes": 16396,
-      "sha256": "fd10f2e95bcc83e2036e63c8840b4ddd1b29a944b920552694982987fbe970d9"
+      "sha256": "9011208521975092f105ce71800532684812278d63c07d3ccfb402e8b79e856c"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "e37b35fcec5233a9df45e23cb35f3624db113b8e59002be7ee247e056593a309"
+      "sha256": "65f46c02c8eee92248b92bf8a8bdcce423f2056e71e9ae2ac8f555baab05f22a"
     }
   }
 }

@@ -11,7 +11,7 @@ import {
   loadEnemyRosterDefinition,
   renderEnemyRosterCa65Include,
 } from "../scripts/enemy-roster.mjs";
-import { parseXex } from "../scripts/formats.mjs";
+import { readRuntimeBytes as readAssembledRuntimeBytes } from "../scripts/runtime-image.mjs";
 import {
   createEnemyAnchorComparisonPreview,
   createEnemyNativeSpritesPreview,
@@ -32,9 +32,7 @@ const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8"
 const definition = loadEnemyRosterDefinition(rosterPath);
 const asset = compileEnemyRoster(definition, rootDirectory);
 const hulls = loadCapitalHullsDefinition(hullsPath);
-const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
-const broadsideRuntime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -44,15 +42,7 @@ const labels = new Map(
 );
 
 function readRuntimeBytes(address, length) {
-  const segment = parseXex(xex).segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  if (segment) return segment.data.subarray(address - segment.start, address - segment.start + length);
-  const runtime = manifest.broadsideRuntime;
-  if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
-    return broadsideRuntime.subarray(address - runtime.runAddress, address - runtime.runAddress + length);
-  }
-  throw new Error(`Runtime address $${address.toString(16)} is not in an assembled segment`);
+  return readAssembledRuntimeBytes(rootDirectory, address, length);
 }
 
 function hammingDistance(left, right) {

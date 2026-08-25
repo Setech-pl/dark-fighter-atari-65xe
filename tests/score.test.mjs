@@ -3,16 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { parseXex } from "../scripts/formats.mjs";
+import { installRuntimeSegments } from "../scripts/runtime-image.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(directory, "..");
 const source = fs.readFileSync(path.join(root, "src", "main.s"), "utf8");
-const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
-const xex = fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"));
-const starfieldRuntime = fs.readFileSync(path.join(root, "build", "starfield-runtime.bin"));
-const broadsideRuntime = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
-const a2KernelRuntime = fs.readFileSync(path.join(root, "build", "a2-kernel-runtime.bin"));
 const labels = new Map(
   fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -58,10 +53,7 @@ function routine(label) {
 
 function createRuntimeMemory() {
   const memory = new Uint8Array(0x10000);
-  for (const segment of parseXex(xex).segments) memory.set(segment.data, segment.start);
-  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
-  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
-  memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
+  installRuntimeSegments(memory, root);
   return memory;
 }
 
@@ -289,7 +281,8 @@ test("all score writes use one BCD award path while source ownership stays uncha
     /cmp #\(DAMAGE_CAPITAL_CYLON\+1\)\s+bcs @no_score\s+jsr add_archetype_score/);
   assert.match(routine("init_state"), /sta score_bcd_lo\s+sta score_bcd_hi/);
   assert.doesNotMatch(routine("init_state"), /TOP_SCORE/);
-  assert.match(routine("start"), /sta TOP_SCORE_BCD_LO\s+sta TOP_SCORE_BCD_HI/);
+  assert.match(routine("finish_startup_after_loader"),
+    /sta TOP_SCORE_BCD_LO\s+sta TOP_SCORE_BCD_HI/);
   assert.equal((source.match(/sta score_bcd_lo/g) ?? []).length, 2);
   assert.equal((source.match(/sta score_bcd_hi/g) ?? []).length, 2);
 });

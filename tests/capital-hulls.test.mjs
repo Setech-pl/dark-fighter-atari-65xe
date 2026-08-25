@@ -10,8 +10,11 @@ import {
   loadCapitalHullsDefinition,
   renderCapitalHullsCa65Include,
 } from "../scripts/capital-hulls.mjs";
-import { parseXex } from "../scripts/formats.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
+import {
+  installRuntimeSegments,
+  readRuntimeBytes,
+} from "../scripts/runtime-image.mjs";
 import { loadLoaderBitmapDefinition } from "../scripts/loader-assets.mjs";
 import {
   compileEnemyRoster,
@@ -38,11 +41,7 @@ const includePath = path.join(rootDirectory, "build", "capital-hulls.inc");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 const definition = loadCapitalHullsDefinition(definitionPath);
 const asset = compileCapitalHulls(definition);
-const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
-const broadsideRuntime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
-const starfieldRuntime = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime.bin"));
-const a2KernelRuntime = fs.readFileSync(path.join(rootDirectory, "build", "a2-kernel-runtime.bin"));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -57,25 +56,7 @@ function sha256(bytes) {
 }
 
 function readXexBytes(address, length) {
-  const runtime = manifest.broadsideRuntime;
-  if (address >= runtime.runAddress && address + length <= runtime.runAddress + runtime.bytes) {
-    return broadsideRuntime.subarray(address - runtime.runAddress, address - runtime.runAddress + length);
-  }
-  const starfield = manifest.starfieldRuntime;
-  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
-    return starfieldRuntime.subarray(address - starfield.runAddress, address - starfield.runAddress + length);
-  }
-  const kernel = manifest.a2Kernel;
-  if (address >= kernel.runAddress && address + length <= kernel.runAddress + kernel.bytes) {
-    return a2KernelRuntime.subarray(address - kernel.runAddress, address - kernel.runAddress + length);
-  }
-  const segment = parseXex(xex).segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  if (segment) {
-    return segment.data.subarray(address - segment.start, address - segment.start + length);
-  }
-  assert.fail(`Resident image does not contain $${address.toString(16)}`);
+  return readRuntimeBytes(rootDirectory, address, length);
 }
 
 function runResidentRoutine(memory, name) {
@@ -163,9 +144,7 @@ test("31 generated ANTIC 4 glyphs fit the 1024-byte assembled gameplay charset",
   const graphics = readGameGraphicsSource(source, definition);
   assert.equal(graphics.charset.length, 1024);
   const memory = new Uint8Array(0x10000);
-  for (const segment of parseXex(xex).segments) memory.set(segment.data, segment.start);
-  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
-  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
+  installRuntimeSegments(memory, rootDirectory);
   runResidentRoutine(memory, "copy_charset");
   runResidentRoutine(memory, "init_fighter_projectiles");
   const runtimeCharset = memory.subarray(0x4400, 0x4800);

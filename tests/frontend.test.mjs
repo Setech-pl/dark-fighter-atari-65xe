@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { parseXex } from "../scripts/formats.mjs";
+import { readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import {
   readFrontendGraphicsSource,
   readStartMenuRuntimeState,
@@ -12,12 +12,7 @@ import {
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
-const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
-const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json")));
-const broadsideRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "broadside-runtime.bin"),
-);
 const labels = new Map(
   fs
     .readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -28,20 +23,11 @@ const labels = new Map(
 );
 
 function readXexBytes(address, length) {
-  const segment = parseXex(xex).segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  assert.ok(segment, `XEX does not contain $${address.toString(16)}`);
-  return segment.data.subarray(
-    address - segment.start,
-    address - segment.start + length,
-  );
+  return readRuntimeBytes(rootDirectory, address, length);
 }
 
 function readBroadsideRuntimeBytes(address, length) {
-  const offset = address - manifest.broadsideRuntime.runAddress;
-  assert.ok(offset >= 0 && offset + length <= broadsideRuntime.length);
-  return broadsideRuntime.subarray(offset, offset + length);
+  return readRuntimeBytes(rootDirectory, address, length);
 }
 
 function routine(label) {
@@ -69,7 +55,8 @@ test("boot enters an explicit ten-state frontend/game state machine", () => {
   assert.match(source, /STATE_GAME_OVER\s*=\s*7/);
   assert.match(source, /STATE_PAUSED\s*=\s*8/);
   assert.match(source, /STATE_PAUSE_QUIT_CONFIRM\s*=\s*9/);
-  assert.match(source, /jsr show_loader[\s\S]+jsr enter_main_menu\s+jmp frontend_loop/);
+  assert.match(source,
+    /jsr show_loader[\s\S]+jmp finish_startup_after_loader[\s\S]+finish_startup_after_loader:[\s\S]+jsr enter_main_menu\s+jmp frontend_loop/);
 });
 
 test("main menu labels are exact, ordered, and default to START GAME", () => {
@@ -213,8 +200,10 @@ test("OPTIONS persists GAME MUSIC and a MEDIUM-default difficulty", () => {
   assert.match(routine("render_frontend_state"),
     /jsr draw_sound_value[\s\S]+jsr draw_game_music_value[\s\S]+jsr draw_difficulty_value[\s\S]+jmp update_frontend_marker/);
 
-  const startBytes = readXexBytes(labels.get("start"), 160);
-  assert.notEqual(startBytes.indexOf(Buffer.from([
+  const startupAddress = labels.get("finish_startup_after_loader");
+  const startupBytes = readXexBytes(startupAddress,
+    labels.get("__ENTITY_CODE_RUN__") + labels.get("__ENTITY_CODE_SIZE__") - startupAddress);
+  assert.notEqual(startupBytes.indexOf(Buffer.from([
     0xa9, 0x01, 0x8d, difficultyAddress & 0xff, difficultyAddress >> 8,
   ])), -1, "boot must store MEDIUM in persistent RAM");
   const setBytes = readBroadsideRuntimeBytes(labels.get("set_difficulty"), 6);

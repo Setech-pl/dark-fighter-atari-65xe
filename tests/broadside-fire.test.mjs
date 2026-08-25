@@ -58,6 +58,7 @@ import {
 } from "../scripts/capital-hulls.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
+import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import {
   createBroadsideAcceptanceSequencePreview,
   createBroadsideCadenceSequencePreview,
@@ -84,18 +85,8 @@ const asset = compileCapitalHulls(definition);
 const alliedTurretIndex = asset.turrets.findIndex(({ side }) => side === "allied");
 const enemyTurretIndex = asset.turrets.findIndex(({ side }) => side === "enemy");
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json")));
-const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const broadsideRuntime = fs.readFileSync(
   path.join(rootDirectory, "build", "broadside-runtime.bin"),
-);
-const starfieldRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "starfield-runtime.bin"),
-);
-const a2KernelRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "a2-kernel-runtime.bin"),
-);
-const entityCodeRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "entity-code-runtime.bin"),
 );
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -118,59 +109,12 @@ function routine(name, next) {
 }
 
 function xexBytesAt(address, length) {
-  const broadside = manifest.broadsideRuntime;
-  if (address >= broadside.runAddress && address + length <= broadside.runAddress + broadside.bytes) {
-    return broadsideRuntime.subarray(
-      address - broadside.runAddress,
-      address - broadside.runAddress + length,
-    );
-  }
-  const starfield = manifest.starfieldRuntime;
-  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
-    return starfieldRuntime.subarray(
-      address - starfield.runAddress,
-      address - starfield.runAddress + length,
-    );
-  }
-  const kernel = manifest.a2Kernel;
-  if (address >= kernel.runAddress && address + length <= kernel.runAddress + kernel.bytes) {
-    return a2KernelRuntime.subarray(
-      address - kernel.runAddress,
-      address - kernel.runAddress + length,
-    );
-  }
-  let offset = 0;
-  while (offset < xex.length) {
-    if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
-    assert.ok(offset + 4 <= xex.length, "truncated XEX segment header");
-    const start = xex.readUInt16LE(offset);
-    const end = xex.readUInt16LE(offset + 2);
-    offset += 4;
-    const bytes = end - start + 1;
-    assert.ok(offset + bytes <= xex.length, "truncated XEX segment data");
-    if (address >= start && address + length - 1 <= end) {
-      return xex.subarray(offset + address - start, offset + address - start + length);
-    }
-    offset += bytes;
-  }
-  assert.fail(`XEX address $${address.toString(16)} is not in a segment`);
+  return readRuntimeBytes(rootDirectory, address, length);
 }
 
 function createLinkedRuntimeMemory() {
   const memory = new Uint8Array(0x10000);
-  let offset = 0;
-  while (offset < xex.length) {
-    if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
-    const start = xex.readUInt16LE(offset);
-    const end = xex.readUInt16LE(offset + 2);
-    offset += 4;
-    memory.set(xex.subarray(offset, offset + end - start + 1), start);
-    offset += end - start + 1;
-  }
-  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
-  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
-  memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
-  memory.set(entityCodeRuntime, manifest.entityEffects.codeRunAddress);
+  installRuntimeSegments(memory, rootDirectory);
   const rowLo = labels.get("PLAYFIELD_ROW_LO");
   const rowHi = labels.get("PLAYFIELD_ROW_HI");
   for (let row = 0; row < 22; row += 1) {
@@ -298,8 +242,8 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
   assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
   assert.ok(starPacked.length <= 0x700);
-  assert.match(routine("start", "unpack_broadside_runtime"),
-    /jsr unpack_entity_runtime[\s\S]+jsr init_entity_effects[\s\S]+jsr unpack_broadside_runtime[\s\S]+jsr stage_a2_kernel[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
+  assert.match(routine("start", "broadside_unpack_command"),
+    /jsr stage_boot_streams[\s\S]+jsr unpack_boot_broadside_runtime[\s\S]+jsr unpack_resident_runtime[\s\S]+jsr unpack_entity_runtime[\s\S]+jsr init_entity_effects[\s\S]+jsr stage_a2_kernel[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });
 
 test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve every other pair", () => {

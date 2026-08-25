@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { parseXex } from "../scripts/formats.mjs";
+import { readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import {
   createExplosionFlashComparisonPreview,
   createExplosionFlashNativePreview,
@@ -23,7 +23,6 @@ const labels = new Map(
     .filter(Boolean)
     .map((match) => [match[2], Number.parseInt(match[1], 16)]),
 );
-const xex = fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"));
 
 function routine(start, end) {
   const startIndex = source.search(new RegExp(`^${start}:`, "m"));
@@ -34,11 +33,7 @@ function routine(start, end) {
 
 function linkedBytes(label, length) {
   const address = labels.get(label);
-  const segment = parseXex(xex).segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  assert.ok(segment, `${label} must be present in the linked XEX`);
-  return [...segment.data.subarray(address - segment.start, address - segment.start + length)];
+  return [...readRuntimeBytes(root, address, length)];
 }
 
 test("named PAL colours and linked tables define the exact two fighter profiles", () => {

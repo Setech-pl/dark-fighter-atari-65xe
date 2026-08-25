@@ -94,6 +94,8 @@ NMIEN       = $D40E
 PMG_BASE    = $3800
 STARFIELD_STAGING = $7810
 STARFIELD_STAGING_BYTES = $0700
+BOOT_A2_STAGING = $7F10
+PACKED_RESIDENT_STAGING = $8100
 PAUSE_SCREEN_BACKUP = STARFIELD_STAGING
 PAUSE_SCREEN_BYTES = $03C0
 MISSILES    = PMG_BASE + $0300
@@ -760,80 +762,22 @@ start:
     sta GRACTL
     sta AUDCTL
 
-    ; The packed boot tail is expanded to reclaimed resident RAM before the
-    ; loader starts using $4010-$5E0F for its bitmap.
+    ; Only this bounded prefix is stored verbatim in the boot payload. Preserve
+    ; every source that later expansion can overwrite, expand BROADSIDE, then
+    ; restore the byte-exact resident suffix at its linked address.
+    jsr stage_boot_streams
+    jsr unpack_boot_broadside_runtime
+    jsr unpack_resident_runtime
     jsr unpack_entity_runtime
     jsr init_entity_effects
-    jsr unpack_broadside_runtime
     jsr stage_a2_kernel
-    jsr stage_starfield_runtime
 
-    sta game_state                 ; STATE_LOADER
+    lda #STATE_LOADER
+    sta game_state
     jsr unpack_loader_bitmap
     jsr show_loader
     jsr unpack_starfield_runtime
-
-    ; Rebuild the gameplay and mixed-mode frontend displays with DMA off.
-    ; This also reclaims loader-only payload bytes before Player 2 PMG data.
-    jsr clear_pmg
-    jsr copy_charset
-    jsr copy_frontend_charset
-    jsr copy_hud_charset
-    jsr clear_screen
-
-    ; Session TOP survives gameplay resets but not a full program restart.
-    lda #$00
-    sta TOP_SCORE_BCD_LO
-    sta TOP_SCORE_BCD_HI
-
-    lda #>PMG_BASE
-    sta PMBASE
-    lda #>CHARSET
-    sta CHBASE
-
-    lda #$01                    ; double-width ships at 160-color-clock scale
-    sta SIZEP0
-    sta SIZEP1
-    sta SIZEP2
-    sta SIZEP3
-    lda #$00
-    sta SIZEM
-    sta PRIOR
-
-    lda #$0E                    ; cold white player hull
-    sta COLPM0
-    lda #ENEMY_RUNTIME_BODY_COLOR ; Cylon-family burgundy Raider hull
-    sta COLPM1
-    lda #ENEMY_SCANNER_COLOR    ; hostile red scanner and M2 pulse
-    sta COLPM2
-    lda #$28                    ; amber engine plume
-    sta COLPM3
-    lda #$0E                    ; HUD and stars
-    sta COLPF0
-    lda #$84                    ; worn steel-blue structures
-    sta COLPF1
-    lda #$28                    ; amber telemetry
-    sta COLPF2
-    lda #KAWASAKI_GREEN        ; active main-menu label
-    sta COLPF3
-    lda #$00
-    sta COLBK
-
-    jsr silence_audio
-    lda #$01
-    sta sound_enabled           ; options default: SOUND ON
-    sta GAME_MUSIC_ENABLED      ; options default: GAME MUSIC ON
-    jsr music_init
-    lda #DIFFICULTY_DEFAULT
-    sta DIFFICULTY_SETTING      ; options default: MEDIUM
-.if ENEMY_REVIEW_HARNESS
-    jmp start_gameplay          ; compile-time review artifact skips frontend input
-.elseif ENEMY_COMBAT_REVIEW_HARNESS
-    jmp start_gameplay          ; palette/combat review variants skip frontend input
-.else
-    jsr enter_main_menu
-    jmp frontend_loop
-.endif
+    jmp finish_startup_after_loader
 
 broadside_unpack_command:
     jsr broadside_read_source
@@ -897,45 +841,71 @@ unpack_starfield_runtime:
     sta broadside_destination+2
     jmp broadside_unpack_command
 
-; Patched by scripts/build.mjs. The packed starfield stream follows the packed
-; BROADSIDE stream in the boot payload and is staged before loader bitmap use.
+; Patched by scripts/build.mjs. Four source/destination/size records preserve
+; the resident suffix, ENTITY_CODE stream, starfield stream and A2 bytes before
+; either decompressor can overwrite their low-memory payload source.
+boot_stage_streams:
+resident_packed_source:
+    .word $FFFF
+    .word PACKED_RESIDENT_STAGING
+resident_packed_size:
+    .word $FFFF
+entity_packed_source:
+    .word $FFFF
+entity_staged_source:
+    .word $FFFF
+entity_packed_size:
+    .word $FFFF
 starfield_packed_source:
     .word $FFFF
+    .word STARFIELD_STAGING
 starfield_packed_size:
     .word $FFFF
 a2_kernel_source:
     .word $FFFF
-entity_packed_source:
-    .word $FFFF
+    .word BOOT_A2_STAGING
+    .word __A2_KERNEL_SIZE__
+boot_stage_streams_end:
 
-; ENTITY_CODE may extend past the broadside destination boundary in the
-; consecutive boot payload. It is therefore expanded first, before the
-; broadside decoder is allowed to overwrite any already-consumed source byte.
-unpack_entity_runtime:
-    lda entity_packed_source
-    sta broadside_read_source+1
-    lda entity_packed_source+1
-    sta broadside_read_source+2
-    lda #<__ENTITY_CODE_RUN__
-    sta broadside_destination+1
-    lda #>__ENTITY_CODE_RUN__
-    sta broadside_destination+2
-    jmp broadside_unpack_command
-
-; Preserve the compact stream above the resident broadside reservation, clear
-; of both the packed loader source and its bitmap destination. The buffer is
-; transient and released after the loader.
-stage_starfield_runtime:
-    lda starfield_packed_source
+stage_boot_streams:
+    lda #<boot_stage_streams
+    sta frontend_data_ptr
+    lda #>boot_stage_streams
+    sta frontend_data_ptr+1
+    lda #$04
+    sta loader_dli_phase
+@record:
+    ldy #$00
+    lda (frontend_data_ptr),y
     sta src_ptr
-    lda starfield_packed_source+1
+    iny
+    lda (frontend_data_ptr),y
     sta src_ptr+1
-    lda #<STARFIELD_STAGING
+    iny
+    lda (frontend_data_ptr),y
     sta dst_ptr
-    lda #>STARFIELD_STAGING
+    iny
+    lda (frontend_data_ptr),y
     sta dst_ptr+1
-    lda starfield_packed_size+1
+    iny
+    lda (frontend_data_ptr),y
+    sta loader_repeat_value
+    iny
+    lda (frontend_data_ptr),y
     sta row_counter
+    jsr copy_boot_stream
+    clc
+    lda frontend_data_ptr
+    adc #$06
+    sta frontend_data_ptr
+    bcc :+
+    inc frontend_data_ptr+1
+:
+    dec loader_dli_phase
+    bne @record
+    rts
+
+copy_boot_stream:
     ldy #$00
     lda row_counter
     beq @tail_setup
@@ -949,9 +919,8 @@ stage_starfield_runtime:
     dec row_counter
     bne @page
 @tail_setup:
-    lda starfield_packed_size
+    ldx loader_repeat_value
     beq @done
-    tax
     ldy #$00
 @tail:
     lda (src_ptr),y
@@ -962,18 +931,49 @@ stage_starfield_runtime:
 @done:
     rts
 
-; The build appends the exact A2 kernel bytes after both packed relocation
-; streams and patches a2_kernel_source in resident CODE. This bounded copy is
-; shared by XEX and cold-boot ATR, so neither artifact relies on a loader-only
-; memory mapping side effect.
+broadside_packed_source:
+    .word $FFFF
+
+unpack_boot_broadside_runtime:
+    lda broadside_packed_source
+    sta broadside_read_source+1
+    lda broadside_packed_source+1
+    sta broadside_read_source+2
+    lda #<__BROADSIDE_RUN__
+    sta broadside_destination+1
+    lda #>__BROADSIDE_RUN__
+    sta broadside_destination+2
+    jmp broadside_unpack_command
+
+unpack_resident_runtime:
+    lda #<PACKED_RESIDENT_STAGING
+    sta broadside_read_source+1
+    lda #>PACKED_RESIDENT_STAGING
+    sta broadside_read_source+2
+    lda #<resident_runtime_suffix
+    sta broadside_destination+1
+    lda #>resident_runtime_suffix
+    sta broadside_destination+2
+    jmp broadside_unpack_command
+
+; ENTITY_CODE is staged above the resident output before any packed source is
+; consumed, then expanded after the resident suffix has been restored.
+unpack_entity_runtime:
+    lda entity_staged_source
+    sta broadside_read_source+1
+    lda entity_staged_source+1
+    sta broadside_read_source+2
+    lda #<__ENTITY_CODE_RUN__
+    sta broadside_destination+1
+    lda #>__ENTITY_CODE_RUN__
+    sta broadside_destination+2
+    jmp broadside_unpack_command
+
+; The staged A2 bytes are copied after the resident suffix has been restored.
 stage_a2_kernel:
-    lda a2_kernel_source
-    sta src_ptr
-    lda a2_kernel_source+1
-    sta src_ptr+1
     ldy #$00
 @copy:
-    lda (src_ptr),y
+    lda BOOT_A2_STAGING,y
     sta __A2_KERNEL_RUN__,y
     iny
     cpy #<__A2_KERNEL_SIZE__
@@ -1006,6 +1006,9 @@ broadside_destination:
 ; -----------------------------------------------------------------------------
 ; Frontend state machine
 
+.assert *-start <= $01A3, error, "resident bootstrap prefix exceeds its fixed boundary"
+.res $01A3-(*-start)
+resident_runtime_suffix:
 frontend_loop:
     jsr wait_frame
     lda game_state
@@ -1023,7 +1026,7 @@ frontend_input_poll:
     lda TRIG0
     beq @active_input
 
-    lda #$01
+    lda #$01                    ; double-width ships at 160-color-clock scale
     sta frontend_input_armed
     jmp frontend_loop
 
@@ -8707,6 +8710,69 @@ entity_raider_fragment_render_ids:
     .byte ENTITY_DEBRIS_GLYPH_BASE
     .byte ENTITY_DEBRIS_GLYPH_BASE,ENTITY_DEBRIS_GLYPH_BASE+2
     .byte RAIDER_PROJECTILE_GLYPH_BASE|$80,EFFECT_FRAGMENT_GLYPH_BASE,$00
+
+; The bootstrap restores the packed resident suffix before the loader display
+; starts. Finish the byte-exact cold initialisation from ENTITY_CODE afterwards
+; so the verbatim boot prefix stays small and stable.
+finish_startup_after_loader:
+    jsr clear_pmg
+    jsr copy_charset
+    jsr copy_frontend_charset
+    jsr copy_hud_charset
+    jsr clear_screen
+
+    lda #$00
+    sta TOP_SCORE_BCD_LO
+    sta TOP_SCORE_BCD_HI
+
+    lda #>PMG_BASE
+    sta PMBASE
+    lda #>CHARSET
+    sta CHBASE
+
+    lda #$01
+    sta SIZEP0
+    sta SIZEP1
+    sta SIZEP2
+    sta SIZEP3
+    lda #$00
+    sta SIZEM
+    sta PRIOR
+
+    lda #$0E
+    sta COLPM0
+    lda #ENEMY_RUNTIME_BODY_COLOR
+    sta COLPM1
+    lda #ENEMY_SCANNER_COLOR
+    sta COLPM2
+    lda #$28                    ; amber engine plume
+    sta COLPM3
+    lda #$0E
+    sta COLPF0
+    lda #$84
+    sta COLPF1
+    lda #$28
+    sta COLPF2
+    lda #KAWASAKI_GREEN
+    sta COLPF3
+    lda #$00
+    sta COLBK
+
+    jsr silence_audio
+    lda #$01
+    sta sound_enabled           ; options default: SOUND ON
+    sta GAME_MUSIC_ENABLED      ; options default: GAME MUSIC ON
+    jsr music_init
+    lda #DIFFICULTY_DEFAULT
+    sta DIFFICULTY_SETTING      ; options default: MEDIUM
+.if ENEMY_REVIEW_HARNESS
+    jmp start_gameplay
+.elseif ENEMY_COMBAT_REVIEW_HARNESS
+    jmp start_gameplay
+.else
+    jsr enter_main_menu
+    jmp frontend_loop
+.endif
 
 .segment "CODE"
 entity_slot_bit_masks:

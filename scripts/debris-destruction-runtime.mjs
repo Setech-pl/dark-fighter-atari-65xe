@@ -148,11 +148,12 @@ export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "
   const payload = loadPayload(root, artifact, manifest);
   memory.set(payload.data, payload.start);
 
+  runRoutine(memory, labels, "stage_boot_streams");
+  runRoutine(memory, labels, "unpack_boot_broadside_runtime");
+  runRoutine(memory, labels, "unpack_resident_runtime");
   runRoutine(memory, labels, "unpack_entity_runtime");
   runRoutine(memory, labels, "init_entity_effects");
-  runRoutine(memory, labels, "unpack_broadside_runtime");
   runRoutine(memory, labels, "stage_a2_kernel");
-  runRoutine(memory, labels, "stage_starfield_runtime");
   runRoutine(memory, labels, "unpack_starfield_runtime");
   runRoutine(memory, labels, "copy_charset");
   runRoutine(memory, labels, "install_entity_effects_glyph");
@@ -176,6 +177,7 @@ export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "
   memory[requiredLabel(labels, "player_y")] = 184;
   memory[requiredLabel(labels, "score_bcd_lo")] = 0x42;
   memory[requiredLabel(labels, "score_bcd_hi")] = 0x07;
+  armShot(memory, labels);
 
   const records = [];
   let worldAccumulator = 0;
@@ -222,11 +224,12 @@ export function executeRaiderBreakupTrace({ root = defaultRoot, artifact = "xex"
   const payload = loadPayload(root, artifact, manifest);
   memory.set(payload.data, payload.start);
 
+  runRoutine(memory, labels, "stage_boot_streams");
+  runRoutine(memory, labels, "unpack_boot_broadside_runtime");
+  runRoutine(memory, labels, "unpack_resident_runtime");
   runRoutine(memory, labels, "unpack_entity_runtime");
   runRoutine(memory, labels, "init_entity_effects");
-  runRoutine(memory, labels, "unpack_broadside_runtime");
   runRoutine(memory, labels, "stage_a2_kernel");
-  runRoutine(memory, labels, "stage_starfield_runtime");
   runRoutine(memory, labels, "unpack_starfield_runtime");
   runRoutine(memory, labels, "copy_charset");
   runRoutine(memory, labels, "init_fighter_projectiles");
@@ -234,6 +237,11 @@ export function executeRaiderBreakupTrace({ root = defaultRoot, artifact = "xex"
   initialiseRows(memory, labels);
   memory.fill(0, 0x3800, 0x4000);
   memory.fill(0, 0x4000, 0x4400);
+  // Keep this Raider-only visual trace independent from the normal neutral
+  // entity scheduler, whose first legal spawn occurs after the same 32-frame
+  // window used to prove complete effect expiry.
+  memory[requiredLabel(labels, "ENTITY_SPAWN_TIMER_LO")] = 0xff;
+  memory[requiredLabel(labels, "ENTITY_SPAWN_TIMER_HI")] = 0xff;
 
   memory[requiredLabel(labels, "ENEMY_ARCHETYPE")] = 0;
   memory[requiredLabel(labels, "ENEMY_ACTIVE")] = 1;

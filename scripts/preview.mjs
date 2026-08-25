@@ -766,7 +766,7 @@ export function readGameGraphicsSource(
   );
   const initialState = extractConstantStores(extractRoutine(source, "init_state"), constants);
   const frontendHardwareState = extractConstantStores(
-    extractRoutine(source, "start"),
+    extractRoutine(source, "finish_startup_after_loader"),
     constants,
   );
   const gameplayHardwareState = new Map(frontendHardwareState);

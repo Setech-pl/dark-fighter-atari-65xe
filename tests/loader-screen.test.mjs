@@ -16,7 +16,7 @@ import {
   renderLoaderCa65Include,
 } from "../scripts/loader-assets.mjs";
 import { unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
-import { parseXex } from "../scripts/formats.mjs";
+import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import {
   PREVIEW_HEIGHT,
@@ -51,7 +51,6 @@ const sourcePath = path.join(rootDirectory, "src", "main.s");
 const labelsPath = path.join(rootDirectory, "build", "dark-fighter.lbl");
 const mapPath = path.join(rootDirectory, "build", "dark-fighter.map");
 const includePath = path.join(rootDirectory, "build", "loader-screen.inc");
-const xexPath = path.join(rootDirectory, "dist", "dark-fighter.xex");
 const manifestPath = path.join(
   rootDirectory,
   "dist",
@@ -77,25 +76,12 @@ function readLabels() {
 }
 
 function readXexBytes(address, length) {
-  const { segments } = parseXex(fs.readFileSync(xexPath));
-  const segment = segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  assert.ok(segment, `XEX does not contain $${address.toString(16)}`);
-  return segment.data.subarray(
-    address - segment.start,
-    address - segment.start + length,
-  );
+  return readRuntimeBytes(rootDirectory, address, length);
 }
 
 function executeLoaderUnpack(labels) {
   const memory = new Uint8Array(0x10000);
-  for (const segment of parseXex(fs.readFileSync(xexPath)).segments) {
-    memory.set(segment.data, segment.start);
-  }
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  memory.set(fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin")),
-    manifest.broadsideRuntime.runAddress);
+  installRuntimeSegments(memory, rootDirectory);
   const cpu = new Nmos6502(memory);
   const stop = 0x7fff;
   cpu.push((stop - 1) >> 8);
@@ -366,8 +352,8 @@ test("XEX and ATR use the current packed bitmap source", () => {
 });
 
 test("loader still owns exactly 250 full PAL frames and enters the main menu", () => {
-  assert.ok(source.indexOf("jsr show_loader") < source.indexOf("jsr enter_main_menu"));
-  assert.ok(source.indexOf("jsr enter_main_menu") < source.indexOf("start_gameplay:"));
+  assert.match(source,
+    /jsr show_loader[\s\S]+jsr unpack_starfield_runtime[\s\S]+jmp finish_startup_after_loader/);
   assert.match(source, /lda #LOADER_DURATION_FRAMES\s+sta loader_frame_count/);
   assert.match(
     source,

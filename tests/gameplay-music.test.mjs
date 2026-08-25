@@ -22,7 +22,7 @@ import {
   loadCapitalHullsDefinition,
 } from "../scripts/capital-hulls.mjs";
 import { simulateBroadsideCadence } from "../scripts/broadside.mjs";
-import { parseXex } from "../scripts/formats.mjs";
+import { readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import {
   compileStarfield,
   createStarfieldState,
@@ -47,7 +47,6 @@ const asset = compileGameplayMusic(
   menuAsset,
 );
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json")));
-const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -57,14 +56,7 @@ const labels = new Map(
 );
 
 function readXexBytes(address, length) {
-  const segment = parseXex(xex).segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  assert.ok(segment, `XEX does not contain $${address.toString(16)}`);
-  return segment.data.subarray(
-    address - segment.start,
-    address - segment.start + length,
-  );
+  return readRuntimeBytes(rootDirectory, address, length);
 }
 
 function routine(label, nextLabel) {
@@ -236,7 +228,7 @@ test("shot and hit SFX preempt music absolutely, then music resumes in place", (
 });
 
 test("assembly preserves SFX ownership, lifecycle, and GAME MUSIC persistence", () => {
-  assert.match(routine("start", "unpack_broadside_runtime"),
+  assert.match(routine("finish_startup_after_loader", "entity_slot_bit_masks"),
     /sta sound_enabled[\s\S]+sta GAME_MUSIC_ENABLED[\s\S]+jsr music_init/);
   assert.match(routine("music_start_gameplay", "music_tick_gameplay"),
     /lda GAME_MUSIC_ENABLED\s+beq @done[\s\S]+lda sound_enabled\s+beq @done/);
