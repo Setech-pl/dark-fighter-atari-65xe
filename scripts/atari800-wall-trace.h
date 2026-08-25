@@ -8,6 +8,7 @@
 
 #include "gtia.h"
 #include "pia.h"
+#include "screen.h"
 
 #define DFTRACE_PAL_FRAME_CYCLES 35568u
 
@@ -60,6 +61,9 @@ typedef struct {
 	unsigned colpf3;
 	unsigned viper_explosion_timer;
 	unsigned enemy_explosion_timer;
+	unsigned effect_active_mask;
+	unsigned effect_active_count;
+	unsigned effect_rendered_mask;
 } DFTraceFrame;
 
 enum {
@@ -74,7 +78,12 @@ enum {
 	DFTRACE_EVENT_ENTITY_CONTACT = 1u << 8,
 	DFTRACE_EVENT_ENTITY_DESPAWN = 1u << 9,
 	DFTRACE_EVENT_NEAR_STEP = 1u << 10,
-	DFTRACE_EVENT_FAR_STEP = 1u << 11
+	DFTRACE_EVENT_FAR_STEP = 1u << 11,
+	DFTRACE_EVENT_ENTITY_SHOT = 1u << 12,
+	DFTRACE_EVENT_EFFECT_SPAWN = 1u << 13,
+	DFTRACE_EVENT_EFFECT_ERASE = 1u << 14,
+	DFTRACE_EVENT_EFFECT_UPDATE = 1u << 15,
+	DFTRACE_EVENT_EFFECT_RENDER = 1u << 16
 };
 
 static int dftrace_initialised;
@@ -105,6 +114,11 @@ static unsigned dftrace_pc_music_tick;
 static unsigned dftrace_pc_entity_spawn;
 static unsigned dftrace_pc_entity_contact;
 static unsigned dftrace_pc_entity_despawn;
+static unsigned dftrace_pc_entity_shot;
+static unsigned dftrace_pc_effect_spawn;
+static unsigned dftrace_pc_effect_erase;
+static unsigned dftrace_pc_effect_update;
+static unsigned dftrace_pc_effect_render;
 
 static unsigned dftrace_player_x;
 static unsigned dftrace_player_y;
@@ -134,6 +148,232 @@ static unsigned dftrace_entity_vx;
 static unsigned dftrace_entity_move_accumulator;
 static unsigned dftrace_entity_vertical_accumulator;
 static unsigned dftrace_entity_render_id;
+static unsigned dftrace_effect_active_mask;
+static unsigned dftrace_effect_active_count;
+static unsigned dftrace_effect_rendered_mask;
+
+typedef struct {
+	unsigned frame;
+	unsigned pc;
+	int scanline;
+	int cycle;
+	unsigned loader_timer;
+	unsigned game_state;
+	unsigned dlist;
+	unsigned charset_address;
+	unsigned pm_base;
+	unsigned dma_ctl;
+	unsigned nmi_en;
+	unsigned vdslst;
+	unsigned runad;
+	unsigned initad;
+	unsigned dosvec;
+	unsigned screen_checksum;
+	unsigned frontend_dlist_checksum;
+} DFBootSnapshot;
+
+static int dfboot_initialised;
+static FILE *dfboot_file;
+static const char *dfboot_artifact;
+static const char *dfboot_screenshot_prefix;
+static unsigned dfboot_fill;
+static unsigned dfboot_last_frame = 0xffffffffu;
+static unsigned dfboot_seen_start = 0xffffffffu;
+static unsigned dfboot_seen_loader = 0xffffffffu;
+static unsigned dfboot_seen_menu = 0xffffffffu;
+static unsigned dfboot_seen_frontend = 0xffffffffu;
+static unsigned dfboot_seen_gameplay = 0xffffffffu;
+static unsigned dfboot_seen_main = 0xffffffffu;
+static unsigned dfboot_pc_start;
+static unsigned dfboot_pc_loader;
+static unsigned dfboot_pc_menu;
+static unsigned dfboot_pc_frontend;
+static unsigned dfboot_pc_gameplay;
+static unsigned dfboot_pc_main;
+static unsigned dfboot_loader_timer;
+static unsigned dfboot_game_state;
+static unsigned dfboot_main_menu_dlist;
+static unsigned dfboot_frontend_dlist_end;
+static unsigned dfboot_snapshots_count;
+static DFBootSnapshot dfboot_snapshots[5];
+
+static unsigned dfboot_env_u(const char *name)
+{
+	const char *value = getenv(name);
+	char *end;
+	unsigned long parsed;
+	if (value == NULL || *value == '\0') {
+		fprintf(stderr, "darkfighter boot smoke: missing %s\n", name);
+		exit(2);
+	}
+	parsed = strtoul(value, &end, 0);
+	if (*end != '\0' || parsed > 0xffffu) {
+		fprintf(stderr, "darkfighter boot smoke: invalid %s=%s\n", name, value);
+		exit(2);
+	}
+	return (unsigned) parsed;
+}
+
+static unsigned dfboot_word(unsigned address)
+{
+	return MEMORY_mem[address] | ((unsigned) MEMORY_mem[address + 1u] << 8);
+}
+
+static unsigned dfboot_checksum(unsigned address, unsigned length)
+{
+	unsigned index;
+	unsigned value = 0;
+	for (index = 0; index < length; ++index)
+		value = value * 33u + MEMORY_mem[(address + index) & 0xffffu];
+	return value;
+}
+
+static int dfboot_target_frame(unsigned frame)
+{
+	return frame == 1u || frame == 250u || frame == 300u ||
+		frame == 500u || frame == 750u;
+}
+
+static void dfboot_capture(unsigned frame, unsigned pc)
+{
+	DFBootSnapshot *snapshot;
+	char screenshot[FILENAME_MAX];
+	if (dfboot_snapshots_count >= 5u) {
+		fprintf(stderr, "darkfighter boot smoke: too many target frames\n");
+		exit(2);
+	}
+	snapshot = &dfboot_snapshots[dfboot_snapshots_count++];
+	memset(snapshot, 0, sizeof(*snapshot));
+	snapshot->frame = frame;
+	snapshot->pc = pc;
+	snapshot->scanline = ANTIC_ypos;
+	snapshot->cycle = ANTIC_XPOS;
+	snapshot->loader_timer = MEMORY_mem[dfboot_loader_timer];
+	snapshot->game_state = MEMORY_mem[dfboot_game_state];
+	snapshot->dlist = ANTIC_dlist;
+	snapshot->charset_address = (unsigned) ANTIC_CHBASE << 8;
+	snapshot->pm_base = (unsigned) ANTIC_PMBASE << 8;
+	snapshot->dma_ctl = ANTIC_DMACTL;
+	snapshot->nmi_en = ANTIC_NMIEN;
+	snapshot->vdslst = dfboot_word(0x0200u);
+	snapshot->runad = dfboot_word(0x02e0u);
+	snapshot->initad = dfboot_word(0x02e2u);
+	snapshot->dosvec = dfboot_word(0x000au);
+	snapshot->screen_checksum = dfboot_checksum(0x4000u, 0x0400u);
+	snapshot->frontend_dlist_checksum = dfboot_checksum(dfboot_main_menu_dlist,
+		dfboot_frontend_dlist_end - dfboot_main_menu_dlist);
+	if (dfboot_screenshot_prefix != NULL && *dfboot_screenshot_prefix != '\0') {
+		snprintf(screenshot, sizeof(screenshot), "%s-frame%03u.png",
+			dfboot_screenshot_prefix, frame);
+		if (!Screen_SaveScreenshot(screenshot, 0)) {
+			fprintf(stderr, "darkfighter boot smoke: screenshot failed: %s\n", screenshot);
+			exit(2);
+		}
+	}
+}
+
+static void dfboot_write(void)
+{
+	unsigned index;
+	fprintf(dfboot_file,
+		"{\n  \"artifact\": \"%s\",\n  \"cold_ram_fill\": %u,\n  \"snapshots\": [\n",
+		dfboot_artifact, dfboot_fill);
+	for (index = 0; index < dfboot_snapshots_count; ++index) {
+		DFBootSnapshot *snapshot = &dfboot_snapshots[index];
+		fprintf(dfboot_file,
+			"    {\"frame\":%u,\"pc\":%u,\"scanline\":%d,\"cycle\":%d,"
+			"\"loader_timer\":%u,\"game_state\":%u,\"dlist\":%u,"
+			"\"charset_address\":%u,\"pm_base\":%u,\"dma_ctl\":%u,"
+			"\"nmi_en\":%u,\"vdslst\":%u,\"runad\":%u,\"initad\":%u,"
+			"\"dosvec\":%u,\"screen_checksum\":%u,"
+			"\"frontend_dlist_checksum\":%u}%s\n",
+			snapshot->frame, snapshot->pc, snapshot->scanline, snapshot->cycle,
+			snapshot->loader_timer, snapshot->game_state, snapshot->dlist,
+			snapshot->charset_address, snapshot->pm_base, snapshot->dma_ctl,
+			snapshot->nmi_en, snapshot->vdslst, snapshot->runad, snapshot->initad,
+			snapshot->dosvec, snapshot->screen_checksum,
+			snapshot->frontend_dlist_checksum,
+			index + 1u == dfboot_snapshots_count ? "" : ",");
+	}
+	fprintf(dfboot_file,
+		"  ],\n  \"milestones\": {\"start\":%u,\"loader\":%u,\"menu\":%u,"
+		"\"frontend_poll\":%u,\"gameplay_init\":%u,\"main_loop\":%u}\n}\n",
+		dfboot_seen_start, dfboot_seen_loader, dfboot_seen_menu,
+		dfboot_seen_frontend, dfboot_seen_gameplay, dfboot_seen_main);
+	if (fclose(dfboot_file) != 0) {
+		perror("darkfighter boot smoke close");
+		exit(2);
+	}
+}
+
+static void dfboot_init(void)
+{
+	unsigned address;
+	dfboot_artifact = getenv("DFBOOT_ARTIFACT");
+	dfboot_screenshot_prefix = getenv("DFBOOT_SCREENSHOT_PREFIX");
+	if (dfboot_artifact == NULL || *dfboot_artifact == '\0') {
+		fprintf(stderr, "darkfighter boot smoke: missing DFBOOT_ARTIFACT\n");
+		exit(2);
+	}
+	dfboot_file = fopen(getenv("DFBOOT_OUTPUT"), "w");
+	if (dfboot_file == NULL) {
+		perror("darkfighter boot smoke output");
+		exit(2);
+	}
+	dfboot_fill = dfboot_env_u("DFBOOT_RAM_FILL");
+	if (dfboot_fill > 0xffu) {
+		fprintf(stderr, "darkfighter boot smoke: RAM fill exceeds one byte\n");
+		exit(2);
+	}
+	for (address = 0x8000u; address < 0xa000u; ++address)
+		MEMORY_mem[address] = (UBYTE) dfboot_fill;
+	dfboot_pc_start = dfboot_env_u("DFBOOT_PC_START");
+	dfboot_pc_loader = dfboot_env_u("DFBOOT_PC_LOADER");
+	dfboot_pc_menu = dfboot_env_u("DFBOOT_PC_MENU");
+	dfboot_pc_frontend = dfboot_env_u("DFBOOT_PC_FRONTEND");
+	dfboot_pc_gameplay = dfboot_env_u("DFBOOT_PC_GAMEPLAY");
+	dfboot_pc_main = dfboot_env_u("DFBOOT_PC_MAIN");
+	dfboot_loader_timer = dfboot_env_u("DFBOOT_LOADER_TIMER");
+	dfboot_game_state = dfboot_env_u("DFBOOT_GAME_STATE");
+	dfboot_main_menu_dlist = dfboot_env_u("DFBOOT_MAIN_MENU_DLIST");
+	dfboot_frontend_dlist_end = dfboot_env_u("DFBOOT_FRONTEND_DLIST_END");
+	dfboot_initialised = 1;
+}
+
+static void dfboot_observe(unsigned pc)
+{
+	unsigned frame;
+	if (!dfboot_initialised)
+		dfboot_init();
+	frame = (unsigned) Atari800_nframes;
+	if (pc == dfboot_pc_start && dfboot_seen_start == 0xffffffffu)
+		dfboot_seen_start = frame;
+	if (pc == dfboot_pc_loader && dfboot_seen_loader == 0xffffffffu)
+		dfboot_seen_loader = frame;
+	if (pc == dfboot_pc_menu && dfboot_seen_menu == 0xffffffffu)
+		dfboot_seen_menu = frame;
+	if (pc == dfboot_pc_frontend && dfboot_seen_frontend == 0xffffffffu)
+		dfboot_seen_frontend = frame;
+	if (pc == dfboot_pc_gameplay && dfboot_seen_gameplay == 0xffffffffu)
+		dfboot_seen_gameplay = frame;
+	if (pc == dfboot_pc_main && dfboot_seen_main == 0xffffffffu)
+		dfboot_seen_main = frame;
+
+	/* Drive the production menu input path: neutral through the loader/menu,
+	 * then a short FIRE press after the frame-500 proof snapshot. */
+	PIA_PORT_input[0] = (PIA_PORT_input[0] & 0xf0u) | 0x0fu;
+	GTIA_TRIG[0] = (UBYTE) (frame >= 501u && frame <= 506u ? 0 : 1);
+	if (frame != dfboot_last_frame) {
+		dfboot_last_frame = frame;
+		if (dfboot_target_frame(frame))
+			dfboot_capture(frame, pc);
+		if (frame > 750u) {
+			dfboot_write();
+			fflush(NULL);
+			exit(0);
+		}
+	}
+}
 
 static unsigned dftrace_env_u(const char *name)
 {
@@ -296,6 +536,9 @@ static void dftrace_snapshot_flash(DFTraceFrame *frame)
 	frame->colpf3 = GTIA_COLPF3;
 	frame->viper_explosion_timer = MEMORY_mem[dftrace_fighter_explosion_timer];
 	frame->enemy_explosion_timer = MEMORY_mem[dftrace_fighter_explosion_timer + 1u];
+	frame->effect_active_mask = MEMORY_mem[dftrace_effect_active_mask];
+	frame->effect_active_count = MEMORY_mem[dftrace_effect_active_count];
+	frame->effect_rendered_mask = MEMORY_mem[dftrace_effect_rendered_mask];
 }
 
 static void dftrace_write(void)
@@ -307,7 +550,7 @@ static void dftrace_write(void)
 		perror("darkfighter trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events\n");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -316,7 +559,7 @@ static void dftrace_write(void)
 		unsigned extra_boundaries = host_boundaries > 1 ? host_boundaries - 1 : 0;
 		unsigned missed_frames = cadence_frames > 1 ? cadence_frames - 1 : 0;
 		fprintf(file,
-			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+			"%s,%u,%llu,%llu,%llu,%llu,%u,%u,%u,%d,%d,%d,%d,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
 			dftrace_session, index,
 			(unsigned long long) frame->start_clock,
 			(unsigned long long) frame->end_clock,
@@ -336,7 +579,8 @@ static void dftrace_write(void)
 			frame->entity_render_id, frame->colbk, frame->colpm0, frame->colpm1,
 			frame->colpm2, frame->colpm3, frame->colpf0, frame->colpf1,
 			frame->colpf2, frame->colpf3, frame->viper_explosion_timer,
-			frame->enemy_explosion_timer, frame->events);
+			frame->enemy_explosion_timer, frame->events, frame->effect_active_mask,
+			frame->effect_active_count, frame->effect_rendered_mask);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -382,6 +626,11 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_entity_spawn, "DFTRACE_PC_ENTITY_SPAWN");
 	DFTRACE_ADDRESS(dftrace_pc_entity_contact, "DFTRACE_PC_ENTITY_CONTACT");
 	DFTRACE_ADDRESS(dftrace_pc_entity_despawn, "DFTRACE_PC_ENTITY_DESPAWN");
+	DFTRACE_ADDRESS(dftrace_pc_entity_shot, "DFTRACE_PC_ENTITY_SHOT");
+	DFTRACE_ADDRESS(dftrace_pc_effect_spawn, "DFTRACE_PC_EFFECT_SPAWN");
+	DFTRACE_ADDRESS(dftrace_pc_effect_erase, "DFTRACE_PC_EFFECT_ERASE");
+	DFTRACE_ADDRESS(dftrace_pc_effect_update, "DFTRACE_PC_EFFECT_UPDATE");
+	DFTRACE_ADDRESS(dftrace_pc_effect_render, "DFTRACE_PC_EFFECT_RENDER");
 	DFTRACE_ADDRESS(dftrace_player_x, "DFTRACE_PLAYER_X");
 	DFTRACE_ADDRESS(dftrace_player_y, "DFTRACE_PLAYER_Y");
 	DFTRACE_ADDRESS(dftrace_projectile_active, "DFTRACE_PROJECTILE_ACTIVE");
@@ -410,12 +659,19 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_entity_move_accumulator, "DFTRACE_ENTITY_MOVE_ACCUMULATOR");
 	DFTRACE_ADDRESS(dftrace_entity_vertical_accumulator, "DFTRACE_ENTITY_VERTICAL_ACCUMULATOR");
 	DFTRACE_ADDRESS(dftrace_entity_render_id, "DFTRACE_ENTITY_RENDER_ID");
+	DFTRACE_ADDRESS(dftrace_effect_active_mask, "DFTRACE_EFFECT_ACTIVE_MASK");
+	DFTRACE_ADDRESS(dftrace_effect_active_count, "DFTRACE_EFFECT_ACTIVE_COUNT");
+	DFTRACE_ADDRESS(dftrace_effect_rendered_mask, "DFTRACE_EFFECT_RENDERED_MASK");
 #undef DFTRACE_ADDRESS
 	dftrace_initialised = 1;
 }
 
 static void DFTrace_Observe(unsigned pc)
 {
+	if (getenv("DFBOOT_OUTPUT") != NULL) {
+		dfboot_observe(pc);
+		return;
+	}
 	if (!dftrace_initialised)
 		dftrace_init();
 
@@ -479,6 +735,16 @@ static void DFTrace_Observe(unsigned pc)
 		dftrace_current.events |= DFTRACE_EVENT_ENTITY_CONTACT;
 	else if (pc == dftrace_pc_entity_despawn)
 		dftrace_current.events |= DFTRACE_EVENT_ENTITY_DESPAWN;
+	else if (pc == dftrace_pc_entity_shot)
+		dftrace_current.events |= DFTRACE_EVENT_ENTITY_SHOT;
+	else if (pc == dftrace_pc_effect_spawn)
+		dftrace_current.events |= DFTRACE_EVENT_EFFECT_SPAWN;
+	else if (pc == dftrace_pc_effect_erase)
+		dftrace_current.events |= DFTRACE_EVENT_EFFECT_ERASE;
+	else if (pc == dftrace_pc_effect_update)
+		dftrace_current.events |= DFTRACE_EVENT_EFFECT_UPDATE;
+	else if (pc == dftrace_pc_effect_render)
+		dftrace_current.events |= DFTRACE_EVENT_EFFECT_RENDER;
 
 	if (pc == dftrace_pc_end) {
 		dftrace_snapshot_flash(&dftrace_current);

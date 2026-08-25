@@ -351,6 +351,7 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
   const frontendStart = labels.get("frontend_glyph_source");
   const frontendEnd = labels.get("frontend_glyph_rows_end");
   const charsetEnd = labels.get("charset_data_end");
+  const constants = readFrontendGraphicsSource(source).constants;
   assert.ok(Number.isInteger(charsetStart));
   assert.equal(hullGlyphStart, charsetStart + 59 * 8);
   assert.ok(frontendStart > hullGlyphStart);
@@ -366,10 +367,22 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
   assert.ok(labels.get("draw_main_menu_hangar") < charsetStart);
   assert.ok(labels.get("frontend_glyph_rows") >= frontendStart);
   assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_lzss"));
-  assert.ok(labels.get("loader_bitmap_lzss") < labels.get("loader_display_list"));
-  assert.ok(labels.get("loader_display_list") < 0x4000);
+  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_display_list_lzss"));
+  assert.ok(labels.get("loader_display_list_lzss") < labels.get("loader_bitmap_lzss"));
+  assert.ok(labels.get("loader_bitmap_lzss") < 0x4000);
+  assert.equal(
+    labels.get("main_menu_display_list") & 0xfc00,
+    (labels.get("frontend_display_lists_end") - 1) & 0xfc00,
+    "frontend display lists must not cross ANTIC's 1 KiB counter boundary",
+  );
+  assert.ok(labels.get("frontend_display_lists_end") <= constants.get("MISSILES"));
 
-  const constants = readFrontendGraphicsSource(source).constants;
+  const clearPmg = routine("clear_pmg", "copy_charset");
+  assert.doesNotMatch(clearPmg, /PMG_BASE\+\$(?:000|100|200)/);
+  for (const offset of ["300", "400", "500", "600", "700"]) {
+    assert.match(clearPmg, new RegExp(`PMG_BASE\\+\\$${offset}`));
+  }
+
   assert.equal(constants.get("SCREEN"), 0x4000);
   assert.equal(constants.get("CHARSET"), 0x4400);
   assert.equal(constants.get("FRONTEND_CHARSET"), 0x4800);

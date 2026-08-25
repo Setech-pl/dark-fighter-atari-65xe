@@ -9,7 +9,7 @@
     "interactiveSlots": 4,
     "interactiveActiveLimit": 1,
     "effectSlots": 6,
-    "effectActiveLimit": 0,
+    "effectActiveLimit": 5,
     "stateAddress": 32768,
     "stateBytes": 256,
     "codeAddress": 37120,
@@ -67,12 +67,24 @@
       }
     ]
   },
+  "debrisDestruction": {
+    "hitFlashFrames": 2,
+    "coreFrames": 5,
+    "fragmentFrames": 30,
+    "fragmentCount": 4,
+    "fragmentLocalXSpeedHpos": 2,
+    "fragmentLocalYSpeedScanlines": 2,
+    "fragmentPhases": [
+      [0, 0, 192, 240, 60, 48, 0, 0],
+      [0, 0, 12, 15, 60, 12, 0, 0]
+    ]
+  },
   "archetypes": [
     {
       "id": "neutral-debris",
       "type": 1,
       "initialState": 1,
-      "flags": 55,
+      "flags": 63,
       "updateProfile": 1,
       "renderProfile": 1,
       "collisionCategory": 1,
@@ -84,7 +96,7 @@
       "movementNumerator": 3,
       "movementDenominator": 5,
       "lifetime": 0,
-      "hitPoints": 1,
+      "hitPoints": 3,
       "spawnPolicy": 1,
       "sfxEventId": 0
     }

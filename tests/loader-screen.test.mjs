@@ -17,6 +17,7 @@ import {
 } from "../scripts/loader-assets.mjs";
 import { unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
 import { parseXex } from "../scripts/formats.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import {
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
@@ -85,6 +86,24 @@ function readXexBytes(address, length) {
     address - segment.start,
     address - segment.start + length,
   );
+}
+
+function executeLoaderUnpack(labels) {
+  const memory = new Uint8Array(0x10000);
+  for (const segment of parseXex(fs.readFileSync(xexPath)).segments) {
+    memory.set(segment.data, segment.start);
+  }
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  memory.set(fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin")),
+    manifest.broadsideRuntime.runAddress);
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = labels.get("unpack_loader_bitmap");
+  for (let steps = 0; steps < 2_000_000 && cpu.pc !== stop; steps += 1) cpu.step();
+  assert.equal(cpu.pc, stop, "unpack_loader_bitmap did not return");
+  return memory;
 }
 
 function countPixels({ x, y, width, height }) {
@@ -282,12 +301,13 @@ test("generated include is canonical and contains no ANTIC 4 loader assets", () 
 
 test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
   const labels = readLabels();
-  const displayListAddress = labels.get("loader_display_list");
+  const displayListAddress = labels.get("loader_bitmap_lzss");
   assert.ok(Number.isInteger(displayListAddress));
   const expected = createLoaderDisplayListBytes(compiled, displayListAddress);
   assert.equal(expected.length, 202);
   assert.deepEqual(
-    readXexBytes(displayListAddress, expected.length),
+    Buffer.from(executeLoaderUnpack(labels).subarray(
+      displayListAddress, displayListAddress + expected.length)),
     Buffer.from(expected),
   );
 
@@ -366,8 +386,8 @@ test("loader-only tail may use PMG bytes but stays below screen memory", () => {
   assert.ok(mainEnd);
   assert.ok(Number.parseInt(mainEnd[1], 16) < 0x4000);
   const labels = readLabels();
-  assert.ok(labels.get("loader_bitmap_lzss") < labels.get("loader_display_list"));
-  assert.ok(labels.get("loader_display_list") < 0x4000);
+  assert.ok(labels.get("loader_display_list_lzss") < labels.get("loader_bitmap_lzss"));
+  assert.ok(labels.get("loader_bitmap_lzss") < 0x4000);
   assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_frontend_charset/);
   assert.equal(compiled.bitmapAddress, 0x4010);
   assert.equal(compiled.bitmapAddress + compiled.bitmapBytes.length - 1, 0x5e0f);

@@ -180,8 +180,9 @@ Pierwszy neutralny obiekt złomu jest przeszkodą testową wspólnego entity
 engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny jest
 najwyżej jeden. Ma dwie czytelne sylwetki 2×1 znak (16×8 pikseli) — zwartą,
 asymetryczną płytę pancerza i ażurowy fragment kratownicy — po dwie fazy
-tumblingu każda. Cztery fazy używają dokładnie ośmiu glifów 110–117; indeksy
-118–127 pozostają wolne. Płyta i kratownica korzystają z kolorów pola 1/2,
+tumblingu każda. Cztery fazy używają dokładnie ośmiu glifów 110–117; dwie
+fazy fragmentu rozpadu używają 118–119, a indeksy 120–127 pozostają wolne.
+Płyta i kratownica korzystają z kolorów pola 1/2,
 więc nie są białymi odpowiednikami największych gwiazd. Każda faza wypełnia
 bounding box 16×8; armour ma 47, a truss 45 aktywnych pikseli ANTIC.
 Niezależny RNG entity deterministycznie wybiera sylwetkę, fazę początkową,
@@ -194,10 +195,26 @@ w trzech z każdych pięciu takich zdarzeń; profile boczne przesuwają obiekt o
 znak co cztery takie zdarzenia i nie wymagają odbicia od krawędzi. Kontakt
 zdejmuje jedną jednostkę HULL (10 punktów procentowych) przez wspólną damage
 gate i usuwa złom tylko wtedy, gdy obrażenie zostało przyjęte; invulnerability
-nie zużywa przeszkody. Hitbox obejmuje widoczne 16×8 pikseli, bez kolizji z
-pociskami i bez punktacji. Slice nie zmienia logiki spawn/despawn,
-nie podnosi limitów pul i nie dodaje dropów, boosterów, fragmentów ani
-transient effects.
+nie zużywa przeszkody. Hitbox obejmuje widoczne 16×8 pikseli. Debris zaczyna
+z 3 HP; każdy prawidłowy pocisk Vipera odbiera 1 HP i zostaje zużyty. Pierwsze
+dwa trafienia pozostawiają obiekt aktywny oraz pokazują dokładnie dwie klatki
+lokalnego żółto-czerwonego feedbacku. Trzecie trafienie usuwa neutralny hitbox
+przed testem kontaktu z graczem i tworzy lokalny pięcioklatkowy rdzeń oraz
+cztery bezkolizyjne fragmenty na 30 klatek (0,6 s). Fragmenty lecą
+deterministycznie lewo-góra, prawo-góra, lewo-dół i prawo-dół, zmieniają dwie
+fazy oraz przechodzą od żółtego przez czerwony do migotania. Nie używają RNG
+gameplay, nie zadają obrażeń i nie wpływają na wynik, enemy death,
+full-screen flash ani SFX. Pociski Raidera i broadside ignorują debris.
+
+Viper shots są rozstrzygane w rosnącej kolejności slotów przed kontaktem debris
+z graczem; dlatego w jednej ramce tylko najniższy trafiający slot jest zużyty,
+a finalnie zniszczony tuż przed kontaktem debris nie zadaje obrażeń. Przy
+wspólnym przecięciu z Raiderem wygrywa pierwszy cel napotkany przez pocisk
+lecący w górę, a dokładny remis wybiera debris. Następny debris używa zwykłego
+64-klatkowego repeat delay, bez natychmiastowego zastępstwa. Slice nie zmienia
+pozostałej logiki spawn/despawn i nie podnosi limitu puli interactive; pula
+effects pozostaje fizycznie sześcioslotowa, z limitem aktywnym 5 dla rdzenia
+i czterech fragmentów.
 
 World zachowuje 20/22,5/25 wiersza/s dla EASY/MEDIUM/HARD. Near stars mają
 10/11,25/12,5, far stars 5/5,625/6,25, a debris 12/13,5/15 wiersza/s.

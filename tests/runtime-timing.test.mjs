@@ -28,7 +28,16 @@ test("linked release replay covers every reviewed runtime timing scenario", () =
   assert.equal(timing.legalHeavyCombination.origin, "deterministic legal replay");
   assert.ok(timing.legalHeavyCombination.events.includes("hull-copy"));
   assert.ok(timing.legalHeavyCombination.events.includes("music+sfx"));
-  assert.ok(timing.legalHeavyCombination.events.includes("active-debris"));
+  assert.ok(timing.scenarios.debrisShotPath.events.includes("active-debris"));
+  assert.ok(timing.scenarios.debrisShotPath.events.includes("debris-shot"));
+  assert.ok(timing.scenarios.debrisShotPath.viperProjectileOccupancy > 0);
+  assert.equal(timing.scenarios.noViperProjectilePath.viperProjectileOccupancy, 0);
+  assert.equal(timing.scenarios.noViperProjectilePath.procedureCallCounts
+    .entity_viper_projectile_target ?? 0, 0);
+  assert.ok(timing.destructibleDebris.noActiveDebrisPathDeltaCpuCycles <=
+    timing.destructibleDebris.noActiveDebrisPathLimitCpuCycles);
+  assert.ok(timing.destructibleDebris.noActiveViperProjectilePathDeltaCpuCycles <=
+    timing.destructibleDebris.noActiveViperProjectilePathLimitCpuCycles);
 });
 
 test("DMA-off CPU comparison stays below its executable comparison gate", () => {
@@ -68,14 +77,18 @@ test("measured DMA-on fields come only from an artifact-matched Atari800 trace",
 
 test("protected linked segments do not regress beyond the accepted feature baseline", () => {
   for (const segment of timing.protectedSegments) {
-    assert.ok(segment.bytes <= segment.acceptedMaximumBytes,
-      `${segment.name} grew beyond ${segment.acceptedMaximumBytes} bytes`);
     if (segment.reservedMaximumBytes !== null) {
       assert.ok(segment.bytes <= segment.reservedMaximumBytes,
         `${segment.name} overflows its ${segment.reservedMaximumBytes}-byte reservation`);
       assert.equal(segment.freeReservedBytes, segment.reservedMaximumBytes - segment.bytes);
     }
   }
+  assert.equal(manifest.runtimeCodeBudget.baselineBytes, 13_697);
+  assert.equal(manifest.runtimeCodeBudget.approvedDeltaBytes, 768);
+  assert.ok(manifest.runtimeCodeBudget.actualDeltaBytes <=
+    manifest.runtimeCodeBudget.approvedDeltaBytes);
+  assert.equal(manifest.runtimeCodeBudget.remainingBytes,
+    manifest.runtimeCodeBudget.approvedDeltaBytes - manifest.runtimeCodeBudget.actualDeltaBytes);
 });
 
 test("post-loader runtime and future entity ranges are non-overlapping", () => {

@@ -162,7 +162,7 @@ test("flash selection does not touch RNG, cadence, glyphs, or entity/effects lim
     /rng|WORLD_ROW_ADVANCED|STAR_|scroll_accumulator|DIFFICULTY|ENTITY_ACTIVE_LIMIT|EFFECT_ACTIVE_LIMIT/);
   const entityInclude = fs.readFileSync(path.join(root, "build", "entity-effects.inc"), "utf8");
   assert.match(entityInclude, /ENTITY_ACTIVE_LIMIT\s*=\s*1/);
-  assert.match(entityInclude, /EFFECT_ACTIVE_LIMIT\s*=\s*0/);
+  assert.match(entityInclude, /EFFECT_ACTIVE_LIMIT\s*=\s*5/);
   assert.match(source, /ENTITY_DEBRIS_GLYPH_COUNT\s*=\s*8/);
 });
 

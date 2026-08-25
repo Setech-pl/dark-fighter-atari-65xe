@@ -9,6 +9,7 @@ import {
   compileLoaderBitmap,
   loadLoaderBitmapDefinition,
   renderLoaderCa65Include,
+  renderLoaderDisplayListCa65Include,
 } from "./loader-assets.mjs";
 import {
   compileCapitalHulls,
@@ -77,6 +78,9 @@ const entityEffectsFoundationPayloadBudget = 1024;
 const entityEffectsFoundationPayloadLimit =
   acceptedRuntimeHeadroomPayloadBytes + entityEffectsFoundationPayloadBudget;
 const debrisVisualPolishPayloadLimitBytes = 16384;
+const exactBootPayloadBytes = 16384;
+const bootPayloadTrailer = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
+const bootPayloadCoreBytes = exactBootPayloadBytes - bootPayloadTrailer.length;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
 const runtimeHeadroomHistoricalWallGate = 31568;
@@ -95,6 +99,15 @@ const explosionFlashBaselineHeadroomCycles = 3487;
 const explosionFlashApprovedWallDelta = 64;
 const explosionFlashWallLimit = 32145;
 const explosionFlashAbsoluteMinimumHeadroom = 3200;
+const destructibleDebrisBaselineWallCycles = 32122;
+const destructibleDebrisBaselineHeadroomCycles = 3446;
+const destructibleDebrisTargetDeltaCycles = 640;
+const destructibleDebrisHardDeltaCycles = 768;
+const destructibleDebrisMinimumHeadroomCycles = 2800;
+const destructibleDebrisEntityCodeBaselineBytes = 714;
+const destructibleDebrisEntityCodeBudgetBytes = 768;
+const destructibleDebrisRuntimeCodeBaselineBytes = 13697;
+const destructibleDebrisRuntimeCodeBudgetBytes = 768;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -197,7 +210,11 @@ async function build() {
   const loaderDefinition = loadLoaderBitmapDefinition(loaderDefinitionPath);
   const loaderAsset = compileLoaderBitmap(loaderDefinition);
   const loaderInclude = Buffer.from(renderLoaderCa65Include(loaderAsset));
+  const loaderDisplayListInclude = Buffer.from(
+    renderLoaderDisplayListCa65Include(loaderAsset),
+  );
   writeFile(path.join(buildDirectory, "loader-screen.inc"), loaderInclude);
+  writeFile(path.join(buildDirectory, "loader-display-list.inc"), loaderDisplayListInclude);
   const capitalHullsDefinitionPath = path.join(
     rootDirectory,
     "assets",
@@ -272,6 +289,7 @@ async function build() {
     {
       "/project/src/main.s": source,
       "/project/build/loader-screen.inc": loaderInclude,
+      "/project/build/loader-display-list.inc": loaderDisplayListInclude,
       "/project/build/capital-hulls.inc": capitalHullsInclude,
       "/project/build/enemy-roster.inc": enemyRosterInclude,
       "/project/build/fighter-weapons.inc": fighterWeaponsInclude,
@@ -401,8 +419,8 @@ async function build() {
     throw new Error("ENTITY_CODE lies outside its reviewed $9100-$9FFF runtime range");
   }
   if (!isReviewVariant && entityCodeBytes >
-    debrisVisualPolishEntityCodeBaselineBytes + debrisVisualPolishEntityCodeBudgetBytes) {
-    throw new Error("Debris visual polish exceeds its +512 B ENTITY_CODE budget");
+    destructibleDebrisEntityCodeBaselineBytes + destructibleDebrisEntityCodeBudgetBytes) {
+    throw new Error("Destructible debris exceeds its +768 B ENTITY_CODE budget");
   }
   if (entityStateRunAddress !== 0x8000 || entityStateBytes !== 0x0100) {
     throw new Error("Entity/effects BSS must occupy exactly $8000-$80FF");
@@ -473,19 +491,33 @@ async function build() {
     entityPackedSourceAddress,
     entityPackedSourceOperand - loadAddress,
   );
-  const rawPayload = Buffer.concat([
+  const bootPayloadCore = Buffer.concat([
     residentMain,
     packedBroadsideRuntime,
     packedStarfieldRuntime,
     a2KernelRuntime,
     packedEntityCodeRuntime,
   ]);
+  if (!isReviewVariant && bootPayloadCore.length !== bootPayloadCoreBytes) {
+    throw new Error(
+      `Release boot payload core is ${bootPayloadCore.length} bytes; expected exactly ` +
+      `${bootPayloadCoreBytes} bytes before the source-owned ${bootPayloadTrailer.length}-byte ` +
+      `trailer (no formatter padding or truncation is permitted)`,
+    );
+  }
+  const rawPayload = Buffer.concat([bootPayloadCore, bootPayloadTrailer]);
+  if (!isReviewVariant && rawPayload.length !== exactBootPayloadBytes) {
+    throw new Error(`Release boot payload must be exactly ${exactBootPayloadBytes} bytes`);
+  }
   if (!isReviewVariant && rawPayload.length > entityEffectsFoundationPayloadLimit) {
     throw new Error(
       `Entity/effects foundation payload is ${rawPayload.length} bytes and exceeds ` +
       `its explicit ${entityEffectsFoundationPayloadLimit}-byte limit ` +
       `(${acceptedRuntimeHeadroomPayloadBytes} baseline + ` +
-      `${entityEffectsFoundationPayloadBudget} approved bytes)`,
+      `${entityEffectsFoundationPayloadBudget} approved bytes; ` +
+      `resident ${residentMain.length}, broadside ${packedBroadsideRuntime.length}, ` +
+      `starfield ${packedStarfieldRuntime.length}, A2 ${a2KernelRuntime.length}, ` +
+      `entity ${packedEntityCodeRuntime.length}/${entityCodeRuntime.length} packed/raw)`,
     );
   }
   if (!isReviewVariant && rawPayload.length > debrisVisualPolishPayloadLimitBytes) {
@@ -495,7 +527,8 @@ async function build() {
       `${rawPayload.length - debrisVisualPolishPayloadLimitBytes} bytes ` +
       `(resident ${residentMain.length}, broadside ${packedBroadsideRuntime.length}, ` +
       `starfield ${packedStarfieldRuntime.length}, A2 ${a2KernelRuntime.length}, ` +
-      `entity ${packedEntityCodeRuntime.length}/${entityCodeRuntime.length} packed/raw)`,
+      `entity ${packedEntityCodeRuntime.length}/${entityCodeRuntime.length} packed/raw, ` +
+      `CODE ${codeBytes}, RODATA ${rodataBytes})`,
     );
   }
 
@@ -572,6 +605,12 @@ async function build() {
       },
     },
   };
+  const destructibleDebrisRuntimeCodeBytes = codeBytes + starfieldRuntimeBytes +
+    broadsideRuntimeBytes + a2KernelBytes + entityCodeBytes;
+  if (!isReviewVariant && destructibleDebrisRuntimeCodeBytes >
+    destructibleDebrisRuntimeCodeBaselineBytes + destructibleDebrisRuntimeCodeBudgetBytes) {
+    throw new Error("Destructible debris exceeds its +768 B linked runtime-code budget");
+  }
 
   const manifest = {
     formatVersion: 1,
@@ -590,6 +629,13 @@ async function build() {
     bootInitAddress,
     bootSectors,
     payloadBytes: rawPayload.length,
+    bootPayloadTrailer: {
+      address: loadAddress + bootPayloadCore.length,
+      bytes: bootPayloadTrailer.length,
+      ascii: "DFB1",
+      hex: bootPayloadTrailer.toString("hex"),
+      sourceOwned: true,
+    },
     payloadBudget: {
       historicalRuntimeHeadroom: {
         baselineBytes: acceptedMenuMusicPayloadBytes,
@@ -606,6 +652,12 @@ async function build() {
         remainingBytes: entityEffectsFoundationPayloadLimit - rawPayload.length,
       },
       debrisVisualPolish: {
+        limitBytes: debrisVisualPolishPayloadLimitBytes,
+        actualBytes: rawPayload.length,
+        remainingBytes: debrisVisualPolishPayloadLimitBytes - rawPayload.length,
+        maximumBootSectors: 128,
+      },
+      destructibleDebris: {
         limitBytes: debrisVisualPolishPayloadLimitBytes,
         actualBytes: rawPayload.length,
         remainingBytes: debrisVisualPolishPayloadLimitBytes - rawPayload.length,
@@ -661,6 +713,14 @@ async function build() {
           debrisVisualPolishEntityCodeBudgetBytes,
         remainingBytes: debrisVisualPolishEntityCodeBaselineBytes +
           debrisVisualPolishEntityCodeBudgetBytes - entityCodeBytes,
+        destructibleDebris: {
+          baselineBytes: destructibleDebrisEntityCodeBaselineBytes,
+          approvedDeltaBytes: destructibleDebrisEntityCodeBudgetBytes,
+          actualBytes: entityCodeBytes,
+          actualDeltaBytes: entityCodeBytes - destructibleDebrisEntityCodeBaselineBytes,
+          limitBytes: destructibleDebrisEntityCodeBaselineBytes +
+            destructibleDebrisEntityCodeBudgetBytes,
+        },
       },
       packedBytes: packedEntityCodeRuntime.length,
       packedSourceAddress: entityPackedSourceAddress,
@@ -671,9 +731,13 @@ async function build() {
       logicalRows: entityEffectsAsset.coordinateSystem.logicalRows,
       archetypeCount: entityEffectsAsset.archetypes.length,
       descriptorBytes: entityEffectsAsset.descriptor.length,
-      glyphBytes: entityEffectsAsset.glyphs.length,
+      glyphBytes: entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length,
+      debrisGlyphBytes: entityEffectsAsset.glyphs.length,
+      effectGlyphBytes: entityEffectsAsset.effectGlyphs.length,
       glyphIndex: labels.get("ENTITY_DEBRIS_GLYPH_BASE"),
-      glyphCount: entityEffectsAsset.glyphs.length / 8,
+      glyphCount: (entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length) / 8,
+      debrisGlyphCount: entityEffectsAsset.glyphs.length / 8,
+      effectGlyphCount: entityEffectsAsset.effectGlyphs.length / 8,
       newGlyphsFromFoundation: entityEffectsAsset.glyphs.length / 8 - 1,
       runtimeBudget: {
         historicalGateWallCycles: runtimeHeadroomHistoricalWallGate,
@@ -715,15 +779,49 @@ async function build() {
           deltaLimitedMinimumPhysicalHeadroomCycles:
             explosionFlashBaselineHeadroomCycles - explosionFlashApprovedWallDelta,
           absoluteMinimumPhysicalHeadroomCycles: explosionFlashAbsoluteMinimumHeadroom,
+          measuredWallCycles:
+            wallTrace?.gate.explosion_colour_flash?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.explosion_colour_flash?.actual_delta_cycles ?? null,
+          remainingApprovedCycles:
+            wallTrace?.gate.explosion_colour_flash?.remaining_approved_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
+        destructibleDebris: {
+          baselineWallCycles: destructibleDebrisBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: destructibleDebrisBaselineHeadroomCycles,
+          targetDeltaCycles: destructibleDebrisTargetDeltaCycles,
+          hardDeltaCycles: destructibleDebrisHardDeltaCycles,
+          targetWallLimitCycles: destructibleDebrisBaselineWallCycles +
+            destructibleDebrisTargetDeltaCycles,
+          hardWallLimitCycles: destructibleDebrisBaselineWallCycles +
+            destructibleDebrisHardDeltaCycles,
+          minimumPhysicalHeadroomCycles: destructibleDebrisMinimumHeadroomCycles,
           measuredWallCycles: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
           actualDeltaCycles: wallTrace === null ? null :
-            wallTrace.semantics.measured_wall_cycles_dma_on - explosionFlashBaselineWallCycles,
-          remainingApprovedCycles: wallTrace === null ? null :
-            explosionFlashWallLimit - wallTrace.semantics.measured_wall_cycles_dma_on,
+            wallTrace.semantics.measured_wall_cycles_dma_on -
+              destructibleDebrisBaselineWallCycles,
+          remainingTargetCycles: wallTrace === null ? null :
+            destructibleDebrisBaselineWallCycles + destructibleDebrisTargetDeltaCycles -
+              wallTrace.semantics.measured_wall_cycles_dma_on,
+          remainingHardCycles: wallTrace === null ? null :
+            destructibleDebrisBaselineWallCycles + destructibleDebrisHardDeltaCycles -
+              wallTrace.semantics.measured_wall_cycles_dma_on,
           missedSynchronization: wallTrace?.gate.missed_frames ?? null,
           deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
         },
       },
+    },
+    runtimeCodeBudget: {
+      measurement: "linked CODE + STARFIELD + BROADSIDE + A2_KERNEL + ENTITY_CODE bytes",
+      baselineBytes: destructibleDebrisRuntimeCodeBaselineBytes,
+      actualBytes: destructibleDebrisRuntimeCodeBytes,
+      actualDeltaBytes: destructibleDebrisRuntimeCodeBytes -
+        destructibleDebrisRuntimeCodeBaselineBytes,
+      approvedDeltaBytes: destructibleDebrisRuntimeCodeBudgetBytes,
+      remainingBytes: destructibleDebrisRuntimeCodeBaselineBytes +
+        destructibleDebrisRuntimeCodeBudgetBytes - destructibleDebrisRuntimeCodeBytes,
     },
     loaderScreen: {
       mode: "mixed ANTIC F/E",

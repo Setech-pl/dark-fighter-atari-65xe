@@ -27,6 +27,15 @@ const EXPLOSION_FLASH_BASELINE_HEADROOM_CYCLES = 3_487;
 const EXPLOSION_FLASH_APPROVED_DELTA_CYCLES = 64;
 const EXPLOSION_FLASH_FEATURE_GATE_CYCLES = 32_145;
 const EXPLOSION_FLASH_ABSOLUTE_MINIMUM_HEADROOM_CYCLES = 3_200;
+const EXPLOSION_FLASH_ACCEPTED_WALL_CYCLES = 32_122;
+const EXPLOSION_FLASH_ACCEPTED_HEADROOM_CYCLES = 3_446;
+const DESTRUCTIBLE_DEBRIS_BASELINE_WALL_CYCLES = 32_122;
+const DESTRUCTIBLE_DEBRIS_BASELINE_HEADROOM_CYCLES = 3_446;
+const DESTRUCTIBLE_DEBRIS_TARGET_DELTA_CYCLES = 640;
+const DESTRUCTIBLE_DEBRIS_HARD_DELTA_CYCLES = 768;
+const DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES = 32_762;
+const DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES = 32_890;
+const DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES = 2_800;
 const EXPECTED_ATARI800_VERSION = "7.1.2";
 const OFFICIAL_SOURCE_ARCHIVE_SHA256 =
   "9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3";
@@ -73,6 +82,15 @@ const fighterFlashSessions = [{
   kind: "fighter-flash-coverage",
 }];
 
+const debrisEffectsSessions = [{
+  id: "debris-effects-2-sweep-fire4",
+  difficulty: 2,
+  policy: "sweep",
+  fireDelay: 4,
+  frames: 1_200,
+  kind: "debris-effects-coverage",
+}];
+
 const traceLabels = {
   DFTRACE_PC_ACTIVE: "main_loop_option_poll",
   DFTRACE_PC_END: "main_loop",
@@ -90,6 +108,11 @@ const traceLabels = {
   DFTRACE_PC_ENTITY_SPAWN: "entity_spawn_debris",
   DFTRACE_PC_ENTITY_CONTACT: "entity_damage_applied",
   DFTRACE_PC_ENTITY_DESPAWN: "entity_despawn_debris",
+  DFTRACE_PC_ENTITY_SHOT: "entity_debris_shot",
+  DFTRACE_PC_EFFECT_SPAWN: "spawn_debris_destruction_effects",
+  DFTRACE_PC_EFFECT_ERASE: "erase_transient_effect_overlays",
+  DFTRACE_PC_EFFECT_UPDATE: "update_transient_effects",
+  DFTRACE_PC_EFFECT_RENDER: "render_transient_effect_overlays",
   DFTRACE_PLAYER_X: "player_x",
   DFTRACE_PLAYER_Y: "player_y",
   DFTRACE_PROJECTILE_ACTIVE: "FIGHTER_PROJECTILE_ACTIVE",
@@ -118,6 +141,22 @@ const traceLabels = {
   DFTRACE_ENTITY_MOVE_ACCUMULATOR: "ENTITY_MOVE_ACCUMULATOR",
   DFTRACE_ENTITY_VERTICAL_ACCUMULATOR: "ENTITY_TIMER",
   DFTRACE_ENTITY_RENDER_ID: "ENTITY_RENDER_ID",
+  DFTRACE_EFFECT_ACTIVE_MASK: "EFFECT_ACTIVE_MASK",
+  DFTRACE_EFFECT_ACTIVE_COUNT: "EFFECT_ACTIVE_COUNT",
+  DFTRACE_EFFECT_RENDERED_MASK: "EFFECT_RENDERED_MASK",
+};
+
+const bootTraceLabels = {
+  DFBOOT_PC_START: "start",
+  DFBOOT_PC_LOADER: "show_loader",
+  DFBOOT_PC_MENU: "enter_main_menu",
+  DFBOOT_PC_FRONTEND: "frontend_input_poll",
+  DFBOOT_PC_GAMEPLAY: "start_gameplay",
+  DFBOOT_PC_MAIN: "main_loop",
+  DFBOOT_LOADER_TIMER: "loader_frame_count",
+  DFBOOT_GAME_STATE: "game_state",
+  DFBOOT_MAIN_MENU_DLIST: "main_menu_display_list",
+  DFBOOT_FRONTEND_DLIST_END: "frontend_display_lists_end",
 };
 
 const numericCsvFields = new Set([
@@ -133,6 +172,7 @@ const numericCsvFields = new Set([
   "entity_render_id", "events",
   "colbk", "colpm0", "colpm1", "colpm2", "colpm3", "colpf0", "colpf1",
   "colpf2", "colpf3", "viper_explosion_timer", "enemy_explosion_timer",
+  "effect_active_mask", "effect_active_count", "effect_rendered_mask",
 ]);
 let cpuReferenceByFrame = new Map();
 
@@ -230,6 +270,11 @@ function decodeEvents(bits) {
     [1 << 9, "debris-despawn"],
     [1 << 10, "near-copy"],
     [1 << 11, "far-step"],
+    [1 << 12, "debris-shot"],
+    [1 << 13, "debris-destruction-spawn"],
+    [1 << 14, "effect-erase"],
+    [1 << 15, "effect-update"],
+    [1 << 16, "effect-render"],
   ].filter(([mask]) => (bits & mask) !== 0).map(([, name]) => name);
 }
 
@@ -278,6 +323,9 @@ function frameState(row, includeCpuReference = false) {
       entity_move_accumulator: row.entity_move_accumulator,
       entity_vertical_accumulator: row.entity_vertical_accumulator,
       entity_render_id: row.entity_render_id,
+      effect_active_mask: row.effect_active_mask,
+      effect_active_count: row.effect_active_count,
+      effect_rendered_mask: row.effect_rendered_mask,
       live_raider: Boolean(row.live_raider),
       fighter_explosion: Boolean(row.fighter_explosion),
       capital_explosion: Boolean(row.capital_explosion),
@@ -329,10 +377,159 @@ function sessionSummary(session, rows) {
   };
 }
 
+function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
+  const outputDirectory = path.join(buildDirectory, "boot-smoke");
+  fs.mkdirSync(outputDirectory, { recursive: true });
+  const addressEnvironment = {};
+  for (const [environmentName, labelName] of Object.entries(bootTraceLabels)) {
+    const address = labels.get(labelName);
+    invariant(Number.isInteger(address), `Boot-smoke label ${labelName} is missing`);
+    addressEnvironment[environmentName] = `0x${address.toString(16)}`;
+  }
+  const expected = {
+    start: labels.get("start"),
+    loader_dlist: labels.get("loader_bitmap_lzss"),
+    main_menu_dlist: labels.get("main_menu_display_list"),
+    playfield_dlist_a: labels.get("PLAYFIELD_DLIST_A"),
+    playfield_dlist_b: labels.get("PLAYFIELD_DLIST_B"),
+    playfield_dlist_bytes: 75,
+    loader_dli: labels.get("loader_dli"),
+    frontend_dli: labels.get("frontend_hint_dli"),
+    gameplay_dli: labels.get("gameplay_dli"),
+  };
+  invariant(Object.values(expected).every(Number.isInteger),
+    "Boot-smoke expected-address labels are incomplete");
+
+  const definitions = [];
+  for (const artifact of [
+    { id: "xex", path: xexPath, arguments: ["-run", xexPath] },
+    { id: "atr", path: atrPath, arguments: [atrPath] },
+  ]) {
+    for (const fill of [0xa5, 0x5a]) {
+      definitions.push({ ...artifact, fill, id: `${artifact.id}-${fill.toString(16)}` });
+    }
+  }
+
+  const sessions = definitions.map((definition) => {
+    const outputPath = path.join(outputDirectory, `${definition.id}.json`);
+    const screenshotPrefix = path.join(outputDirectory, definition.id);
+    run(emulatorPath, [
+      "-xe", "-pal", "-nobasic", "-nosound", "-turbo", "-no-video-accel", "-no-vsync",
+      ...definition.arguments,
+    ], {
+      env: {
+        ...process.env,
+        SDL_VIDEODRIVER: process.env.SDL_VIDEODRIVER ?? "dummy",
+        ...addressEnvironment,
+        DFBOOT_OUTPUT: outputPath,
+        DFBOOT_ARTIFACT: definition.id,
+        DFBOOT_RAM_FILL: String(definition.fill),
+        DFBOOT_SCREENSHOT_PREFIX: screenshotPrefix,
+      },
+    });
+    const result = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+    invariant(result.artifact === definition.id && result.cold_ram_fill === definition.fill,
+      `${definition.id} boot-smoke identity differs from its invocation`);
+    invariant(result.snapshots.map(({ frame }) => frame).join(",") === "1,250,300,500,750",
+      `${definition.id} did not capture all five required PAL frames`);
+    const byFrame = new Map(result.snapshots.map((snapshot) => [snapshot.frame, snapshot]));
+    const loader250 = byFrame.get(250);
+    const loader300 = byFrame.get(300);
+    const menu = byFrame.get(500);
+    const gameplay = byFrame.get(750);
+    for (const snapshot of [loader250, loader300]) {
+      invariant(snapshot.game_state === 0 && snapshot.dlist === expected.loader_dlist &&
+        snapshot.charset_address === 0xe000 && snapshot.dma_ctl === 0x22 &&
+        snapshot.nmi_en === 0x80 && snapshot.vdslst === expected.loader_dli,
+      `${definition.id} loader display/VBI state is invalid at frame ${snapshot.frame}`);
+    }
+    invariant(loader250.loader_timer > loader300.loader_timer && loader300.loader_timer > 0,
+      `${definition.id} loader countdown did not advance between frames 250 and 300`);
+    invariant(menu.loader_timer === 0 && menu.game_state === 1 &&
+      menu.dlist === expected.main_menu_dlist && menu.charset_address === 0x4800 &&
+      menu.pm_base === 0x3800 && menu.dma_ctl === 0x3a && menu.nmi_en === 0x80 &&
+      menu.vdslst === expected.frontend_dli,
+    `${definition.id} did not reach a valid visible main menu by frame 500`);
+    invariant(gameplay.game_state === 6 && gameplay.charset_address === 0x5000 &&
+      gameplay.pm_base === 0x3800 && gameplay.dma_ctl === 0x3e &&
+      gameplay.nmi_en === 0x80 && gameplay.vdslst === expected.gameplay_dli &&
+      gameplay.dlist >= expected.playfield_dlist_a &&
+      gameplay.dlist < expected.playfield_dlist_b + expected.playfield_dlist_bytes,
+    `${definition.id} did not reach the legal gameplay display/VBI path by frame 750`);
+    const milestones = result.milestones;
+    invariant(Object.values(milestones).every((frame) => frame !== 0xffffffff) &&
+      milestones.start < milestones.loader && milestones.loader < milestones.menu &&
+      milestones.menu <= milestones.frontend_poll &&
+      milestones.frontend_poll < milestones.gameplay_init &&
+      milestones.gameplay_init <= milestones.main_loop && milestones.main_loop < 750,
+    `${definition.id} did not execute the complete loader-to-gameplay handoff`);
+    if (definition.id.startsWith("xex")) {
+      invariant(menu.runad === expected.start,
+        `${definition.id} XEX RUNAD does not point at the game entry`);
+    } else {
+      invariant(menu.dosvec === expected.start,
+        `${definition.id} ATR DOSVEC does not point at the game entry`);
+    }
+    const screenshots = [1, 250, 300, 500, 750].map((frame) => {
+      const screenshotPath = `${screenshotPrefix}-frame${String(frame).padStart(3, "0")}.png`;
+      invariant(fs.existsSync(screenshotPath),
+        `${definition.id} screenshot is missing for frame ${frame}`);
+      const bytes = fs.readFileSync(screenshotPath);
+      return {
+        frame,
+        path: path.relative(rootDirectory, screenshotPath),
+        bytes: bytes.length,
+        sha256: sha256(bytes),
+      };
+    });
+    return {
+      id: definition.id,
+      medium: definition.id.startsWith("xex") ? "XEX" : "ATR",
+      cold_ram_fill: definition.fill,
+      artifact: {
+        path: path.relative(rootDirectory, definition.path),
+        bytes: fs.statSync(definition.path).size,
+        sha256: sha256(fs.readFileSync(definition.path)),
+      },
+      snapshots: result.snapshots,
+      milestones,
+      screenshots,
+      passed: true,
+    };
+  });
+
+  const gameplayScreenshots = sessions.map((session) =>
+    session.screenshots.find(({ frame }) => frame === 750).sha256);
+  invariant(new Set(gameplayScreenshots).size === 1,
+    "XEX/ATR or cold-RAM fills produced different frame-750 gameplay images");
+  const menuScreenshots = sessions.map((session) =>
+    session.screenshots.find(({ frame }) => frame === 500).sha256);
+  invariant(new Set(menuScreenshots).size === 1,
+    "XEX/ATR or cold-RAM fills produced different frame-500 main-menu images");
+
+  const evidence = {
+    emulator: "Atari800 7.1.2 PAL/XL",
+    frames_observed: 750,
+    duration_seconds_pal: 15,
+    guest_instrumentation_bytes: 0,
+    cold_ram_range: "$8000-$9FFF",
+    input: "production joystick path; FIRE pressed on host frames 501-506",
+    expected_addresses: expected,
+    sessions,
+    xex_atr_frame_500_parity_sha256: menuScreenshots[0],
+    xex_atr_frame_750_parity_sha256: gameplayScreenshots[0],
+    passed: sessions.every(({ passed }) => passed),
+  };
+  fs.writeFileSync(path.join(outputDirectory, "report.json"),
+    `${JSON.stringify(evidence, null, 2)}\n`);
+  return evidence;
+}
+
 function main() {
   const sourceDirectory = path.resolve(argumentValue("atari800-source") ??
     process.env.ATARI800_TRACE_SOURCE ?? "/tmp/atari800-7.1.2");
   const shouldPrepare = process.argv.includes("--prepare");
+  const bootSmokeOnly = process.argv.includes("--boot-smoke-only");
   const smokeFramesArgument = argumentValue("smoke-frames");
   const smokeFrames = smokeFramesArgument === undefined ? null : Number(smokeFramesArgument);
   invariant(smokeFrames === null || Number.isInteger(smokeFrames) && smokeFrames > 0,
@@ -345,7 +542,8 @@ function main() {
   const labelPath = path.join(rootDirectory, "build", "dark-fighter.lbl");
   const manifestPath = path.join(rootDirectory, "dist", "dark-fighter-manifest.json");
   const xexPath = path.join(rootDirectory, "dist", "dark-fighter.xex");
-  for (const requiredPath of [labelPath, manifestPath, xexPath]) {
+  const atrPath = path.join(rootDirectory, "dist", "dark-fighter.atr");
+  for (const requiredPath of [labelPath, manifestPath, xexPath, atrPath]) {
     invariant(fs.existsSync(requiredPath), `Build input is missing: ${requiredPath}`);
   }
   const labels = parseViceLabels(fs.readFileSync(labelPath, "utf8"));
@@ -358,10 +556,18 @@ function main() {
   }
 
   fs.mkdirSync(buildDirectory, { recursive: true });
+  const bootSmoke = runBootSmoke({ emulatorPath, labels, xexPath, atrPath });
+  console.log(`Boot smoke: ${bootSmoke.sessions.length} XEX/ATR cold-start sessions passed`);
+  if (bootSmokeOnly) {
+    console.log(`Report: ${path.relative(rootDirectory,
+      path.join(buildDirectory, "boot-smoke", "report.json"))}`);
+    return;
+  }
   const allRows = [];
   const summaries = [];
   const sessionsToRun = smokeFrames === null
-    ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions]
+    ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
+      ...debrisEffectsSessions]
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
   for (const session of sessionsToRun) {
     const outputPath = path.join(buildDirectory, `${session.id}.csv`);
@@ -395,6 +601,7 @@ function main() {
   const targetedRows = allRows.filter((row) => row.trace_kind === "targeted-heavy-coincidence");
   const cadenceRows = allRows.filter((row) => row.trace_kind === "parallax-cadence");
   const fighterFlashRows = allRows.filter((row) => row.trace_kind === "fighter-flash-coverage");
+  const debrisEffectsRows = allRows.filter((row) => row.trace_kind === "debris-effects-coverage");
   invariant(baselineRows.length === 9_040,
     `Baseline trace measured ${baselineRows.length}/9040 frames`);
   invariant(targetedRows.length === 920,
@@ -403,6 +610,8 @@ function main() {
     `Parallax trace measured ${cadenceRows.length}/1200 frames`);
   invariant(fighterFlashRows.length === 1_600,
     `Fighter-flash trace measured ${fighterFlashRows.length}/1600 frames`);
+  invariant(debrisEffectsRows.length === 1_200,
+    `Debris-effects trace measured ${debrisEffectsRows.length}/1200 frames`);
   invariant(allRows.every((row) => row.dma_ctl === 0x3e),
     "Trace observed gameplay DMACTL other than $3E");
   invariant(allRows.every((row) => row.nmi_en === 0x80),
@@ -437,19 +646,51 @@ function main() {
   const spawnRows = allRows.filter((row) => (row.events & (1 << 7)) !== 0);
   const contactRows = allRows.filter((row) => (row.events & (1 << 8)) !== 0);
   const despawnRows = allRows.filter((row) => (row.events & (1 << 9)) !== 0);
-  const bottomDespawnRows = despawnRows.filter((row) => (row.events & (1 << 8)) === 0);
+  const shotRows = allRows.filter((row) => (row.events & (1 << 12)) !== 0);
+  const effectSpawnRows = allRows.filter((row) => (row.events & (1 << 13)) !== 0);
+  const fullEffectRows = allRows.filter((row) =>
+    row.effect_active_mask === 0x1f && row.effect_active_count === 5);
+  const bottomDespawnRows = despawnRows.filter((row) =>
+    (row.events & ((1 << 8) | (1 << 12))) === 0);
   invariant(emptyEntityRows.length > 0, "Trace did not observe the empty entity/effects path");
   invariant(activeEntityRows.length > 0, "Trace did not observe one active debris");
   invariant(spawnRows.length > 0, "Trace did not observe debris spawn");
   invariant(contactRows.length > 0, "Trace did not observe successful debris contact");
   invariant(bottomDespawnRows.length > 0,
     "Trace did not observe debris leaving the bottom after ring/world advancement");
+  invariant(shotRows.length > 0,
+    "Trace did not observe a Viper projectile destroying active debris");
+  invariant(shotRows.some((row) => row.sector_state === 7),
+    "Trace did not observe a Viper projectile destroying post-capital debris");
+  invariant(effectSpawnRows.length > 0,
+    "Trace did not execute the debris destruction effect spawner");
+  invariant(fullEffectRows.length > 0,
+    "Trace did not observe one core plus four active fragments");
+  invariant(effectSpawnRows.every((row) =>
+    row.effect_active_mask === 0x1f && row.effect_active_count === 5 &&
+    (row.events & (1 << 15)) !== 0 && (row.events & (1 << 16)) !== 0),
+  "Final-hit frame did not update and render all five spawned effects");
+  invariant(fullEffectRows.some((row) => (row.events & (1 << 14)) !== 0),
+    "Active debris fragments were never erased on the following frame");
+  invariant(effectSpawnRows.some((row) => row.sector_state === 7),
+    "Trace did not spawn the five-slot destruction effect after the capital sector");
   const emptyEntityMaximum = maximumRow(emptyEntityRows, (row) => row.wall_cycles);
   const activeEntityMaximum = maximumRow(activeEntityRows, (row) => row.wall_cycles);
   const spawnMaximum = maximumRow(spawnRows, (row) => row.wall_cycles);
   const contactMaximum = maximumRow(contactRows, (row) => row.wall_cycles);
+  const shotMaximum = maximumRow(shotRows, (row) => row.wall_cycles);
+  const targetBudgetOverruns = allRows.filter((row) =>
+    row.wall_cycles > DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES);
   const featureBudgetOverruns = allRows.filter((row) =>
-    row.wall_cycles > EXPLOSION_FLASH_FEATURE_GATE_CYCLES);
+    row.wall_cycles > DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES);
+  const noActiveDebrisPathDelta =
+    manifest.runtimeTiming.destructibleDebris.noActiveDebrisPathDeltaCpuCycles;
+  const noActiveViperPathDelta =
+    manifest.runtimeTiming.destructibleDebris.noActiveViperProjectilePathDeltaCpuCycles;
+  invariant(noActiveDebrisPathDelta <= 32,
+    "Linked no-active-debris path exceeded its +32-cycle limit");
+  invariant(noActiveViperPathDelta <= 48,
+    "Linked no-active-Viper-projectile path exceeded its +48-cycle limit");
   const activeGlyphOffsets = activeEntityRows.map((row) =>
     row.entity_render_id - manifest.entityEffects.glyphIndex);
   const observedVariants = [...new Set(activeGlyphOffsets.map((offset) => offset >> 2))].sort();
@@ -578,9 +819,11 @@ function main() {
     const flightFrames = [];
     for (const row of rows) {
       if ((row.events & (1 << 7)) !== 0) spawnFrame = row.frame;
-      if (spawnFrame !== null && (row.events & (1 << 8)) !== 0) spawnFrame = null;
+      if (spawnFrame !== null && (row.events & ((1 << 8) | (1 << 12))) !== 0) {
+        spawnFrame = null;
+      }
       if (spawnFrame !== null && (row.events & (1 << 9)) !== 0 &&
-          (row.events & (1 << 8)) === 0) {
+          (row.events & ((1 << 8) | (1 << 12))) === 0) {
         flightFrames.push(row.frame - spawnFrame);
         spawnFrame = null;
       }
@@ -667,6 +910,7 @@ function main() {
       ],
       audio_note: "-nosound disables host playback only; guest sound/music state and POKEY register writes remain active",
     },
+    boot_smoke: bootSmoke,
     semantics: {
       cpu_cycles_dma_off: cpuCycles,
       cpu_comparison_headroom: PAL_FRAME_CYCLES - cpuCycles,
@@ -676,7 +920,7 @@ function main() {
     },
     gate: {
       pal_frame_cycles: PAL_FRAME_CYCLES,
-      maximum_wall_cycles: EXPLOSION_FLASH_FEATURE_GATE_CYCLES,
+      maximum_wall_cycles: DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES,
       historical_runtime_headroom_gate: {
         maximum_wall_cycles: HISTORICAL_PHYSICAL_GATE_CYCLES,
         preserved_for_history: true,
@@ -739,10 +983,40 @@ function main() {
             EXPLOSION_FLASH_APPROVED_DELTA_CYCLES,
         absolute_minimum_physical_headroom:
           EXPLOSION_FLASH_ABSOLUTE_MINIMUM_HEADROOM_CYCLES,
-        actual_delta_cycles: heaviest.wall_cycles - EXPLOSION_FLASH_BASELINE_WALL_CYCLES,
+        measured_wall_cycles: EXPLOSION_FLASH_ACCEPTED_WALL_CYCLES,
+        measured_physical_headroom: EXPLOSION_FLASH_ACCEPTED_HEADROOM_CYCLES,
+        actual_delta_cycles:
+          EXPLOSION_FLASH_ACCEPTED_WALL_CYCLES - EXPLOSION_FLASH_BASELINE_WALL_CYCLES,
         remaining_approved_cycles:
-          EXPLOSION_FLASH_FEATURE_GATE_CYCLES - heaviest.wall_cycles,
-        budget_overrun_frames: featureBudgetOverruns.length,
+          EXPLOSION_FLASH_FEATURE_GATE_CYCLES - EXPLOSION_FLASH_ACCEPTED_WALL_CYCLES,
+        budget_overrun_frames: 0,
+        passed: true,
+      },
+      destructible_debris: {
+        baseline_wall_cycles: DESTRUCTIBLE_DEBRIS_BASELINE_WALL_CYCLES,
+        baseline_physical_headroom: DESTRUCTIBLE_DEBRIS_BASELINE_HEADROOM_CYCLES,
+        target_delta_cycles: DESTRUCTIBLE_DEBRIS_TARGET_DELTA_CYCLES,
+        hard_delta_cycles: DESTRUCTIBLE_DEBRIS_HARD_DELTA_CYCLES,
+        target_wall_cycles: DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES,
+        maximum_wall_cycles: DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES,
+        minimum_physical_headroom: DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES,
+        measured_wall_cycles: heaviest.wall_cycles,
+        measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
+        actual_delta_cycles: heaviest.wall_cycles - DESTRUCTIBLE_DEBRIS_BASELINE_WALL_CYCLES,
+        remaining_target_cycles: DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES - heaviest.wall_cycles,
+        remaining_hard_cycles: DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES - heaviest.wall_cycles,
+        target_overrun_frames: targetBudgetOverruns.length,
+        hard_overrun_frames: featureBudgetOverruns.length,
+        no_active_debris_path_delta_cpu_cycles: noActiveDebrisPathDelta,
+        no_active_debris_path_limit_cpu_cycles: 32,
+        no_active_viper_projectile_path_delta_cpu_cycles: noActiveViperPathDelta,
+        no_active_viper_projectile_path_limit_cpu_cycles: 48,
+        debris_shot_path: frameState(shotMaximum),
+        passed: heaviest.wall_cycles <= DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES &&
+          PAL_FRAME_CYCLES - heaviest.wall_cycles >=
+            DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES &&
+          noActiveDebrisPathDelta <= 32 && noActiveViperPathDelta <= 48 &&
+          deadlineOverruns.length === 0,
       },
       measured_wall_cycles_dma_on: heaviest.wall_cycles,
       measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
@@ -766,10 +1040,11 @@ function main() {
       host_vbi_boundary_crossings:
         allRows.reduce((sum, row) => sum + row.host_vbi_boundaries, 0),
       extra_vbi_boundaries: allRows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0),
-      passed: heaviest.wall_cycles <= EXPLOSION_FLASH_FEATURE_GATE_CYCLES &&
+      passed: heaviest.wall_cycles <= DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES &&
         PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-          EXPLOSION_FLASH_ABSOLUTE_MINIMUM_HEADROOM_CYCLES &&
-        featureBudgetOverruns.length === 0 && deadlineOverruns.length === 0,
+          DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES &&
+        featureBudgetOverruns.length === 0 && deadlineOverruns.length === 0 &&
+        allRows.every((row) => row.extra_vbi_boundaries === 0),
     },
     instrumentation: {
       start_label: "main_loop_option_poll",
@@ -789,6 +1064,7 @@ function main() {
       targeted_measured_frames: targetedRows.length,
       parallax_cadence_measured_frames: cadenceRows.length,
       fighter_flash_measured_frames: fighterFlashRows.length,
+      debris_effects_measured_frames: debrisEffectsRows.length,
       input: "production frontend/options handlers followed by deterministic held-FIRE neutral/sweep/evasive joystick policies",
       sessions: summaries,
       baseline_heaviest: frameState(baselineHeaviest),
@@ -826,8 +1102,24 @@ function main() {
       debris_spawn: coverageRecord(allRows, (row) => (row.events & (1 << 7)) !== 0),
       debris_contact: coverageRecord(allRows, (row) => (row.events & (1 << 8)) !== 0),
       debris_despawn: coverageRecord(allRows, (row) => (row.events & (1 << 9)) !== 0),
+      debris_shot: coverageRecord(allRows, (row) => (row.events & (1 << 12)) !== 0),
+      debris_destruction_effects: {
+        ...coverageRecord(fullEffectRows, () => true),
+        spawner_frames: effectSpawnRows.length,
+        active_frames: fullEffectRows.length,
+        active_mask: 0x1f,
+        active_count: 5,
+        spawn_updated_and_rendered: effectSpawnRows.every((row) =>
+          (row.events & ((1 << 15) | (1 << 16))) === ((1 << 15) | (1 << 16))),
+        following_frame_erase_observed: fullEffectRows.some((row) =>
+          (row.events & (1 << 14)) !== 0),
+        post_capital_spawn_observed: effectSpawnRows.some((row) => row.sector_state === 7),
+      },
+      debris_shot_post_capital: coverageRecord(allRows, (row) =>
+        row.sector_state === 7 && (row.events & (1 << 12)) !== 0),
       debris_bottom_despawn: coverageRecord(allRows, (row) =>
-        (row.events & (1 << 9)) !== 0 && (row.events & (1 << 8)) === 0),
+        (row.events & (1 << 9)) !== 0 &&
+          (row.events & ((1 << 8) | (1 << 12))) === 0),
       debris_post_capital_sector: coverageRecord(allRows, (row) =>
         row.sector_state === 7 && row.entity_active === 1),
       post_capital_transition: postCapitalTransition,

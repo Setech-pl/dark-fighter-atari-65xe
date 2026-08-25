@@ -37,6 +37,11 @@ import {
   loadEntityEffectsDefinition,
 } from "./entity-effects.mjs";
 import {
+  assertDebrisDestructionTraceParity,
+  debrisDestructionTraceCsv,
+  executeDebrisDestructionTrace,
+} from "./debris-destruction-runtime.mjs";
+import {
   beginEnemyDamageFrame,
   createEnemyCombatState,
   createEnemyDamageState,
@@ -345,6 +350,18 @@ export const DEFAULT_DEBRIS_REVIEW_TRACE_PATH = path.join(
   "build",
   "previews",
   "debris-visual-polish-trace.csv",
+);
+export const DEFAULT_DESTRUCTIBLE_DEBRIS_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "destructible-debris-review.png",
+);
+export const DEFAULT_DESTRUCTIBLE_DEBRIS_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "destructible-debris-trace.csv",
 );
 const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   rootDirectory,
@@ -763,9 +780,9 @@ export function readGameGraphicsSource(
     source,
     "charset_data",
     constants,
-    "capital_hull_glyphs",
+    "charset_fixed_frontend_end",
   );
-  requireLength("base charset", baseCharset, 59 * CHARACTER_HEIGHT);
+  requireLength("fixed frontend charset source", baseCharset, 16 * CHARACTER_HEIGHT);
   const charset = new Uint8Array(1024);
   charset.set(baseCharset);
   charset.set(
@@ -785,6 +802,10 @@ export function readGameGraphicsSource(
     capitalHulls.definition.charsetBaseIndex * CHARACTER_HEIGHT + capitalHulls.glyphBytes.length,
   );
   const sourceCharset = Uint8Array.from(charset);
+  charset.set(
+    fighterWeapons.glyphs.viper.flat(),
+    fighterWeapons.glyphLayout.viperBase * CHARACTER_HEIGHT,
+  );
   charset.set(starfield.glyphBytes, starfield.glyphs[0].screenCode * CHARACTER_HEIGHT);
 
   const hudHardwareState = new Map(gameplayHardwareState);
@@ -1994,7 +2015,7 @@ export function readExplosionFlashRuntimeState(
     source,
     "player_death_flash_colors",
     constants,
-    "hud_ascii",
+    "flash_color_tables_end",
   );
   requireLength("enemy fighter flash table", enemyStored, 4);
   requireLength("player death flash table", playerStored, 6);
@@ -3821,6 +3842,112 @@ export function createDebrisReviewPreview(
   return encodePng(rgb, width, height);
 }
 
+export function createDestructibleDebrisTrace(
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const xex = executeDebrisDestructionTrace({ artifact: "xex" });
+  const atr = executeDebrisDestructionTrace({ artifact: "atr" });
+  assertDebrisDestructionTraceParity(xex, atr);
+  const atrRows = debrisDestructionTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${debrisDestructionTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+}
+
+function copyRgbPanel(destination, destinationWidth, destinationHeight,
+  source, sourceWidth, sourceHeight, x, y) {
+  for (let row = 0; row < sourceHeight; row += 1) {
+    const destinationY = y + row;
+    if (destinationY < 0 || destinationY >= destinationHeight) continue;
+    const sourceStart = row * sourceWidth * 3;
+    const destinationStart = (destinationY * destinationWidth + x) * 3;
+    source.copy(destination, destinationStart, sourceStart, sourceStart + sourceWidth * 3);
+  }
+}
+
+function runtimeDebrisFrameRgb(record, trace, graphics, scale) {
+  const registerPixels = drawAnticScreen(
+    graphics.hardwareState,
+    record.screen,
+    { charset: trace.charset },
+    undefined,
+    22,
+  );
+  return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, 22 * CHARACTER_HEIGHT, scale);
+}
+
+export function createDestructibleDebrisPreview(
+  source,
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const trace = executeDebrisDestructionTrace({ artifact: "xex" });
+  const atrTrace = executeDebrisDestructionTrace({ artifact: "atr" });
+  assertDebrisDestructionTraceParity(trace, atrTrace);
+  const constants = parseConstants(source);
+  const graphics = {
+    hardwareState: new Map([
+      ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+      ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+      ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+      ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+      ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+    ]),
+  };
+  const frontend = readFrontendGraphicsSource(source);
+  const selected = [
+    ["PRE_HIT", 0, "1 DEBRIS"],
+    ["FINAL", 0, "2 FINAL HIT"],
+    ["FINAL", 1, "3 YELLOW CORE"],
+    ["FINAL", 3, "4 FOUR FRAGMENTS"],
+    ["FINAL", 5, "5 EARLY SPREAD"],
+    ["FINAL", 12, "6 MID SPREAD"],
+    ["FINAL", 29, "7 MAX SPREAD"],
+    ["FINAL", 31, "8 CLEAN"],
+  ].map(([phase, frame, label]) => ({
+    label,
+    record: trace.records.find((candidate) => candidate.phase === phase && candidate.frame === frame),
+  }));
+  if (selected.some(({ record }) => !record)) throw new Error("Runtime debris preview frame is missing");
+
+  const nativeWidth = SOURCE_WIDTH;
+  const nativeHeight = 22 * CHARACTER_HEIGHT;
+  const panelGap = 12;
+  const width = 8 * nativeWidth * 2 + 9 * panelGap;
+  const height = 720;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "DEBRIS DESTRUCTION  EXECUTED XEX BYTES  50 FPS", 24, 16,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "CORE 5 FRAMES  FRAGMENTS 30 FRAMES  XEX ATR BYTE-EXACT TRACE PARITY", 24, 34,
+    frontend, yellow);
+
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  EIGHT ACTUAL RUNTIME FRAMES", 24, 58,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const x = panelGap + index * (nativeWidth + panelGap);
+    fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
+    strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
+    drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
+    const frameRgb = runtimeDebrisFrameRgb(record, trace, graphics, 1);
+    copyRgbPanel(rgb, width, height, frameRgb, nativeWidth, nativeHeight, x, 102);
+  });
+
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME EXECUTED FRAMES GLYPHS COLORS AND TIMINGS", 24, 306,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const panelWidth = nativeWidth * 2;
+    const x = panelGap + index * (panelWidth + panelGap);
+    drawRgbLabel(rgb, width, label, x + 4, 330, frontend, white);
+    const frameRgb = runtimeDebrisFrameRgb(record, trace, graphics, 2);
+    copyRgbPanel(rgb, width, height, frameRgb, panelWidth, nativeHeight * 2, x, 350);
+  });
+  return encodePng(rgb, width, height);
+}
+
 export function readProjectileVisualLanguageRuntimeState(
   source,
   capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
@@ -5220,6 +5347,30 @@ export function generateDebrisReviewTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
+export function generateDestructibleDebrisPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DESTRUCTIBLE_DEBRIS_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createDestructibleDebrisPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadEntityEffectsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateDestructibleDebrisTrace({
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DESTRUCTIBLE_DEBRIS_TRACE_PATH,
+} = {}) {
+  const trace = createDestructibleDebrisTrace(loadEntityEffectsDefinition(definitionPath));
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateEnemyReferenceInventoryPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   outputPath = DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH,
@@ -5670,6 +5821,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Debris visual-polish trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, debrisReviewTrace.outputPath)}`);
     console.log(`  rows: ${debrisReviewTrace.rows}, ${debrisReviewTrace.bytes} bytes`);
+
+    const destructibleDebrisResult = generateDestructibleDebrisPreview();
+    console.log(`Destructible-debris owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, destructibleDebrisResult.outputPath)}`);
+    console.log(
+      `  size: ${destructibleDebrisResult.width}x${destructibleDebrisResult.height}, ${destructibleDebrisResult.bytes} bytes`,
+    );
+    const destructibleDebrisTrace = generateDestructibleDebrisTrace();
+    console.log(`Destructible-debris acceptance trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, destructibleDebrisTrace.outputPath)}`);
+    console.log(`  rows: ${destructibleDebrisTrace.rows}, ${destructibleDebrisTrace.bytes} bytes`);
 
     const startMenuResult = generateStartMenuPreview();
     console.log(`Start-menu preview generated successfully`);

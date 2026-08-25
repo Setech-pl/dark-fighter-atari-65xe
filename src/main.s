@@ -14,6 +14,7 @@
 .include "menu-music.inc"
 .include "gameplay-music.inc"
 .include "entity-effects.inc"
+.include "loader-display-list.inc"
 
 .import __A2_KERNEL_RUN__, __A2_KERNEL_SIZE__
 
@@ -213,6 +214,7 @@ MUZZLE_TRACKING_STATE_END    = MUZZLE_SCREEN_HI+$02
 ; layout in a host-side wall-clock tracer.
 .export BROAD_STATE, DIFFICULTY_SETTING, CAPITAL_SECTOR_STATE, PLAYER_LIFECYCLE
 .export CAPITAL_EXPLOSION_TIMER, CAPITAL_EXPLOSION_SOUND_TIMER, ENEMY_ACTIVE
+.export ENEMY_ARCHETYPE, ENEMY_HP, ENEMY_PENDING_DAMAGE, ENEMY_PENDING_SOURCE
 .export STAR_FAR_ACTIVE, MUSIC_ACTIVE
 
 .assert MUZZLE_TRACKING_STATE_END <= $5000, error, "session, music and muzzle state exceed reclaimed loader RAM"
@@ -490,6 +492,7 @@ ENTITY_CORRIDOR_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_CORRIDOR_END_COLUMN*4
 ENTITY_SAFE_SPAWN_LEFT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_FIRST_COLUMN*4
 ENTITY_SAFE_SPAWN_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_END_COLUMN*4
 ENTITY_DEBRIS_GLYPH_BASE = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
+EFFECT_FRAGMENT_GLYPH_BASE = ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
 .assert CAPITAL_HULL_TURRET_COUNT = 2, error, "tracked muzzle records require exactly one turret per side"
@@ -520,7 +523,11 @@ ENTITY_DEBRIS_GLYPH_BASE = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_
 .assert ENTITY_DEBRIS_PHASE_COUNT = 2, error, "debris must retain two tumbling phases"
 .assert ENTITY_DEBRIS_GLYPHS_PER_PHASE = 2, error, "debris renderer must remain exactly 2x1"
 .assert ENTITY_DEBRIS_GLYPH_COUNT = 8, error, "debris must use exactly eight glyphs"
-.assert ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT <= 128, error, "debris glyphs exceed the ANTIC 4 charset"
+.assert EFFECT_FRAGMENT_GLYPH_COUNT = 2, error, "debris fragments must use exactly two glyphs"
+.assert EFFECT_FRAGMENT_GLYPH_BASE = 118, error, "debris fragment glyph indices must begin at 118"
+.assert EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT = 120, error, "glyphs 120-127 must remain free"
+.assert 128-(EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT) >= 8, error, "at least eight ANTIC 4 glyphs must remain free"
+.assert EFFECT_ACTIVE_LIMIT = 5, error, "debris destruction requires one core and four fragments"
 .assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
 .assert HUD_BOTTOM = GAMEPLAY_TOP, error, "gameplay must begin immediately below the HUD"
 .assert GAMEPLAY_BOTTOM-GAMEPLAY_TOP = CAPITAL_HULL_VISIBLE_ROWS*8, error, "gameplay viewport height changed"
@@ -2358,6 +2365,15 @@ unpack_loader_bitmap:
     sta broadside_destination+1
     lda #>LOADER_BITMAP_ADDRESS
     sta broadside_destination+2
+    jsr broadside_unpack_command
+    lda #<loader_display_list_lzss
+    sta broadside_read_source+1
+    lda #>loader_display_list_lzss
+    sta broadside_read_source+2
+    lda #<loader_display_list
+    sta broadside_destination+1
+    lda #>loader_display_list
+    sta broadside_destination+2
     jmp broadside_unpack_command
 
 init_state:
@@ -2411,9 +2427,9 @@ clear_pmg:
     lda #$00
     ldx #$00
 @loop:
-    sta PMG_BASE+$000,x
-    sta PMG_BASE+$100,x
-    sta PMG_BASE+$200,x
+    ; In single-line mode ANTIC fetches missiles from $3B00 and players from
+    ; $3C00-$3FFF.  $3800-$3AFF is not PMG DMA storage; it also contains the
+    ; loader/frontend display lists, so it must survive this clear.
     sta PMG_BASE+$300,x
     sta PMG_BASE+$400,x
     sta PMG_BASE+$500,x
@@ -3009,19 +3025,15 @@ init_fighter_projectiles:
     sta FIGHTER_EXPLOSION_Y,x
     dex
     bpl @explosion_state
-    ldx #$00
-@viper_glyph_page:
-    lda viper_projectile_glyphs,x
+    ; Glyphs 16-46 already contain Viper phases 5-35 in the canonical charset
+    ; image. Preserve frontend graphics 11-15 by copying their five replacement
+    ; phases from otherwise unused source glyphs 47-51 after frontend setup.
+    ldx #(5*8-1)
+@viper_glyph_head:
+    lda viper_projectile_glyph_head,x
     sta CHARSET+VIPER_PROJECTILE_GLYPH_BASE*8,x
-    inx
-    bne @viper_glyph_page
-    ldx #$00
-@viper_glyph_tail:
-    lda viper_projectile_glyphs+$100,x
-    sta CHARSET+VIPER_PROJECTILE_GLYPH_BASE*8+$100,x
-    inx
-    cpx #32
-    bne @viper_glyph_tail
+    dex
+    bpl @viper_glyph_head
     jsr build_raider_projectile_glyphs
     jmp build_star_glyphs
 
@@ -3126,14 +3138,11 @@ update_fighter_projectiles:
     sec
     sbc #VIPER_PROJECTILE_SPEED
     sta FIGHTER_PROJECTILE_Y,x
-    jsr viper_projectile_hits_enemy
+    jsr entity_viper_projectile_target
     bcc @viper_next
-    lda #FIGHTER_PROJECTILE_FREE
-    sta FIGHTER_PROJECTILE_ACTIVE,x
     lda #$01
     ldy #DAMAGE_PLAYER_PROJECTILE
     jsr queue_enemy_damage
-    jmp @viper_next
 @viper_free:
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
@@ -3179,27 +3188,20 @@ viper_projectile_hits_enemy:
     lda ENEMY_ACTIVE
     cmp #ENEMY_ACTIVE_STATE
     bne @miss
-    lda FIGHTER_PROJECTILE_X,x
-    cmp enemy_x
-    bcc @miss
     ldy ENEMY_ARCHETYPE
-    lda enemy_x
-    clc
-    adc enemy_visible_widths,y
-    cmp FIGHTER_PROJECTILE_X,x
+    lda FIGHTER_PROJECTILE_X,x
+    sec
+    sbc enemy_x
+    cmp enemy_visible_widths,y
+    bcs @miss
+    lda FIGHTER_PROJECTILE_Y,x
+    sec
+    sbc enemy_y
+    cmp enemy_frame_heights,y
+    bcc @hit
+    cmp #(256-(VIPER_PROJECTILE_SPEED+VIPER_PROJECTILE_HEIGHT-1))
     bcc @miss
-    beq @miss
-    lda enemy_y
-    clc
-    adc enemy_frame_heights,y
-    cmp FIGHTER_PROJECTILE_Y,x
-    bcc @miss
-    beq @miss
-    lda FIGHTER_PROJECTILE_PREV_Y,x
-    clc
-    adc #(VIPER_PROJECTILE_HEIGHT-1)
-    cmp enemy_y
-    bcc @miss
+@hit:
     sec
     rts
 @miss:
@@ -3208,27 +3210,21 @@ viper_projectile_hits_enemy:
 
 raider_projectile_hits_player:
     lda FIGHTER_PROJECTILE_X,x
-    clc
-    adc #RAIDER_PROJECTILE_WIDTH_HPOS
-    cmp player_x
+    sec
+    sbc player_x
+    cmp #PLAYER_COLLISION_WIDTH
+    bcc @horizontal_overlap
+    cmp #(256-(RAIDER_PROJECTILE_WIDTH_HPOS-1))
     bcc @miss
-    beq @miss
-    lda player_x
-    clc
-    adc #PLAYER_COLLISION_WIDTH
-    cmp FIGHTER_PROJECTILE_X,x
+@horizontal_overlap:
+    lda FIGHTER_PROJECTILE_PREV_Y,x
+    sec
+    sbc player_y
+    cmp #(PLAYER_COLLISION_LAST_ROW+1)
+    bcc @hit
+    cmp #(256-(RAIDER_PROJECTILE_SPEED+RAIDER_PROJECTILE_HEIGHT-1))
     bcc @miss
-    beq @miss
-    lda FIGHTER_PROJECTILE_Y,x
-    clc
-    adc #(RAIDER_PROJECTILE_HEIGHT-1)
-    cmp player_y
-    bcc @miss
-    lda player_y
-    clc
-    adc #PLAYER_COLLISION_LAST_ROW
-    cmp FIGHTER_PROJECTILE_PREV_Y,x
-    bcc @miss
+@hit:
     sec
     rts
 @miss:
@@ -4258,31 +4254,23 @@ player_contacts_enemy:
     lda ENEMY_ACTIVE
     cmp #ENEMY_ACTIVE_STATE
     bne @miss
-    lda player_x
-    clc
-    adc #PLAYER_COLLISION_WIDTH
-    cmp enemy_x
-    bcc @miss
-    beq @miss
     ldx ENEMY_ARCHETYPE
-    lda enemy_x
-    clc
-    adc enemy_visible_widths,x
-    cmp player_x
+    lda player_x
+    sec
+    sbc enemy_x
+    cmp enemy_visible_widths,x
+    bcc @horizontal_overlap
+    cmp #(256-(PLAYER_COLLISION_WIDTH-1))
     bcc @miss
-    beq @miss
+@horizontal_overlap:
     lda player_y
-    clc
-    adc #(PLAYER_COLLISION_LAST_ROW+1)
-    cmp enemy_y
+    sec
+    sbc enemy_y
+    cmp enemy_frame_heights,x
+    bcc @hit
+    cmp #(256-PLAYER_COLLISION_LAST_ROW)
     bcc @miss
-    beq @miss
-    lda enemy_y
-    clc
-    adc enemy_frame_heights,x
-    cmp player_y
-    bcc @miss
-    beq @miss
+@hit:
     lda #$01
     rts
 @miss:
@@ -5904,14 +5892,7 @@ silence_audio:
 
 .segment "RODATA"
 
-; Indexed by the descending 24-frame shared explosion timer after subtracting
-; the first active timer value. Tables therefore read expiry-to-impact here,
-; while the visible PAL sequences run in the requested impact-to-expiry order.
-enemy_fighter_flash_colors:
-    .byte FLASH_RED_DARK,FLASH_YELLOW_MID,FLASH_RED_BRIGHT,FLASH_YELLOW_BRIGHT
-player_death_flash_colors:
-    .byte FLASH_RED_DARK,FLASH_RED_MID,FLASH_RED_BRIGHT
-    .byte FLASH_YELLOW_MID,FLASH_RED_BRIGHT,FLASH_YELLOW_BRIGHT
+.segment "RODATA"
 
 hud_ascii:
     .byte "SCORE 00000  LIFE 3  HULL 100%"
@@ -5925,9 +5906,7 @@ frontend_screen_data:
 
 raider_post_burst_frames:
     .byte RAIDER_POST_BURST_EASY,RAIDER_POST_BURST_MEDIUM,RAIDER_POST_BURST_HARD
-viper_projectile_glyphs:
-    EMIT_VIPER_PROJECTILE_GLYPHS
-    .assert *-viper_projectile_glyphs = VIPER_PROJECTILE_GLYPH_COUNT*8, error, "Viper projectile glyph data changed"
+.segment "RODATA"
 shared_fighter_explosion_masks:
     EMIT_SHARED_FIGHTER_EXPLOSION_MASKS
 shared_fighter_explosion_core_masks:
@@ -5966,6 +5945,46 @@ player_engine_shape:
     .byte %00011000
     .byte $00,$00
 
+; Keep both frontend display lists in one ANTIC 1 KiB address window. ANTIC's
+; display-list counter wraps at that boundary instead of carrying into the
+; next kilobyte, so these bytes must move together as resident data grows.
+; Main menu: one 16-scanline ANTIC 7 title plus twenty-two 8-scanline rows.
+main_menu_display_list:
+    .byte $70,$70,$70
+    .byte $47,<SCREEN,>SCREEN      ; ANTIC 7 title, 20 B
+    .byte $04,$04,$04             ; upper ANTIC 4 hangar, 40 B each
+    .byte $06                     ; START GAME, 20 B
+    .byte $04                     ; ANTIC 4 bay, 40 B
+    .byte $06                     ; OPTIONS, 20 B
+    .byte $04                     ; ANTIC 4 scene, 40 B
+    .byte $06                     ; TOP SCORES, 20 B
+    .byte $04                     ; ANTIC 4 scene, 40 B
+    .byte $06                     ; EXIT, 20 B
+    .repeat 9
+        .byte $04                 ; lower ANTIC 4 scene, 40 B
+    .endrepeat
+    .byte $84                     ; divider + DLI before neutral hint palette
+    .byte $02                     ; 40-column ANTIC 2 control hint
+    .byte $04                     ; black breathing-space row
+main_menu_display_list_jvb:
+    .byte $41
+    .word main_menu_display_list
+
+; Text-heavy sub-screens use the same readable 1-bit frontend charset.
+frontend_text_display_list:
+    .byte $70,$70,$70
+    .byte $42,<SCREEN,>SCREEN      ; ANTIC 2 + LMS
+    .repeat 23
+        .byte $02
+    .endrepeat
+    .byte $41
+    .word frontend_text_display_list
+
+frontend_display_lists_end:
+
+    .assert (main_menu_display_list & $FC00) = ((frontend_display_lists_end-1) & $FC00), error, "frontend display lists cross an ANTIC 1 KiB boundary"
+    .assert frontend_display_lists_end <= MISSILES, error, "frontend display lists overlap missile DMA"
+
 ; ANTIC 4 character set. Each byte stores four two-bit pixels.
 ; Pixel values: 0=black, 1=white, 2=steel blue, 3=COLPF2 or COLPF3 when
 ; bit 7 of the screen code is set. The frontend sets COLPF3 to Kawasaki
@@ -5995,56 +6014,39 @@ charset_data:
     .byte $00,$00,$00,$55,$00,$00,$00,$00
     .byte $00,$00,$00,$00,$00,$10,$00,$00
     .byte $01,$01,$04,$04,$10,$10,$40,$40
+charset_fixed_frontend_end:
 
-    ; 16-25: amber digits 0-9
-    .byte $3C,$C3,$C3,$C3,$C3,$C3,$3C,$00
-    .byte $0C,$3C,$0C,$0C,$0C,$0C,$3F,$00
-    .byte $3C,$C3,$03,$0C,$30,$C0,$FF,$00
-    .byte $FC,$03,$03,$3C,$03,$03,$FC,$00
-    .byte $0C,$3C,$CC,$FF,$0C,$0C,$0C,$00
-    .byte $FF,$C0,$FC,$03,$03,$03,$FC,$00
-    .byte $3C,$C0,$FC,$C3,$C3,$C3,$3C,$00
-    .byte $FF,$03,$0C,$0C,$30,$30,$30,$00
-    .byte $3C,$C3,$C3,$3C,$C3,$C3,$3C,$00
-    .byte $3C,$C3,$C3,$3F,$03,$03,$3C,$00
-
-    ; 26: colon, 27-30 unused, 31: question mark, 32 unused
-    .byte $00,$10,$10,$00,$10,$10,$00,$00
-    .repeat 32
+    ; 16-46: Viper projectile phases 5-35. Gameplay uses a dedicated HUD
+    ; charset, so these former font cells can be canonical projectile storage.
+    EMIT_VIPER_PROJECTILE_GLYPHS_TAIL
+    ; 47-51: five preserved source phases copied over frontend graphics 11-15
+    ; only after the frontend charset has captured those accepted glyphs.
+viper_projectile_glyph_head:
+    EMIT_VIPER_PROJECTILE_GLYPHS_HEAD
+viper_projectile_glyph_head_end:
+    .assert viper_projectile_glyph_head_end-viper_projectile_glyph_head = 5*8, error, "Viper projectile head source changed"
+    ; 52-58: compact loader-display-list stream plus unused tail. It is decoded
+    ; over the consumed bitmap source before loader DMA is enabled.
+loader_display_list_lzss:
+    EMIT_LOADER_DISPLAY_LIST_LZSS
+    ; Gameplay-only tables share the fixed unused charset-source tail. The
+    ; source remains resident below PMG RAM after the loader completes.
+enemy_fighter_flash_colors:
+    .byte FLASH_RED_DARK,FLASH_YELLOW_MID,FLASH_RED_BRIGHT,FLASH_YELLOW_BRIGHT
+player_death_flash_colors:
+    .byte FLASH_RED_DARK,FLASH_RED_MID,FLASH_RED_BRIGHT
+    .byte FLASH_YELLOW_MID,FLASH_RED_BRIGHT,FLASH_YELLOW_BRIGHT
+flash_color_tables_end:
+effect_fragment_vx:
+    .byte $00,$FE,$02,$FE,$02
+effect_fragment_vy:
+    .byte $00,$FE,$FE,$02,$02
+    ; All but one byte of the fixed cells 0-58 are occupied above. Keep the
+    ; final source pad literal so the source-asset preview parser can reproduce
+    ; the canonical charset; the following size assertion remains authoritative.
+    .repeat $01
         .byte $00
     .endrepeat
-    .byte $14,$41,$01,$04,$04,$00,$04,$00
-    .repeat 8
-        .byte $00
-    .endrepeat
-
-    ; 33-58: white uppercase A-Z
-    .byte $14,$41,$41,$55,$41,$41,$41,$00 ; A
-    .byte $54,$41,$41,$54,$41,$41,$54,$00 ; B
-    .byte $15,$40,$40,$40,$40,$40,$15,$00 ; C
-    .byte $54,$41,$41,$41,$41,$41,$54,$00 ; D
-    .byte $55,$40,$40,$54,$40,$40,$55,$00 ; E
-    .byte $55,$40,$40,$54,$40,$40,$40,$00 ; F
-    .byte $15,$40,$40,$45,$41,$41,$15,$00 ; G
-    .byte $41,$41,$41,$55,$41,$41,$41,$00 ; H
-    .byte $55,$04,$04,$04,$04,$04,$55,$00 ; I
-    .byte $05,$01,$01,$01,$01,$41,$14,$00 ; J
-    .byte $41,$44,$50,$40,$50,$44,$41,$00 ; K
-    .byte $40,$40,$40,$40,$40,$40,$55,$00 ; L
-    .byte $41,$55,$55,$41,$41,$41,$41,$00 ; M
-    .byte $41,$51,$51,$45,$45,$41,$41,$00 ; N
-    .byte $14,$41,$41,$41,$41,$41,$14,$00 ; O
-    .byte $54,$41,$41,$54,$40,$40,$40,$00 ; P
-    .byte $14,$41,$41,$41,$45,$44,$15,$00 ; Q
-    .byte $54,$41,$41,$54,$44,$41,$41,$00 ; R
-    .byte $15,$40,$40,$14,$01,$01,$54,$00 ; S
-    .byte $55,$04,$04,$04,$04,$04,$04,$00 ; T
-    .byte $41,$41,$41,$41,$41,$41,$14,$00 ; U
-    .byte $41,$41,$41,$41,$41,$14,$04,$00 ; V
-    .byte $41,$41,$41,$55,$55,$55,$41,$00 ; W
-    .byte $41,$41,$14,$04,$14,$41,$41,$00 ; X
-    .byte $41,$41,$14,$04,$04,$04,$04,$00 ; Y
-    .byte $55,$01,$04,$04,$10,$40,$55,$00 ; Z
 
     .assert * - charset_data = CAPITAL_HULL_GLYPH_BASE*8, error, "capital hull glyph base changed"
 capital_hull_glyphs:
@@ -7044,6 +7046,7 @@ apply_player_damage:
     bne @update_hud
     lda #PLAYER_DYING
     sta PLAYER_LIFECYCLE
+    jsr clear_transient_effects
     lda PLAYER_LIVES
     beq :+
     dec PLAYER_LIVES
@@ -7958,39 +7961,6 @@ enemy_runtime_data_end:
 
 .segment "RODATA"
 
-; Main menu: one 16-scanline ANTIC 7 title plus twenty-two 8-scanline rows.
-; Cumulative screen offsets are documented by MAIN_MENU_*_OFFSET constants.
-main_menu_display_list:
-    .byte $70,$70,$70
-    .byte $47,<SCREEN,>SCREEN      ; ANTIC 7 title, 20 B
-    .byte $04,$04,$04             ; upper ANTIC 4 hangar, 40 B each
-    .byte $06                     ; START GAME, 20 B
-    .byte $04                     ; ANTIC 4 bay, 40 B
-    .byte $06                     ; OPTIONS, 20 B
-    .byte $04                     ; ANTIC 4 scene, 40 B
-    .byte $06                     ; TOP SCORES, 20 B
-    .byte $04                     ; ANTIC 4 scene, 40 B
-    .byte $06                     ; EXIT, 20 B
-    .repeat 9
-        .byte $04                 ; lower ANTIC 4 scene, 40 B
-    .endrepeat
-    .byte $84                     ; divider + DLI before neutral hint palette
-    .byte $02                     ; 40-column ANTIC 2 control hint
-    .byte $04                     ; black breathing-space row
-main_menu_display_list_jvb:
-    .byte $41
-    .word main_menu_display_list
-
-; Text-heavy sub-screens use the same readable 1-bit frontend charset.
-frontend_text_display_list:
-    .byte $70,$70,$70
-    .byte $42,<SCREEN,>SCREEN      ; ANTIC 2 + LMS
-    .repeat 23
-        .byte $02
-    .endrepeat
-    .byte $41
-    .word frontend_text_display_list
-
     .assert MAIN_MENU_SCREEN_BYTES <= $400, error, "main-menu screen data exceeds shared buffer"
 
 .include "loader-screen.inc"
@@ -8001,14 +7971,14 @@ frontend_text_display_list:
 ; stream. Re-arm the shared self-modifying decoder after ENTITY_CODE unpacking
 ; changed both operands, without growing the protected resident CODE segment.
 unpack_broadside_runtime:
+    ldx #>__BROADSIDE_LOAD__
     lda #<__BROADSIDE_LOAD__
     sta broadside_read_source+1
-    lda #>__BROADSIDE_LOAD__
-    sta broadside_read_source+2
+    stx broadside_read_source+2
+    ldx #>__BROADSIDE_RUN__
     lda #<__BROADSIDE_RUN__
     sta broadside_destination+1
-    lda #>__BROADSIDE_RUN__
-    sta broadside_destination+2
+    stx broadside_destination+2
     jmp broadside_unpack_command
 
 ; New backed overlays form the top of the character stack. Effects are
@@ -8020,9 +7990,7 @@ entity_effects_erase:
     jsr erase_transient_effect_overlays
 @entities:
     lda ENTITY_RENDERED_MASK
-    beq @done
-    jmp erase_interactive_entity_overlays
-@done:
+    bne erase_interactive_entity_overlays
     rts
 
 erase_transient_effect_overlays:
@@ -8031,9 +7999,6 @@ erase_transient_effect_overlays:
     lda entity_slot_bit_masks,x
     and EFFECT_RENDERED_MASK
     beq @next
-    lda EFFECT_DRAWN_MASK,x
-    and #$01
-    beq @clear_slot
     lda EFFECT_SCREEN_LO,x
     sta dst_ptr
     lda EFFECT_SCREEN_HI,x
@@ -8048,7 +8013,6 @@ erase_transient_effect_overlays:
 @next:
     dex
     bpl @slot
-    lda #$00
     sta EFFECT_RENDERED_MASK
     rts
 
@@ -8079,10 +8043,13 @@ erase_interactive_entity_overlays:
 ; non-zero spawn timer is the ordinary empty path and stays below 100 linked
 ; CPU cycles together with erase and render.
 entity_effects_update:
+    lda EFFECT_ACTIVE_MASK
+    beq :+
+    jsr update_transient_effects
+:
     lda ENTITY_ACTIVE_MASK
     bne @active
-    lda #$00
-    sta ENTITY_FRAME_EVENTS
+    lsr ENTITY_FRAME_EVENTS
     dec ENTITY_SPAWN_TIMER_LO
     bne @done
     lda CAPITAL_SECTOR_STATE
@@ -8099,6 +8066,15 @@ entity_effects_update:
     rts
 
 @active:
+    lda ENTITY_OWNER
+    beq :+
+    dec ENTITY_OWNER
+:
+    ; A nonlethal hit clears SHOOTABLE for the remainder of the ascending
+    ; projectile scan. Projectile processing precedes this update, so restoring
+    ; the canonical debris flags here admits exactly one hit again next frame.
+    lda #ENTITY_DEBRIS_INITIAL_FLAGS
+    sta ENTITY_FLAGS
     lsr ENTITY_FRAME_EVENTS
     bcc @collision
     lda ENTITY_TIMER
@@ -8147,16 +8123,14 @@ entity_effects_update:
 ; though the physical SoA reserves four slots. The independent LFSR cannot
 ; perturb Raider, starfield, broadside or weapon cadence.
 entity_spawn_debris:
-    lda ENTITY_ACTIVE_COUNT
-    cmp #ENTITY_ACTIVE_LIMIT
-    bcs @done
+    lda ENTITY_ACTIVE_MASK
+    bne @done
     jsr entity_next_rng
-    sta ENTITY_SCRATCH1
     and #$03
     asl
     adc #ENTITY_DEBRIS_GLYPH_BASE
     sta ENTITY_RENDER_ID
-    lda ENTITY_SCRATCH1
+    lda ENTITY_RNG_STATE
     lsr
     lsr
     and #$03
@@ -8175,9 +8149,6 @@ entity_spawn_debris:
     sta ENTITY_X
     lda #ENTITY_GAMEPLAY_TOP
     sta ENTITY_Y
-    lda #ENTITY_TYPE_DEBRIS       ; type and active state are both one
-    sta ENTITY_TYPE
-    sta ENTITY_STATE
     lda #ENTITY_DEBRIS_INITIAL_FLAGS
     sta ENTITY_FLAGS
     lda #ENTITY_DEBRIS_VY
@@ -8185,12 +8156,16 @@ entity_spawn_debris:
     lda #$00
     sta ENTITY_MOVE_ACCUMULATOR
     sta ENTITY_TIMER
-    lda #ENTITY_COLLISION_PLAYER_DAMAGE
+    sta ENTITY_OWNER
+    lda #ENTITY_TYPE_DEBRIS       ; type, state, collision and masks are all one
+    sta ENTITY_TYPE
+    sta ENTITY_STATE
     sta ENTITY_COLLISION_CATEGORY
-    sta ENTITY_HP
     sta ENTITY_ACTIVE_MASK
     sta ENTITY_ACTIVE_COUNT
     sta ENTITY_ALLOCATION_RESULT
+    lda #ENTITY_DEBRIS_HP
+    sta ENTITY_HP
 @done:
     rts
 
@@ -8208,6 +8183,7 @@ entity_next_rng:
 ; full-width starfield and combat behavior, but gives the entity scheduler a
 ; deterministic legal boundary and restores the normal initial spawn delay.
 entity_begin_sector_complete:
+    jsr clear_transient_effects
     lda #PLAYFIELD_RING_ROWS
     sta ENTITY_SPAWN_TIMER_HI
     inc CAPITAL_SECTOR_STATE
@@ -8226,8 +8202,95 @@ entity_complete_scroll_tick:
 @done:
     rts
 
+; Viper projectiles remain the owners of their existing ascending slot scan.
+; A destroyed debris keeps its coordinates until the end of the frame so a
+; higher slot remains active after the lowest matching slot wins. Carry set is
+; reserved for the existing enemy damage path; debris is consumed here and
+; returns carry clear.
+entity_viper_projectile_target:
+    lda ENTITY_ACTIVE_MASK
+    bne @active
+    lda ENTITY_SPAWN_TIMER_LO
+    cmp #ENTITY_SHOT_RESPAWN_DELAY
+    bne entity_viper_projectile_enemy_target
+    ; Once the lowest matching slot has destroyed debris, every higher slot
+    ; stays active for the remainder of this deterministic ascending scan.
+    clc
+    rts
+@active:
+    jsr entity_viper_projectile_hits_debris
+    bcc entity_viper_projectile_enemy_target
+    ; Consult the per-frame shootable latch only after the cheap swept
+    ; geometry says this slot could hit. Ordinary misses therefore retain the
+    ; bounded active-debris path without paying the category test repeatedly.
+    lda ENTITY_FLAGS
+    and #ENTITY_FLAG_SHOOTABLE
+    beq entity_viper_projectile_enemy_target
+    jsr viper_projectile_hits_enemy
+    bcc entity_viper_projectile_debris_target
+    ; Both targets intersect the swept path. Upward fire meets the target with
+    ; the greater bottom edge first; the BCS equality case gives debris the tie.
+    ; Both targets intersect the same seven-scanline upward sweep, so the
+    ; signed bottom-edge delta is bounded and cannot cross the sign boundary.
+    lda ENTITY_Y
+    sec
+    sbc enemy_y
+    bmi @enemy_first
+    cmp #(ENEMY_RELEASE_FRAME_HEIGHT-ENTITY_DEBRIS_HEIGHT_SCANLINES)
+    bcs entity_viper_projectile_debris_target
+@enemy_first:
+    sec
+    rts
+entity_viper_projectile_debris_target:
+    lda #FIGHTER_PROJECTILE_FREE
+    sta FIGHTER_PROJECTILE_ACTIVE,x
+entity_debris_hit:
+    dec ENTITY_HP
+    beq entity_debris_destroyed
+    lda #(ENTITY_DEBRIS_INITIAL_FLAGS-ENTITY_FLAG_SHOOTABLE)
+    sta ENTITY_FLAGS
+    lda #ENTITY_HIT_FLASH_TIMER_LOAD
+    sta ENTITY_OWNER
+    clc
+    rts
+entity_debris_destroyed:
+    jsr spawn_debris_destruction_effects
+    jsr entity_despawn_debris
+    ; The empty-pool update later in this frame consumes the extra count. The
+    ; transient +1 also identifies the destroyed snapshot to higher shot slots.
+    inc ENTITY_SPAWN_TIMER_LO
+    clc
+    rts
+entity_viper_projectile_enemy_target:
+    jmp viper_projectile_hits_enemy
+entity_debris_shot = entity_viper_projectile_debris_target
+
+; The projectile is one HPOS unit wide. Its two-scanline previous/current
+; positions form the same inclusive swept interval already used for fighters.
+.segment "CODE"
+entity_viper_projectile_hits_debris:
+    lda FIGHTER_PROJECTILE_X,x
+    sec
+    sbc ENTITY_X
+    cmp #ENTITY_DEBRIS_WIDTH_HPOS
+    bcs @miss
+    lda FIGHTER_PROJECTILE_Y,x
+    sec
+    sbc ENTITY_Y
+    cmp #ENTITY_DEBRIS_HEIGHT_SCANLINES
+    bcc @hit
+    cmp #(256-(VIPER_PROJECTILE_SPEED+VIPER_PROJECTILE_HEIGHT-1))
+    bcc @miss
+@hit:
+    sec
+    rts
+@miss:
+    clc
+    rts
+
 ; Half-open X and inclusive visible-row tests mirror the existing projectile
 ; collision contract. Coordinates outside 24..199 cannot reach this path.
+.segment "ENTITY_CODE"
 entity_collide_player:
     lda ENTITY_Y
     cmp #ENTITY_GAMEPLAY_TOP
@@ -8235,28 +8298,22 @@ entity_collide_player:
     cmp #ENTITY_GAMEPLAY_BOTTOM
     bcs entity_collision_miss
 entity_collide_player_active:
-    lda ENTITY_Y
-    clc
-    adc #7
-    cmp player_y
-    bcc entity_collision_miss
     lda player_y
-    clc
-    adc #PLAYER_COLLISION_LAST_ROW
-    cmp ENTITY_Y
+    sec
+    sbc ENTITY_Y
+    cmp #ENTITY_DEBRIS_HEIGHT_SCANLINES
+    bcc @vertical_overlap
+    cmp #(256-PLAYER_COLLISION_LAST_ROW)
     bcc entity_collision_miss
-    lda ENTITY_X
-    clc
-    adc #8
-    cmp player_x
-    bcc entity_collision_miss
-    beq entity_collision_miss
+@vertical_overlap:
     lda player_x
-    clc
-    adc #PLAYER_COLLISION_WIDTH
-    cmp ENTITY_X
+    sec
+    sbc ENTITY_X
+    cmp #ENTITY_DEBRIS_WIDTH_HPOS
+    bcc @overlap
+    cmp #(256-(PLAYER_COLLISION_WIDTH-1))
     bcc entity_collision_miss
-    beq entity_collision_miss
+@overlap:
     lda BROAD_DAMAGE_APPLIED
     bne entity_collision_miss
     lda #$01
@@ -8274,21 +8331,147 @@ entity_despawn_debris:
     sta ENTITY_ACTIVE_COUNT
     sta ENTITY_STATE
     sta ENTITY_ALLOCATION_RESULT
+    sta ENTITY_OWNER
     lda #ENTITY_REPEAT_SPAWN_DELAY
     sta ENTITY_SPAWN_TIMER_LO
     rts
+
+; Final debris destruction owns the complete five-slot active slice. Normal
+; respawn delay is longer than every TTL, so destruction instances cannot
+; overlap; the sixth physical slot remains reserved and inactive.
+.segment "CODE"
+spawn_debris_destruction_effects:
+    stx ENTITY_SCRATCH_SLOT
+    ldx #EFFECT_DEBRIS_FRAGMENT_COUNT
+@fragment:
+    lda #EFFECT_TYPE_DEBRIS_FRAGMENT
+    sta EFFECT_TYPE,x
+    lda #EFFECT_STATE_ACTIVE
+    sta EFFECT_STATE,x
+    lda #EFFECT_DEBRIS_FRAGMENT_TIMER_LOAD
+    sta EFFECT_TIMER,x
+    lda ENTITY_X
+    clc
+    adc #$04
+    sta EFFECT_X,x
+    lda ENTITY_Y
+    clc
+    adc #$04
+    sta EFFECT_Y,x
+    lda #EFFECT_FRAGMENT_GLYPH_BASE
+    sta EFFECT_RENDER_ID,x
+    dex
+    bne @fragment
+
+    lda #EFFECT_TYPE_DEBRIS_CORE
+    sta EFFECT_TYPE
+    lda #EFFECT_STATE_ACTIVE
+    sta EFFECT_STATE
+    lda ENTITY_X
+    sta EFFECT_X
+    lda ENTITY_Y
+    sta EFFECT_Y
+    lda #EFFECT_DEBRIS_CORE_TIMER_LOAD
+    sta EFFECT_TIMER
+    lda ENTITY_RENDER_ID
+    sta EFFECT_RENDER_ID
+    lda #EFFECT_DEBRIS_FRAGMENT_COUNT+1
+    sta EFFECT_ACTIVE_COUNT
+    lda #EFFECT_DEBRIS_ACTIVE_MASK
+    sta EFFECT_ACTIVE_MASK
+    ldx ENTITY_SCRATCH_SLOT
+    rts
+
+; Lifecycle reset releases collisionless effects but deliberately preserves
+; a current frame's backing records. If called after rendering (sector COMPLETE),
+; the next frame's reverse erase still restores the exact lower layers.
+clear_transient_effects:
+    lda #$00
+    sta EFFECT_ACTIVE_MASK
+    sta EFFECT_ACTIVE_COUNT
+    ldx #(EFFECT_SLOT_COUNT-1)
+@slot:
+    sta EFFECT_STATE,x
+    sta EFFECT_TIMER,x
+    dex
+    bpl @slot
+    rts
+
+; Fragment slots receive a deterministic local radial step every active PAL
+; frame plus one scanline for each WORLD_ROW_ADVANCED event. Local motion is
+; therefore visually dominant while the fragments still inherit world travel.
+; The core is stationary and all TTLs are frozen automatically while paused.
+update_transient_effects:
+    lda EFFECT_ACTIVE_MASK
+    and #$01
+    beq @fragments
+    dec EFFECT_TIMER
+    bne @fragments
+    lda EFFECT_ACTIVE_MASK
+    and #$FE
+    sta EFFECT_ACTIVE_MASK
+    dec EFFECT_ACTIVE_COUNT
+    lda #$00
+    sta EFFECT_STATE
+@fragments:
+    lda EFFECT_ACTIVE_MASK
+    and #$1E
+    beq @done
+    lda ENTITY_FRAME_EVENTS
+    and #ENTITY_EVENT_WORLD_ROW_ADVANCED
+    sta EFFECT_SCRATCH0
+    ldx #EFFECT_DEBRIS_FRAGMENT_COUNT
+@slot:
+    dec EFFECT_TIMER,x
+    lda EFFECT_X,x
+    clc
+    adc effect_fragment_vx,x
+    sta EFFECT_X,x
+    and #$02
+    lsr
+    ora #EFFECT_FRAGMENT_GLYPH_BASE
+    sta EFFECT_RENDER_ID,x
+    lda EFFECT_Y,x
+    clc
+    adc effect_fragment_vy,x
+    clc
+    adc EFFECT_SCRATCH0
+    sta EFFECT_Y,x
+@next:
+    dex
+    bne @slot
+    lda EFFECT_TIMER+1
+    beq @expire_fragments
+    rts
+@expire_fragments:
+    lda #$00
+    sta EFFECT_ACTIVE_MASK
+    sta EFFECT_ACTIVE_COUNT
+    ldx #EFFECT_DEBRIS_FRAGMENT_COUNT
+@clear_state:
+    sta EFFECT_STATE,x
+    dex
+    bne @clear_state
+@done:
+    rts
+
+.segment "ENTITY_CODE"
 
 ; Render after scroll and after existing shell/projectile rendering. Logical Y
 ; is authoritative; the exact physical cell pointer is cached only until the
 ; reverse erase at the beginning of the next active frame.
 entity_effects_render:
     lda ENTITY_ACTIVE_MASK
-    beq @done
-    .assert EFFECT_ACTIVE_LIMIT = 0, error, "active entity fast path assumes disabled effects"
-    jmp render_interactive_entity_overlays
-@done:
+    beq @effects
+    jsr render_interactive_entity_overlays
+@effects:
+    lda EFFECT_ACTIVE_MASK
+    beq :+
+    jmp render_transient_effect_overlays
+:
     rts
 
+.segment "CODE"
 render_interactive_entity_overlays:
     ; Slot zero is the only allocator target while ENTITY_ACTIVE_LIMIT is one.
     ; The remaining SoA slots stay reserved and deterministically initialised.
@@ -8321,11 +8504,19 @@ render_interactive_entity_overlays:
     lda (dst_ptr),y
     sta ENTITY_BACKING0
     lda ENTITY_RENDER_ID
+    ldx ENTITY_OWNER
+    beq :+
+    ora #$80
+:
     sta (dst_ptr),y
     iny
     lda (dst_ptr),y
     sta ENTITY_BACKING1
     lda ENTITY_RENDER_ID
+    ldx ENTITY_OWNER
+    beq :+
+    ora #$80
+:
     ora #$01
     sta (dst_ptr),y
     lda #$03
@@ -8333,6 +8524,116 @@ render_interactive_entity_overlays:
     sta ENTITY_RENDERED_MASK
 @done:
     rts
+
+; Effects render after the interactive layer. Slot order is core then the four
+; fragments; erase scans the physical pool in the exact opposite direction.
+; The local 1x1 core reuses the destroyed debris's left-phase glyph: normal
+; D7=0 selects yellow, D7=1 selects red, then an inverse fragment glyph
+; provides the dark fade.
+.segment "CODE"
+render_transient_effect_overlays:
+    ldx #$00
+@slot:
+    lda EFFECT_STATE,x
+    bne :+
+    jmp @next
+:
+    stx EFFECT_SCRATCH_SLOT
+    lda EFFECT_Y,x
+    cmp #ENTITY_GAMEPLAY_TOP
+    bcs :+
+    jmp @next_saved
+:
+    cmp #ENTITY_GAMEPLAY_BOTTOM
+    bcc :+
+    jmp @next_saved
+:
+    sec
+    sbc #ENTITY_GAMEPLAY_TOP
+    lsr
+    lsr
+    lsr
+    clc
+    adc #$01
+    jsr set_gameplay_row_ptr
+    ldx EFFECT_SCRATCH_SLOT
+    lda EFFECT_X,x
+    cmp #GAMEPLAY_LEFT_HPOS
+    bcc @next_saved
+    cmp #(GAMEPLAY_LEFT_HPOS+GAMEPLAY_SCREEN_COLUMNS*4)
+    bcs @next_saved
+    sec
+    sbc #GAMEPLAY_LEFT_HPOS
+    lsr
+    lsr
+    clc
+    adc dst_ptr
+    sta dst_ptr
+    sta EFFECT_SCREEN_LO,x
+    lda dst_ptr+1
+    adc #$00
+    sta dst_ptr+1
+    sta EFFECT_SCREEN_HI,x
+    ldy #$00
+    lda (dst_ptr),y
+    sta EFFECT_BACKING0,x
+    cpx #$00
+    beq @core
+
+    lda EFFECT_RENDER_ID,x
+    ldy EFFECT_TIMER,x
+    cpy #23
+    bcs @fragment_code
+    cpy #9
+    bcs @fragment_red
+    tya
+    and #$02
+    beq @fragment_yellow
+@fragment_red:
+    lda EFFECT_RENDER_ID,x
+    ora #$80
+    bne @fragment_code
+@fragment_yellow:
+    lda EFFECT_RENDER_ID,x
+@fragment_code:
+    ldy #$00
+    sta (dst_ptr),y
+    lda #$01
+    bne @mark_drawn
+
+@core:
+    lda EFFECT_TIMER,x
+    cmp #EFFECT_DEBRIS_CORE_FRAMES-1
+    bcs @yellow_core
+    cmp #EFFECT_DEBRIS_CORE_FRAMES-3
+    bcs @red_core
+    lda #EFFECT_FRAGMENT_GLYPH_BASE|$80
+    bne @core_codes
+@yellow_core:
+    lda EFFECT_RENDER_ID,x
+    bne @core_codes
+@red_core:
+    lda EFFECT_RENDER_ID,x
+    ora #$80
+@core_codes:
+    sta (dst_ptr),y
+    lda #$01
+@mark_drawn:
+    sta EFFECT_DRAWN_MASK,x
+    lda EFFECT_RENDERED_MASK
+    ora entity_slot_bit_masks,x
+    sta EFFECT_RENDERED_MASK
+@next_saved:
+    ldx EFFECT_SCRATCH_SLOT
+@next:
+    inx
+    cpx #EFFECT_ACTIVE_LIMIT
+    beq :+
+    jmp @slot
+:
+    rts
+
+.segment "ENTITY_CODE"
 
 ; Cold-boot RAM is undefined on real 65XE hardware. Clear the complete owned
 ; page, including every mask, slot field, backing byte and scratch byte, then
@@ -8355,7 +8656,7 @@ init_entity_effects:
 ; rebuilt after the loader. Keep this copy separate so state initialisation has
 ; the strict write footprint $8000-$80FF on startup, XEX and cold-boot ATR.
 install_entity_effects_glyph:
-    ldx #(ENTITY_DEBRIS_GLYPH_BYTES-1)
+    ldx #(ENTITY_EFFECT_GLYPH_BYTES-1)
 @copy_glyph:
     lda entity_debris_glyph,x
     sta CHARSET+ENTITY_DEBRIS_GLYPH_BASE*8,x
@@ -8369,14 +8670,20 @@ entity_archetype_descriptors_end:
 entity_debris_glyph:
     EMIT_ENTITY_DEBRIS_GLYPHS
 entity_debris_glyph_end:
+effect_fragment_glyph:
+    EMIT_EFFECT_FRAGMENT_GLYPHS
+effect_fragment_glyph_end:
 
+.segment "CODE"
 entity_slot_bit_masks:
     .byte $01,$02,$04,$08,$10,$20
+.segment "ENTITY_CODE"
 entity_trajectory_vx:
     EMIT_ENTITY_TRAJECTORY_VX
 
 .assert entity_archetype_descriptors_end-entity_archetype_descriptors = ENTITY_ARCHETYPE_DESCRIPTOR_BYTES, error, "entity descriptor size changed"
 .assert entity_debris_glyph_end-entity_debris_glyph = ENTITY_DEBRIS_GLYPH_BYTES, error, "debris glyph bank size changed"
+.assert effect_fragment_glyph_end-effect_fragment_glyph = EFFECT_FRAGMENT_GLYPH_BYTES, error, "fragment glyph bank size changed"
 .assert *-__ENTITY_CODE_RUN__ <= ENTITY_CODE_RESERVED_BYTES, error, "ENTITY_CODE exceeds its unconditional RAM reservation"
 
 .export init_entity_effects, install_entity_effects_glyph
@@ -8384,6 +8691,11 @@ entity_trajectory_vx:
 .export entity_effects_erase, entity_effects_update, entity_effects_render
 .export entity_spawn_debris, entity_damage_applied, entity_despawn_debris
 .export entity_begin_sector_complete, entity_complete_scroll_tick
+.export entity_viper_projectile_target, entity_viper_projectile_hits_debris
+.export entity_debris_shot
+.export entity_debris_hit, entity_debris_destroyed
+.export clear_transient_effects, spawn_debris_destruction_effects
+.export update_transient_effects, render_transient_effect_overlays
 .export erase_transient_effect_overlays, erase_interactive_entity_overlays
 .export render_interactive_entity_overlays
-.export entity_archetype_descriptors, entity_debris_glyph, entity_trajectory_vx
+.export entity_archetype_descriptors, entity_debris_glyph, effect_fragment_glyph, entity_trajectory_vx

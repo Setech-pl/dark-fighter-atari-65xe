@@ -11,6 +11,8 @@ import {
   createSharedFighterExplosionTrace,
   createDebrisReviewPreview,
   createDebrisReviewTrace,
+  createDestructibleDebrisPreview,
+  createDestructibleDebrisTrace,
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   createGameplayPreview,
@@ -238,4 +240,21 @@ test("debris owner review is deterministic and covers visuals, trajectories, con
     row.endsWith(",$91,$92,NONE,10,10")));
   const ringHeads = new Set(rows.slice(1, 39).map((row) => Number(row.split(",")[14])));
   assert.ok(ringHeads.has(21) && ringHeads.has(0), "preview pass must cross the A2 ring wrap");
+});
+
+test("destructible debris owner preview is an XEX/ATR-executed eight-frame breakup", () => {
+  const first = createDestructibleDebrisPreview(source, entityEffectsDefinition);
+  const second = createDestructibleDebrisPreview(source, entityEffectsDefinition);
+  assert.deepEqual(first, second);
+  assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [5228, 720]);
+  const trace = createDestructibleDebrisTrace(entityEffectsDefinition);
+  assert.equal(trace, createDestructibleDebrisTrace(entityEffectsDefinition));
+  const rows = trace.trimEnd().split("\n");
+  assert.equal(rows.filter((row) => row.startsWith("xex,FINAL,")).length, 127);
+  assert.equal(rows.filter((row) => row.startsWith("atr,FINAL,")).length, 127);
+  assert.ok(rows.some((row) => row.startsWith("xex,FINAL,0,0,0,0,0,0,$1F,5,")));
+  assert.ok(rows.some((row) => row.startsWith("atr,FINAL,0,0,0,0,0,0,$1F,5,")));
+  assert.ok(rows.some((row) => row.startsWith("xex,FINAL,31,0,0,0,0,0,$00,0,")));
+  assert.ok(rows.slice(1).every((row) => row.endsWith(",0742")),
+    "runtime preview trace changed score");
 });

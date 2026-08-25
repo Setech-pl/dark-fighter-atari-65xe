@@ -11,6 +11,10 @@ import {
 } from "../scripts/entity-effects.mjs";
 import { parseAtr, parseXex } from "../scripts/formats.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
+import {
+  assertDebrisDestructionTraceParity,
+  executeDebrisDestructionTrace,
+} from "../scripts/debris-destruction-runtime.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const definitionPath = path.join(root, "assets", "graphics", "entity-effects.json");
@@ -45,6 +49,8 @@ const addresses = {
   spawnPhase: labels.get("ENTITY_SPAWN_PHASE"),
   rng: labels.get("ENTITY_RNG_STATE"),
   events: labels.get("ENTITY_FRAME_EVENTS"),
+  type: labels.get("ENTITY_TYPE"),
+  entityState: labels.get("ENTITY_STATE"),
   flags: labels.get("ENTITY_FLAGS"),
   x: labels.get("ENTITY_X"),
   y: labels.get("ENTITY_Y"),
@@ -58,6 +64,16 @@ const addresses = {
   backing: labels.get("ENTITY_BACKING0"),
   backing1: labels.get("ENTITY_BACKING1"),
   drawnMask: labels.get("ENTITY_DRAWN_MASK"),
+  hp: labels.get("ENTITY_HP"),
+  owner: labels.get("ENTITY_OWNER"),
+  effectActiveMask: labels.get("EFFECT_ACTIVE_MASK"),
+  effectActiveCount: labels.get("EFFECT_ACTIVE_COUNT"),
+  effectState: labels.get("EFFECT_STATE"),
+  effectType: labels.get("EFFECT_TYPE"),
+  effectX: labels.get("EFFECT_X"),
+  effectY: labels.get("EFFECT_Y"),
+  effectTimer: labels.get("EFFECT_TIMER"),
+  effectRenderId: labels.get("EFFECT_RENDER_ID"),
   effectRendered: labels.get("EFFECT_RENDERED_MASK"),
   effectScreenLo: labels.get("EFFECT_SCREEN_LO"),
   effectScreenHi: labels.get("EFFECT_SCREEN_HI"),
@@ -84,6 +100,20 @@ const addresses = {
   broadsideFlashTimer: (labels.get("CAPITAL_SECTOR_STATE") ?? 0x4ea5) - 3,
   capitalExplosionTimer: labels.get("CAPITAL_EXPLOSION_TIMER") ?? 0x4eae,
   fighterExplosionTimer: labels.get("FIGHTER_EXPLOSION_TIMER") ?? 0x54c4,
+  projectileActive: labels.get("FIGHTER_PROJECTILE_ACTIVE"),
+  projectileX: labels.get("FIGHTER_PROJECTILE_X"),
+  projectileY: labels.get("FIGHTER_PROJECTILE_Y"),
+  projectilePreviousY: labels.get("FIGHTER_PROJECTILE_PREV_Y"),
+  projectileLifetime: labels.get("FIGHTER_PROJECTILE_LIFETIME"),
+  enemyActive: labels.get("ENEMY_ACTIVE"),
+  enemyArchetype: labels.get("ENEMY_ARCHETYPE"),
+  enemyHp: labels.get("ENEMY_HP"),
+  enemyPendingDamage: labels.get("ENEMY_PENDING_DAMAGE"),
+  enemyPendingSource: labels.get("ENEMY_PENDING_SOURCE"),
+  enemyX: labels.get("enemy_x"),
+  enemyY: labels.get("enemy_y"),
+  scoreLo: labels.get("score_bcd_lo"),
+  scoreHi: labels.get("score_bcd_hi"),
   viperBurstTimer: labels.get("VIPER_BURST_TIMER"),
   raiderBurstTimer: labels.get("RAIDER_BURST_TIMER"),
 };
@@ -137,6 +167,22 @@ function initialiseEntity(memory, { x = 124, y = 24 } = {}) {
   memory[addresses.playerY] = 184;
   memory[addresses.playerLifecycle] = 0;
   memory[addresses.sectorState] = 0;
+}
+
+function initialiseShootableDebris(memory, { hp = 3, ...options } = {}) {
+  initialiseEntity(memory, options);
+  memory[addresses.flags] = 0x3f;
+  memory[addresses.type] = 1;
+  memory[addresses.entityState] = 1;
+  memory[addresses.hp] = hp;
+}
+
+function armViperProjectile(memory, slot, { x, y, lifetime = 10 }) {
+  memory[addresses.projectileActive + slot] = 1;
+  memory[addresses.projectileX + slot] = x;
+  memory[addresses.projectileY + slot] = y;
+  memory[addresses.projectilePreviousY + slot] = y;
+  memory[addresses.projectileLifetime + slot] = lifetime;
 }
 
 test("entity descriptor and glyph generation are deterministic and bounded", () => {
@@ -200,12 +246,12 @@ test("entity memory and code reservations are exact and do not use BASIC ROM", (
   assert.equal(manifest.entityEffects.interactiveSlots, 4);
   assert.equal(manifest.entityEffects.interactiveActiveLimit, 1);
   assert.equal(manifest.entityEffects.effectSlots, 6);
-  assert.equal(manifest.entityEffects.effectActiveLimit, 0);
-  assert.equal(manifest.entityEffects.glyphCount, 8);
-  assert.equal(manifest.entityEffects.glyphBytes, 64);
+  assert.equal(manifest.entityEffects.effectActiveLimit, 5);
+  assert.equal(manifest.entityEffects.glyphCount, 10);
+  assert.equal(manifest.entityEffects.glyphBytes, 80);
   assert.equal(manifest.entityEffects.newGlyphsFromFoundation, 7);
-  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 118);
-  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 10);
+  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 120);
+  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 8);
   assert.equal(manifest.entityEffects.codeBudget.baselineBytes, 564);
   assert.equal(manifest.entityEffects.codeBudget.approvedDeltaBytes, 512);
   assert.ok(manifest.entityEffects.codeBudget.actualDeltaBytes <= 512);
@@ -319,8 +365,9 @@ test("spawn deterministically selects two variants, two phases and three traject
     if (columnOffset === 3) columnOffset = 1;
     assert.deepEqual([
       first[addresses.renderId], first[addresses.vx], first[addresses.x], first[addresses.rng],
+      first[addresses.hp],
     ], [manifest.entityEffects.glyphIndex + glyphOffset, expectedVx,
-      120 + columnOffset * 4, positionRandom]);
+      120 + columnOffset * 4, positionRandom, 3]);
     assert.deepEqual(
       [...first.slice(addresses.state, addresses.stateEnd)],
       [...second.slice(addresses.state, addresses.stateEnd)],
@@ -766,6 +813,278 @@ test("debris collision covers the full visible 16x8 box with half-open edges", (
     "the eighth visible scanline must collide");
   assert.deepEqual(collideAt(124, 192), [10, 1],
     "the exclusive bottom edge must not collide");
+});
+
+test("three Viper hits destroy every debris form while score and enemy paths remain unchanged", () => {
+  for (const renderId of [110, 112, 114, 116]) {
+    for (const vx of [0, 0xfc, 4]) {
+      const memory = createRuntimeMemory();
+      initialiseRows(memory);
+      initialiseShootableDebris(memory, { x: 124, y: 100 });
+      memory[addresses.renderId] = renderId;
+      memory[addresses.vx] = vx;
+      memory[addresses.scoreLo] = 0x42;
+      memory[addresses.scoreHi] = 0x07;
+      memory[addresses.enemyPendingDamage] = 0;
+      memory[addresses.fighterExplosionTimer] = 0;
+      for (let hit = 1; hit <= 3; hit += 1) {
+        armViperProjectile(memory, 0, { x: 127, y: 106 });
+        runRoutine(memory, "update_fighter_projectiles");
+        assert.equal(memory[addresses.projectileActive], 0,
+          `hit ${hit} did not consume its projectile`);
+        assert.deepEqual([memory[addresses.scoreLo], memory[addresses.scoreHi]], [0x42, 0x07]);
+        assert.deepEqual([
+          memory[addresses.enemyPendingDamage], memory[addresses.fighterExplosionTimer],
+        ], [0, 0], `hit ${hit} entered an enemy/full-screen explosion path`);
+        if (hit < 3) {
+          assert.deepEqual([
+            memory[addresses.hp], memory[addresses.activeMask], memory[addresses.activeCount],
+            memory[addresses.owner], memory[addresses.effectActiveCount],
+          ], [3 - hit, 1, 1, 3, 0]);
+          runRoutine(memory, "entity_effects_update");
+        }
+      }
+      assert.deepEqual([
+        memory[addresses.hp], memory[addresses.activeMask], memory[addresses.activeCount],
+        memory[addresses.spawnTimer], memory[addresses.effectActiveMask],
+        memory[addresses.effectActiveCount],
+      ], [0, 0, 0, 65, 0x1f, 5],
+      `render ${renderId}, vx ${vx} did not spawn one core plus four fragments`);
+      runRoutine(memory, "entity_effects_update");
+      assert.equal(memory[addresses.spawnTimer], 64,
+        "shot destruction must enter the ordinary full repeat delay");
+    }
+  }
+});
+
+test("Viper collision covers the half-open 2x1 footprint and swept upper boundary", () => {
+  const hit = ({ x, y }) => {
+    const memory = createRuntimeMemory();
+    initialiseRows(memory);
+    initialiseShootableDebris(memory, { x: 124, y: 100, hp: 1 });
+    armViperProjectile(memory, 0, { x, y });
+    runRoutine(memory, "update_fighter_projectiles");
+    return [memory[addresses.activeMask], memory[addresses.projectileActive]];
+  };
+  for (let x = 124; x < 132; x += 1) assert.deepEqual(hit({ x, y: 106 }), [0, 0]);
+  assert.deepEqual(hit({ x: 123, y: 106 }), [1, 1], "left edge must be half-open");
+  assert.deepEqual(hit({ x: 132, y: 106 }), [1, 1], "right edge must be half-open");
+  for (let row = 0; row < 8; row += 1) {
+    assert.deepEqual(hit({ x: 124, y: 106 + row }), [0, 0],
+      `visible debris row ${row} was not shootable`);
+  }
+  assert.deepEqual(hit({ x: 124, y: 99 }), [0, 0],
+    "a six-scanline step plus the two-line projectile must catch the exact swept boundary");
+  assert.deepEqual(hit({ x: 124, y: 98 }), [1, 1],
+    "the scanline above the swept boundary must miss");
+});
+
+test("lowest matching Viper slot is consumed once and every higher slot remains active", () => {
+  const memory = createRuntimeMemory();
+  initialiseRows(memory);
+  initialiseShootableDebris(memory, { x: 124, y: 100 });
+  armViperProjectile(memory, 0, { x: 112, y: 106 });
+  armViperProjectile(memory, 2, { x: 124, y: 106 });
+  armViperProjectile(memory, 5, { x: 124, y: 106 });
+  runRoutine(memory, "update_fighter_projectiles");
+  assert.deepEqual([
+    memory[addresses.projectileActive + 0],
+    memory[addresses.projectileActive + 2],
+    memory[addresses.projectileActive + 5],
+    memory[addresses.activeMask], memory[addresses.hp],
+  ], [1, 0, 1, 1, 2]);
+  assert.equal(memory[addresses.projectileLifetime + 5], 9,
+    "the preserved higher slot must advance exactly once without being consumed");
+});
+
+test("debris and Raider arbitration follows upward first-contact order with debris ties", () => {
+  const collide = (enemyY) => {
+    const memory = createRuntimeMemory();
+    initialiseRows(memory);
+    initialiseShootableDebris(memory, { x: 124, y: 100, hp: 1 });
+    memory[addresses.enemyActive] = 1;
+    memory[addresses.enemyArchetype] = 0;
+    memory[addresses.enemyHp] = 1;
+    memory[addresses.enemyPendingDamage] = 0;
+    memory[addresses.enemyX] = 124;
+    memory[addresses.enemyY] = enemyY;
+    armViperProjectile(memory, 0, { x: 127, y: 109 });
+    runRoutine(memory, "update_fighter_projectiles");
+    return {
+      debris: memory[addresses.activeMask],
+      projectile: memory[addresses.projectileActive],
+      enemyDamage: memory[addresses.enemyPendingDamage],
+    };
+  };
+  assert.deepEqual(collide(93), { debris: 0, projectile: 0, enemyDamage: 0 },
+    "debris with the greater bottom edge must be met first");
+  assert.deepEqual(collide(94), { debris: 0, projectile: 0, enemyDamage: 0 },
+    "an exact bottom-edge tie must resolve to debris");
+  assert.deepEqual(collide(95), { debris: 1, projectile: 0, enemyDamage: 1 },
+    "the lower Raider must receive the one consumed projectile first");
+});
+
+test("shot resolution precedes player contact while an unshot debris still deals one damage", () => {
+  const shot = createRuntimeMemory();
+  initialiseRows(shot);
+  initialiseShootableDebris(shot, { x: 124, y: 100, hp: 1 });
+  shot[addresses.playerX] = 124;
+  shot[addresses.playerY] = 100;
+  shot[addresses.playerHealth] = 10;
+  shot[addresses.damageCooldown] = 0;
+  shot[addresses.damageApplied] = 0;
+  armViperProjectile(shot, 0, { x: 124, y: 106 });
+  runRoutine(shot, "update_fighter_projectiles");
+  runRoutine(shot, "entity_effects_update");
+  assert.deepEqual([
+    shot[addresses.activeMask], shot[addresses.projectileActive],
+    shot[addresses.playerHealth], shot[addresses.damageCooldown],
+  ], [0, 0, 10, 0], "the shot must remove debris before its player-contact update");
+
+  const contact = createRuntimeMemory();
+  initialiseRows(contact);
+  initialiseShootableDebris(contact, { x: 124, y: 100 });
+  contact[addresses.playerX] = 124;
+  contact[addresses.playerY] = 100;
+  contact[addresses.playerHealth] = 10;
+  contact[addresses.damageCooldown] = 0;
+  contact[addresses.damageApplied] = 0;
+  runRoutine(contact, "entity_effects_update");
+  assert.deepEqual([contact[addresses.activeMask], contact[addresses.playerHealth]], [0, 9],
+    "unshot debris must retain canonical apply_player_damage(1)");
+});
+
+test("Raider and broadside projectiles cannot enter the debris target path", () => {
+  const memory = createRuntimeMemory();
+  initialiseRows(memory);
+  initialiseShootableDebris(memory, { x: 124, y: 100 });
+  const raiderSlot = 10;
+  memory[addresses.projectileActive + raiderSlot] = 2;
+  memory[addresses.projectileX + raiderSlot] = 124;
+  memory[addresses.projectileY + raiderSlot] = 94;
+  memory[addresses.projectilePreviousY + raiderSlot] = 94;
+  memory[addresses.projectileLifetime + raiderSlot] = 10;
+  runRoutine(memory, "update_fighter_projectiles");
+  assert.deepEqual([
+    memory[addresses.activeMask], memory[addresses.projectileActive + raiderSlot],
+  ], [1, 2]);
+  const projectileUpdate = source.slice(source.indexOf("update_fighter_projectiles:"),
+    source.indexOf("update_viper_weapon:"));
+  assert.match(projectileUpdate,
+    /@viper_slot:[\s\S]+jsr entity_viper_projectile_target[\s\S]+@raider_slot:/);
+  assert.doesNotMatch(projectileUpdate.slice(projectileUpdate.indexOf("@raider_slot:")),
+    /entity_viper_projectile_target/);
+  assert.doesNotMatch(source.slice(source.indexOf("update_broadside:"),
+    source.indexOf("schedule_broadside:")), /entity_viper_projectile_target/);
+});
+
+test("shot destruction after reverse erase leaves no glyph at any A2 ring head", () => {
+  for (let head = 0; head < 22; head += 1) {
+    for (const renderId of [110, 112, 114, 116]) {
+      const memory = createRuntimeMemory();
+      initialiseRows(memory, head);
+      initialiseShootableDebris(memory, { x: 124, y: 104, hp: 1 });
+      memory[addresses.renderId] = renderId;
+      const logical = (104 - 24) >> 3;
+      const cell = 0x4050 + ((head + logical) % 22) * 40 + 19;
+      memory[cell] = 0x31;
+      memory[cell + 1] = 0x32;
+      runRoutine(memory, "entity_effects_render");
+      runRoutine(memory, "entity_effects_erase");
+      armViperProjectile(memory, 0, { x: 124, y: 110 });
+      runRoutine(memory, "update_fighter_projectiles");
+      memory[addresses.events] = 0;
+      runRoutine(memory, "entity_effects_update");
+      runRoutine(memory, "entity_effects_render");
+      assert.equal(memory[addresses.effectActiveCount], 5);
+      for (let frame = 1; frame <= 30; frame += 1) {
+        runRoutine(memory, "entity_effects_erase");
+        memory[addresses.events] = 0;
+        runRoutine(memory, "entity_effects_update");
+        runRoutine(memory, "entity_effects_render");
+      }
+      assert.deepEqual([memory[cell], memory[cell + 1]], [0x31, 0x32],
+        `head ${head}, glyph ${renderId} left a backed ghost after effect expiry`);
+      assert.deepEqual([
+        memory[addresses.renderedMask], memory[addresses.drawnMask],
+        memory[addresses.effectRendered], memory[addresses.effectActiveCount],
+      ], [0, 0, 0, 0]);
+    }
+  }
+});
+
+test("executed XEX and ATR traces show five rendered effects and a visible 30-frame split", () => {
+  const xexTrace = executeDebrisDestructionTrace({ root, artifact: "xex" });
+  const atrTrace = executeDebrisDestructionTrace({ root, artifact: "atr" });
+  assert.equal(assertDebrisDestructionTraceParity(xexTrace, atrTrace), true);
+  const find = (phase, frame) => xexTrace.records.find((record) =>
+    record.phase === phase && record.frame === frame);
+  assert.deepEqual([
+    find("PRE_HIT", 0).debrisHp,
+    find("HIT_1", 0).debrisHp,
+    find("HIT_2", 0).debrisHp,
+    find("FINAL", 0).debrisHp,
+  ], [3, 2, 1, 0]);
+  assert.deepEqual([
+    find("HIT_1", 0).debrisHitFlashTimer,
+    find("HIT_1", 1).debrisHitFlashTimer,
+    find("HIT_2", 0).debrisHitFlashTimer,
+    find("HIT_2", 1).debrisHitFlashTimer,
+  ], [2, 1, 2, 1], "each nonlethal flash must render for exactly two PAL frames");
+  assert.equal(find("HIT_1", 0).projectileActive, 0);
+  assert.equal(find("HIT_2", 0).projectileActive, 0);
+
+  const first = find("FINAL", 0);
+  assert.deepEqual([
+    first.debrisActive, first.debrisState, first.projectileActive,
+    first.effectActiveMask, first.effectActiveCount,
+  ], [0, 0, 0, 0x1f, 5]);
+  assert.deepEqual(first.effects.map(({ slot, type, ttl }) => [slot, type, ttl]),
+    [[0, 1, 5], [1, 2, 30], [2, 2, 30], [3, 2, 30], [4, 2, 30]]);
+  const firstFragments = first.effects.slice(1);
+  assert.equal(new Set(firstFragments.map(({ screenAddress }) => screenAddress)).size, 4,
+    "all four fragments must occupy distinct rendered cells immediately");
+  assert.ok(firstFragments.every(({ drawn, screenCode }) => drawn === 1 && screenCode !== 0));
+
+  const positions = (frame) => new Map(find("FINAL", frame).effects
+    .filter(({ slot }) => slot > 0).map(({ slot, x, y }) => [slot, { x, y }]));
+  const p0 = positions(0);
+  const p4 = positions(4);
+  const p12 = positions(12);
+  for (const slot of [1, 2, 3, 4]) {
+    const horizontalSign = slot & 1 ? -1 : 1;
+    const verticalSign = slot < 3 ? -1 : 1;
+    assert.ok((p4.get(slot).x - p0.get(slot).x) * horizontalSign > 0);
+    assert.ok((p12.get(slot).x - p4.get(slot).x) * horizontalSign > 0);
+    assert.ok((p4.get(slot).y - p0.get(slot).y) * verticalSign > 0);
+    assert.ok((p12.get(slot).y - p4.get(slot).y) * verticalSign > 0);
+  }
+  assert.ok(Math.max(...[...p12.values()].map(({ x }) => x)) -
+    Math.min(...[...p12.values()].map(({ x }) => x)) >= 16,
+  "frame 12 must span at least four character columns");
+  assert.ok(Math.max(...[...p12.values()].map(({ y }) => y)) -
+    Math.min(...[...p12.values()].map(({ y }) => y)) >= 16,
+  "frame 12 must span at least two character rows");
+
+  for (let frame = 0; frame < 30; frame += 1) {
+    const fragments = find("FINAL", frame).effects.filter(({ slot }) => slot > 0);
+    assert.equal(fragments.length, 4, `frame ${frame} lost a fragment early`);
+    assert.ok(find("FINAL", frame).rendered, `frame ${frame} skipped effect render`);
+  }
+  assert.equal(find("FINAL", 4).effects.length, 5);
+  assert.equal(find("FINAL", 5).effects.length, 4, "core must expire after five frames");
+  assert.deepEqual([
+    find("FINAL", 30).effectActiveMask, find("FINAL", 30).effectActiveCount,
+    find("FINAL", 31).effectActiveMask, find("FINAL", 31).effectActiveCount,
+  ], [0, 0, 0, 0]);
+  assert.ok(find("FINAL", 31).screen.every((code) => code === 0),
+    "the final reverse erase must leave no ghost screen code");
+  for (let glyph = 118; glyph < 120; glyph += 1) {
+    const lit = [...xexTrace.charset.slice(glyph * 8, glyph * 8 + 8)]
+      .reduce((count, row) => count + [6, 4, 2, 0]
+        .filter((shift) => (row >> shift & 3) !== 0).length, 0);
+    assert.ok(lit >= 4 && lit <= 7, `fragment glyph ${glyph} has ${lit} lit pixels`);
+  }
 });
 
 test("backed overlay stack restores base, shell/projectile, entity and effect in reverse", () => {

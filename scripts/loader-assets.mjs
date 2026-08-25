@@ -676,30 +676,8 @@ export function renderLoaderCa65Include(compiled) {
 
   lines.push("", "loader_bitmap_lzss:");
   lines.push(...byteLines(compiled.packedBitmap));
-  lines.push("", "loader_display_list:", "    .byte $70,$70,$70");
-  for (let line = 0; line < BITMAP_HEIGHT; line += 1) {
-    const zone = compiled.paletteZones.find(
-      ({ startLine, endLine }) => line >= startLine && line <= endLine,
-    );
-    const hasLms = line === 0 || line === compiled.secondLmsLine;
-    const opcode =
-      zone.modeNumber |
-      (hasLms ? 0x40 : 0) |
-      (compiled.dliLines.includes(line) ? 0x80 : 0);
-    const opcodeText = `$${opcode.toString(16).padStart(2, "0").toUpperCase()}`;
-    if (hasLms) {
-      const address =
-        line === 0
-          ? "LOADER_BITMAP_ADDRESS"
-          : "LOADER_BITMAP_SECOND_ADDRESS";
-      lines.push(`    .byte ${opcodeText},<${address},>${address}`);
-    } else {
-      lines.push(`    .byte ${opcodeText}`);
-    }
-  }
+  lines.push("", "loader_display_list = loader_bitmap_lzss");
   lines.push(
-    "    .byte $41,<loader_display_list,>loader_display_list",
-    "",
     '.assert LOADER_BITMAP_BYTES = 7680, error, "loader bitmap size must be 7680 bytes"',
     '.assert LOADER_BITMAP_ADDRESS + LOADER_BITMAP_SECOND_LINE * LOADER_BITMAP_BYTES_PER_ROW = LOADER_BITMAP_SECOND_ADDRESS, error, "loader first LMS range is invalid"',
     '.assert LOADER_BITMAP_SECOND_ADDRESS + (LOADER_BITMAP_HEIGHT - LOADER_BITMAP_SECOND_LINE) * LOADER_BITMAP_BYTES_PER_ROW = $5E10, error, "loader bitmap end is invalid"',
@@ -707,6 +685,21 @@ export function renderLoaderCa65Include(compiled) {
     "",
   );
   return `${lines.join("\n")}\n`;
+}
+
+export function renderLoaderDisplayListCa65Include(compiled) {
+  const displayListPrefix = createLoaderDisplayListBytes(compiled, 0).subarray(0, -3);
+  const packedPrefix = packBroadsideLzss(displayListPrefix).subarray(0, -1);
+  return [
+    "; Generated compact loader display list source. Do not edit.",
+    `LOADER_DISPLAY_LIST_BYTES = ${displayListPrefix.length + 3}`,
+    `LOADER_DISPLAY_LIST_LZSS_BYTES = ${packedPrefix.length + 5}`,
+    ".macro EMIT_LOADER_DISPLAY_LIST_LZSS",
+    ...byteLines(packedPrefix),
+    "    .byte $03,$41,<loader_display_list,>loader_display_list,$00",
+    ".endmacro",
+    "",
+  ].join("\n");
 }
 
 export const loaderBitmapConstants = {

@@ -367,6 +367,7 @@ test("assembled death and respawn preserve whole-game SCORE before the next awar
     "erase_player",
     "clear_fighter_projectiles",
     "clear_player_collision_latches",
+    "clear_transient_effects",
     "draw_player",
   ].map((label) => labels.get(label)));
 

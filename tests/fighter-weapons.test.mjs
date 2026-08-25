@@ -19,6 +19,7 @@ import {
   loadEnemyRosterDefinition,
 } from "../scripts/enemy-roster.mjs";
 import { parseXex } from "../scripts/formats.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import { loadCapitalHullsDefinition } from "../scripts/capital-hulls.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -252,9 +253,27 @@ test("assembled PMG renderer shares one explosion bank between Viper and Raider 
 });
 
 test("Viper glyphs and the assembled Raider glyph builder match authoritative runtime masks", () => {
-  const viperBytes = xexBytes(labels.get("viper_projectile_glyphs"),
-    weapons.glyphs.viper.length * 8);
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
+  const memory = new Uint8Array(0x10000);
+  for (const segment of parseXex(xex).segments) memory.set(segment.data, segment.start);
+  const buildManifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
+  memory.set(fs.readFileSync(path.join(root, "build", "starfield-runtime.bin")),
+    buildManifest.starfieldRuntime.runAddress);
+  memory.set(fs.readFileSync(path.join(root, "build", "broadside-runtime.bin")),
+    buildManifest.broadsideRuntime.runAddress);
+  const run = (name) => {
+    const cpu = new Nmos6502(memory);
+    const stop = 0x7fff;
+    cpu.push((stop - 1) >> 8);
+    cpu.push((stop - 1) & 0xff);
+    cpu.pc = labels.get(name);
+    for (let steps = 0; steps < 500_000 && cpu.pc !== stop; steps += 1) cpu.step();
+    assert.equal(cpu.pc, stop, `${name} did not return`);
+  };
+  run("copy_charset");
+  run("init_fighter_projectiles");
+  const viperBytes = memory.subarray(0x4400 + weapons.glyphLayout.viperBase * 8,
+    0x4400 + (weapons.glyphLayout.viperBase + weapons.glyphs.viper.length) * 8);
+  const manifest = buildManifest;
   const packed = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
   const runtimeBytes = (label, length) => {
     const offset = labels.get(label) - manifest.broadsideRuntime.runAddress;

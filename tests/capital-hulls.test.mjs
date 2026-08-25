@@ -11,6 +11,7 @@ import {
   renderCapitalHullsCa65Include,
 } from "../scripts/capital-hulls.mjs";
 import { parseXex } from "../scripts/formats.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import { loadLoaderBitmapDefinition } from "../scripts/loader-assets.mjs";
 import {
   compileEnemyRoster,
@@ -75,6 +76,17 @@ function readXexBytes(address, length) {
     return segment.data.subarray(address - segment.start, address - segment.start + length);
   }
   assert.fail(`Resident image does not contain $${address.toString(16)}`);
+}
+
+function runResidentRoutine(memory, name) {
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = labels.get(name);
+  assert.ok(Number.isInteger(cpu.pc), `missing linked routine ${name}`);
+  for (let steps = 0; steps < 500_000 && cpu.pc !== stop; steps += 1) cpu.step();
+  assert.equal(cpu.pc, stop, `${name} did not return`);
 }
 
 function colorCounts(side) {
@@ -150,10 +162,17 @@ test("31 generated ANTIC 4 glyphs fit the 1024-byte assembled gameplay charset",
   }
   const graphics = readGameGraphicsSource(source, definition);
   assert.equal(graphics.charset.length, 1024);
-  assert.deepEqual(
-    readXexBytes(labels.get("charset_data"), 1024),
-    Buffer.from(graphics.sourceCharset),
-  );
+  const memory = new Uint8Array(0x10000);
+  for (const segment of parseXex(xex).segments) memory.set(segment.data, segment.start);
+  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
+  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
+  runResidentRoutine(memory, "copy_charset");
+  runResidentRoutine(memory, "init_fighter_projectiles");
+  const runtimeCharset = memory.subarray(0x4400, 0x4800);
+  assert.deepEqual(Buffer.from(runtimeCharset.subarray(0, 47 * 8)),
+    Buffer.from(graphics.charset.subarray(0, 47 * 8)));
+  assert.deepEqual(Buffer.from(runtimeCharset.subarray(59 * 8, 90 * 8)),
+    Buffer.from(graphics.charset.subarray(59 * 8, 90 * 8)));
 });
 
 test("assembled gameplay display list and DLI switch a dedicated ANTIC 2 HUD", () => {
