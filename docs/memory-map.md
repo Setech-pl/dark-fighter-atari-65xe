@@ -10,16 +10,16 @@ loaderze nie są tym samym budżetem.
 | `$0080-$009F` | 32 B zero-page variables; the three unread legacy bullet mirrors were removed |
 | `$0100-$01FF` | stos 6502 |
 | `$0200-$03FF` | obszar systemowy OS i wektory |
-| `$2000-$313E` | resident CODE, 4415 B; includes bootstrap, A2 logical-row mapper, display-list publisher, fighter-flash selector, shared projectile targeting and transient-effect update/render entry points |
-| `$313F-$3FF3` | resident RODATA, 3765 B; includes palette tables, compact charset sources, fragment velocity tables, frontend records, packed maps and loader LZ-10/5 sources |
-| `$31E1-$321F` | 63 B main-menu and text frontend display lists; deliberately contained inside one ANTIC 1 KiB counter window |
-| `$33C0-$33E2` | 35 B transient LZ-10/5 source of the exact 202 B loader display list |
-| `$3827-$3FF3` | 1997 B transient loader-bitmap LZ-10/5 stream; after bitmap decoding its consumed prefix is reused as the decoded display list |
-| `$3FF4-$3FFF` | 12 B fixed-block linker padding before the packed payload tails |
+| `$2000-$3149` | resident CODE, 4426 B; includes bootstrap, A2 logical-row mapper, display-list publisher, fighter-flash selector, shared projectile targeting and transient-effect update/render entry points |
+| `$314A-$3FFE` | resident RODATA, 3765 B; includes palette tables, compact charset sources, fragment velocity tables, frontend records, packed maps and loader LZ-10/5 sources |
+| `$31EC-$322A` | 63 B main-menu and text frontend display lists; deliberately contained inside one ANTIC 1 KiB counter window |
+| `$33CB-$33ED` | 35 B transient LZ-10/5 source of the exact 202 B loader display list |
+| `$3832-$3FFE` | 1997 B transient loader-bitmap LZ-10/5 stream; after bitmap decoding its consumed prefix is reused as the decoded display list |
+| `$3FFF` | 1 B fixed-block linker padding before the packed payload tails |
 | `$4000-$55EB` | on entry: 5612 B packed LZ-10/5 broadside/frontend/enemy/pause runtime; expanded before the loader |
 | `$55EC-$5C8E` | on entry: 1699 B packed starfield/shared/music runtime, staged before loader overwrite |
 | `$5C8F-$5D70` | on entry: 226 B source of the A2 kernel copied to `$9000-$90E1` |
-| `$5D71-$5FFB` | on entry: 651 B packed `ENTITY_CODE`, expanded first to `$9100-$93D7` |
+| `$5D71-$5FFB` | on entry: 651 B packed `ENTITY_CODE`, expanded first to `$9100-$93D4` |
 | `$5FFC-$5FFF` | source-owned `DFB1` boot trailer; completes the exact 16 KiB/128-sector payload invariant |
 | `$4000-$43FF` | wspólny bufor ekranu gameplayu/frontendu, 1024 B; loader zaczyna bitmapę dopiero pod `$4010` |
 | `$4400-$47FF` | gameplay charset, dokładnie 1024 B |
@@ -80,8 +80,8 @@ loaderze nie są tym samym budżetem.
 | `$8100-$8FFF` | 3840 B zachowanej rezerwacji na przyszły entity/effects state; bieżący feature jej nie zapisuje |
 | `$9000-$90E1` | 226 B product-preserving A2 kernel; bootstrap kopiuje identyczne bajty w XEX i cold-boot ATR |
 | `$90E2-$90FF` | 30 B wolne w jawnej 256 B rezerwacji A2 kernel |
-| `$9100-$93D7` | 728 B `ENTITY_CODE`: bootstrap LZSS re-arm, 2×1 debris update/render/collision, three-hit arbitration, sector re-arm, pool wrappers, descriptor, eight debris glyphs and two fragment glyphs |
-| `$93D8-$9FFF` | 3112 B wolne w jawnej rezerwacji `ENTITY_CODE`; nieprzydzielone bieżącemu feature |
+| `$9100-$93D4` | 725 B `ENTITY_CODE`: bootstrap LZSS re-arm, 2×1 debris update/render/collision, three-hit arbitration, sector re-arm, pool wrappers, Raider render-ID template, descriptor, eight debris glyphs and two fragment glyphs |
+| `$93D5-$9FFF` | 3115 B wolne w jawnej rezerwacji `ENTITY_CODE`; nieprzydzielone bieżącemu feature |
 | `$A000-$BFFF` | warunkowy RAM pod BASIC ROM; celowo niewliczony do dostępnej pamięci bez dowodu PORTB dla XEX, cold-boot ATR i realnego 65XE/SIO2SD |
 | `$C000-$FFFF` | OS ROM oraz sprzętowe rejestry I/O; nie jest pulą gameplay RAM |
 
@@ -97,10 +97,10 @@ PMG dla bazy `$3800`:
 | `$3F00-$3FFF` | Player 3 — silnik gracza, `COLPM3=$28`; M3 dziedziczy ten kolor |
 
 Podczas loadera PMG i PMG DMA są wyłączone. Pakowany strumień bitmapy pod
-`$3827-$3FF3` cannot be used as an additional buffer. The exact 202-byte
-display list is stored as a separate 35-byte stream at `$33C0-$33E2`; after
+`$3832-$3FFE` cannot be used as an additional buffer. The exact 202-byte
+display list is stored as a separate 35-byte stream at `$33CB-$33ED`; after
 the bitmap has been decoded, it is expanded over the consumed bitmap source
-at `$3827-$38F0`. The former starfield staging at `$3800-$3BBC` would overwrite
+at `$3832-$38FB`. The former starfield staging at `$3800-$3BBC` would overwrite
 the bitmap source before decoding, so the corrected sequence copies packed
 starfield/music to the separate `$7810-$7F0F` buffer; the current 1699 B
 occupies `$7810-$7EAA` and expands after 250 complete frames to `$552A-$5D99`. Code
@@ -116,7 +116,7 @@ mapy side hulls do `$4C00-$4E3F`. Są to trwałe dane gameplayu, odzyskane z
 bitmapy loadera, a nie dodatkowa pamięć masowa ATR.
 
 Before unpacking the bitmap, `start` expands packed `ENTITY_CODE`
-`$5D71-$5FFB` to `$9100-$93D7`, clears the complete BSS page
+`$5D71-$5FFB` to `$9100-$93D4`, clears the complete BSS page
 `$8000-$80FF`, expands `$4000-$55EB` to `$5E10-$780E`, preserves the
 1699-byte starfield tail at `$7810`, and copies the bounded A2 kernel to
 `$9000-$90E1`. The shared self-modifying LZSS decoder is explicitly re-armed
@@ -186,16 +186,29 @@ consume a second target in that frame. The following empty update restores the
 normal 64-frame respawn delay. Score, enemy death and fighter flash are not
 entered.
 
-Effects reuse only the existing SoA. Each 1×1 slot uses `EFFECT_TYPE/STATE`,
+Effects reuse only the existing SoA. `EFFECT_STATE[0..5]` occupies
+`$8084-$8089` directly after the pending-allocation latch, so replacement
+clears exactly the latch and six state bytes without scanning unrelated
+scratch/type fields. Each 1×1 slot uses `EFFECT_TYPE/STATE`,
 `X/Y`, `TIMER`, `RENDER_ID`, cached screen pointer, `BACKING0` and bit zero of
 `DRAWN_MASK`; the other backing fields remain reserved. Slot 0 is the
 five-frame core. Slots 1..4 are collisionless 30-frame fragments with fixed
 directions left-up/right-up/left-down/right-down. Their local ±2 HPOS and ±2
 scanline step runs every active PAL frame and receives the shared +1 scanline
 world event, without using gameplay RNG. Core is rendered first and fragments
-after it; reverse erase scans slots 5..0. Pause freezes update and TTL, while
+after it; reverse erase scans admitted slots 4..0 while physical slot 5 remains
+reserved and inactive. Pause freezes update and TTL, while
 new game, life loss, sector completion and Game Over use the existing clear
 policy.
+
+Every canonical Raider death captures the PMG explosion origin after hiding
+the fighter and removing its hitbox. The accepted score, sound and full-screen
+flash paths remain unchanged. A two-step latch materialises the character
+effect one PAL frame later: slot 0 is a five-frame core at PMG X+6 and the
+captured explosion Y; slots 1..4 are 30-frame left-wing, right-wing, red-eye
+and central fragments. Their first update applies the existing four radial
+directions before rendering. A newer debris or Raider event replaces the old
+five-slot event only after the prior backing has been erased; none collides.
 The backed character order is base/ring, broadside shell, fighter projectile,
 entity, effect; erase is the exact reverse. PMG remains independent.
 
@@ -308,7 +321,7 @@ komórek ANTIC 4. Dwa już istniejące glify (`base+18/+19`) dają 8×6 slug; D7
 broadside/pause runtime occupies 6655/6656 B; relocated shared procedures,
 frontend option helpers, and both music players share the 2160/2278 B
 starfield block. The packed tails are 5612 B and 1699 B; the separate A2
-kernel occupies 226/256 B at `$9000`, while ENTITY_CODE occupies 728/3840 B
+kernel occupies 226/256 B at `$9000`, while ENTITY_CODE occupies 725/3840 B
 at `$9100` and is stored as a 651 B packed boot tail.
 `WARNING` i `IMPACT`
 korzystają z maskowych par M1–M3; M0 pozostaje wyłącznie zarezerwowane dla

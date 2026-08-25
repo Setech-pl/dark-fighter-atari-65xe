@@ -216,6 +216,17 @@ pozostałej logiki spawn/despawn i nie podnosi limitu puli interactive; pula
 effects pozostaje fizycznie sześcioslotowa, z limitem aktywnym 5 dla rdzenia
 i czterech fragmentów.
 
+Każda prawidłowa śmierć zwykłego Raidera zachowuje dotychczasowy wynik,
+dźwięk i pełnoekranowy profil `$1E,$3C,$1C,$34`, a dodatkowo uruchamia lokalny
+rozpad w pozycji PMG myśliwca. Raider i jego hitbox znikają przed efektem.
+Pięcioklatkowy rdzeń oraz cztery trzydziestoklatkowe fragmenty — lewe skrzydło,
+prawe skrzydło, czerwone oko i część centralna — używają bezkolizyjnej puli
+effects i wspólnych glifów debris/fragmentów. Materializacja następuje w
+następnej klatce PAL, podczas czerwono-pomarańczowej fazy pełnoekranowego
+flasha; pierwszy update od razu rozdziela fragmenty w cztery kierunki.
+Najnowszy rozpad debris albo Raidera zastępuje poprzedni dopiero po reverse
+erase, bez punktów, obrażeń, zmian RNG lub ghostów.
+
 World zachowuje 20/22,5/25 wiersza/s dla EASY/MEDIUM/HARD. Near stars mają
 10/11,25/12,5, far stars 5/5,625/6,25, a debris 12/13,5/15 wiersza/s.
 Dokładna kolejność pozostaje `far < near < debris < world`. Trace mierzy od

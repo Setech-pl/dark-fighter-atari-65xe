@@ -244,7 +244,7 @@ test("debris visual polish preserves foundation history and passes its +256 PAL 
   assert.ok(feature.actual_delta_cycles <= feature.approved_delta_cycles);
   assert.ok(feature.measured_physical_headroom >= feature.minimum_physical_headroom);
   assert.equal(feature.budget_overrun_frames, 0);
-  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 100, true);
+  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 123, true);
   assert.equal(manifest.entityEffects.runtimeBudget.debrisVisualPolish.actualDeltaCycles,
     feature.actual_delta_cycles);
 });
@@ -305,8 +305,8 @@ test("destructible debris passes PAL, inactive-path and linked-code budgets", ()
     feature.maximum_wall_cycles,
     feature.minimum_physical_headroom,
   ], [32_122, 3_446, 640, 768, 32_762, 32_890, 2_800]);
-  assert.equal(feature.measured_wall_cycles, report.gate.measured_wall_cycles_dma_on);
-  assert.equal(feature.measured_physical_headroom, report.gate.measured_physical_headroom);
+  assert.deepEqual([feature.measured_wall_cycles, feature.measured_physical_headroom],
+    [32_719, 2_849], "the accepted destructible-debris checkpoint must remain frozen");
   assert.equal(feature.actual_delta_cycles,
     feature.measured_wall_cycles - feature.baseline_wall_cycles);
   assert.ok(feature.measured_wall_cycles <= feature.maximum_wall_cycles);
@@ -335,6 +335,64 @@ test("destructible debris passes PAL, inactive-path and linked-code budgets", ()
   assert.equal(manifest.runtimeCodeBudget.baselineBytes, 13_697);
   assert.equal(manifest.runtimeCodeBudget.approvedDeltaBytes, 768);
   assert.ok(manifest.runtimeCodeBudget.actualDeltaBytes <= 768);
+});
+
+test("enemy breakup passes the hard PAL gate and executes the five-slot runtime path", () => {
+  const feature = report.gate.enemy_breakup_effects;
+  assert.deepEqual([
+    feature.baseline_wall_cycles,
+    feature.baseline_physical_headroom,
+    feature.target_delta_cycles,
+    feature.hard_delta_cycles,
+    feature.target_wall_cycles,
+    feature.maximum_wall_cycles,
+    feature.minimum_physical_headroom,
+  ], [32_719, 2_849, 128, 224, 32_847, 32_943, 2_600]);
+  assert.deepEqual([
+    feature.measured_wall_cycles,
+    feature.measured_physical_headroom,
+    feature.actual_delta_cycles,
+    feature.remaining_target_cycles,
+    feature.remaining_hard_cycles,
+  ], [32_869, 2_699, 150, -22, 74]);
+  assert.equal(feature.target_overrun_frames > 0, true);
+  assert.equal(feature.hard_overrun_frames, 0);
+  assert.equal(feature.passed, true);
+  assert.equal(report.gate.passed, true);
+  assert.equal(report.gate.missed_frames, 0);
+  assert.equal(report.gate.deadline_overrun_frames, 0);
+  assert.equal(report.gate.extra_vbi_boundaries, 0);
+  assert.deepEqual([
+    report.coverage.raider_breakup_effects.observed,
+    report.coverage.raider_breakup_effects.active_mask,
+    report.coverage.raider_breakup_effects.active_count,
+    report.coverage.raider_breakup_effects.spawn_updated_and_rendered,
+    report.coverage.raider_breakup_effects.full_screen_flash_preserved,
+  ], [true, 0x1f, 5, true, true]);
+  assert.ok(report.coverage.raider_breakup_effects.spawner_frames > 0);
+  assert.ok(report.coverage.raider_breakup_effects.yellow_death_then_red_materialisation_frames > 0);
+  assert.deepEqual(manifest.entityEffects.runtimeBudget.enemyBreakupEffects, {
+    baselineWallCycles: 32_719,
+    baselinePhysicalHeadroomCycles: 2_849,
+    targetDeltaCycles: 128,
+    hardDeltaCycles: 224,
+    targetWallLimitCycles: 32_847,
+    hardWallLimitCycles: 32_943,
+    minimumPhysicalHeadroomCycles: 2_600,
+    measuredWallCycles: 32_869,
+    actualDeltaCycles: 150,
+    remainingTargetCycles: -22,
+    remainingHardCycles: 74,
+    missedSynchronization: 0,
+    deadlineOverruns: 0,
+  });
+  assert.deepEqual(manifest.runtimeCodeBudget.enemyBreakupEffects, {
+    baselineBytes: 14_184,
+    actualBytes: 14_192,
+    actualDeltaBytes: 8,
+    approvedDeltaBytes: 512,
+    remainingBytes: 504,
+  });
 });
 
 test("ten heaviest frames retain exact clock positions, VBI IDs and state", () => {

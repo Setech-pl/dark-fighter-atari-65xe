@@ -108,6 +108,13 @@ const destructibleDebrisEntityCodeBaselineBytes = 714;
 const destructibleDebrisEntityCodeBudgetBytes = 768;
 const destructibleDebrisRuntimeCodeBaselineBytes = 13697;
 const destructibleDebrisRuntimeCodeBudgetBytes = 768;
+const enemyBreakupBaselineWallCycles = 32719;
+const enemyBreakupBaselineHeadroomCycles = 2849;
+const enemyBreakupTargetDeltaCycles = 128;
+const enemyBreakupHardDeltaCycles = 224;
+const enemyBreakupMinimumHeadroomCycles = 2600;
+const enemyBreakupRuntimeCodeBaselineBytes = 14184;
+const enemyBreakupRuntimeCodeBudgetBytes = 512;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -611,6 +618,10 @@ async function build() {
     destructibleDebrisRuntimeCodeBaselineBytes + destructibleDebrisRuntimeCodeBudgetBytes) {
     throw new Error("Destructible debris exceeds its +768 B linked runtime-code budget");
   }
+  if (!isReviewVariant && destructibleDebrisRuntimeCodeBytes >
+    enemyBreakupRuntimeCodeBaselineBytes + enemyBreakupRuntimeCodeBudgetBytes) {
+    throw new Error("Enemy breakup effects exceed their +512 B linked runtime-code budget");
+  }
 
   const manifest = {
     formatVersion: 1,
@@ -661,6 +672,12 @@ async function build() {
         limitBytes: debrisVisualPolishPayloadLimitBytes,
         actualBytes: rawPayload.length,
         remainingBytes: debrisVisualPolishPayloadLimitBytes - rawPayload.length,
+        maximumBootSectors: 128,
+      },
+      enemyBreakupEffects: {
+        limitBytes: exactBootPayloadBytes,
+        actualBytes: rawPayload.length,
+        remainingBytes: exactBootPayloadBytes - rawPayload.length,
         maximumBootSectors: 128,
       },
     },
@@ -771,6 +788,27 @@ async function build() {
           missedSynchronization: wallTrace?.gate.missed_frames ?? null,
           deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
         },
+        enemyBreakupEffects: {
+          baselineWallCycles: enemyBreakupBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: enemyBreakupBaselineHeadroomCycles,
+          targetDeltaCycles: enemyBreakupTargetDeltaCycles,
+          hardDeltaCycles: enemyBreakupHardDeltaCycles,
+          targetWallLimitCycles: enemyBreakupBaselineWallCycles +
+            enemyBreakupTargetDeltaCycles,
+          hardWallLimitCycles: enemyBreakupBaselineWallCycles +
+            enemyBreakupHardDeltaCycles,
+          minimumPhysicalHeadroomCycles: enemyBreakupMinimumHeadroomCycles,
+          measuredWallCycles:
+            wallTrace?.gate.enemy_breakup_effects?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.enemy_breakup_effects?.actual_delta_cycles ?? null,
+          remainingTargetCycles:
+            wallTrace?.gate.enemy_breakup_effects?.remaining_target_cycles ?? null,
+          remainingHardCycles:
+            wallTrace?.gate.enemy_breakup_effects?.remaining_hard_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
         explosionColourFlash: {
           baselineWallCycles: explosionFlashBaselineWallCycles,
           baselinePhysicalHeadroomCycles: explosionFlashBaselineHeadroomCycles,
@@ -798,16 +836,14 @@ async function build() {
           hardWallLimitCycles: destructibleDebrisBaselineWallCycles +
             destructibleDebrisHardDeltaCycles,
           minimumPhysicalHeadroomCycles: destructibleDebrisMinimumHeadroomCycles,
-          measuredWallCycles: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
-          actualDeltaCycles: wallTrace === null ? null :
-            wallTrace.semantics.measured_wall_cycles_dma_on -
-              destructibleDebrisBaselineWallCycles,
-          remainingTargetCycles: wallTrace === null ? null :
-            destructibleDebrisBaselineWallCycles + destructibleDebrisTargetDeltaCycles -
-              wallTrace.semantics.measured_wall_cycles_dma_on,
-          remainingHardCycles: wallTrace === null ? null :
-            destructibleDebrisBaselineWallCycles + destructibleDebrisHardDeltaCycles -
-              wallTrace.semantics.measured_wall_cycles_dma_on,
+          measuredWallCycles:
+            wallTrace?.gate.destructible_debris?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.destructible_debris?.actual_delta_cycles ?? null,
+          remainingTargetCycles:
+            wallTrace?.gate.destructible_debris?.remaining_target_cycles ?? null,
+          remainingHardCycles:
+            wallTrace?.gate.destructible_debris?.remaining_hard_cycles ?? null,
           missedSynchronization: wallTrace?.gate.missed_frames ?? null,
           deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
         },
@@ -822,6 +858,15 @@ async function build() {
       approvedDeltaBytes: destructibleDebrisRuntimeCodeBudgetBytes,
       remainingBytes: destructibleDebrisRuntimeCodeBaselineBytes +
         destructibleDebrisRuntimeCodeBudgetBytes - destructibleDebrisRuntimeCodeBytes,
+      enemyBreakupEffects: {
+        baselineBytes: enemyBreakupRuntimeCodeBaselineBytes,
+        actualBytes: destructibleDebrisRuntimeCodeBytes,
+        actualDeltaBytes: destructibleDebrisRuntimeCodeBytes -
+          enemyBreakupRuntimeCodeBaselineBytes,
+        approvedDeltaBytes: enemyBreakupRuntimeCodeBudgetBytes,
+        remainingBytes: enemyBreakupRuntimeCodeBaselineBytes +
+          enemyBreakupRuntimeCodeBudgetBytes - destructibleDebrisRuntimeCodeBytes,
+      },
     },
     loaderScreen: {
       mode: "mixed ANTIC F/E",

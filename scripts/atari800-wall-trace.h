@@ -83,7 +83,8 @@ enum {
 	DFTRACE_EVENT_EFFECT_SPAWN = 1u << 13,
 	DFTRACE_EVENT_EFFECT_ERASE = 1u << 14,
 	DFTRACE_EVENT_EFFECT_UPDATE = 1u << 15,
-	DFTRACE_EVENT_EFFECT_RENDER = 1u << 16
+	DFTRACE_EVENT_EFFECT_RENDER = 1u << 16,
+	DFTRACE_EVENT_RAIDER_BREAKUP_SPAWN = 1u << 17
 };
 
 static int dftrace_initialised;
@@ -119,6 +120,7 @@ static unsigned dftrace_pc_effect_spawn;
 static unsigned dftrace_pc_effect_erase;
 static unsigned dftrace_pc_effect_update;
 static unsigned dftrace_pc_effect_render;
+static unsigned dftrace_pc_raider_breakup_spawn;
 
 static unsigned dftrace_player_x;
 static unsigned dftrace_player_y;
@@ -631,6 +633,7 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_effect_erase, "DFTRACE_PC_EFFECT_ERASE");
 	DFTRACE_ADDRESS(dftrace_pc_effect_update, "DFTRACE_PC_EFFECT_UPDATE");
 	DFTRACE_ADDRESS(dftrace_pc_effect_render, "DFTRACE_PC_EFFECT_RENDER");
+	DFTRACE_ADDRESS(dftrace_pc_raider_breakup_spawn, "DFTRACE_PC_RAIDER_BREAKUP_SPAWN");
 	DFTRACE_ADDRESS(dftrace_player_x, "DFTRACE_PLAYER_X");
 	DFTRACE_ADDRESS(dftrace_player_y, "DFTRACE_PLAYER_Y");
 	DFTRACE_ADDRESS(dftrace_projectile_active, "DFTRACE_PROJECTILE_ACTIVE");
@@ -745,6 +748,8 @@ static void DFTrace_Observe(unsigned pc)
 		dftrace_current.events |= DFTRACE_EVENT_EFFECT_UPDATE;
 	else if (pc == dftrace_pc_effect_render)
 		dftrace_current.events |= DFTRACE_EVENT_EFFECT_RENDER;
+	else if (pc == dftrace_pc_raider_breakup_spawn)
+		dftrace_current.events |= DFTRACE_EVENT_RAIDER_BREAKUP_SPAWN;
 
 	if (pc == dftrace_pc_end) {
 		dftrace_snapshot_flash(&dftrace_current);

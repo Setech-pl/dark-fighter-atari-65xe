@@ -526,7 +526,7 @@ EFFECT_FRAGMENT_GLYPH_BASE = ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT
 .assert EFFECT_FRAGMENT_GLYPH_COUNT = 2, error, "debris fragments must use exactly two glyphs"
 .assert EFFECT_FRAGMENT_GLYPH_BASE = 118, error, "debris fragment glyph indices must begin at 118"
 .assert EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT = 120, error, "glyphs 120-127 must remain free"
-.assert 128-(EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT) >= 8, error, "at least eight ANTIC 4 glyphs must remain free"
+.assert 128-(EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT) >= 8, error, "Raider breakup must retain all eight currently free ANTIC 4 glyphs"
 .assert EFFECT_ACTIVE_LIMIT = 5, error, "debris destruction requires one core and four fragments"
 .assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
 .assert HUD_BOTTOM = GAMEPLAY_TOP, error, "gameplay must begin immediately below the HUD"
@@ -682,12 +682,12 @@ EFFECT_ACTIVE_MASK:          .res 1
 EFFECT_RENDERED_MASK:        .res 1
 EFFECT_ACTIVE_COUNT:         .res 1
 EFFECT_ALLOCATION_RESULT:    .res 1
+EFFECT_STATE:                .res EFFECT_SLOT_COUNT
 EFFECT_SCRATCH_SLOT:         .res 1
 EFFECT_SCRATCH0:             .res 1
 EFFECT_SCRATCH1:             .res 1
 EFFECT_SCRATCH2:             .res 1
 EFFECT_TYPE:                 .res EFFECT_SLOT_COUNT
-EFFECT_STATE:                .res EFFECT_SLOT_COUNT
 EFFECT_FLAGS:                .res EFFECT_SLOT_COUNT
 EFFECT_X:                    .res EFFECT_SLOT_COUNT
 EFFECT_Y:                    .res EFFECT_SLOT_COUNT
@@ -4124,7 +4124,7 @@ resolve_enemy_damage:
     sta HITCLR
     lda #ENEMY_EXPLOSION_CORE_COLOR ; preserve the accepted $84/$46 explosion
     sta COLPM1
-    jsr begin_enemy_fighter_explosion
+    jsr spawn_raider_breakup_effects
     jsr reset_enemy_fire_cooldown
     pla
     cmp #(DAMAGE_CAPITAL_CYLON+1)
@@ -7994,7 +7994,9 @@ entity_effects_erase:
     rts
 
 erase_transient_effect_overlays:
-    ldx #(EFFECT_SLOT_COUNT-1)
+    ; Slot five is physical reserve and can never acquire valid backing while
+    ; EFFECT_ACTIVE_LIMIT is five.
+    ldx #(EFFECT_ACTIVE_LIMIT-1)
 @slot:
     lda entity_slot_bit_masks,x
     and EFFECT_RENDERED_MASK
@@ -8043,10 +8045,7 @@ erase_interactive_entity_overlays:
 ; non-zero spawn timer is the ordinary empty path and stays below 100 linked
 ; CPU cycles together with erase and render.
 entity_effects_update:
-    lda EFFECT_ACTIVE_MASK
-    beq :+
     jsr update_transient_effects
-:
     lda ENTITY_ACTIVE_MASK
     bne @active
     lsr ENTITY_FRAME_EVENTS
@@ -8341,36 +8340,44 @@ entity_despawn_debris:
 ; overlap; the sixth physical slot remains reserved and inactive.
 .segment "CODE"
 spawn_debris_destruction_effects:
-    stx ENTITY_SCRATCH_SLOT
+    ; A debris event later than a deferred Raider event wins. In the released
+    ; frame order all old backing is already erased; clear its state before the
+    ; five admitted slots are reused. The reset preserves projectile-slot X.
+    jsr clear_transient_effects
+    lda ENTITY_X
+    ldy ENTITY_Y
+spawn_breakup_effects_at:
+    sta EFFECT_SCRATCH0
+    sty EFFECT_SCRATCH1
+    txa
+    pha
     ldx #EFFECT_DEBRIS_FRAGMENT_COUNT
 @fragment:
     lda #EFFECT_TYPE_DEBRIS_FRAGMENT
     sta EFFECT_TYPE,x
-    lda #EFFECT_STATE_ACTIVE
+    lsr
     sta EFFECT_STATE,x
     lda #EFFECT_DEBRIS_FRAGMENT_TIMER_LOAD
     sta EFFECT_TIMER,x
-    lda ENTITY_X
+    lda EFFECT_SCRATCH0
     clc
     adc #$04
     sta EFFECT_X,x
-    lda ENTITY_Y
+    lda EFFECT_SCRATCH1
     clc
     adc #$04
     sta EFFECT_Y,x
     lda #EFFECT_FRAGMENT_GLYPH_BASE
     sta EFFECT_RENDER_ID,x
     dex
-    bne @fragment
+    bpl @fragment
 
-    lda #EFFECT_TYPE_DEBRIS_CORE
-    sta EFFECT_TYPE
-    lda #EFFECT_STATE_ACTIVE
-    sta EFFECT_STATE
-    lda ENTITY_X
+    ; Slot zero is a core by fixed pool role; all five cells share the generic
+    ; collisionless renderer. Retag only its semantic type after the loop.
+    lsr EFFECT_TYPE
+    lda EFFECT_SCRATCH0
     sta EFFECT_X
-    lda ENTITY_Y
-    sta EFFECT_Y
+    sty EFFECT_Y
     lda #EFFECT_DEBRIS_CORE_TIMER_LOAD
     sta EFFECT_TIMER
     lda ENTITY_RENDER_ID
@@ -8379,21 +8386,50 @@ spawn_debris_destruction_effects:
     sta EFFECT_ACTIVE_COUNT
     lda #EFFECT_DEBRIS_ACTIVE_MASK
     sta EFFECT_ACTIVE_MASK
-    ldx ENTITY_SCRATCH_SLOT
+    pla
+    tax
+    rts
+
+; Reuse the proven debris five-slot allocator, then restore the still-live
+; neutral entity and retag only the visual roles. Every legal death runs after
+; the frame-start reverse erase, so a prior event has no valid backing left;
+; a same-frame debris event has not rendered yet and is atomically replaced.
+.segment "CODE"
+spawn_raider_breakup_effects:
+    jsr clear_transient_effects
+    lda #$02
+    sta EFFECT_ALLOCATION_RESULT
+    jmp begin_enemy_fighter_explosion
+
+materialize_raider_breakup_effects:
+    lda FIGHTER_EXPLOSION_X+FIGHTER_EXPLOSION_ENEMY_SLOT
+    ; The releasing LSR enters with C=1; fold it into the centred offset.
+    adc #(EFFECT_RAIDER_CORE_X_OFFSET-1)
+    ldy FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_ENEMY_SLOT
+    jsr spawn_breakup_effects_at
+    ldx #(EFFECT_ACTIVE_LIMIT-1)
+@render_id:
+    lda entity_raider_fragment_render_ids,x
+    sta EFFECT_RENDER_ID,x
+    dex
+    bpl @render_id
     rts
 
 ; Lifecycle reset releases collisionless effects but deliberately preserves
 ; a current frame's backing records. If called after rendering (sector COMPLETE),
 ; the next frame's reverse erase still restores the exact lower layers.
+.segment "CODE"
 clear_transient_effects:
     lda #$00
     sta EFFECT_ACTIVE_MASK
     sta EFFECT_ACTIVE_COUNT
-    ldx #(EFFECT_SLOT_COUNT-1)
+    ; The six existing state bytes sit directly after the pending latch, so the
+    ; replacement/reset path clears exactly those seven bytes. Scratch, type
+    ; and timers are ignored while inactive and overwritten before publication.
+    ldy #(EFFECT_STATE+EFFECT_SLOT_COUNT-1-EFFECT_ALLOCATION_RESULT)
 @slot:
-    sta EFFECT_STATE,x
-    sta EFFECT_TIMER,x
-    dex
+    sta EFFECT_ALLOCATION_RESULT,y
+    dey
     bpl @slot
     rts
 
@@ -8402,20 +8438,25 @@ clear_transient_effects:
 ; therefore visually dominant while the fragments still inherit world travel.
 ; The core is stationary and all TTLs are frozen automatically while paused.
 update_transient_effects:
+    ; The two-step pending latch isolates a Raider kill from materialising five
+    ; backed overlays in the same world/hull-copy frame. A set carry calls the
+    ; materialiser on the following PAL frame, then the ordinary update
+    ; gives all four fragments their first radial step before the first draw.
+    lsr EFFECT_ALLOCATION_RESULT
+    bcc :+
+    jsr materialize_raider_breakup_effects
+:
     lda EFFECT_ACTIVE_MASK
-    and #$01
+    beq @done
+    lda EFFECT_STATE
     beq @fragments
     dec EFFECT_TIMER
     bne @fragments
-    lda EFFECT_ACTIVE_MASK
-    and #$FE
-    sta EFFECT_ACTIVE_MASK
+    dec EFFECT_ACTIVE_MASK
     dec EFFECT_ACTIVE_COUNT
-    lda #$00
-    sta EFFECT_STATE
+    lsr EFFECT_STATE
 @fragments:
-    lda EFFECT_ACTIVE_MASK
-    and #$1E
+    lda EFFECT_STATE+1
     beq @done
     lda ENTITY_FRAME_EVENTS
     and #ENTITY_EVENT_WORLD_ROW_ADVANCED
@@ -8427,9 +8468,8 @@ update_transient_effects:
     clc
     adc effect_fragment_vx,x
     sta EFFECT_X,x
-    and #$02
-    lsr
-    ora #EFFECT_FRAGMENT_GLYPH_BASE
+    lda EFFECT_RENDER_ID,x
+    eor #$01
     sta EFFECT_RENDER_ID,x
     lda EFFECT_Y,x
     clc
@@ -8441,17 +8481,7 @@ update_transient_effects:
     dex
     bne @slot
     lda EFFECT_TIMER+1
-    beq @expire_fragments
-    rts
-@expire_fragments:
-    lda #$00
-    sta EFFECT_ACTIVE_MASK
-    sta EFFECT_ACTIVE_COUNT
-    ldx #EFFECT_DEBRIS_FRAGMENT_COUNT
-@clear_state:
-    sta EFFECT_STATE,x
-    dex
-    bne @clear_state
+    beq clear_transient_effects
 @done:
     rts
 
@@ -8513,8 +8543,8 @@ render_interactive_entity_overlays:
     lda (dst_ptr),y
     sta ENTITY_BACKING1
     lda ENTITY_RENDER_ID
-    ldx ENTITY_OWNER
-    beq :+
+    dex
+    bmi :+
     ora #$80
 :
     ora #$01
@@ -8533,21 +8563,17 @@ render_interactive_entity_overlays:
 .segment "CODE"
 render_transient_effect_overlays:
     ldx #$00
+    lda EFFECT_ACTIVE_MASK
+    lsr
+    bcs @slot
+    inx                         ; mask $1E means the five-frame core expired
 @slot:
-    lda EFFECT_STATE,x
-    bne :+
-    jmp @next
-:
     stx EFFECT_SCRATCH_SLOT
     lda EFFECT_Y,x
     cmp #ENTITY_GAMEPLAY_TOP
-    bcs :+
-    jmp @next_saved
-:
+    bcc @outside_y
     cmp #ENTITY_GAMEPLAY_BOTTOM
-    bcc :+
-    jmp @next_saved
-:
+    bcs @outside_y
     sec
     sbc #ENTITY_GAMEPLAY_TOP
     lsr
@@ -8580,10 +8606,9 @@ render_transient_effect_overlays:
     cpx #$00
     beq @core
 
-    lda EFFECT_RENDER_ID,x
     ldy EFFECT_TIMER,x
     cpy #23
-    bcs @fragment_code
+    bcs @fragment_yellow
     cpy #9
     bcs @fragment_red
     tya
@@ -8603,18 +8628,21 @@ render_transient_effect_overlays:
 
 @core:
     lda EFFECT_TIMER,x
-    cmp #EFFECT_DEBRIS_CORE_FRAMES-1
+    lsr
+    beq @dark_core
+    cmp #$02
     bcs @yellow_core
-    cmp #EFFECT_DEBRIS_CORE_FRAMES-3
-    bcs @red_core
-    lda #EFFECT_FRAGMENT_GLYPH_BASE|$80
+@red_core:
+    lda EFFECT_RENDER_ID,x
+    ora #$80
     bne @core_codes
 @yellow_core:
     lda EFFECT_RENDER_ID,x
     bne @core_codes
-@red_core:
-    lda EFFECT_RENDER_ID,x
-    ora #$80
+@outside_y:
+    jmp @next_saved
+@dark_core:
+    lda #EFFECT_FRAGMENT_GLYPH_BASE|$80
 @core_codes:
     sta (dst_ptr),y
     lda #$01
@@ -8673,11 +8701,16 @@ entity_debris_glyph_end:
 effect_fragment_glyph:
     EMIT_EFFECT_FRAGMENT_GLYPHS
 effect_fragment_glyph_end:
+entity_raider_fragment_render_ids:
+    ; Complete physical-pool template: core, two wings, red eye, central
+    ; fragment, then the mandatory inactive sixth-slot sentinel.
+    .byte ENTITY_DEBRIS_GLYPH_BASE
+    .byte ENTITY_DEBRIS_GLYPH_BASE,ENTITY_DEBRIS_GLYPH_BASE+2
+    .byte RAIDER_PROJECTILE_GLYPH_BASE|$80,EFFECT_FRAGMENT_GLYPH_BASE,$00
 
 .segment "CODE"
 entity_slot_bit_masks:
-    .byte $01,$02,$04,$08,$10,$20
-.segment "ENTITY_CODE"
+    .byte $01,$02,$04,$08,$10
 entity_trajectory_vx:
     EMIT_ENTITY_TRAJECTORY_VX
 
@@ -8695,7 +8728,10 @@ entity_trajectory_vx:
 .export entity_debris_shot
 .export entity_debris_hit, entity_debris_destroyed
 .export clear_transient_effects, spawn_debris_destruction_effects
+.export spawn_breakup_effects_at, spawn_raider_breakup_effects
+.export materialize_raider_breakup_effects
 .export update_transient_effects, render_transient_effect_overlays
 .export erase_transient_effect_overlays, erase_interactive_entity_overlays
 .export render_interactive_entity_overlays
-.export entity_archetype_descriptors, entity_debris_glyph, effect_fragment_glyph, entity_trajectory_vx
+.export entity_archetype_descriptors, entity_debris_glyph, effect_fragment_glyph
+.export entity_raider_fragment_render_ids, entity_trajectory_vx

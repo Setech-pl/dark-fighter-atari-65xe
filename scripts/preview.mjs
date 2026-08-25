@@ -38,8 +38,11 @@ import {
 } from "./entity-effects.mjs";
 import {
   assertDebrisDestructionTraceParity,
+  assertRaiderBreakupTraceParity,
   debrisDestructionTraceCsv,
   executeDebrisDestructionTrace,
+  executeRaiderBreakupTrace,
+  raiderBreakupTraceCsv,
 } from "./debris-destruction-runtime.mjs";
 import {
   beginEnemyDamageFrame,
@@ -362,6 +365,18 @@ export const DEFAULT_DESTRUCTIBLE_DEBRIS_TRACE_PATH = path.join(
   "build",
   "previews",
   "destructible-debris-trace.csv",
+);
+export const DEFAULT_RAIDER_BREAKUP_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-raider-breakup-review.png",
+);
+export const DEFAULT_RAIDER_BREAKUP_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-raider-breakup-trace.csv",
 );
 const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   rootDirectory,
@@ -3948,6 +3963,96 @@ export function createDestructibleDebrisPreview(
   return encodePng(rgb, width, height);
 }
 
+export function createRaiderBreakupTrace(
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const xex = executeRaiderBreakupTrace({ artifact: "xex" });
+  const atr = executeRaiderBreakupTrace({ artifact: "atr" });
+  assertRaiderBreakupTraceParity(xex, atr);
+  const atrRows = raiderBreakupTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${raiderBreakupTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+}
+
+function runtimeRaiderFrameRgb(record, trace, graphics, scale) {
+  const registers = new Map([
+    ["COLBK", record.colbk],
+    ["COLPF0", requireValue(graphics.hardwareState, "COLPF0")],
+    ["COLPF1", requireValue(graphics.hardwareState, "COLPF1")],
+    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+  ]);
+  const registerPixels = drawAnticScreen(registers, record.screen,
+    { charset: trace.charset }, undefined, 22);
+  drawPlayer(registerPixels, record.player1, record.hposp1, 0, record.sizep1,
+    record.colpm1, PMG_SCREEN_TOP, 24, 200);
+  drawPlayer(registerPixels, record.player2, record.hposp2, 0, record.sizep2,
+    record.colpm2, PMG_SCREEN_TOP, 24, 200);
+  return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, 22 * CHARACTER_HEIGHT, scale);
+}
+
+export function createRaiderBreakupPreview(
+  source,
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const trace = executeRaiderBreakupTrace({ artifact: "xex" });
+  const atrTrace = executeRaiderBreakupTrace({ artifact: "atr" });
+  assertRaiderBreakupTraceParity(trace, atrTrace);
+  const graphics = readGameGraphicsSource(source);
+  const frontend = readFrontendGraphicsSource(source);
+  const selected = [
+    ["PRE_HIT", 0, "1 RAIDER"],
+    ["BREAKUP", 0, "2 FINAL HIT"],
+    ["BREAKUP", 1, "3 YELLOW CORE"],
+    ["BREAKUP", 3, "4 RED CORE"],
+    ["BREAKUP", 5, "5 FOUR FRAGMENTS"],
+    ["BREAKUP", 12, "6 MID SPREAD"],
+    ["BREAKUP", 30, "7 MAX SPREAD"],
+    ["BREAKUP", 31, "8 CLEAN"],
+  ].map(([phase, frame, label]) => ({
+    label,
+    record: trace.records.find((candidate) => candidate.phase === phase && candidate.frame === frame),
+  }));
+  if (selected.some(({ record }) => !record)) throw new Error("Runtime Raider preview frame is missing");
+
+  const nativeWidth = SOURCE_WIDTH;
+  const nativeHeight = 22 * CHARACTER_HEIGHT;
+  const panelGap = 12;
+  const width = 8 * nativeWidth * 2 + 9 * panelGap;
+  const height = 720;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "RAIDER BREAKUP  EXECUTED XEX BYTES  50 FPS", 24, 16,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "FULL SCREEN FLASH UNCHANGED  LOCAL CORE 5  FOUR FRAGMENTS 30", 24, 34,
+    frontend, yellow);
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  EIGHT ACTUAL RUNTIME FRAMES", 24, 58,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const x = panelGap + index * (nativeWidth + panelGap);
+    fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
+    strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
+    drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
+    const frameRgb = runtimeRaiderFrameRgb(record, trace, graphics, 1);
+    copyRgbPanel(rgb, width, height, frameRgb, nativeWidth, nativeHeight, x, 102);
+  });
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME XEX GLYPHS PMG COLORS AND TIMINGS", 24, 306,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const panelWidth = nativeWidth * 2;
+    const x = panelGap + index * (panelWidth + panelGap);
+    drawRgbLabel(rgb, width, label, x + 4, 330, frontend, white);
+    const frameRgb = runtimeRaiderFrameRgb(record, trace, graphics, 2);
+    copyRgbPanel(rgb, width, height, frameRgb, panelWidth, nativeHeight * 2, x, 350);
+  });
+  return encodePng(rgb, width, height);
+}
+
 export function readProjectileVisualLanguageRuntimeState(
   source,
   capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
@@ -5371,6 +5476,30 @@ export function generateDestructibleDebrisTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
+export function generateRaiderBreakupPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_RAIDER_BREAKUP_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createRaiderBreakupPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadEntityEffectsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateRaiderBreakupTrace({
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_RAIDER_BREAKUP_TRACE_PATH,
+} = {}) {
+  const trace = createRaiderBreakupTrace(loadEntityEffectsDefinition(definitionPath));
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateEnemyReferenceInventoryPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   outputPath = DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH,
@@ -5832,6 +5961,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Destructible-debris acceptance trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, destructibleDebrisTrace.outputPath)}`);
     console.log(`  rows: ${destructibleDebrisTrace.rows}, ${destructibleDebrisTrace.bytes} bytes`);
+
+    const raiderBreakupResult = generateRaiderBreakupPreview();
+    console.log(`Enemy Raider-breakup owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, raiderBreakupResult.outputPath)}`);
+    console.log(
+      `  size: ${raiderBreakupResult.width}x${raiderBreakupResult.height}, ${raiderBreakupResult.bytes} bytes`,
+    );
+    const raiderBreakupTrace = generateRaiderBreakupTrace();
+    console.log(`Enemy Raider-breakup runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, raiderBreakupTrace.outputPath)}`);
+    console.log(`  rows: ${raiderBreakupTrace.rows}, ${raiderBreakupTrace.bytes} bytes`);
 
     const startMenuResult = generateStartMenuPreview();
     console.log(`Start-menu preview generated successfully`);

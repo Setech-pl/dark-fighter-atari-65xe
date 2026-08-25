@@ -327,7 +327,7 @@ debris an exact tie. `ENTITY_HP` begins at 3; the first two hits reuse
 one five-frame core and four 30-frame collisionless fragments. Fixed local
 steps separate all four fragments from the first rendered frame and produce a
 span over four columns and two rows by frame 12. Slot 0 renders before slots
-1..4; erase scans 5..0, preserving exact backing at every A2 head. Shot removal
+1..4; erase scans admitted slots 4..0, preserving exact backing at every A2 head. Shot removal
 bypasses enemy damage, score and fighter-flash paths. The existing spawn
 timer's temporary 65 marker falls to the normal 64-frame repeat delay in the
 same frame.
@@ -337,6 +337,49 @@ baseline (+487 B). ENTITY_CODE itself is 728 B versus the accepted 714 B
 (+14 B). The fixed BSS page remains `$8000-$80FF`: four physical interactive
 slots with active limit one, and six physical effect slots with active limit
 five.
+
+## Enemy-breakup-effects feature gate
+
+The accepted destructible-debris artifact is the baseline: 32,719 measured
+wall cycles and 2,849 cycles of physical headroom. The target delta is +128
+and the hard delta is +224, giving gates 32,847/32,943; physical headroom must
+remain at least 2,600. The no-active-explosion path is separately limited to
+the accepted empty wrapper plus 32 linked CPU cycles, or 123.
+
+| Metric/path | Measured value | Feature limit |
+| --- | ---: | ---: |
+| No active explosion wrappers, DMA off | 113 CPU | 123 |
+| Raider five-slot materialisation, DMA off | 464 CPU | bounded spawn |
+| Full effects wrappers, DMA off | 1,919 CPU | core + four fragments |
+| Final worst wall | 32,869 | target 32,847 / hard 32,943 |
+| Final physical headroom | 2,699 | minimum 2,600 |
+
+The final wall delta is +150 cycles. It exceeds the preferred target by 22
+but remains 74 below the explicit hard limit. The complete trace records zero
+missed synchronisations, zero deadline overruns and zero extra VBI boundaries.
+It observes 216 executions of the actual Raider materialiser with active mask
+`$1F`, active count 5, update and render in the same frame; 215 have the
+directly preceding yellow `$1E` death frame and the expected `$3C`
+materialisation frame. Four real Atari800 boot-smoke sessions (XEX/ATR × cold
+RAM `$A5/$5A`) still enter gameplay by frame 505 and run through frame 750.
+
+All canonical destruction sources converge after their existing score-source
+arbitration. `erase_enemy` removes the PMG hull and hitbox before the accepted
+PMG explosion, SFX and full-screen flash start. A two-step latch defers only
+the backed character effect by one PAL frame so the death path does not also
+pay five-slot update/render during a world/hull copy. The next frame places a
+five-frame core at the captured PMG origin plus six HPOS and updates four
+30-frame fragments before their first render. The render-ID template identifies
+left wing, right wing, red eye and centre while reusing glyphs 110–119 and the
+existing Raider pulse phase; no glyph or gameplay RNG was added.
+
+Newest-event-wins is symmetric. Frame-start reverse erase invalidates the old
+backing, and either spawner clears the pending latch plus all six existing
+`EFFECT_STATE` bytes before publishing slots 0..4. The physical sixth slot
+remains inactive. Pause freezes the latch and TTL; new game, life loss, sector
+completion and Game Over use the same clear policy. Linked runtime code is
+14,192 B, only +8 B from the 14,184 B accepted baseline. `ENTITY_CODE` is
+725 B, +11 B from 714; BSS remains exactly `$8000-$80FF`.
 
 ## Size and memory checkpoints
 
@@ -353,6 +396,7 @@ five.
 | Debris visual polish + owner retest glyphs | 16,384 B | 16,396 B | 92,176 B |
 | Explosion colour flash | 16,384 B | 16,396 B | 92,176 B |
 | Destructible debris + boot handoff guard | 16,384 B | 16,396 B | 92,176 B |
+| Raider local breakup | 16,384 B | 16,396 B | 92,176 B |
 
 The final payload occupies exactly 128 boot sectors with zero formatter
 padding. Its 16,380-byte linked/packed core is followed by a source-owned
@@ -366,25 +410,25 @@ handoff. Growth had placed `main_menu_display_list` at `$37E8`, so its 63-byte
 menu/text block crossed ANTIC's 1 KiB display-list-counter boundary at
 `$37FF/$3800`; the counter wrapped and fetched unrelated bytes. The legacy
 `clear_pmg` routine at `$27B2` also wrote all eight pages `$3800-$3FFF`,
-destroying the part above `$3800`. The repaired lists live at `$31E1-$321F`
+destroying the part above `$3800`. The current repaired lists live at `$31EC-$322A`
 inside one counter window, and `clear_pmg` writes only actual single-line PMG
 DMA pages `$3B00-$3FFF`. Link-time guards cover both constraints. Four real
 Atari800 PAL/XL boot-smoke runs (XEX/ATR × cold RAM `$A5/$5A`) capture frames
 1, 250, 300, 500 and 750; all reach the visible menu and then gameplay through
 production FIRE input, with identical XEX/ATR images at frames 500 and 750.
 
-Final protected use is MAIN 8,180/8,192 B (CODE 4,415 B plus RODATA 3,765 B), PROJECTILES 202/298 B,
+Final protected use is MAIN 8,191/8,192 B (CODE 4,426 B plus RODATA 3,765 B), PROJECTILES 202/298 B,
 STARFIELD 2,160/2,278 B, BROADSIDE 6,655/6,656 B, A2 kernel 226/256 B,
-ENTITY_STATE 256/256 B and ENTITY_CODE 728/3,840 B. Packed staging uses
+ENTITY_STATE 256/256 B and ENTITY_CODE 725/3,840 B. Packed staging uses
 1,699/1,792 B until unpacking; the separate ENTITY_CODE boot tail is 651 B.
 A2 display/ring state owns
 203 B at `$7F10-$7FDA`. The kernel is copied identically by XEX and cold-boot
 ATR startup into unconditional 64 KiB RAM at `$9000-$90E1`; `$90E2-$90FF`
 remains free. Startup explicitly clears every byte `$8000-$80FF` and loads
-ENTITY_CODE at `$9100-$93D7`; `$8100-$8FFF` and `$93D8-$9FFF` remain reserved
+ENTITY_CODE at `$9100-$93D4`; `$8100-$8FFF` and `$93D5-$9FFF` remain reserved
 and untouched. `$A000-$BFFF` is excluded.
-ENTITY_CODE grows from the 564 B foundation checkpoint to 728 B (+164 B),
-and only +14 B from the accepted 714 B feature baseline. Debris uses exactly
+ENTITY_CODE grows from the 564 B foundation checkpoint to 725 B (+161 B),
+and only +11 B from the accepted 714 B feature baseline. Debris uses exactly
 eight glyphs 110–117 (seven new from foundation), effects use two fragment
 glyphs 118–119, and eight glyphs 120–127 remain free.
 

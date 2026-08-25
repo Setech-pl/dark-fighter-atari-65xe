@@ -13,6 +13,8 @@ import {
   createDebrisReviewTrace,
   createDestructibleDebrisPreview,
   createDestructibleDebrisTrace,
+  createRaiderBreakupPreview,
+  createRaiderBreakupTrace,
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   createGameplayPreview,
@@ -257,4 +259,24 @@ test("destructible debris owner preview is an XEX/ATR-executed eight-frame break
   assert.ok(rows.some((row) => row.startsWith("xex,FINAL,31,0,0,0,0,0,$00,0,")));
   assert.ok(rows.slice(1).every((row) => row.endsWith(",0742")),
     "runtime preview trace changed score");
+});
+
+test("Raider owner preview is the XEX/ATR-executed eight-frame local breakup", () => {
+  const first = createRaiderBreakupPreview(source, entityEffectsDefinition);
+  const second = createRaiderBreakupPreview(source, entityEffectsDefinition);
+  assert.deepEqual(first, second);
+  assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [5228, 720]);
+  const trace = createRaiderBreakupTrace(entityEffectsDefinition);
+  assert.equal(trace, createRaiderBreakupTrace(entityEffectsDefinition));
+  const rows = trace.trimEnd().split("\n");
+  assert.equal(rows.filter((row) => row.startsWith("xex,BREAKUP,")).length, 127);
+  assert.equal(rows.filter((row) => row.startsWith("atr,BREAKUP,")).length, 127);
+  assert.ok(rows.some((row) => row.startsWith("xex,BREAKUP,0,1,2,24,$1E,$00,0,1,")));
+  assert.ok(rows.some((row) => row.startsWith("atr,BREAKUP,0,1,2,24,$1E,$00,0,1,")));
+  assert.ok(rows.some((row) => row.startsWith("xex,BREAKUP,1,1,2,23,$3C,$1F,5,0,")));
+  assert.ok(rows.some((row) => row.startsWith("xex,BREAKUP,31,1,1,0,$00,$00,0,0,")));
+  assert.ok(rows.slice(1).filter((row) => row.includes(",PRE_HIT,")).every((row) =>
+    row.endsWith(",0742")));
+  assert.ok(rows.slice(1).filter((row) => row.includes(",BREAKUP,")).every((row) =>
+    row.endsWith(",0752")), "Raider score policy must remain byte-exact");
 });

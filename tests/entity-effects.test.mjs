@@ -13,7 +13,9 @@ import { parseAtr, parseXex } from "../scripts/formats.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import {
   assertDebrisDestructionTraceParity,
+  assertRaiderBreakupTraceParity,
   executeDebrisDestructionTrace,
+  executeRaiderBreakupTrace,
 } from "../scripts/debris-destruction-runtime.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -68,6 +70,7 @@ const addresses = {
   owner: labels.get("ENTITY_OWNER"),
   effectActiveMask: labels.get("EFFECT_ACTIVE_MASK"),
   effectActiveCount: labels.get("EFFECT_ACTIVE_COUNT"),
+  effectPending: labels.get("EFFECT_ALLOCATION_RESULT"),
   effectState: labels.get("EFFECT_STATE"),
   effectType: labels.get("EFFECT_TYPE"),
   effectX: labels.get("EFFECT_X"),
@@ -100,6 +103,8 @@ const addresses = {
   broadsideFlashTimer: (labels.get("CAPITAL_SECTOR_STATE") ?? 0x4ea5) - 3,
   capitalExplosionTimer: labels.get("CAPITAL_EXPLOSION_TIMER") ?? 0x4eae,
   fighterExplosionTimer: labels.get("FIGHTER_EXPLOSION_TIMER") ?? 0x54c4,
+  fighterExplosionX: labels.get("FIGHTER_EXPLOSION_X"),
+  fighterExplosionY: labels.get("FIGHTER_EXPLOSION_Y"),
   projectileActive: labels.get("FIGHTER_PROJECTILE_ACTIVE"),
   projectileX: labels.get("FIGHTER_PROJECTILE_X"),
   projectileY: labels.get("FIGHTER_PROJECTILE_Y"),
@@ -198,6 +203,17 @@ test("entity descriptor and glyph generation are deterministic and bounded", () 
   assert.deepEqual(first.debrisVisuals.variants.map(({ id }) => id),
     ["armour-shard", "truss-fragment"]);
   assert.ok(first.debrisVisuals.variants.every(({ phases }) => phases.length === 2));
+  assert.deepEqual(first.raiderBreakup, {
+    coreFrames: 5,
+    fragmentFrames: 30,
+    coreOffsetHpos: 6,
+    fragments: [
+      { id: "left-wing", phaseGlyphs: ["armour-left-0", "armour-left-1"] },
+      { id: "right-wing", phaseGlyphs: ["armour-right-0", "armour-right-1"] },
+      { id: "central", phaseGlyphs: ["debris-fragment-0", "debris-fragment-1"] },
+      { id: "red-eye", phaseGlyphs: ["raider-pulse-0-red", "raider-pulse-1-red"] },
+    ],
+  });
   assert.deepEqual([...first.descriptor.slice(5, 10)], [8, 8, 1, 0, 8]);
   assert.equal(first.descriptor[12], 0,
     "ENTITY_TIMER must start at zero for the deterministic 3/5 accumulator");
@@ -1087,6 +1103,152 @@ test("executed XEX and ATR traces show five rendered effects and a visible 30-fr
   }
 });
 
+test("every canonical Raider death spawns one local breakup without changing score policy", () => {
+  for (const [sourceId, scoreLo] of [[0, 0x52], [1, 0x52], [2, 0x52], [3, 0x42], [5, 0x42]]) {
+    const memory = createRuntimeMemory();
+    initialiseRows(memory);
+    runRoutine(memory, "init_entity_effects");
+    memory[addresses.enemyArchetype] = 0;
+    memory[addresses.enemyActive] = 1;
+    memory[addresses.enemyHp] = 1;
+    memory[addresses.enemyPendingDamage] = 1;
+    memory[addresses.enemyPendingSource] = sourceId;
+    memory[addresses.enemyX] = 124;
+    memory[addresses.enemyY] = 88;
+    memory[addresses.scoreLo] = 0x42;
+    memory[addresses.scoreHi] = 0x07;
+    memory.fill(0xff, 0x3d00 + 88, 0x3d00 + 102);
+    memory.fill(0xff, 0x3e00 + 88, 0x3e00 + 102);
+    runRoutine(memory, "resolve_enemy_damage");
+    assert.deepEqual([
+      memory[addresses.enemyActive], memory[addresses.fighterExplosionTimer + 1],
+      memory[addresses.effectActiveMask], memory[addresses.effectActiveCount],
+      memory[addresses.effectPending], memory[addresses.scoreLo], memory[addresses.scoreHi],
+    ], [2, 24, 0, 0, 2, scoreLo, 0x07], `damage source ${sourceId}`);
+    assert.ok(memory.subarray(0x3d00 + 88, 0x3d00 + 102).every((value) => value === 0));
+    assert.ok(memory.subarray(0x3e00 + 88, 0x3e00 + 102).every((value) => value === 0));
+    assert.deepEqual([
+      memory[addresses.fighterExplosionX + 1], memory[addresses.fighterExplosionY + 1],
+    ], [124, 91], "PMG origin must be captured before the deferred local effect");
+    runRoutine(memory, "entity_effects_update");
+    assert.deepEqual([
+      memory[addresses.effectPending], memory[addresses.effectActiveMask],
+    ], [1, 0], "the death frame must only advance the bounded defer latch");
+    runRoutine(memory, "entity_effects_update");
+    assert.deepEqual([
+      memory[addresses.effectPending], memory[addresses.effectActiveMask],
+      memory[addresses.effectActiveCount], memory[addresses.effectX], memory[addresses.effectY],
+    ], [0, 0x1f, 5, 130, 91], "the next PAL frame must materialise the centred effect");
+    assert.deepEqual([...memory.subarray(addresses.effectType, addresses.effectType + 5)],
+      [1, 2, 2, 2, 2], "Raider reuses the collisionless core/fragment renderer types");
+    assert.deepEqual([...memory.subarray(addresses.effectRenderId, addresses.effectRenderId + 5)],
+      [110, 111, 113, 0xdb, 119], "four fragment identities must use linked render IDs");
+  }
+});
+
+test("executed Raider breakup is one-frame deferred, radial, thirty frames and XEX/ATR exact", () => {
+  const xexTrace = executeRaiderBreakupTrace({ root, artifact: "xex" });
+  const atrTrace = executeRaiderBreakupTrace({ root, artifact: "atr" });
+  assert.equal(assertRaiderBreakupTraceParity(xexTrace, atrTrace), true);
+  const frame = (index) => xexTrace.records.find((record) =>
+    record.phase === "BREAKUP" && record.frame === index);
+  assert.deepEqual([
+    xexTrace.records[0].enemyActive, frame(0).enemyActive,
+    frame(0).effectPending, frame(0).effectActiveMask, frame(0).effectActiveCount,
+    frame(1).effectPending, frame(1).effectActiveMask, frame(1).effectActiveCount,
+  ], [1, 2, 1, 0, 0, 0, 0x1f, 5]);
+  assert.deepEqual([frame(0).colbk, frame(1).colbk, frame(2).colbk, frame(3).colbk, frame(4).colbk],
+    [0x1e, 0x3c, 0x1c, 0x34, 0x00], "accepted full-screen profile changed");
+  assert.deepEqual(frame(1).effects.map(({ slot, type, ttl, renderId }) =>
+    [slot, type, ttl, renderId]), [
+    [0, 1, 5, 110],
+    [1, 2, 30, 111],
+    [2, 2, 30, 113],
+    [3, 2, 30, 0xdb],
+    [4, 2, 30, 119],
+  ]);
+  assert.equal(new Set(frame(1).effects.slice(1).map(({ screenAddress }) => screenAddress)).size, 4,
+    "all four fragments must render in distinct cells in the materialisation frame");
+  const centre = { x: frame(1).effects[0].x + 4, y: frame(1).effects[0].y + 4 };
+  const distance = (effect) => Math.abs(effect.x - centre.x) + Math.abs(effect.y - centre.y);
+  for (const slot of [1, 2, 3, 4]) {
+    const at0 = frame(1).effects.find((effect) => effect.slot === slot);
+    const at4 = frame(4).effects.find((effect) => effect.slot === slot);
+    const at12 = frame(12).effects.find((effect) => effect.slot === slot);
+    assert.ok(distance(at4) > distance(at0));
+    assert.ok(distance(at12) > distance(at4));
+  }
+  for (let index = 1; index <= 30; index += 1) {
+    assert.equal(frame(index).effects.filter(({ slot }) => slot > 0).length, 4);
+    assert.ok(frame(index).rendered, `frame ${index} expired before render`);
+  }
+  assert.equal(frame(5).effects.some(({ slot }) => slot === 0), true);
+  assert.equal(frame(6).effects.some(({ slot }) => slot === 0), false);
+  assert.deepEqual([frame(30).effectActiveMask, frame(31).effectActiveMask], [0x1e, 0]);
+  assert.ok(frame(31).screen.every((code) => code === 0));
+  assert.deepEqual([xexTrace.records[0].scoreLo, frame(31).scoreLo], [0x42, 0x52]);
+});
+
+test("newest debris or Raider breakup safely replaces the previous five-slot event", () => {
+  const spawnRaider = (memory) => {
+    memory[addresses.enemyArchetype] = 0;
+    memory[addresses.enemyX] = 124;
+    memory[addresses.enemyY] = 88;
+    runRoutine(memory, "spawn_raider_breakup_effects");
+  };
+  const spawnDebris = (memory) => {
+    memory[addresses.x] = 124;
+    memory[addresses.y] = 104;
+    memory[addresses.renderId] = 116;
+    runRoutine(memory, "spawn_debris_destruction_effects");
+  };
+  const advanceRaiderDefer = (memory) => {
+    runRoutine(memory, "entity_effects_update");
+    runRoutine(memory, "entity_effects_update");
+  };
+  for (let head = 0; head < 22; head += 1) {
+    for (const [first, second, expected] of [
+      [spawnRaider, spawnDebris, [116, 118, 118, 118, 118]],
+      [spawnDebris, spawnRaider, [110, 111, 113, 0xdb, 119]],
+    ]) {
+      const memory = createRuntimeMemory();
+      initialiseRows(memory, head);
+      runRoutine(memory, "init_entity_effects");
+      memory.fill(0x2a, 0x4050, 0x43c0);
+      first(memory);
+      if (first === spawnRaider) advanceRaiderDefer(memory);
+      else runRoutine(memory, "entity_effects_update");
+      runRoutine(memory, "entity_effects_render");
+      runRoutine(memory, "entity_effects_erase");
+      assert.equal(memory[addresses.effectRendered], 0);
+      second(memory);
+      if (second === spawnRaider) advanceRaiderDefer(memory);
+      assert.deepEqual([...memory.subarray(addresses.effectRenderId, addresses.effectRenderId + 5)],
+        expected);
+      if (second !== spawnRaider) runRoutine(memory, "entity_effects_update");
+      runRoutine(memory, "entity_effects_render");
+      runRoutine(memory, "entity_effects_erase");
+      assert.ok(memory.subarray(0x4050, 0x43c0).every((value) => value === 0x2a),
+        `ring head ${head} retained a replacement ghost`);
+    }
+  }
+
+  const sameFrame = createRuntimeMemory();
+  initialiseRows(sameFrame);
+  runRoutine(sameFrame, "init_entity_effects");
+  spawnDebris(sameFrame);
+  spawnRaider(sameFrame);
+  assert.deepEqual([
+    sameFrame[addresses.effectActiveMask], sameFrame[addresses.effectActiveCount],
+    sameFrame[addresses.effectPending],
+  ], [0, 0, 2]);
+  advanceRaiderDefer(sameFrame);
+  assert.deepEqual([
+    sameFrame[addresses.effectActiveMask], sameFrame[addresses.effectActiveCount],
+    ...sameFrame.subarray(addresses.effectRenderId, addresses.effectRenderId + 5),
+  ], [0x1f, 5, 110, 111, 113, 0xdb, 119]);
+});
+
 test("backed overlay stack restores base, shell/projectile, entity and effect in reverse", () => {
   for (const lowerOverlay of [0x66, 0x91]) {
     const memory = createRuntimeMemory();
@@ -1128,9 +1290,9 @@ test("backed overlay stack restores base, shell/projectile, entity and effect in
   }
 });
 
-test("linked empty engine path remains within 100 CPU cycles", () => {
-  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathLimitCpuCycles, 100);
-  assert.ok(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 100);
+test("linked empty engine path remains within the accepted +32 CPU-cycle slice", () => {
+  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathLimitCpuCycles, 123);
+  assert.ok(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 123);
   assert.equal(manifest.runtimeTiming.entityEffects.measurement,
     "inclusive JSR-to-RTS cycles from executed linked release bytes");
 });

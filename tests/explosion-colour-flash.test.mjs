@@ -86,7 +86,9 @@ test("Viper death wins same-frame arbitration and enemy flashes cannot restart f
   }
   const resolution = routine("resolve_enemy_damage", "add_archetype_score");
   assert.match(resolution,
-    /ENEMY_ACTIVE[\s\S]+cmp #ENEMY_ACTIVE_STATE[\s\S]+bne @done[\s\S]+sta ENEMY_ACTIVE[\s\S]+begin_enemy_fighter_explosion/);
+    /ENEMY_ACTIVE[\s\S]+cmp #ENEMY_ACTIVE_STATE[\s\S]+bne @done[\s\S]+sta ENEMY_ACTIVE[\s\S]+spawn_raider_breakup_effects/);
+  assert.match(source,
+    /spawn_raider_breakup_effects:[\s\S]+begin_enemy_fighter_explosion/);
   assert.match(routine("update_enemy", "draw_enemy"),
     /cmp #ENEMY_EXPLODING_STATE[\s\S]+FIGHTER_EXPLOSION_TIMER\+FIGHTER_EXPLOSION_ENEMY_SLOT[\s\S]+beq @reset\s+rts/);
 });

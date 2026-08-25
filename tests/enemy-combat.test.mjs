@@ -108,7 +108,11 @@ test("selected Raider palette matches the Cylon hull hue with independent lumina
     [0x0e, 0x44, 0x46, 0x28],
   );
   assert.match(source,
-    /resolve_enemy_damage:[\s\S]+lda #ENEMY_EXPLOSION_CORE_COLOR[\s\S]+sta COLPM1[\s\S]+jsr begin_enemy_fighter_explosion/);
+    /resolve_enemy_damage:[\s\S]+lda #ENEMY_EXPLOSION_CORE_COLOR[\s\S]+sta COLPM1[\s\S]+jsr spawn_raider_breakup_effects/);
+  assert.match(source,
+    /spawn_raider_breakup_effects:[\s\S]+jsr clear_transient_effects[\s\S]+sta EFFECT_ALLOCATION_RESULT[\s\S]+jmp begin_enemy_fighter_explosion/);
+  assert.match(source,
+    /materialize_raider_breakup_effects:[\s\S]+jsr spawn_breakup_effects_at[\s\S]+entity_raider_fragment_render_ids/);
   assert.match(source,
     /tick_shared_fighter_explosions:[\s\S]+cpx #FIGHTER_EXPLOSION_ENEMY_SLOT[\s\S]+lda #ENEMY_RUNTIME_BODY_COLOR[\s\S]+sta COLPM1/);
   assert.match(source,
@@ -484,7 +488,7 @@ test("runtime routes every fighter hit through canonical damage-source arbitrati
   assert.match(source,
     /handle_collisions:[\s\S]+DAMAGE_PLAYER_CONTACT[\s\S]+jsr resolve_enemy_damage/);
   assert.match(source,
-    /resolve_enemy_damage:[\s\S]+ENEMY_EXPLODING_STATE[\s\S]+jsr begin_enemy_fighter_explosion[\s\S]+cmp #\(DAMAGE_CAPITAL_CYLON\+1\)[\s\S]+jsr add_archetype_score/);
+    /resolve_enemy_damage:[\s\S]+ENEMY_EXPLODING_STATE[\s\S]+jsr spawn_raider_breakup_effects[\s\S]+cmp #\(DAMAGE_CAPITAL_CYLON\+1\)[\s\S]+jsr add_archetype_score/);
 });
 
 test("canonical destruction policy awards descriptor score exactly once", () => {

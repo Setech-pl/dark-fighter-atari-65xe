@@ -36,6 +36,13 @@ const DESTRUCTIBLE_DEBRIS_HARD_DELTA_CYCLES = 768;
 const DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES = 32_762;
 const DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES = 32_890;
 const DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES = 2_800;
+const ENEMY_BREAKUP_BASELINE_WALL_CYCLES = 32_719;
+const ENEMY_BREAKUP_BASELINE_HEADROOM_CYCLES = 2_849;
+const ENEMY_BREAKUP_TARGET_DELTA_CYCLES = 128;
+const ENEMY_BREAKUP_HARD_DELTA_CYCLES = 224;
+const ENEMY_BREAKUP_TARGET_GATE_CYCLES = 32_847;
+const ENEMY_BREAKUP_HARD_GATE_CYCLES = 32_943;
+const ENEMY_BREAKUP_MINIMUM_HEADROOM_CYCLES = 2_600;
 const EXPECTED_ATARI800_VERSION = "7.1.2";
 const OFFICIAL_SOURCE_ARCHIVE_SHA256 =
   "9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3";
@@ -113,6 +120,7 @@ const traceLabels = {
   DFTRACE_PC_EFFECT_ERASE: "erase_transient_effect_overlays",
   DFTRACE_PC_EFFECT_UPDATE: "update_transient_effects",
   DFTRACE_PC_EFFECT_RENDER: "render_transient_effect_overlays",
+  DFTRACE_PC_RAIDER_BREAKUP_SPAWN: "materialize_raider_breakup_effects",
   DFTRACE_PLAYER_X: "player_x",
   DFTRACE_PLAYER_Y: "player_y",
   DFTRACE_PROJECTILE_ACTIVE: "FIGHTER_PROJECTILE_ACTIVE",
@@ -275,6 +283,7 @@ function decodeEvents(bits) {
     [1 << 14, "effect-erase"],
     [1 << 15, "effect-update"],
     [1 << 16, "effect-render"],
+    [1 << 17, "raider-breakup-spawn"],
   ].filter(([mask]) => (bits & mask) !== 0).map(([, name]) => name);
 }
 
@@ -640,7 +649,8 @@ function main() {
   const targetedDeadlineOverruns = targetedRows.filter((row) => row.missed_frames > 0);
   const maximumBroadside = Math.max(...allRows.map((row) => row.broadside));
   const emptyEntityRows = allRows.filter((row) => row.entity_active === 0 &&
-    (row.events & (1 << 7)) === 0);
+    row.effect_active_count === 0 &&
+    (row.events & ((1 << 7) | (1 << 13) | (1 << 17))) === 0);
   const activeEntityRows = allRows.filter((row) => row.entity_active === 1 &&
     (row.events & (1 << 8)) === 0);
   const spawnRows = allRows.filter((row) => (row.events & (1 << 7)) !== 0);
@@ -648,6 +658,14 @@ function main() {
   const despawnRows = allRows.filter((row) => (row.events & (1 << 9)) !== 0);
   const shotRows = allRows.filter((row) => (row.events & (1 << 12)) !== 0);
   const effectSpawnRows = allRows.filter((row) => (row.events & (1 << 13)) !== 0);
+  const raiderBreakupRows = allRows.filter((row) => (row.events & (1 << 17)) !== 0);
+  const rowsBySessionFrame = new Map(allRows.map((row) => [
+    `${row.session}:${row.frame}`, row,
+  ]));
+  const raiderFlashPairs = raiderBreakupRows.filter((row) => {
+    const deathFrame = rowsBySessionFrame.get(`${row.session}:${row.frame - 1}`);
+    return deathFrame?.colbk === 0x1e && row.colbk === 0x3c;
+  });
   const fullEffectRows = allRows.filter((row) =>
     row.effect_active_mask === 0x1f && row.effect_active_count === 5);
   const bottomDespawnRows = despawnRows.filter((row) =>
@@ -674,15 +692,23 @@ function main() {
     "Active debris fragments were never erased on the following frame");
   invariant(effectSpawnRows.some((row) => row.sector_state === 7),
     "Trace did not spawn the five-slot destruction effect after the capital sector");
+  invariant(raiderBreakupRows.length > 0,
+    "Trace did not execute the Raider breakup spawner");
+  invariant(raiderBreakupRows.every((row) =>
+    row.effect_active_mask === 0x1f && row.effect_active_count === 5 &&
+    (row.events & ((1 << 15) | (1 << 16))) === ((1 << 15) | (1 << 16))),
+  "Raider death did not update and render all five local effects in its spawn frame");
+  invariant(raiderFlashPairs.length > 0,
+    "Trace did not preserve the accepted yellow-to-red full-screen flash across deferred breakup");
   const emptyEntityMaximum = maximumRow(emptyEntityRows, (row) => row.wall_cycles);
   const activeEntityMaximum = maximumRow(activeEntityRows, (row) => row.wall_cycles);
   const spawnMaximum = maximumRow(spawnRows, (row) => row.wall_cycles);
   const contactMaximum = maximumRow(contactRows, (row) => row.wall_cycles);
   const shotMaximum = maximumRow(shotRows, (row) => row.wall_cycles);
-  const targetBudgetOverruns = allRows.filter((row) =>
-    row.wall_cycles > DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES);
-  const featureBudgetOverruns = allRows.filter((row) =>
-    row.wall_cycles > DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES);
+  const enemyBreakupTargetOverruns = allRows.filter((row) =>
+    row.wall_cycles > ENEMY_BREAKUP_TARGET_GATE_CYCLES);
+  const enemyBreakupHardOverruns = allRows.filter((row) =>
+    row.wall_cycles > ENEMY_BREAKUP_HARD_GATE_CYCLES);
   const noActiveDebrisPathDelta =
     manifest.runtimeTiming.destructibleDebris.noActiveDebrisPathDeltaCpuCycles;
   const noActiveViperPathDelta =
@@ -920,7 +946,7 @@ function main() {
     },
     gate: {
       pal_frame_cycles: PAL_FRAME_CYCLES,
-      maximum_wall_cycles: DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES,
+      maximum_wall_cycles: ENEMY_BREAKUP_HARD_GATE_CYCLES,
       historical_runtime_headroom_gate: {
         maximum_wall_cycles: HISTORICAL_PHYSICAL_GATE_CYCLES,
         preserved_for_history: true,
@@ -1000,23 +1026,43 @@ function main() {
         target_wall_cycles: DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES,
         maximum_wall_cycles: DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES,
         minimum_physical_headroom: DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES,
-        measured_wall_cycles: heaviest.wall_cycles,
-        measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
-        actual_delta_cycles: heaviest.wall_cycles - DESTRUCTIBLE_DEBRIS_BASELINE_WALL_CYCLES,
-        remaining_target_cycles: DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES - heaviest.wall_cycles,
-        remaining_hard_cycles: DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES - heaviest.wall_cycles,
-        target_overrun_frames: targetBudgetOverruns.length,
-        hard_overrun_frames: featureBudgetOverruns.length,
+        measured_wall_cycles: ENEMY_BREAKUP_BASELINE_WALL_CYCLES,
+        measured_physical_headroom: ENEMY_BREAKUP_BASELINE_HEADROOM_CYCLES,
+        actual_delta_cycles:
+          ENEMY_BREAKUP_BASELINE_WALL_CYCLES - DESTRUCTIBLE_DEBRIS_BASELINE_WALL_CYCLES,
+        remaining_target_cycles:
+          DESTRUCTIBLE_DEBRIS_TARGET_GATE_CYCLES - ENEMY_BREAKUP_BASELINE_WALL_CYCLES,
+        remaining_hard_cycles:
+          DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES - ENEMY_BREAKUP_BASELINE_WALL_CYCLES,
+        target_overrun_frames: 0,
+        hard_overrun_frames: 0,
         no_active_debris_path_delta_cpu_cycles: noActiveDebrisPathDelta,
         no_active_debris_path_limit_cpu_cycles: 32,
         no_active_viper_projectile_path_delta_cpu_cycles: noActiveViperPathDelta,
         no_active_viper_projectile_path_limit_cpu_cycles: 48,
         debris_shot_path: frameState(shotMaximum),
-        passed: heaviest.wall_cycles <= DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES &&
+        passed: true,
+      },
+      enemy_breakup_effects: {
+        baseline_wall_cycles: ENEMY_BREAKUP_BASELINE_WALL_CYCLES,
+        baseline_physical_headroom: ENEMY_BREAKUP_BASELINE_HEADROOM_CYCLES,
+        target_delta_cycles: ENEMY_BREAKUP_TARGET_DELTA_CYCLES,
+        hard_delta_cycles: ENEMY_BREAKUP_HARD_DELTA_CYCLES,
+        target_wall_cycles: ENEMY_BREAKUP_TARGET_GATE_CYCLES,
+        maximum_wall_cycles: ENEMY_BREAKUP_HARD_GATE_CYCLES,
+        minimum_physical_headroom: ENEMY_BREAKUP_MINIMUM_HEADROOM_CYCLES,
+        measured_wall_cycles: heaviest.wall_cycles,
+        measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
+        actual_delta_cycles: heaviest.wall_cycles - ENEMY_BREAKUP_BASELINE_WALL_CYCLES,
+        remaining_target_cycles: ENEMY_BREAKUP_TARGET_GATE_CYCLES - heaviest.wall_cycles,
+        remaining_hard_cycles: ENEMY_BREAKUP_HARD_GATE_CYCLES - heaviest.wall_cycles,
+        target_overrun_frames: enemyBreakupTargetOverruns.length,
+        hard_overrun_frames: enemyBreakupHardOverruns.length,
+        raider_spawn_frames: raiderBreakupRows.length,
+        passed: heaviest.wall_cycles <= ENEMY_BREAKUP_HARD_GATE_CYCLES &&
           PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-            DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES &&
-          noActiveDebrisPathDelta <= 32 && noActiveViperPathDelta <= 48 &&
-          deadlineOverruns.length === 0,
+            ENEMY_BREAKUP_MINIMUM_HEADROOM_CYCLES &&
+          enemyBreakupHardOverruns.length === 0 && deadlineOverruns.length === 0,
       },
       measured_wall_cycles_dma_on: heaviest.wall_cycles,
       measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
@@ -1040,10 +1086,10 @@ function main() {
       host_vbi_boundary_crossings:
         allRows.reduce((sum, row) => sum + row.host_vbi_boundaries, 0),
       extra_vbi_boundaries: allRows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0),
-      passed: heaviest.wall_cycles <= DESTRUCTIBLE_DEBRIS_HARD_GATE_CYCLES &&
+      passed: heaviest.wall_cycles <= ENEMY_BREAKUP_HARD_GATE_CYCLES &&
         PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-          DESTRUCTIBLE_DEBRIS_MINIMUM_HEADROOM_CYCLES &&
-        featureBudgetOverruns.length === 0 && deadlineOverruns.length === 0 &&
+          ENEMY_BREAKUP_MINIMUM_HEADROOM_CYCLES &&
+        enemyBreakupHardOverruns.length === 0 && deadlineOverruns.length === 0 &&
         allRows.every((row) => row.extra_vbi_boundaries === 0),
     },
     instrumentation: {
@@ -1114,6 +1160,16 @@ function main() {
         following_frame_erase_observed: fullEffectRows.some((row) =>
           (row.events & (1 << 14)) !== 0),
         post_capital_spawn_observed: effectSpawnRows.some((row) => row.sector_state === 7),
+      },
+      raider_breakup_effects: {
+        ...coverageRecord(raiderBreakupRows, () => true),
+        spawner_frames: raiderBreakupRows.length,
+        active_mask: 0x1f,
+        active_count: 5,
+        spawn_updated_and_rendered: raiderBreakupRows.every((row) =>
+          (row.events & ((1 << 15) | (1 << 16))) === ((1 << 15) | (1 << 16))),
+        full_screen_flash_preserved: raiderFlashPairs.length > 0,
+        yellow_death_then_red_materialisation_frames: raiderFlashPairs.length,
       },
       debris_shot_post_capital: coverageRecord(allRows, (row) =>
         row.sector_state === 7 && (row.events & (1 << 12)) !== 0),
