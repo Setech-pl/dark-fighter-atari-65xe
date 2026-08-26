@@ -440,7 +440,7 @@ export function createGameplayGallery() {
     ["06-rapid-fire-active.png", sources.rapid, "XEX", 449, "RF HUD countdown and red Rapid Fire projectiles"],
     ["07-capital-broadside.png", sources.broadside, "XEX", 100, "Capital corridor combat and broadside fire"],
     ["08-capital-engines.png", sources.engines, "XEX", 96, "Capital engine bank in its deterministic 8-frame phase"],
-    ["09-spread-shot-active.png", sources.spread, "XEX", spreadCaptureFrame, "SP HUD countdown and yellow-centre/red-side three-projectile fan"],
+    ["09-spread-shot-active.png", sources.spread, "XEX", spreadCaptureFrame, "SP HUD countdown and all-yellow three-projectile fan"],
   ];
   return definitions.map(([fileName, sourcePath, medium, frame, description]) => {
     const { sourceBytes, png, width, height } = cropRuntimeFrame(sourcePath);

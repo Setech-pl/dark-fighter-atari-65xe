@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "method": "Atari800 ANTIC master-clock observation at guest-PC boundaries; no guest logging or instrumentation instructions",
   "artifact": {
     "path": "dist/dark-fighter.xex",
@@ -3970,11 +3970,17 @@
       }
     },
     "maximum_projectile_pool": {
-      "observed": false,
-      "matching_frames": 0,
-      "heaviest": null,
-      "maximum_observed": 18,
-      "legal_capacity": 19
+      "scope": "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays",
+      "combined_physical_capacity": 19,
+      "maximum_combined_active_observed": 18,
+      "full_combined_capacity_observed": false,
+      "full_combined_capacity_matching_frames": 0,
+      "heaviest_at_full_combined_capacity": null,
+      "component_physical_capacities": {
+        "viper": 10,
+        "raider": 9
+      },
+      "evidence_note": "The combined capacity is a physical allocation. This report records 18 as the maximum naturally observed combined active count and does not claim an unobserved 19/19 state."
     },
     "broadside_projectiles": {
       "observed": true,
@@ -13213,36 +13219,37 @@
       }
     }
   ],
+  "five_heaviest_frames_scope": "all measured legal runtime replays",
   "five_heaviest_frames": [
     {
-      "session": "1-evasive-fire3",
-      "frame": 515,
-      "wall_cycles": 32939,
-      "physical_headroom": 2629
+      "session": "weapon-pickup-2-hunt-fire4",
+      "frame": 223,
+      "wall_cycles": 33172,
+      "physical_headroom": 2396
     },
     {
-      "session": "2-sweep-fire0",
-      "frame": 463,
-      "wall_cycles": 32475,
-      "physical_headroom": 3093
+      "session": "memory-integrity-xex-2-hunt-fire4",
+      "frame": 223,
+      "wall_cycles": 33172,
+      "physical_headroom": 2396
     },
     {
-      "session": "2-sweep-fire4",
-      "frame": 337,
-      "wall_cycles": 32467,
-      "physical_headroom": 3101
+      "session": "memory-integrity-atr-2-hunt-fire4",
+      "frame": 223,
+      "wall_cycles": 33172,
+      "physical_headroom": 2396
     },
     {
-      "session": "1-evasive-fire3",
-      "frame": 524,
-      "wall_cycles": 32215,
-      "physical_headroom": 3353
+      "session": "weapon-pickup-2-hunt-fire4",
+      "frame": 231,
+      "wall_cycles": 33134,
+      "physical_headroom": 2434
     },
     {
-      "session": "2-sweep-fire2",
-      "frame": 183,
-      "wall_cycles": 32135,
-      "physical_headroom": 3433
+      "session": "memory-integrity-xex-2-hunt-fire4",
+      "frame": 231,
+      "wall_cycles": 33134,
+      "physical_headroom": 2434
     }
   ],
   "limitations": [

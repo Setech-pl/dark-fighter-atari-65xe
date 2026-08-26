@@ -11,9 +11,12 @@
 Pilot a Colonial Viper through open space and the narrow crossfire corridor
 between opposing capital ships. Fight Cylon Raiders, dodge or destroy drifting
 debris, survive heavy broadside fire, and collect the Rapid Fire weapon capsule.
-Successful capsules now alternate between Rapid Fire and the red Spread Shot
-booster. The current release is fully playable in an emulator and on an Atari through
+Successful capsules now alternate between Rapid Fire and the red-cased Spread
+Shot booster. The current release is fully playable in an emulator and on an Atari through
 SIO2SD.
+
+The current documentation map and source-of-truth hierarchy begin at
+[`docs/README.md`](docs/README.md).
 
 ## Gameplay gallery
 
@@ -32,7 +35,7 @@ artifact hashes are recorded in [`docs/media/manifest.json`](docs/media/manifest
 | **Rapid Fire pickup** — a large 2×2 ANTIC 4 capsule appears after three qualifying Raider kills. | **Rapid Fire active** — the HUD counts down while newly fired Viper shots are red and use the faster firing cadence. |
 | ![Capital-ship corridor combat with broadside fire](docs/media/gameplay/07-capital-broadside.png) | ![Animated capital-ship engine modules in the scrolling corridor](docs/media/gameplay/08-capital-engines.png) |
 | **Capital broadside** — opposing hulls exchange deterministic heavy fire around the player. | **Capital engines** — the existing two engine phases pulse at an exact 8+8-frame cadence. |
-| ![Spread Shot active with SP HUD countdown and a yellow-centre red-side projectile fan](docs/media/gameplay/09-spread-shot-active.png) | |
+| ![Spread Shot active with SP HUD countdown and an all-yellow three-projectile fan](docs/media/gameplay/09-spread-shot-active.png) | |
 | **Spread Shot active** — the normal firing cadence emits three logical projectiles in a clearly diverging fan. | |
 
 ## The story
@@ -79,7 +82,7 @@ owner; commit and push happen only after owner acceptance.
   qualifying Raider projectile kill. Each booster lasts exactly 500 active PAL
   frames and replaces or refreshes the other: Rapid uses two-frame burst
   spacing and red projectiles, while Spread keeps the normal cadence and emits
-  an atomic yellow-centre/red-side three-shot fan. The HUD counts down from
+  an atomic all-yellow three-shot fan. The HUD counts down from
   `RF10`/`SP10` through `RF01`/`SP01`.
 - POKEY music and sound effects, including weapon, collision,
   explosion, broadside, and capital-hull feedback.
@@ -98,14 +101,14 @@ and tested by the repository.
 | Toolchain | ca65/ld65 through the pinned WebAssembly package |
 | Distribution | 16,396-byte XEX and 92,176-byte bootable ATR |
 | Boot payload | Exactly 16,384 bytes in 128 sectors, loaded at `$2000`, entry `$201E` |
-| Payload reserve | 285 source-owned bytes after Spread Shot |
+| Payload reserve | 94 source-owned bytes after Spread Shot; zero formatter padding |
 | Runtime BSS | `$8000–$80FF`, exactly 256 bytes |
 | Entity engine | Four physical interactive slots, up to two active |
 | Effects engine | Six physical transient slots, up to five active |
-| Entity code | `$9100–$97CF`, 1,744 of 3,840 bytes before packing |
+| Entity code | `$9100–$9912`, 2,067 of 3,840 bytes before packing |
 | Gameplay layers | base/ring → broadside → projectile → entity → effect; reverse erase |
-| Charset budget | All 128 gameplay glyphs used; Spread occupies 124–127 |
-| Measured PAL wall | 33,036 cycles worst case; 2,532 cycles physical headroom |
+| Charset budget | All 128 gameplay glyphs used; Spread scratch uses 47–56 and its capsule uses 124–127 |
+| Measured PAL wall | 33,172 cycles worst case; 2,396 cycles physical headroom |
 | Synchronization | Zero missed frames, deadline overruns, or extra VBI boundaries in the full trace |
 
 Visible-frame work is deterministic and bounded. Pools have fixed capacity;
@@ -272,10 +275,11 @@ The current build is a complete playable release with a bounded gameplay loop,
 front end, difficulty settings, combat, hazards, sector transitions, weapon
 pickup, scoring, life cycle, audio, XEX distribution, and bootable ATR.
 
-Development can continue without changing that status. Candidate future work
-includes additional enemy roles, bosses, weapon pickups such as missiles and a
-laser, more levels, and a broader Gauntlet Loop. These are future directions,
-not claims about features already present in the downloadable build.
+Development can continue without changing that status. The next planned pickup
+is Shield Booster; pickup drop frequency also has a separate owner-playtest
+tuning task. Additional enemy roles, bosses, more levels, and a broader
+Gauntlet Loop remain future directions, not claims about features already
+present in the downloadable build.
 
 ## Project layout
 

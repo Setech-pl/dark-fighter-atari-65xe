@@ -45,3 +45,28 @@ test("linker allows loader-only PMG tail but protects screen memory", () => {
   assert.match(config, /BOOTTAIL:\s+start = \$4000/);
   assert.match(config, /BROADSIDE_RAM:\s+start = \$5E10/);
 });
+
+test("current documentation keeps implemented, planned and historical state distinct", () => {
+  const read = (name) => fs.readFileSync(path.join(rootDirectory, name), "utf8");
+  const gameDesign = read("docs/game-design.md");
+  const architecture = read("docs/architecture.md");
+  const artDirection = read("docs/art-direction.md");
+  const roadmap = read("docs/roadmap.md");
+  const runtimeHeadroom = read("docs/runtime-headroom.md");
+  const currentSources = [gameDesign, architecture, artDirection, roadmap,
+    runtimeHeadroom, read("docs/memory-map.md")].join("\n");
+
+  assert.match(gameDesign, /The gameplay HUD contains `SCORE`, `LIFE`, and `HULL`\./);
+  assert.doesNotMatch(gameDesign, /\b(?:ARM|FUEL)\b/);
+  assert.match(gameDesign, /Rapid Fire — implemented/);
+  assert.match(gameDesign, /Spread Shot — implemented/);
+  assert.match(gameDesign, /Shield Booster — planned/);
+  assert.doesNotMatch(currentSources, /\$8100-\$99A3/);
+  assert.doesNotMatch(currentSources, /\$8100-\$(?:9AA3|9A3D)/);
+  assert.match(architecture, /stages it at `\$8100-\$9A3E`/);
+  assert.match(architecture, /packs them to \*\*1,997 bytes\*\*/);
+  assert.doesNotMatch(currentSources, /\b2,?027[- ]bytes\b/i);
+  assert.doesNotMatch(artDirection, /\bresidual\b/i);
+  assert.doesNotMatch(roadmap, /next[^\n]*entity\/effects foundation/i);
+  assert.doesNotMatch(runtimeHeadroom, /feature\/runtime-headroom/);
+});

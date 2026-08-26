@@ -24,6 +24,8 @@ emulator and on real hardware through SIO2SD.
 
 ## Engineering rules
 
+Before making project decisions, start with `docs/README.md` and follow its source-of-truth map.
+
 1. Keep changes small, reviewable, and buildable.
 2. Run `npm run build` and `npm test` after every functional change.
 3. Never hand-edit `build/` or `dist/`; they are generated.

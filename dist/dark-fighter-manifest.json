@@ -23153,7 +23153,7 @@
     "estimated_additive_cycles": 33454,
     "wallTrace": {
       "reportPath": "docs/runtime-wall-trace.json",
-      "reportSha256": "6189d7307af7ef3331004bbb338451166e4421180f1b8fece1d3ba732bb90d2f",
+      "reportSha256": "29a452e80c1391af401c1d40fe6da8358a222cec921203578be3469db9616fa2",
       "artifact": {
         "path": "dist/dark-fighter.xex",
         "bytes": 16396,

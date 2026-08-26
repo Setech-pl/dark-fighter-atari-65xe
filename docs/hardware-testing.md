@@ -1,321 +1,79 @@
-# Test na prawdziwym Atari 65XE
+# Hardware acceptance checklist
 
-## Przygotowanie
+Use the packed release artifacts from `dist/`. Test both `dark-fighter.xex` and
+the bootable `dark-fighter.atr`; do not substitute a debug build or a preview
+model. Record emulator/hardware version, medium, joystick, display connection,
+and any failure with a photo or capture and reproduction steps.
 
-1. Użyj release'owego `dist/dark-fighter.atr`.
-2. Zamontuj obraz jako `D1:` w SIO2SD.
-3. Odłącz inne urządzenia SIO na czas pierwszego testu.
-4. Podłącz joystick do portu 1.
-5. Włącz Atari z wciśniętym `OPTION`.
+## Atari800 PAL test
 
-## Lista kontrolna
+Configure Atari800 as PAL XL/XE with 64 KB RAM, BASIC disabled, joystick in port
+1, and normal sound. Repeat the cold-start subset with RAM fill `$A5` and `$5A`
+where the harness supports it.
 
-- obraz bootuje bez DOS-u i bez komunikatu `BOOT ERROR`;
-- loader pojawia się jako pierwszy ekran i pozostaje stabilny przez pełne
-  pięć sekund, czyli 250 ramek PAL;
-- tytuł, profil Galactiki, `BSG`, trzy silniki i zielony podpis studia są
-  czytelne;
-- bitmapa 320×192 jest stabilna, bez poziomego rozdarcia przy drugim LMS po
-  linii 102;
-- trzy zespoły napędowe pozostają rozdzielone, kadłub jest neutralnie
-  stalowoszary, a dziób zwęża się warstwami;
-- granice koloru po liniach 39 i 163 nie przecinają tytułu, okrętu ani podpisu;
-- przejście do main menu jest automatyczne i nie pokazuje częściowo
-  przebudowanego charsetu ani ekranu;
-- menu nie uruchamia gameplayu samoczynnie;
-- the loader remains silent; the clean cinematic four-voice POKEY score starts
-  only when the main menu appears and loops without an audible gap after about
-  30.72 seconds;
-- the menu score reads as a gated low drone, restrained ritual drums, short
-  metallic noise, and a clear minor/Dorian motif without continuous buzzing or
-  reproducing an existing melody;
-- `START GAME`, `OPTIONS`, `TOP SCORES`, `EXIT` są czytelne i występują
-  w tej kolejności, a domyślny marker wskazuje `START GAME`;
-- duży, czytelny `DARK FIGHTER` zajmuje górną część ekranu; kątowy hangar i
-  jasny Viper z bursztynowym silnikiem są po lewej, a czytelne opcje po prawej;
-- marker i cały aktywny napis mają ten sam nasycony zielony akcent `$D8`, bez
-  zielonego prostokąta tła; nie wpadają w żółć ani pomarańcz;
-- main menu nie zawiera `SETECH GAME STUDIO`; podpis pozostaje wyłącznie na
-  loaderze, gdzie ma jasnozielone litery na rzeczywiście czarnym tle;
-- biały hint `UP/DOWN MOVE  FIRE SELECT` pozostaje czytelny i nie barwi tła;
-- hangar, gwiazdy i myśliwiec są stabilne bez animacji, migotania i uszkodzeń
-  display listy; menu nie zawiera `BSG 75` ani skopiowanych insygniów;
-- pojedyncze wychylenie UP/DOWN przesuwa marker dokładnie raz, wybór zawija się
-  między pierwszą i ostatnią pozycją, a trzymanie kierunku nie autorepeatuje;
-- FIRE wybiera dokładnie raz i wymaga puszczenia przed kolejną akcją;
-- `OPTIONS` exposes separate `SOUND: ON/OFF` and `GAME MUSIC: ON/OFF` rows;
-  LEFT/RIGHT wraps `DIFFICULTY` through `EASY/MEDIUM/HARD`; GAME MUSIC defaults
-  ON, difficulty defaults MEDIUM, and all choices survive `BACK`, Game Over,
-  and another game during the same run;
-- myśliwiec z hangaru znika w `OPTIONS`, `TOP SCORES`, potwierdzeniu `EXIT`
-  oraz ekranie końcowym i wraca dopiero po ponownym wejściu do main menu;
-- przy SOUND OFF strzał, trafienie i tło silnika są niesłyszalne, kanały nie
-  zostawiają zawieszonego tonu, a obraz i sterowanie zachowują timing;
-- entering `OPTIONS`, `TOP SCORES`, `EXIT`, Game Over, or gameplay stops the
-  menu score immediately; returning from Game Over restarts it from the intro;
-- `START GAME` leaves no sustained menu tone, and joystick/FIRE response remains
-  one PAL-frame poll while the score is active;
-- with `GAME MUSIC: ON`, gameplay starts the original 30.72-second combat loop
-  from its beginning; its low ostinato and alarm arpeggio remain clearly below
-  the Viper-shot, hit, engine, and capital-explosion SFX;
-- Viper fire and hit effects preempt channels 1 and 2 for their complete
-  existing envelopes; music returns at the current song position without a
-  restart, while the channel-3 engine and channel-4 capital explosion remain
-  unchanged;
-- ordinary death mutes idle music voices without restarting transport, respawn
-  resumes in place, Game Over is silent, and the next main-menu entry restarts
-  the menu theme from its intro;
-- with `GAME MUSIC: OFF`, gameplay produces no score notes or residual tones,
-  but every SFX remains present at its original timing and volume; menu music
-  still works independently;
-- during gameplay, press and hold the physical `OPTION` key: `PAUSED` appears
-  exactly once with `RESUME`, `GAME MUSIC: ON/OFF`, and `QUIT TO MENU`; the held
-  key cannot immediately resume the game;
-- while PAUSED, verify that the Viper, both star layers, hulls, Raider, shells,
-  fighter projectiles, explosions, warning phases, death animation, respawn,
-  invulnerability blink, score, and all visible timers remain frozen;
-- release OPTION and press it again: the exact gameplay scene returns and the
-  current music position continues when GAME MUSIC is ON; holding FIRE on entry
-  must not activate the selected row until FIRE is released and pressed again;
-- toggle GAME MUSIC OFF in PAUSED: gameplay music stops immediately while shot,
-  hit, engine, and capital-explosion state remains intact; toggle ON and RESUME
-  to start gameplay music from its beginning;
-- select `QUIT TO MENU`: confirmation defaults to `NO`; NO returns to PAUSED,
-  while YES clears the active gameplay scene, skips Game Over, preserves TOP,
-  returns to the main menu, and restarts the menu theme from its beginning;
-- `TOP SCORES` pokazuje dziesięć wierszy `01`–`10`; po zdobyciu punktów
-  pierwszy wiersz pokazuje sesyjny TOP w tej samej postaci cyfr co SCORE;
-  śmierć i respawn zachowują SCORE, a dopiero ponowny `START GAME` zeruje
-  SCORE bez obniżania TOP; pierwszy
-  FIRE po wejściu nie wraca natychmiast, a osobne naciśnięcie wraca do menu;
-- `EXIT GAME?` domyślnie wskazuje `NO`; NO wraca do menu;
-- wybranie YES pokazuje `DARK FIGHTER ENDED` oraz `PRESS RESET TO RESTART`,
-  wycisza audio i pozostaje stabilne bez próby powrotu do DOS-u aż do RESET;
-- `START GAME` uruchamia gameplay dopiero po świadomym FIRE;
-- FIRE użyty do startu nie tworzy natychmiast pocisku; po puszczeniu kolejne
-  FIRE działa normalnie;
-- tytuł oraz gwiazdy są stabilne;
-- w gameplayu widać rzadką warstwę jasnych near stars i liczniejszą,
-  stalowo-niebieską warstwę far; w długim oknie near wykonuje dokładnie 50%,
-  a far 25% kroków kadłubów na każdej trudności;
-- neutralny debris zajmuje dwa sąsiednie znaki (16×8 pikseli), obie fazy
-  armour-shard i truss-fragment są czytelne oraz różne od największych gwiazd,
-  a ruch pionowy wykonuje dokładnie 60% kroków świata;
-- podczas `DRAIN/COMPLETE` nie pojawia się nowy debris; po pełnych 22 krokach
-  rekonstrukcji i normalnym opóźnieniu `OPEN` spawn wraca bez pierwszoklatkowego
-  obiektu ani resetu pozostałych systemów;
-- najwyżej pojedynczy far star subtelnie zmienia fazę co 16 ramek; nie ma
-  pełnoekranowego flashu, regularnych siatek ani wzorów podobnych do pocisków;
-- pociski Vipera i Raidera oraz capital slug chwilowo zakrywają gwiazdy, po
-  zejściu przywracają aktualne tło bez czarnego prostokąta lub starej pozycji;
-- wspólna fighter explosion nad gwiazdami kończy się pełnym odtworzeniem tła,
-  bez glyphów w HUD i bez kolizyjnego ghosta;
-- statek porusza się w czterech kierunkach i nie wychodzi poza ekran;
-- przytrzymany FIRE tworzy żółty dziesięciostrzałowy burst co 3 ramki,
-  a starsze strzały nie dziedziczą późniejszego ruchu Vipera;
-- trafienie przeciwnika zwiększa wynik;
-- czerwony skaner porusza się po kadłubie przeciwnika;
-- kolizja statków daje czerwony błysk tła;
-- lewy side hull jest jasny, warstwowy i modułowy, a prawy wyraźnie
-  ciemniejszy, bardziej kanciasty i pełen czarnych wnęk także przy oglądaniu
-  bez koloru;
-- kontury obu stron zmieniają głębokość podczas scrollu, ale nie tworzą
-  nagłego, nieczytelnego zwężenia ani nie zakrywają domyślnej pozycji gracza;
-- lokalne cofnięcia do pięciu komórek wyglądają jak zamierzone wnęki/warstwy,
-  nie jak przypadkowy brak kafla, a granica kolizji zgadza się z obrazem;
-- widać kompletne, wielokomórkowe baterie z podstawą, obudową, lufą i wylotem
-  po obu stronach; wyloty nie są nadpisywane przez gwiazdy;
-- pełny 32-wierszowy segment ma po jednej funkcjonalnej baterii na stronę,
-  strony są przesunięte w pionie, a usunięte stanowiska czytają się jako
-  zwykłe płyty, wnęki i żebra, nie jako nieaktywne działa;
-- pełny segment nie wygląda jak dawny ośmiowierszowy loop, strony nie są
-  lustrzane, a statyczne kadłuby nie powodują migotania ani śmieci w PMG;
-- górny wiersz HUD-u jest ostry i stabilny jako tekst ANTIC 2, jego biały
-  dolny scanline tworzy divider bez dodatkowego wiersza, a pierwszy z 23
-  wierszy ANTIC 4 używa właściwego charsetu/palety;
-- score i trzy cyfry `LIFE` aktualizują się bez uszkodzenia sąsiednich znaków;
-- warning pozostaje przy przewijającym się wylocie przez dokładnie 25 ramek;
-  bez niewidocznej ramki rośnie kolejno jako compact 2-scanline, medium
-  4-scanline i hot 6-scanline z czytelnym dwuramkowym pulsem, po czym salwa
-  startuje bez skoku na zapowiedzianym torze;
-- `HARD` przesuwa dokładnie 10 pełnych wierszy w 20 ramkach PAL (25 wierszy,
-  200 scanlines/s) i odpowiada zaakceptowanemu szybkiemu kandydatowi;
-- `MEDIUM` przesuwa dokładnie 9 wierszy w 20 ramkach (22,5/180), a `EASY` 8
-  (20/160); pełne skoki nie tworzą irytującej pauzy, flickeru ani pozoru
-  błędnego fine scrollu;
-- kadłuby wykonują w tych samych 20 ramkach odpowiednio 10 (`HARD`), 9
-  (`MEDIUM`) i 8 (`EASY`) pełnych kroków, czyli 100% dawnego world rate;
-- w pełnym oknie 20 kroków kadłubów near wykonuje 14, a far 7 kroków; obie
-  warstwy dają czytelną perspektywę i żadna nie płynie razem z kadłubem;
-- przy ciągłym bocznym pościgu Raider pokonuje 8 HPOS w czasie, gdy Viper
-  pokonuje 10 HPOS; pojedyncza pauza w każdym oknie pięciu ramek nie może
-  wyglądać jak zacięcie ani pozwolić Raiderowi zrównać się z Viperem;
-- zmiana trudności wpływa na następne wejście do gameplayu, nie zmienia ruchu
-  gracza, fightera, pocisków ani logicznych 50 updates/s;
-- nowe warningi rozpoczynają się wyraźnie rzadziej i pozostawiają spokojne
-  odstępy; scheduler nie przyspiesza wraz z wybraną stawką scrollu,
-  zachowuje kolejność allied/enemy i nie zmienia 25-ramkowego heat-upu;
-- przy każdym evencie wybierana jest najstarsza bezpieczna bateria danej
-  strony; warning nie rozpoczyna się, jeżeli emplacement nie zdąży zakończyć
-  25 ramek i jednego wiersza marginesu przed opuszczeniem strefy ognia;
-- po warningu czteroramkowy flash pozostaje przy realnym wylocie, a lecący
-  slug pulsuje czytelnie w dwukomórkowym 8×6 ANTIC 4 lozenge bez fighter-colour flickeru,
-  rozszerzenia poza testowany swept hitbox lub pozostawionych kodów ekranu;
-- allied shell jest yellow-gold `$1E`, Cylon shell crimson `$46`, oba są
-  znacznie cięższe niż żółty 1×2 Viper shot i czerwony 2×3 Raider pulse;
-- allied fire niszczy hostile fighter bez score, Cylon friendly fire niszczy
-  własnego fightera i daje pełne 10 punktów Raidera, a Viper projectile oraz contact
-  także dają pełną wartość deskryptora;
-- przy przecięciu fightera i Vipera ten sam Cylon shell zatrzymuje się na
-  pierwszym celu w kierunku lotu i nie może zadać dwóch trafień;
-- każdy ciężki pocisk trafia przeciwny kadłub na widocznej, zależnej od
-  wiersza krawędzi i nie traktuje gwiazd jako kadłuba;
-- trafienie dowolnej strony broadside odejmuje graczowi 20 punktów, a cooldown
-  nie dopuszcza wielokrotnego damage z jednego zbiegu;
-- Viper nie wchodzi w lewy ani prawy kadłub: nieregularne krawędzie oraz
-  projekcje turretów clampują P0/P3 w jednej pozycji i odejmują 20 punktów nie
-  częściej niż co 25 ramek; gwiazdy nigdy nie wywołują tego kontaktu;
-- przy jednoczesnym heavy hit i kontakcie pocisk nadal przechodzi do impact,
-  Viper jest clampowany, lecz zdrowie spada tylko raz;
-- nieruchomy Viper przy `HPOSP0=HPOSP3=124`, `Y=184` przeżywa przejście obu
-  banków engines, aft, combat, forward, prow i 22 pustych wierszy drain; sam
-  wiersz kadłuba na tej samej wysokości nie jest kontaktem bez overlapu X;
-- `LIFE 000` rozpoczyna jedną 24-klatkową wspólną eksplozję fightera i odejmuje tylko
-  jedno z trzech całkowitych żyć; jeśli życie pozostaje, Viper pojawia się
-  atomowo w `X=124/Y=184`, a przy ostatnim życiu wraca istniejącą ścieżką do
-  menu z aktywną bramką puszczenia FIRE;
-- po respawnie Viper przez dokładnie 250 aktualizacji PAL miga 8 klatek ON / 8
-  OFF, zachowuje joystick i M0 oraz ignoruje hull, fighter i heavy damage;
-  po wygaśnięciu jest wymuszony jako widoczny, a pierwszy nowy realny kontakt
-  działa normalnie bez śmierci ze starego latcha;
-- trzy jednoczesne sloty nie tworzą nieuniknionej ściany ognia, nie zostawiają
-  śmieci w missile DMA i znikają całkowicie po powrocie do menu;
-- przelot nie wygląda jak nieskończona ściana: jako pierwsze widać grube,
-  pulsujące banki silników i wydech, potem aft, combat, forward, a jako ostatnie
-  zwężające się prows i terminal tips, z niezmiennym przesunięciem
-  o osiem wierszy i bez dryfu;
-- lewa rufa czyta się jako dwa masywne rdzenie z ciemnym spine, prawa jako dwa
-  szersze kanciaste zespoły; fazy dim/bright/residual zmieniają się co osiem
-  ramek bez checkerboardu, comb stripes i pozostawionego glow w AFT;
-- lewy bow tworzy ciężki wedge, prawy odmienny spear/split shoulder; oba
-  zwężają się 8→1 przez partial-edge pixels, a bezpośrednio po tip widać pusty
-  drain bez niewidzialnej kolizji;
-- ordinary P1/P2 fighter przy lewej granicy zajmuje `[80,96)`, przy prawej
-  `[160,176)`; podczas spawnu, odbicia i pełnego ataku żaden widoczny piksel
-  nie zachodzi na side hull, a ruch pionowy i zagrożenie pozostają aktywne;
-- działa pojawiają się wyłącznie w combat, ostatnie osiem jego wierszy nie
-  rozpoczyna nowych warningów, silniki pulsują w charsecie bez PMG, a po zejściu
-  bow tips drain pozostawia stabilny HUD i pustą krawędź bez nowej broni;
-- trafienie przeciwnego kadłuba przez M1–M3 uruchamia jeden 24-ramkowy,
-  dominująco czerwony fireball 3×3 przyklejony do scrollu i jeden ciężki
-  channel-4 crack/rumble; drugi bok może eksplodować niezależnie;
-- `SOUND OFF` blokuje nowy capital impact i natychmiast zeruje aktywny
-  `AUDC4/AUDCTL`; po 24 ramkach ON kanał również dochodzi do ciszy bez stuck tone;
-- podczas całego broadside gwiazdy występują wyłącznie w kolumnach 9–30,
-  nigdy pod hull bands; po `DRAIN/COMPLETE` pełna szerokość odtwarza się od
-  nowo odsłanianego górnego wiersza bez blank pause, a świeże i trzymane FIRE
-  zachowują zaakceptowany burst;
-- dźwięki nie zawieszają obrazu ani sterowania;
-- po pięciu minutach nie pojawiają się śmieci w grafice.
+For both XEX and ATR:
 
-## Harness rosteru przeciwników
+- [ ] Loader appears intact for five seconds, then reaches the main menu.
+- [ ] Menu, options, top scores, music toggle, and exit screen respond normally.
+- [ ] A new game shows `SCORE`, `LIFE`, and `HULL`; values do not corrupt nearby
+      characters.
+- [ ] Viper movement and normal fire remain responsive at 50 FPS PAL.
+- [ ] Pause freezes world motion, capital-engine phase, active pickup movement,
+      and booster timer; resume restores the exact visible gameplay state.
+- [ ] Colonial and Cylon hulls remain continuous through prow, modules, engine
+      banks, A2-head changes, and ring wrap.
+- [ ] Capital engines alternate only between dim and bright, holding each phase
+      for eight active frames.
+- [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
+      Raider breakup, and debris breakup behave normally.
+- [ ] Rapid Fire capsule moves as one stable 2x2 footprint; collection displays
+      `RF`, changes only in-burst cadence, and expires after ten active seconds.
+- [ ] Spread Shot capsule is a stable red 2x2 footprint with a black fan symbol.
+- [ ] Collecting Spread displays `SP` and produces three yellow Viper projectiles:
+      one vertical and two smoothly diverging, symmetric side shots.
+- [ ] Rapid and Spread replace each other; collecting the active type refreshes
+      its countdown; neither timer advances during pause.
+- [ ] Spread projectiles cross empty space and successive Colonial hull segments
+      without vertical lines, blank cells, ghosts, or stale projectile glyphs.
+- [ ] Repeat over the Cylon prow, midship modules, engine section, module
+      boundaries, A2-head changes, and wrap with the same clean backing result.
+- [ ] Overlapping projectiles do not erase a projectile that remains in the
+      cell; the final departure restores the current hull or starfield byte.
+- [ ] No combat state corrupts the HUD, gameplay charset, loader data, or the
+      opposite capital ship.
+- [ ] Losing a life clears life-scoped weapon state and respawns with the
+      expected blink; losing the last life reaches Game Over.
+- [ ] New Game resets score, lives, hull, boosters, pickup sequence, projectiles,
+      entities, effects, and sector state while preserving the session top score.
+- [ ] XEX and ATR show equivalent gameplay behavior for at least 120 seconds
+      each.
 
-`npm run enemy:review` tworzy osobny
-`build/enemy-review/dark-fighter.xex` i ATR z kompilacyjnym harnessiem; nie
-modyfikuje release flow w `dist/`. Po wejściu do gameplayu harness cyklicznie
-pokazuje Raidera, Talona i Scythe Bombera w środku oraz przy obu granicach.
+## Real Atari 65XE via SIO2SD
 
-- Raider czyta się jako szeroki crescent z wklęsłą krawędzią i czerwonym
-  scannerem, a nie dawny schematyczny znak;
-- Talon jest wyraźnie węższy, ma długi spine, krótki fin i dolny nos;
-- Scythe ma największą masę, szerokie wings, centralny fuselage i pods;
-- wszystkie trzy są zwrócone ku dolnej części ekranu/graczowi;
-- trzy fazy P2 zmieniają rozmiar/położenie czerwonego slit co osiem ramek bez
-  migania P1, M1 ani M2 kolorem;
-- przy szybkim przełączeniu typu stary body/scanner znika w całości;
-- Raider i Scythe mieszczą się w logical `80..160`, Talon w `80..170`; jego
-  HPOSP `79..169` kompensuje pierwszy pusty bit;
-- release XEX/ATR nadal pokazują wyłącznie Raidera i zachowują dotychczasowy
-  movement, kolizję, score i przejście przez broadside.
+Use a stock PAL Atari 65XE with 64 KB and boot the ATR through SIO2SD. Also run
+the XEX through the owner's normal real-hardware loader path when available.
 
-Korekta palety i pierwszej broni dodaje osobne artefakty review:
+- [ ] Cold boot succeeds repeatedly after power-off, not only after warm reset.
+- [ ] Loader duration, menu transitions, audio, controls, pause, Game Over, and
+      New Game match the Atari800 reference.
+- [ ] The fixed HUD is stable on the connected PAL display and remains readable
+      through heavy combat.
+- [ ] Starfield and both hulls scroll smoothly without tearing, missing modules,
+      vertical lines, or intermittent engine cells.
+- [ ] Dim/bright engine animation is stable and does not alter non-engine hull
+      pixels.
+- [ ] Rapid Fire and Spread Shot can each be collected, refreshed, replaced, and
+      allowed to expire; pause freezes both timers.
+- [ ] All three Spread Shot projectiles are yellow and form a clear symmetric
+      fan without flicker or sudden horizontal jumps.
+- [ ] Spread projectiles pass over both capital ships, including prow, midship,
+      engines, module boundaries, and wrap, with exact backing restoration.
+- [ ] Long combat produces no ghosts, HUD damage, charset corruption, stuck
+      tones, unexpected reset, or slowdown.
+- [ ] SIO2SD can reboot the ATR after Game Over and after a power cycle.
 
-- `npm run enemy:palette:cylon-oxblood` — `COLPM1=$42`;
-- `npm run enemy:palette:cylon-burgundy` — `COLPM1=$44`, release default;
-- `npm run enemy:palette:cylon-scarlet` — `COLPM1=$48`;
-- `npm run enemy:combat-review` — direct gameplay z rzeczywistym Raiderem,
-  profilem `WEAPON_SINGLE_PULSE` i pulą ANTIC 4.
+## Failure classification
 
-Każdy wariant trafia pod `build/enemy-*` i nie nadpisuje release `dist/`.
-Porównanie release `$44` jest generowane jako
-`build/previews/enemy-raider-cylon-burgundy-comparison.png`: pokazuje Raidera
-przy lewej, kolonialnej burcie `$84`, na środku `$00` i przy prawej, cylonowej
-burcie `$46`. Sprawdź na PAL: P1 body pozostaje czytelny we wszystkich trzech
-położeniach, P2 scanner jest wyraźnie czerwony i jaśniejszy od body, a eksplozja
-Raidera zachowuje dotychczasowe `$84/$46`. Playfield pulse powstaje pod aktualną obwiednią
-Raidera, porusza się o 5 scanlines, odejmuje dokładnie 10, a podczas 250 ramek
-invulnerability jest zużywany bez damage. W broadside pule fighterów nie mogą
-zmienić właściciela M1–M3 ani nadpisać capital slotu.
-
-Test release musi czekać na naturalne pełne wejście bez ustawiania active flag:
-Raider startuje pod `enemy_y=GAMEPLAY_TOP-14`, pierwsze piksele są przycinane
-do Y=16, a następnie emituje 10 zaakceptowanych strzałów co 4 ramki. Pauza po
-burst wynosi 60/50/40. Zajęte M1–M3 nie blokują dziewięcioslotowej puli.
-`build/previews/raider-natural-fire-trace.csv` zapisuje burst state, shot index,
-timer, occupancy, wynik alokacji, X/Y i aktywne overlaye playfield.
-`build/previews/fighter-burst-runtime-trace.csv` zestawia oba kontrolery od
-`WAITING`, przez accepted allocation i niezależne poprzednie/bieżące Y, po
-dziesięciopunktowy Viper hit oraz źródła kolorów `$1E/$46`.
-
-Artefakty `projectile-visual-language.png` i
-`projectile-collision-scoring-sequence.png` muszą odpowiadać bieżącym runtime
-bytes. Pierwszy pokazuje cztery klasy na tej samej skali i osobny widok
-monochromatyczny, drugi: M0/contact score, colonial zero-score, Cylon
-friendly-fire score, spatial first-target oraz zero double score. Literalnie
-żółte Viper fire musi pochodzić z `COLPF2=$1E` w aktualnym framebufferze;
-P0 `$0E` i P3 `$28` nie mogą się zmienić. Przy trzymanym FIRE powinno być
-widoczne 10 strzałów co 3 ramki, z prędkością 6 i 12-ramkową pauzą.
-Capital slugs muszą w runtime zajmować dwa sąsiednie znaki ANTIC 4, czyli
-8 HPOS × 6 scanlines. W native capture ich długość pozioma musi być co najmniej
-dwukrotnością 2-HPOS Raider pulse; metadata bez obu zapisów screen RAM nie jest
-dowodem.
-
-`DRAIN` i `COMPLETE` nie są blokadą broni Vipera: oba backing-aware fighter
-pools zachowują własne lifecycle aż do kolizji, expiry, śmierci lub rzeczywistego
-teardown gameplayu. Sprawdź osobno świeże naciśnięcie w `DRAIN`/`COMPLETE`
-oraz FIRE trzymany przez całą granicę sektora: oba mają zachować niezmieniony
-dziesięciostrzałowy burst Vipera, bez ghost glyphs.
-
-Każde zniszczenie fightera ma pokazać te same sześć faz PMG 8×8 po cztery
-ramki. Raider podczas `EXPLODING` nie może się poruszać, strzelać ani ponownie
-punktować; inny enemy pozostaje aktywny. Śmierć Vipera najpierw pokazuje pełne
-24 ramki tej samej animacji, a dopiero potem centrum corridor i dokładnie 250
-ramek invulnerability. Zweryfikuj jednoczesną eksplozję Vipera i Raidera oraz
-brak zapisu w HUD scanlines.
-
-`npm run preview` generuje review full-screen flasha:
-
-- `build/previews/explosion-colour-flash-native.png` — każda próbka i każda
-  klatka enemy/Viper pokazana jako pełny framebuffer 320×192 w skali 1:1;
-- `build/previews/explosion-colour-flash-comparison.png` — powiększone swatche
-  nazwanych kolorów i obie osie czasu;
-- `build/previews/explosion-colour-flash-trace.csv` — timer i `COLBK` klatka po
-  klatce, łącznie z pierwszą ramką przywróconego `$00`.
-
-Na PAL enemy ma przejść `$1E→$3C→$1C→$34→$00` w pięciu kolejnych
-ramkach, a Viper `$1E→$3C→$1C→$3C→$38→$34→$00` w siedmiu. Przy
-jednoczesnej śmierci obowiązuje oś Vipera. Pause w dowolnej fazie ma pokazać
-czarną bazę i zamrozić timer; resume kontynuuje bez stuck colour. `COLPM0/2/3`
-nie mogą się zmienić, a `COLPM1` zachowuje wyłącznie wcześniejszą lokalną
-sekwencję Raidera `$44/$84`.
-
-## Raport błędu
-
-Zapisz:
-
-- wersję z `build/manifest.json`;
-- model Atari i wersję systemu, jeśli jest znana;
-- model/firmware SIO2SD;
-- etap, na którym wystąpił błąd;
-- zdjęcie lub krótki film ekranu;
-- informację, czy ten sam ATR działa w emulatorze.
+Classify a failure as artifact/boot, timing/synchronization, display/backing,
+input, gameplay state, or audio. Preserve the failing artifact hashes. Emulator
+success is necessary but does not close real-hardware acceptance.

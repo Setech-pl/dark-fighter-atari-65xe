@@ -1159,6 +1159,10 @@ function main() {
     .sort((left, right) => right.wall_cycles - left.wall_cycles)
     .slice(0, 10)
     .map((row) => frameState(row, true));
+  const topFiveAll = [...allRows]
+    .sort((left, right) => right.wall_cycles - left.wall_cycles)
+    .slice(0, 5)
+    .map((row) => frameState(row));
   const deadlineOverruns = allRows.filter((row) => row.missed_frames > 0);
   const baselineDeadlineOverruns = baselineRows.filter((row) => row.missed_frames > 0);
   const targetedDeadlineOverruns = targetedRows.filter((row) => row.missed_frames > 0);
@@ -1621,7 +1625,7 @@ function main() {
   };
 
   const report = {
-    schema_version: 1,
+    schema_version: 2,
     method: "Atari800 ANTIC master-clock observation at guest-PC boundaries; no guest logging or instrumentation instructions",
     artifact: {
       path: "dist/dark-fighter.xex",
@@ -1938,9 +1942,24 @@ function main() {
       hull_event: coverageRecord(allRows, (row) => (row.events & (1 << 2)) !== 0),
       active_muzzles: coverageRecord(allRows, (row) => row.active_muzzles > 0),
       maximum_projectile_pool: {
-        ...coverageRecord(allRows, (row) => row.projectiles === 19),
-        maximum_observed: Math.max(...allRows.map((row) => row.projectiles)),
-        legal_capacity: 19,
+        scope: "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays",
+        combined_physical_capacity: 19,
+        maximum_combined_active_observed:
+          Math.max(...allRows.map((row) => row.projectiles)),
+        full_combined_capacity_observed:
+          allRows.some((row) => row.projectiles === 19),
+        full_combined_capacity_matching_frames:
+          allRows.filter((row) => row.projectiles === 19).length,
+        heaviest_at_full_combined_capacity:
+          allRows.some((row) => row.projectiles === 19)
+            ? frameState(maximumRow(allRows.filter((row) => row.projectiles === 19),
+              (row) => row.wall_cycles))
+            : null,
+        component_physical_capacities: {
+          viper: 10,
+          raider: 9,
+        },
+        evidence_note: "The combined capacity is a physical allocation. This report records 18 as the maximum naturally observed combined active count and does not claim an unobserved 19/19 state.",
       },
       broadside_projectiles: {
         ...coverageRecord(allRows, (row) => row.broadside === maximumBroadside),
@@ -2071,7 +2090,8 @@ function main() {
       fighter_colour_flash: flashRegisterCoverage,
     },
     ten_heaviest_frames_in_9040_replay: topTenBaseline,
-    five_heaviest_frames: topTenBaseline.slice(0, 5).map((frame) => ({
+    five_heaviest_frames_scope: "all measured legal runtime replays",
+    five_heaviest_frames: topFiveAll.map((frame) => ({
       session: frame.session,
       frame: frame.frame,
       wall_cycles: frame.wall_cycles,

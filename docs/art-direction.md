@@ -1,359 +1,82 @@
-# Dark Fighter — kierunek artystyczny
-
-## Rdzeń stylu
-
-Dark Fighter ma wyglądać jak wojna prowadzona przez maszyny naprawiane,
-łatane i ponownie wysyłane do walki. To zużyte, wojskowe dark science-fiction,
-a nie czysta i kolorowa przyszłość. Najważniejsze skojarzenia to ciężar,
-funkcja, napięcie, ograniczone zasoby i widoczne ślady kolejnych napraw.
-
-Priorytety palety:
-
-- czerń i bardzo ciemny granat dla przestrzeni oraz negatywnych szczelin;
-- przygaszona stal i chłodna biel dla Vipera oraz strony Battlestara;
-- ciemne, chłodne szarości dla Cylon capital ship;
-- pomarańcz i bursztyn dla silników, ciężkich pocisków, ognia i damage;
-- oszczędny, agresywny czerwony dla sensorów i akcentów Cylonów;
-- wysoki kontrast gameplayu ważniejszy niż lokalna zgodność koloru z dużą
-  ilustracją referencyjną.
-
-## Fan-art BSG i oryginalność wykonania
-
-Dark Fighter jest nieoficjalnym, hobbystycznym i niekomercyjnym fan-artem
-`Battlestar Galactica`. Właściciel projektu dopuścił użycie świata BSG,
-statków, nazw, frakcji, oznaczeń, lore, odniesień UI i motywów muzycznych.
-Projekt nie sugeruje oficjalnego związku ani poparcia właścicieli marki.
-Dostarczonych i zaakceptowanych odniesień BSG nie należy po cichu zastępować
-innym uniwersum.
-
-Jednocześnie każda grafika Atari, konwersja, animacja, aranżacja, muzyka,
-efekt i fragment kodu powstaje od nowa dla Dark Fighter. Nie kopiujemy muzyki,
-układów UI, grafik źródłowych ani danych binarnych z istniejących gier lub
-produkcji BSG. Odniesienie definiuje temat i tożsamość, nie dostarcza danych do
-wycięcia lub przepisania.
-
-## Czytelność na Atari
-
-Każdy obiekt przechodzi test sylwetki w docelowej rozdzielczości i na
-analogowym obrazie PAL. Detal ma wynikać z ruchu, kontrastu, animacji,
-char-mode oraz oszczędnego nakładania PMG, a nie z pojedynczych pikseli
-widocznych tylko na powiększonym PNG.
-
-Bieżące PMG są w całości zajęte przez Vipera z silnikiem oraz jednego wroga ze
-skanerem; Missile 0 pozostaje wyłącznie zarezerwowany dla broni gracza, lecz
-bieżący żółty burst używa niezależnych glifów ANTIC 4. To potwierdzony stan wydania,
-nie obietnica dowolnej liczby wielokolorowych sprite'ów. Przyszłe użycie
-multipleksowania, nakładania players/missiles lub znakowych obiektów wymaga
-pomiaru VBI/DLI, kolizji i real hardware.
-
-## Viper
-
-Viper musi być najszybciej rozpoznawalną ruchomą sylwetką:
-
-- jasny, klinowaty kadłub z ciemnym rdzeniem;
-- wyraźny kierunek lotu nawet bez koloru;
-- oddzielony pomarańczowy lub bursztynowy ślad silnika;
-- kształt i hitbox spójne na tyle, aby gracz mógł ocenić przejście obok debris
-  i heavy projectile;
-- damage feedback czytelny, ale nie zasłaniający bezpiecznej trasy.
-
-## Cylon fighters i role
-
-Cylon fighters mają zachować wspólny język Raiderów: szeroką, symetryczną
-sylwetkę, ciemniejszy kadłub i czerwony sensor. Scout, Interceptor, Line
-fighter, Hunter, Heavy, Minelayer, Rammer i Ace nie wymagają ośmiu dużych,
-unikatowych zestawów sprite'ów.
-
-Role należy rozróżniać tanimi środkami:
-
-- tempem i charakterem ruchu;
-- telegraphingiem przed dive, burst lub ram;
-- położeniem i rytmem czerwonego sensora;
-- jedną klatką attachments albo zmianą obrysu;
-- akcentem koloru lub luminancji;
-- skalą, formation role i sposobem strzelania.
-
-Współdzielona baza jest pożądana, dopóki test bez ruchu i test w ruchu nadal
-pozwalają szybko odróżnić zagrożenia.
-
-## Capital ships i corridor
-
-Bieżąca implementacja używa neutralnych nazw `allied_line_hull` po lewej i
-`enemy_void_hull` po prawej. Oba kadłuby są przewijanym tłem znakowym ANTIC 4;
-nie zużywają PMG ani DLI. Bazowy, nieoczywisty moduł ma 32 wiersze, nominalny
-podział wynosi `8 + 24 + 8`, a wylot kompletnej baterii może wejść o jedną
-komórkę do korytarza. Aktualna geometria pozostawia co najmniej 23 wolne
-komórki w każdym wierszu. Każda strona ma siedem cyklicznych przejść
-głębokości 5/6/7/8, skupionych w odcinkach po 2–8 wierszy zamiast
-jednowierszowego zygzakowania. Dwa lokalne cofnięcia o jedną komórkę dają
-około 12,5% nominalnej szerokości pasa dodatkowej zmiany profilu, czyli
-najbliższe siatce znakowej wykonanie żądanego około 10%, bez poszerzenia całej
-ściany. Fazy zmian lewej i prawej strony są różne.
-
-Jasny kadłub sojuszniczy używa warstwowych stalowo-niebieskich płyt,
-chłodnobiałych krawędzi, pionowych grooves, wnęk, napraw i nielicznych
-bursztynowych detali. Około 80% zajętej powierzchni pikselowej wybiera stalowy
-`COLPF1`. Jego duże baterie składają się z szerokiej podstawy, obudowy,
-dwóch grubych pasów lufy i wysuniętego wylotu. Ciemniejszy kadłub przeciwnika
-używa D7=1: jego piksele `11` trafiają do `COLPF3=$44`, a `10` pozostają
-stalowymi krawędziami. W zajętej powierzchni kandydat ma około 69% burgundu,
-10% stali i 21% czarnych trenches; bieli używa poniżej 1%. Jego baterie są
-węższe i bardziej zintegrowane z poszyciem. Mapy, sylwetki i główne struktury
-broni nie są lustrzanymi odbiciami.
-
-Pełny sektor układa te powierzchnie w dwa różne okręty i pokazuje je od rufy
-do dziobu: odmienne 32-wierszowe banki silników, 24-wierszowe aft machinery,
-128-wierszowy combat midsection, forward reinforcement i osobne prows z
-konwergentnymi pasami. Moduły mają po 8 wierszy, więc duże formy zmieniają rytm
-bez drobnego proceduralnego szumu. Lewa rufa ma dwa masywne, oddzielone
-armoured spine rdzenie, prawa dwa szersze i bardziej regularne apertures;
-energia jest odpowiednio stalowo-biała i bursztynowo-biała. Każdy rdzeń jest
-ciągłym polem bez checkerboardu i comb stripes, rozszerza się w wielokomórkową
-obudowę, kończy przed AFT i pulsuje w trzech fazach po 8 ramek przez charset,
-nie PMG. Końcowe prows używają 32-bajtowych profili zajętości i częściowych
-glifów krawędzi: ciężki lewy wedge oraz rozdzielony w środku prawy spear
-schodzą z 8 do 1 komórki, a ostatnia komórka ma rzeczywisty ukośny kontur
-zamiast płaskiego odcięcia. Stały offset +8 wierszy zapobiega lustrzanemu
-wejściu struktur, lecz obie strony pozostają jednym fizycznym strumieniem.
-
-Pierwsza baza rosteru zastępuje schematycznego przeciwnika ręcznie poprawionym
-native Atari Raiderem: szeroki crescent, wklęsła dolna krawędź, osobny centralny
-korpus i czerwony slit skanera. `TALON` ma smukły 6-HPOS spine, krótki fin i
-ostry nos, a `SCYTHE_BOMBER` ciężką 16-HPOS masę skrzydeł, boczne pods i gruby
-fuselage. Wszystkie lecą dolnym nosem ku graczowi i pozostają rozpoznawalne w
-monochromatycznej masce; nie są palette aliases.
-
-P1/P2 pozwalają zachować prawdziwy czerwony scanner bez zmniejszania capacity.
-P1 Raidera używa teraz burgundowego `$44`: należy do tej samej rodziny hue
-`$4x` co dominujący pancerz prawej, cylonowej burty `$46`, ale ma niższą
-luminancję. Dzięki temu nie aliasuje ani czarnego tła `$00`, ani cylonowej
-burty `$46`; od lewej, kolonialnej burty `$84` odcina go inny hue. Viper `$0E`
-pozostaje najjaśniejszym statkiem. P2 `$46` niesie trzyfazowy czerwony scanner,
-jaśniejszy od body o jeden krok GTIA; Raider burst używa niezależnie
-`COLPF3=$46`, więc jego kolor się nie zmienia. Kandydaci `$42/$44/$48` są
-renderowani deterministyczną paletą Atari, a `$44` jest domyślnym kompromisem
-czytelności na czerni i przynależności do palety Cylonów. Na 24 ramki eksplozji
-Raidera P1 wraca do zaakceptowanego `$84`, po czym wygaśnięcie efektu
-przywraca body `$44` przed kolejnym spawnem; wejście do nowej gry również
-jawnie przywraca `$44`, jeśli poprzedni efekt został przerwany w frontendzie;
-efekt `$84/$46` pozostaje wizualnie bez zmian.
-
-Obwiednia jest per-type. Raider i Scythe zajmują `[80,96)` przy lewej oraz
-`[160,176)` przy prawej granicy. Talon zajmuje tylko 6 HPOS i porusza się
-logicznie `80..170`; jego PMG byte origin `79..169` kompensuje pusty pierwszy
-bit. Spawn, steering, type change i zapis HPOSP1/HPOSP2 korzystają z jednego
-deskryptora, więc żadna klatka nie nachodzi na side hull.
-
-Dominująca płyta strony sojuszniczej zajmuje 2–4 komórki szerokości i 3–6
-wierszy wysokości. Staggered horizontal seams, czarne grooves i białe lips
-oddzielają ją od sąsiedniej płyty; vent lub bursztynowy service point pojawia
-się tylko wyjątkowo. Strona przeciwnika nie używa diagonalnej siatki: jej
-czarne wnętrza są ograniczone długimi pionowymi ribs i szerokimi burgundowymi
-slabami. Czerwień stanowi główną masę pancerza, lecz jawne glyphs trench/void,
-offset buttresses i niejednakowy kontur zapobiegają powstaniu jednolitego
-czerwonego prostokąta.
-
-Późniejsze stany powinny dać się składać z małego zestawu:
-
-- **normal armour** — regularne panele, żebra i ciemne szczeliny;
-- **damaged armour** — przerwane linie, wgniecenia i odsłonięta konstrukcja;
-- **burning armour** — oszczędny, animowany pomarańczowo-bursztynowy ogień;
-- **weapon battery** — łatwa do odróżnienia geometria, nawet zanim stanie się
-  destructible;
-- **muzzle flash** — krótki, jasny sygnał wystrzału;
-- **impact state** — lokalny błysk, damage lub ogień po trafieniu.
-
-Kontrast stron musi pozostać czytelny również na monochromatycznym zdjęciu
-ekranu. Układ `8 + 24 + 8` jest przyjętą geometrią tej bazy wizualnej, nie
-ogólnym kontraktem dla wszystkich późniejszych poziomów. Każda przyszła
-zmiana musi ponownie przejść test czytelności, szerokości i osiągalnej trasy.
-
-## Broadside i crossfire
-
-Heavy projectiles muszą różnić się od zwykłego ognia myśliwców grubością,
-długością, rytmem, kolorem lub poprzedzającym je muzzle flash. Gracz ma
-rozpoznać linię ognia dostatecznie wcześnie, aby samemu uniknąć salwy albo
-zwabić Cylon fighter.
-
-Czytelność wymaga:
-
-- wyraźnego początku po stronie strzelającego capital ship;
-- spójnego toru przez corridor;
-- odróżnienia pocisku aktywnego od impact effect;
-- takiej samej wiarygodności trafienia Vipera, Cylon fightera i przeciwnego
-  kadłuba;
-- ograniczenia liczby jednoczesnych błysków, aby nie zamieniły ekranu w szum.
-
-Bieżąca implementacja realizuje tę bazę bez zmiany zaakceptowanej grafiki
-kadłubów. Warning jest widoczny przez wszystkie 25 ramek: przez 8 ramek ma
-2 scanlines i normalną szerokość, przez 9 ramek 4 scanlines i double width,
-a przez ostatnie 8 ramek 6 scanlines oraz dwuramkowy puls double/quad. Rośnie
-od wylotu w stronę corridor i kończy się bez skoku względem przyszłego toru.
-Lecący slug pulsuje co dwie ramki między dwoma zwartymi lozenge glyphs w
-dwóch sąsiednich komórkach ANTIC 4. Zajmuje 8 HPOS × 6 scanlines i około 40
-native pixeli, czyli ma cztery razy większą długość osi lotu niż 2×3 Raider
-pulse i osiem razy większą niż jedno-HPOS Viper fire; przesuwa się logicznie o 2
-HPOS na ramkę. Allied używa
-yellow-gold `COLPF2=$1E`, enemy crimson `COLPF3=$46`, a collision obejmuje
-pełny widoczny 8×6 swept extent.
-Na launch czteroramkowy glif flash łączy realny wylot z pociskiem i pozostaje
-przy wolniejszym strumieniu kadłuba; sam slug natychmiast przechodzi na ruch
-ekranowy. Impact wykorzystuje ten sam slot, rozszerza wysokość
-do 8 scanlines i trwa 5 ramek. Warning oraz impact zachowują
-rzeczywiste kolory M1–M3; stan `FLYING` zapisuje i przywraca oba znaki playfieldu,
-nie missile bitmapę. Dzięki temu animacja nie zapisuje `COLPM`, a P1–P3,
-scanner i silnik Vipera nie zmieniają koloru.
-
-Język fighter fire pozostaje krótszy: Raider pulse to nasycone czerwone
-`COLPF3=$46`, 2 HPOS × 3 scanlines, a Viper fire literalne żółte
-`COLPF2=$1E`, 1 HPOS × 2 scanlines. Obie bronie używają przywracanych kodów
-ekranu i prekompilowanych glifów fazowych; P0 pozostaje `$0E`, P3 `$28`, a
-P1/P2 `$84/$46`. Burst Vipera ma 10 strzałów co 3 ramki i prędkość 6
-scanlines/rama; Raider ma 8 strzałów co 4 ramki i prędkość 5. Capital slug
-pozostaje co najmniej czterokrotnie dłuższy w osi lotu.
-
-Wspólna fighter explosion korzysta z sześciu oryginalnych masek 8×8:
-zwarty flash, dwa etapy rozszerzenia, nieregularne maksimum, fragmenty i
-embers. Viper renderuje je istniejącą parą P0/P3, a ordinary enemy parą P1/P2;
-kolory pozostają przypisane do statków i nie są przełączane na czas efektu.
-Każdy obraz trwa cztery ramki i jest clipowany do gameplay viewportu.
-
-Trafienie przeciwnego capital hull uruchamia osobny, niekolizyjny overlay
-3×3 znaków. Przez 24 ramki przechodzi od białobursztynowego core przez
-dominujące czerwone rozszerzenie i nieregularny fireball do ciemnych embers.
-Efekt zapisuje tylko komórki rzeczywistego bandu kadłuba, podąża za jego
-scrollingiem i przywraca dokładnie przechwycony moduł; nie zużywa M0–M3 ani
-nie zmienia kolorów fighterów.
-
-Pełny skok zawsze ma 8 scanlines, bez fine scrollingu. Oba capital hulls
-wykonują dokładnie 8/9/10 takich skoków w 20 ramkach: `EASY` daje 20 wierszy
-lub 160 scanlines/s, `MEDIUM` 22,5/180, a `HARD` 25/200. Jest to 100%
-dotychczasowej prędkości świata. Wyloty, warningi i granice kontaktowe
-pozostają przy tej samej fazie; lecące pociski zachowują własny timing PAL.
-Skalę obu capital ships podkreślają rzadsze, niezależnie planowane sekwencje
-ognia i spokojne odstępy między nimi, nie spowolnienie całego świata. Fizyczna
-krawędź, łącznie z projekcjami turretów, jest też granicą kontaktu gracza.
-Clamp utrzymuje obie warstwy Vipera razem i uruchamia istniejący damage flash.
-
-Każdy 32-wierszowy moduł combat zawiera jedną funkcjonalną, wielokomórkową
-baterię na stronę, z wierszami allied 8 i enemy 12 celowo przesuniętymi
-względem siebie. Prow, forward, aft i engines nie mają funkcjonalnych dział,
-a ostatnie 8 wierszy combat ma margines shutdown. Usunięte stanowiska są
-zastąpione płytami, wnękami, żebrami i detalem
-serwisowym bez glifu wylotu, aby nie sugerować nieaktywnej broni. Firing event
-wybiera najstarszy bezpieczny widoczny emplacement danej strony; wymagany jest
-pełny 25-ramkowy warning oraz jeden wiersz marginesu przed wyjściem ze strefy.
-
-## Debris
-
-Klasy debris mają różne sylwetki, a nie tylko różny kolor:
-
-- płaskie armour plates;
-- nieregularne fighter remains;
-- otwarte framework sections;
-- masywne, wolno obracające się wreckage.
-
-Bieżąca neutralna przeszkoda 2×1 używa dwóch sylwetek o pełnym obrysie 16×8:
-armour-shard ma 47 aktywnych pikseli ANTIC i pozostaje zwarty oraz asymetryczny,
-natomiast truss-fragment ma 45 aktywnych pikseli ANTIC, grubsze belki i czytelne
-otwory konstrukcji. Obie
-fazy każdej sylwetki zmieniają orientację. Kolory pola 1/2 odcinają debris od
-białego starfield; renderer i hitbox obejmują te same dwa sąsiednie znaki.
-
-Duży debris natychmiast niszczy Vipera, więc jego rozmiar i zagrożenie muszą
-być bezbłędnie czytelne. Animacja obrotu może używać małej liczby klatek lub
-zmian znaków, ale nie może powodować mylącej zmiany hitboxu.
-
-## Repair drone
-
-Repair object ma wyglądać jak wojskowy drone lub pod: zwarta techniczna
-sylwetka, czytelny sygnał funkcji i kontrast od debris oraz enemy fire.
-Nie używa czerwonego krzyża ani dosłownej ziemskiej apteczki. Musi być równie
-łatwy do rozpoznania jako obiekt do zebrania i jako cel dający bonus za
-zestrzelenie.
-
-## HUD i obecny ekran referencyjny
-
-`assets/graphics/dark-fighter-screen-concept-v1.png` pozostaje zaakceptowanym
-wzorcem kompozycji pierwszego gameplay screen: jednowierszowy HUD, czarna
-przestrzeń lotu, stalowo-granatowe struktury, jasny Viper, blade Cylon fighters
-i oszczędne weapon accents.
-
-Bieżące wydanie Atari pokazuje `SCORE`, `LIFE` i `HULL` jako prawdziwy,
-monochromatyczny tekst ANTIC 2 z dedykowanego fontu 6×7. Jeden górny wiersz
-kończy się jednoliniowym separatorem i pozostawia 23 wiersze kolorowego ANTIC 4
-playfieldu. Dynamiczne score, całkowite życia i procent zdrowia pozostają
-kodami znaków, nie PMG ani bitmapowym ornamentem; niewyjaśnione placeholdery
-`ARM` i `FUEL` zostały usunięte.
-
-PNG nie ustala rozdzielczości, liczby PMG ani zagęszczenia obiektów. Te wartości
-są adaptowane do ANTIC/GTIA, budżetu PMG i jednej ramki PAL.
-
-## Pierwszy pass starfield
-
-Gameplay zachowuje dużo czarnego negative space. Warstwa far używa 24
-logicznych, przeważnie jednokropkowych znaków `COLPF1=$84`; near generuje
-średnio 8,625 widocznego znaku w 23 wierszach z jasnym `COLPF0=$0E` i tylko
-rzadkim dwupikselowym lub czteroramiennym wariantem. Near porusza się z 50%,
-a far z 25% prędkości kadłubów; zachowują więc czytelny stosunek 2:1, ale
-żadna warstwa nie płynie razem z kadłubami. Co 16 ramek najwyżej jeden
-aktualnie odsłonięty far star
-zmienia spokojnie fazę dim/bright. Gwiazdy nie mogą czytać się jak żółty ogień
-Vipera, czerwony Raider pulse ani poziomy capital slug.
-
-Sześć oryginalnych glyphów zajmuje screen codes 1–6. Far używa wyłącznie
-ANTIC 4 pixel value `10`, near `01`; kształty są bez antyaliasingu i bez
-fragmentów poza zwartym 8×8 polem znaku. W broadside tło pozostaje w kolumnach
-9–30, więc czarne/kolorowe masy kadłubów i ich wyloty zachowują pełną własność.
-
-## Main menu i frontend
-
-`assets/graphics/mainmenu.png` jest zatwierdzoną referencją wyłącznie dla
-kompozycji, proporcji, atmosfery i hierarchii koloru. Atari menu nie skaluje,
-nie trasuje i nie osadza tego PNG. Nie przejmuje z niego `BSG 75`, insygniów,
-typografii, dokładnej sylwetki statku ani geometrii hangaru.
-
-Bieżąca, oryginalna interpretacja miesza tryby znakowe według ich mocnych
-stron:
-
-- wyśrodkowanego `DARK FIGHTER` w 20-kolumnowym ANTIC 7, z czystym fontem
-  6×7 i podwojoną wysokością;
-- kątowych, stalowo-niebieskich warstw hangaru po lewej;
-- istniejącego autorskiego `player_shape` z bursztynowym
-  `player_engine_shape` jako statycznego, dwuwarstwowego PMG w hangarze;
-- czterech czytelnych opcji ANTIC 6 ustawionych pionowo po prawej;
-- kilku deterministycznych gwiazd i dużych czarnych przerw;
-- nasyconego akcentu `$D8` dla markera i całego aktywnego napisu;
-- oszczędnego czerwonego światła identyfikacyjnego bez oznaczeń BSG.
-- neutralnego, białego hintu `UP/DOWN MOVE  FIRE SELECT` w ANTIC 2.
-
-`SETECH GAME STUDIO` nie występuje w main menu; pozostaje częścią loadera.
-Wiersze ANTIC 4 zachowują hangar, gwiazdy i dekoracje, a czarne odstępy
-porządkują title, scenę, menu oraz hint bez dekoracyjnego przeliczania per-frame.
-
-Menu główne może czasowo używać P0, P2 i P3, ponieważ nie wykonuje gameplayu.
-Ekrany podrzędne wyłączają PMG, a wejście do gameplayu czyści cały obszar i
-odtwarza zaakceptowane rozmiary oraz paletę obiektów.
-
-## Zaakceptowany loader
-
-Loader zachowuje zaakceptowaną geometrię i używa bitmapy mieszanej: ANTIC F
-320 px dla tytułu i statku oraz ANTIC E 160 px dla podpisu studia, z:
-
-- czarnym tłem;
-- kremowym tytułem;
-- stalowo-szarą Galactiką skierowaną w prawo;
-- trzema oddzielnymi zespołami napędowymi;
-- oznaczeniem `BSG`;
-- zielonym `SETECH GAME STUDIO`;
-- trzema strefami koloru utworzonymi przez dwa DLI.
-
-Atari-native source znajduje się w `assets/graphics/loader-bitmap.json`,
-a `assets/graphics/loader.png` pozostaje wysokorozdzielczą referencją
-kompozycji. Strefy statku świadomie oddają półtony ditheringiem,
-panelami, żebrami i czarnymi szczelinami. Loader nie ma wspieranego wariantu
-ANTIC 4 i nie jest modyfikowany podczas prac nad gameplayem.
-
-Poprawa litery `S` w `BSG`, wygładzenie jagged edges, mocniejsze negative gaps
-oraz pomarańczowy PMG engine exhaust należą wyłącznie do niskopriorytetowego
-visual-polish backlogu.
+# Dark Fighter art direction
+
+Dark Fighter is worn military science fiction rendered within stock Atari
+65XE constraints. It is unofficial, non-commercial Battlestar Galactica fan
+art and must not imply official affiliation or endorsement.
+
+## Visual language
+
+- Space is black, with restrained star density and clear combat silhouettes.
+- Colonial machinery uses cold steel, pale highlights, dark seams, and warm
+  engine accents.
+- Cylon machinery uses dark metal, burgundy/red hull accents, and a distinct red
+  scanner and weapon language.
+- Damage uses short, local flashes and fragments; it must not repaint the global
+  palette or obscure the HUD.
+- Pixel shapes favor readable mass, panel rhythm, and negative space over tiny
+  lettering or decorative noise.
+
+The loader preserves the owner-approved Galactica profile, `BSG` marking,
+three engine groups, title, and studio footer. It uses mixed ANTIC F/E with two
+palette-zone DLIs. Gameplay does not add another DLI or PMG multiplexing merely
+for a local colour effect.
+
+## Gameplay palette ownership
+
+The fixed HUD remains legible and visually separate from the ANTIC 4 gameplay
+field. Stars, hulls, Viper weapon pixels, Cylon weapon pixels, pickups, and
+effects use existing playfield banks and PMG registers. A local object must not
+change the global palette in a way that recolours other objects.
+
+Viper weapon colours are:
+
+- normal projectile: yellow (`$1E`);
+- Spread Shot centre, left, and right projectiles: the same yellow Viper colour;
+- Rapid Fire projectile: the established powered red (`$46`).
+
+Cylon Raider pulses remain red (`$46`) and retain their wider shape. Spread
+Shot side projectiles must be identified by their symmetric fan geometry, not
+by borrowing the Cylon weapon colour.
+
+## Capital ships and engines
+
+Both capital hulls must remain continuous through prow, forward modules, combat
+modules, aft modules, and engines. Overlays may not leave blank segments,
+vertical lines, stale glyphs, or wrap artifacts.
+
+Engine banks have exactly two phases: `dim` and `bright`. Each phase lasts eight
+active PAL frames, producing a 16-frame loop. The phases change only the engine
+pixels while preserving the established hull silhouette and backing behavior.
+
+## Pickups
+
+Pickup capsules are large, static 2x2-character objects. Their movement comes
+from world scrolling; the four-cell footprint does not flicker or alternate
+between old and new positions.
+
+- **Rapid Fire:** steel/yellow casing with a black `RF` symbol. It must remain
+  readable against space and either capital hull.
+- **Spread Shot:** bright red casing with a black fan/three-projectile symbol.
+  The dark symbol is formed by the capsule interior, not white text.
+- **Shield:** planned only. Its final casing, symbol, and palette ownership need
+  owner review before implementation.
+
+Pickup and projectile erase must restore the current lower layer. Visual review
+therefore covers empty space, both hulls, module boundaries, prow, engine banks,
+and display-list wrap.
+
+## Motion and effects
+
+Spread Shot begins as a compact Viper salvo and opens into an immediately
+readable medium-width, symmetric fan. Side shots move smoothly by equal and
+opposite horizontal increments while all three continue upward at the normal
+weapon speed.
+
+Breakups are brief and local. Debris uses two shapes and two tumble phases;
+Raider breakup preserves the recognizable wings, central body, and red eye.
+Transient effects are erased in reverse layer order and may not damage hulls,
+stars, HUD characters, or the gameplay charset.
+
+Editable declarative sources under `assets/graphics/` remain authoritative for
+generated Atari art. Runtime captures are unenhanced emulator output and must
+never be replaced by concept art or a hand-corrected mockup.

@@ -9,6 +9,10 @@ const report = JSON.parse(fs.readFileSync(
   path.join(root, "docs", "runtime-wall-trace.json"), "utf8"));
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
 
+test("wall trace uses the unambiguous current coverage schema", () => {
+  assert.equal(report.schema_version, 2);
+});
+
 test("wall trace keeps CPU comparison, measured wall time and additive estimate distinct", () => {
   const values = report.semantics;
   assert.equal(values.cpu_comparison_headroom,
@@ -116,6 +120,9 @@ test("wall trace covers legal short replays and 120-second XEX/ATR integrity run
     .reduce((sum, session) => sum + session.measured_frames, 0), 1_200);
   assert.equal(report.ten_heaviest_frames_in_9040_replay.length, 10);
   assert.equal(report.five_heaviest_frames.length, 5);
+  assert.equal(report.five_heaviest_frames_scope, "all measured legal runtime replays");
+  assert.equal(report.five_heaviest_frames[0].wall_cycles,
+    report.gate.measured_wall_cycles_dma_on);
   assert.equal(report.replay.targeted_heaviest.frame,
     report.replay.targeted_reference_heaviest.frame);
   assert.equal(report.replay.targeted_heaviest.wall_cycles,
@@ -301,8 +308,16 @@ test("wall trace records the required legal runtime coverage without incoherent 
   ]) {
     assert.equal(report.coverage[name].observed, true, `${name} was not observed`);
   }
-  assert.ok(report.coverage.maximum_projectile_pool.maximum_observed >= 18);
-  assert.equal(report.coverage.maximum_projectile_pool.legal_capacity, 19);
+  assert.deepEqual(report.coverage.maximum_projectile_pool, {
+    scope: "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays",
+    combined_physical_capacity: 19,
+    maximum_combined_active_observed: 18,
+    full_combined_capacity_observed: false,
+    full_combined_capacity_matching_frames: 0,
+    heaviest_at_full_combined_capacity: null,
+    component_physical_capacities: { viper: 10, raider: 9 },
+    evidence_note: "The combined capacity is a physical allocation. This report records 18 as the maximum naturally observed combined active count and does not claim an unobserved 19/19 state.",
+  });
   assert.equal(report.coverage.broadside_projectiles.pool_capacity, 3);
   assert.equal(report.coverage.broadside_projectiles.release_source_turrets, 2);
   assert.match(report.coverage.broadside_projectiles.classification,

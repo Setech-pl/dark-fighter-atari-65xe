@@ -14,7 +14,7 @@
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "6189d7307af7ef3331004bbb338451166e4421180f1b8fece1d3ba732bb90d2f"
+      "sha256": "29a452e80c1391af401c1d40fe6da8358a222cec921203578be3469db9616fa2"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
@@ -125,7 +125,7 @@
     },
     {
       "path": "docs/media/gameplay/09-spread-shot-active.png",
-      "description": "SP HUD countdown and yellow-centre/red-side three-projectile fan",
+      "description": "SP HUD countdown and all-yellow three-projectile fan",
       "source": "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
