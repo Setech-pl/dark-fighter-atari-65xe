@@ -51,8 +51,8 @@ resident helper.
 
 This is not yet the final scheduler. The numeric player hull, death/respawn,
 terminal Game Over lifecycle and one neutral debris are implemented;
-procedural waves, the encounter director and repair drone are not. Bieżący vertical slice ma finalną bazę graficzną
-bocznych kadłubów i działający, deterministyczny prototyp crossfire M1–M3,
+procedural waves, the encounter director and repair drone are not. Bieżące wydanie ma finalną bazę graficzną
+bocznych kadłubów i działający, deterministyczny system crossfire M1–M3,
 z 24-ramkowym SFX trafienia capital hull. Nadal nie ma trwałych damage decals,
 zniszczenia capital ship ani encounter directora. Po jednym pełnym obrocie
 ringu w stanie `COMPLETE` runtime przechodzi do legalnego otwartego stanu

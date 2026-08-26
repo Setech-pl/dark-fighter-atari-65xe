@@ -41,7 +41,7 @@ widocznych tylko na powiększonym PNG.
 
 Bieżące PMG są w całości zajęte przez Vipera z silnikiem oraz jednego wroga ze
 skanerem; Missile 0 pozostaje wyłącznie zarezerwowany dla broni gracza, lecz
-bieżący żółty burst używa niezależnych glifów ANTIC 4. To potwierdzony stan vertical slice,
+bieżący żółty burst używa niezależnych glifów ANTIC 4. To potwierdzony stan wydania,
 nie obietnica dowolnej liczby wielokolorowych sprite'ów. Przyszłe użycie
 multipleksowania, nakładania players/missiles lub znakowych obiektów wymaga
 pomiaru VBI/DLI, kolizji i real hardware.
@@ -279,7 +279,7 @@ wzorcem kompozycji pierwszego gameplay screen: jednowierszowy HUD, czarna
 przestrzeń lotu, stalowo-granatowe struktury, jasny Viper, blade Cylon fighters
 i oszczędne weapon accents.
 
-Bieżący Atari vertical slice pokazuje `SCORE`, `LIFE` i `HULL` jako prawdziwy,
+Bieżące wydanie Atari pokazuje `SCORE`, `LIFE` i `HULL` jako prawdziwy,
 monochromatyczny tekst ANTIC 2 z dedykowanego fontu 6×7. Jeden górny wiersz
 kończy się jednoliniowym separatorem i pozostawia 23 wiersze kolorowego ANTIC 4
 playfieldu. Dynamiczne score, całkowite życia i procent zdrowia pozostają

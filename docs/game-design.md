@@ -174,7 +174,7 @@ modelu kolizji oraz uszkodzeń.
 
 ## Odłamki
 
-**IMPLEMENTED FOUNDATION SLICE**
+**IMPLEMENTED FOUNDATION**
 
 Pierwszy neutralny obiekt złomu jest przeszkodą testową wspólnego entity
 engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny jest
@@ -211,7 +211,7 @@ z graczem; dlatego w jednej ramce tylko najniższy trafiający slot jest zużyty
 a finalnie zniszczony tuż przed kontaktem debris nie zadaje obrażeń. Przy
 wspólnym przecięciu z Raiderem wygrywa pierwszy cel napotkany przez pocisk
 lecący w górę, a dokładny remis wybiera debris. Następny debris używa zwykłego
-64-klatkowego repeat delay, bez natychmiastowego zastępstwa. Slice nie zmienia
+64-klatkowego repeat delay, bez natychmiastowego zastępstwa. Ta funkcja nie zmienia
 pozostałej logiki spawn/despawn i nie podnosi limitu puli interactive; pula
 effects pozostaje fizycznie sześcioslotowa, z limitem aktywnym 5 dla rdzenia
 i czterech fragmentów.
@@ -603,7 +603,7 @@ spekulacyjnej infrastruktury.
 - Capital ships nie pojawiają się natychmiast i nie są budowane głównie z PMG.
 - Fighters nie mają sztucznej odporności na ogień własnej frakcji.
 - Paliwo, energia i punkty ich uzupełniania nie należą do zatwierdzonego
-  modelu rozgrywki. Napis `FUEL` w bieżącym vertical slice jest pozostałością
+  modelu rozgrywki. Napis `FUEL` w bieżącym wydaniu jest pozostałością
   technicznego HUD-u, a nie aktywną decyzją produktu.
 
 ## Inwarianty sprzętowe

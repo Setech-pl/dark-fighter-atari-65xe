@@ -1,174 +1,291 @@
 # Dark Fighter
 
-![Dark Fighter — retro space battle banner](assets/graphics/dark-fighter-banner-03-retro-box-art.png)
+### A complete vertical space-combat game for the Atari 65XE, built for PAL in NMOS 6502 assembly
 
-`Dark Fighter` to nieoficjalny, hobbystyczny i niekomercyjny fan-art
-`Battlestar Galactica`: pionowa strzelanka kosmiczna dla stockowego Atari 65XE
-PAL z 64 KB RAM. Gracz pilotuje Vipera przeciwko myśliwcom Cylonów. Projekt
-nie jest oficjalnym produktem ani nie sugeruje związku lub poparcia
-właścicieli marki; wszystkie dane Atari, grafiki, animacje, audio i kod
-powstają od nowa dla tego projektu.
+![Dark Fighter gameplay with the Viper, capital ships, the Rapid Fire HUD indicator, and red powered projectiles](docs/media/gameplay/06-rapid-fire-active.png)
 
-## Bieżący vertical slice
+**Atari 65XE · 64 KB · PAL · 50 FPS · NMOS 6502 assembly**
 
-Zaakceptowany build `0.1.1` potwierdza przenośny łańcuch builda i pierwszy
-ekran gameplayu. Obecnie zawiera:
+[Download the XEX](dist/dark-fighter.xex) · [Boot the ATR](dist/dark-fighter.atr)
 
-- sterowanie joystickiem w porcie 1 i strzelanie pojedynczym FIRE;
-- jednego przeciwnika z czerwonym skanerem, sprzętowe PMG, kolizje i score;
-- przewijany playfield ANTIC 4, czytelny kompaktowy HUD ANTIC 2 z osobnym
-  fontem oraz efekty POKEY;
-- oryginalne 32-wierszowe kadłuby boczne ANTIC 4 w układzie nominalnym
-  `8 + 24 + 8`, z jedną funkcjonalną, wielokomórkową baterią na stronę w
-  każdym segmencie i niezależnym, o połowę wolniejszym ruchem kadłubów;
-- deterministyczny crossfire broadside: 25-ramkowe rosnące ostrzeżenia przy
-  źródłowych wylotach, stała pula trzech ciężkich pocisków M1–M3, trafienia
-  gracza, przeciwnika i przeciwnego kadłuba, 24-ramkowe czerwone eksplozje
-  3×3 przy kadłubie oraz zsynchronizowany crack/rumble POKEY;
-- trzy dokładne ustawienia prędkości świata: `EASY` 20, `MEDIUM` 22,5 i
-  `HARD` 25 pełnych wierszy/s; niezależnie rzadszy harmonogram salw oraz
-  source-derived kontakt gracza z nieregularnymi krawędziami i turretami;
-- samowystarczalny XEX oraz bootowalny ATR dla emulatora i SIO2SD;
-- pięciosekundowy loader mieszający ANTIC F z footerem ANTIC E: bitmapę
-  7680 B, Galactikę
-  z `BSG`, kremowy tytuł, zielone `SETECH GAME STUDIO`, dwa LMS, dwa DLI
-  i dokładnie 250 pełnych ramek PAL;
-- czytelny, mieszany frontend ANTIC 7/6/4/2: duży tytuł, hangar i Viper po
-  lewej, opcje po prawej oraz ekrany `OPTIONS`, `TOP SCORES`, potwierdzenie
-  `EXIT`, `SOUND: ON/OFF` oraz sesyjny wybór `EASY/MEDIUM/HARD`;
-- czyste przejście z loadera do menu, a następnie przez `START GAME` do
-  istniejącego gameplayu, bez kosztu loadera w gameplay main loop lub
-  gameplay VBI.
-- a complete last-life Game Over lifecycle after the 24-frame Viper explosion,
-  with saturated `LIFE 0`, frozen gameplay, final `SCORE`, session `TOP SCORE`,
-  and release-gated `FIRE TO CONTINUE` back to the main menu.
-- a physical-OPTION pause lifecycle with frozen simulation, release-gated
-  `RESUME`, synchronized `GAME MUSIC: ON/OFF`, and confirmed `QUIT TO MENU`.
+Pilot a Colonial Viper through open space and the narrow crossfire corridor
+between opposing capital ships. Fight Cylon Raiders, dodge or destroy drifting
+debris, survive heavy broadside fire, and collect the Rapid Fire weapon capsule.
+The current release is fully playable in an emulator and on an Atari through
+SIO2SD.
 
-## Docelowa gra
+## Gameplay gallery
 
-Docelowo Viper stale leci przez powtarzalne poziomy, walczy z różnymi rolami
-Cylon fighters i unika zagrożeń. Open space będzie przeplatać się z
-zapowiadanymi korytarzami bitwy między Battlestarem po lewej i Cylon capital
-ship po prawej. Plan obejmuje hull percentage, zniszczenie i restart, debris
-z zawsze osiągalną trasą, wybór między zebraniem i zestrzeleniem repair drone,
-proceduralne fale, kontrolowaną losowość oraz broadside crossfire bez faction
-immunity.
+Every image below is an unenhanced frame from the packed release XEX running in
+Atari800 7.1.2 in PAL/XL mode. Only Atari800's eight-pixel side borders were
+cropped to produce the native 320×240, 4:3 image. The complete source frame and
+artifact hashes are recorded in [`docs/media/manifest.json`](docs/media/manifest.json).
 
-Poza wskazanym vertical slice te systemy są **planowane i nie są jeszcze
-zaimplementowane**. Kanoniczne
-decyzje i statusy znajdują się w
-[`docs/game-design.md`](docs/game-design.md), kolejność prac w
-[`docs/roadmap.md`](docs/roadmap.md), a stan obecny i docelowe granice systemów
-w [`docs/architecture.md`](docs/architecture.md).
+| | |
+|---|---|
+| ![The Dark Fighter loader with its Galactica illustration and five-second PAL presentation](docs/media/gameplay/01-title-loader.png) | ![Standard Dark Fighter combat between the blue and red capital hulls](docs/media/gameplay/02-standard-combat.png) |
+| **Loader and title art** — the boot handoff begins with a timed PAL presentation. | **Standard combat** — Viper, Raider, projectiles, starfield, and scrolling capital hulls. |
+| ![A Cylon Raider breaking into local explosion fragments](docs/media/gameplay/03-raider-breakup.png) | ![Neutral debris breaking into four transient fragments](docs/media/gameplay/04-debris-breakup.png) |
+| **Raider breakup** — a local core and four deterministic fragments accompany the yellow-red screen flash. | **Destructible debris** — three hits break a neutral obstacle apart without awarding points. |
+| ![The static yellow and steel-blue RF weapon capsule in active gameplay](docs/media/gameplay/05-rapid-fire-pickup.png) | ![Rapid Fire active with RF10 in the HUD and red Viper projectiles](docs/media/gameplay/06-rapid-fire-active.png) |
+| **Rapid Fire pickup** — a large 2×2 ANTIC 4 capsule appears after three qualifying Raider kills. | **Rapid Fire active** — the HUD counts down while newly fired Viper shots are red and use the faster firing cadence. |
+| ![Capital-ship corridor combat with broadside fire](docs/media/gameplay/07-capital-broadside.png) | ![Animated capital-ship engine modules in the scrolling corridor](docs/media/gameplay/08-capital-engines.png) |
+| **Capital broadside** — opposing hulls exchange deterministic heavy fire around the player. | **Capital engines** — the existing two engine phases pulse at an exact 8+8-frame cadence. |
 
-Gra pozostaje jednym resident gameplay programem bez ładowania pakietów między
-normalnymi poziomami. Title loader jest jedyną obecną fazą ładowania.
+## The story
 
-## Wymagania builda
+Dark Fighter began in 1990, when I started creating a space-combat game for the
+Atari 65XE. Decades later, I recovered the surviving project material from
+5¼-inch floppy disks using an Atari computer and SIO2SD, transferred it to a
+modern cross-development environment, and completed a full playable release
+with AI-assisted engineering.
 
-- Node.js 24 lub nowszy;
-- npm;
-- macOS Intel albo Windows;
-- opcjonalnie Altirra (Windows), Atari800 lub Atari800MacX;
-- dla prawdziwego Atari: SIO2SD i karta SD.
+The tools changed. The target did not: real 6502 code, real PAL timing, real XEX
+and ATR images, and validation on Atari hardware.
 
-Nie trzeba instalować natywnego `cc65`. Przypięty `ca65/ld65` działa przez
-WebAssembly, dzięki czemu macOS Intel i Windows używają tego samego toolchainu.
+> Dark Fighter is a return to programming for the joy of making a machine do
+> something that initially seemed impossible.
 
-## Build i walidacja
+The original vision, gameplay decisions, constraints, and Definition of Done
+remain owner-led. Codex assists with implementation, testing, analysis, and
+documentation. Every feature is validated automatically and then played by the
+owner; commit and push happen only after owner acceptance.
+
+## What you can play now
+
+- A complete loader, main menu, options, top-scores screen, pause menu, life
+  cycle, respawn, and Game Over flow.
+- Joystick control in port 1 and ten-shot Viper bursts from the single fire
+  button.
+- Three exact world-speed settings: EASY at 20 rows/s, MEDIUM at 22.5 rows/s,
+  and HARD at 25 rows/s.
+- A PMG Viper and Cylon Raider with deterministic movement, firing, collision,
+  scoring, sound, and yellow-red destruction flashes.
+- Open-space and capital-ship corridor sectors with two independently scrolling
+  hulls, animated engine banks, turrets, warning phases, and M1–M3 broadside
+  crossfire.
+- Neutral armour-shard and truss-fragment debris with three HP, deterministic
+  trajectories, local hit feedback, a breakup core, and four non-colliding
+  fragments.
+- Local Raider breakup effects that reuse the fixed transient-effects system.
+- A 2×2 Rapid Fire weapon capsule earned after every third qualifying Raider
+  projectile kill: 30 active frames pending, then a collectible that enables
+  exactly 500 active PAL frames of 2-frame burst spacing, red projectiles, and
+  an `RF10` through `RF01` HUD countdown.
+- POKEY music and sound effects, including weapon, collision,
+  explosion, broadside, and capital-hull feedback.
+- A self-contained XEX and a bootable 90 KB ATR for emulators or SIO2SD.
+
+## Engineering an Atari game today
+
+Dark Fighter is not a browser reimplementation. The distributed files contain
+the same NMOS 6502 runtime that is assembled, linked, packed, booted, traced,
+and tested by the repository.
+
+| Constraint or system | Current release |
+|---|---|
+| CPU and machine | Atari 65XE, NMOS 6502C, 64 KB RAM |
+| Video target | PAL, 50 FPS, ANTIC 2/4/6/7/F and PMG |
+| Toolchain | ca65/ld65 through the pinned WebAssembly package |
+| Distribution | 16,396-byte XEX and 92,176-byte bootable ATR |
+| Boot payload | Exactly 16,384 bytes in 128 sectors, loaded at `$2000`, entry `$201E` |
+| Payload reserve | 518 source-owned bytes after runtime payload compaction |
+| Runtime BSS | `$8000–$80FF`, exactly 256 bytes |
+| Entity engine | Four physical interactive slots, up to two active |
+| Effects engine | Six physical transient slots, up to five active |
+| Entity code | `$9100–$9780`, 1,665 of 3,840 bytes before packing |
+| Gameplay layers | base/ring → broadside → projectile → entity → effect; reverse erase |
+| Charset budget | Glyphs 0–123 used; glyphs 124–127 free |
+| Measured PAL wall | 32,956 cycles worst case; 2,612 cycles physical headroom |
+| Synchronization | Zero missed frames, deadline overruns, or extra VBI boundaries in the full trace |
+
+Visible-frame work is deterministic and bounded. Pools have fixed capacity;
+overflow behavior is explicit. Cold-RAM tests use both `$A5` and `$5A` fills so
+runtime correctness cannot depend on friendly power-on memory. The full PAL
+trace runs instrumented Atari800 at guest-PC boundaries against the actual XEX
+and ATR payload, including the heaviest combination of projectiles, debris,
+pickups, broadside fire, and five transient effects.
+
+The current repository validates more than 300 contracts covering formats,
+memory ownership, rendering, backing and reverse erase, RNG and cadence,
+gameplay lifecycle, real-artifact boot smoke, and runtime wall timing. Exact
+measurements are kept in
+[`docs/runtime-wall-trace.json`](docs/runtime-wall-trace.json) and explained in
+[`docs/runtime-headroom.md`](docs/runtime-headroom.md).
+
+## Development workflow
+
+```mermaid
+flowchart LR
+    O[Owner vision and Definition of Done] --> B[Feature branch and measured baseline]
+    B --> I[Local implementation with AI assistance]
+    I --> T[Automated tests]
+    T --> P[Build XEX and bootable ATR]
+    P --> E[Atari800 and cold RAM verification]
+    E --> W[PAL wall trace and memory checks]
+    W --> A[Owner gameplay acceptance]
+    A -->|Accepted| C[Commit]
+    C --> R[Push or release]
+    A -->|Defect or failed validation| I
+    T -->|Failure| I
+    E -->|Failure| I
+    W -->|Failure| I
+```
+
+The editable Mermaid source is
+[`docs/diagrams/development-workflow.mmd`](docs/diagrams/development-workflow.mmd).
+
+### Git and SDLC
+
+```mermaid
+flowchart LR
+    B[Accepted baseline] --> F[One feature branch]
+    F --> L[Local implementation]
+    L --> V[Build and validation]
+    V --> A[Owner acceptance]
+    A -->|Changes requested| L
+    A -->|Accepted| C[Commit]
+    C --> P[Push and merge]
+```
+
+The editable source is
+[`docs/diagrams/git-feature-lifecycle.mmd`](docs/diagrams/git-feature-lifecycle.mmd).
+
+The working rules are deliberately strict:
+
+- one focused feature per branch, always starting from an explicit accepted
+  baseline;
+- a small, closed scope with memory and PAL budgets stated before coding;
+- code, generated data, tests, and relevant technical documentation updated
+  together;
+- no commit or push before automated validation and owner gameplay acceptance;
+- XEX and ATR tested as executable products, not merely as structurally valid
+  files;
+- final diff review for memory overlap, page crossings, layer order, backing,
+  determinism, packaging parity, and unintended scope;
+- repository documentation and measured build outputs remain the sources of
+  truth when an older report disagrees.
+
+## Art direction and asset sets
+
+### In-game assets
+
+These sheets are generated from the current PMG, ANTIC 4, projectile, effect,
+and capital-hull source data. They show assets used by the release; no new art
+is invented for the sheets.
+
+![Compiled PMG Viper and Cylon Raider assets used by the release](docs/media/assets/fighter-and-enemies.png)
+
+![Actual projectile glyphs and local explosion masks used by the release](docs/media/assets/weapons-and-effects.png)
+
+![Actual debris, breakup fragments, and Rapid Fire capsule glyphs used by the release](docs/media/assets/debris-and-pickups.png)
+
+![Compiled ANTIC 4 capital-ship modules used by the release](docs/media/assets/capital-ship-modules.png)
+
+Regenerate the deterministic sheets and media manifest with:
 
 ```bash
-npm install
+npm run showcase
+```
+
+Use `npm run showcase -- --capture` only when fresh Atari800 gameplay frames
+are required; it captures the packed release through the existing runtime trace
+harness.
+
+### Art direction and concepts
+
+The visual direction is worn military science fiction: restrained hull
+palettes, hard silhouettes, readable hazards, compact instrumentation, and
+bright weapon accents against deep space. Future illustrations may be added to
+this section, but every such image will be explicitly labeled **concept art**.
+Concept art will never be presented as a gameplay screenshot.
+
+## Build and play
+
+### Requirements
+
+- Node.js 24 or newer and npm;
+- macOS or Linux for the commands below (the pinned WebAssembly assembler also
+  keeps the project portable to the documented Windows build path);
+- Atari800 for emulator play and release-runtime verification;
+- optionally, an Atari 65XE, joystick, SIO2SD, and SD card for real hardware.
+
+No system-wide cc65 installation is required.
+
+### Build and validate
+
+```bash
+npm ci
 npm run build
 npm test
 npm run preview
 npm run verify
-npm run package
 ```
 
-Najważniejsze wyniki w `dist/`:
+The release artifacts are written to `dist/`. Generated build and preview files
+belong in `build/` and `dist/`; source assets remain under `assets/`.
 
-- `dark-fighter.xex` — program wykonywalny dla emulatora;
-- `dark-fighter.atr` — standardowy obraz 90 KB bootujący bez DOS-u;
-- `dark-fighter-boot.bin` — surowy payload sektorów startowych;
-- `dark-fighter-manifest.json` — adresy, rozmiary i sumy kontrolne;
-- `dark-fighter-0.1.1.zip` — archiwum wydania tworzone przez `npm run package`.
+### Run the XEX in Atari800
 
-Standardowy ATR ma dużo miejsca na nośniku, ale ta pojemność nie jest
-dodatkowym resident RAM podczas gameplayu.
+```bash
+atari800 -xe -pal -nobasic -run dist/dark-fighter.xex
+```
 
-## Deterministyczne preview
+### Boot the ATR in Atari800
 
-`npm run preview` tworzy:
+```bash
+atari800 -xe -pal -nobasic dist/dark-fighter.atr
+```
 
-- `build/previews/loader-screen.png` z
-  `assets/graphics/loader-bitmap.json`;
-- `build/previews/start-menu.png` z tych samych danych menu, charsetu, PMG i
-  palety, których używa program;
-- `build/previews/gameplay-screen.png` z kanonicznych danych `src/main.s` oraz
-  `assets/graphics/capital-hulls.json`;
-- `build/previews/capital-hulls-strip.png` z pełnego segmentu kadłubów,
-  glifów i metadanych `assets/graphics/capital-hulls.json`;
-- `build/previews/enemy-hull-colour-options.png` z identycznych danych prawego
-  kadłuba wyrenderowanych przez `COLPF3=$44` i `$46` do oceny ownera.
-- `build/previews/broadside-fire-sequence.png` jako sześcioklatkowy,
-  source-derived zapis warning, lotu oraz trafień broadside.
-- `build/previews/broadside-acceptance-sequence.png` jako dziesięcioklatkowy
-  zapis faz ładowania działa, launch, obu clampów, damage flash i zero health.
-- `build/previews/player-respawn-sequence.png` jako dziesięcioklatkowy zapis
-  bezpiecznego przejścia wierszy kadłubów przy wyśrodkowanym Viperze, realnych
-  kontaktów, śmierci, centralnego respawnu oraz granic 250-klatkowego blink/invulnerability.
-- `build/previews/broadside-cadence-sequence.png` jako source-derived oś czasu
-  1000 ramek, porównująca warningi, launch i ticki scrollu przed i po korekcie.
-- `build/previews/broadside-speed-sequence.png` jako pięć kolejnych ramek PAL
-  pokazujących dwa kroki świata, pierwszy oddzielny krok kadłubów, warning
-  pozostający przy wylocie i stały ruch pocisku.
-- `build/previews/difficulty-speed-comparison.png` jako dokładne porównanie
-  zdarzeń scrolla `EASY/MEDIUM/HARD` w tym samym 20-ramkowym oknie PAL.
-- `build/previews/flagship-sector-sequence.png` jako kolejność ENGINES, AFT,
-  COMBAT, FORWARD, PROW, terminalne bow tips, DRAIN i COMPLETE.
-- `build/previews/capital-hull-explosion-sequence.png` jako sześć faz dużej
-  eksplozji 3×3, wraz z `capital-explosion-pokey-trace.csv` zawierającym
-  24-ramkową obwiednię AUDF4/AUDC4 i końcowe wyciszenie.
+Map the host joystick to Atari port 1. Use the joystick to move, FIRE to shoot
+or select menu entries, and the physical/console `OPTION` key to enter the
+in-game pause menu.
 
-Podstawowe obrazy mają 640×384, a pełny 32-wierszowy pas kadłubów 640×512.
-Wszystkie są skalowane całkowicie nearest-neighbour i powstają bez
-zewnętrznego narzędzia graficznego. Kolory RGB są stabilnym przybliżeniem
-rejestrów Atari PAL, więc mogą nieznacznie różnić się od konkretnego emulatora
-lub fizycznego odbiornika. Zaakceptowanego loader assetu nie należy zmieniać
-podczas implementacji planowanych systemów gameplayu.
+### Run on an Atari through SIO2SD
 
-W Atari800 należy osobno przypisać joystick hosta do portu 1; samo wskazanie
-XEX nie tworzy mapowania wejścia.
+1. Copy `dist/dark-fighter.atr` to the SD card.
+2. Mount the image as `D1:` in SIO2SD.
+3. Connect a joystick to port 1.
+4. Power on the Atari while holding `OPTION` to disable BASIC.
+5. The loader remains visible for exactly 250 PAL frames, then hands control to
+   the main menu.
 
-## Atari 65XE i SIO2SD
-
-1. Skopiuj `dist/dark-fighter.atr` na kartę SD.
-2. Zamontuj obraz jako `D1:` w SIO2SD.
-3. Podłącz joystick do portu 1.
-4. Włącz Atari z wciśniętym `OPTION`, aby wyłączyć BASIC.
-5. Sprawdź loader widoczny dokładnie przez pięć sekund i automatyczne przejście
-   do menu.
-6. Sprawdź nawigację menu, ekrany podrzędne i uruchomienie gry przez
-   `START GAME`.
-7. Sprawdź ruch we wszystkich kierunkach oraz FIRE w gameplayu.
-8. Press physical `OPTION`, verify the PAUSED menu and frozen world, then test
-   quick resume, GAME MUSIC switching, and confirmed QUIT TO MENU.
-
-Emulator jest koniecznym, ale niewystarczającym testem. Procedura raportowania
-real hardware znajduje się w
+The full real-hardware checklist is in
 [`docs/hardware-testing.md`](docs/hardware-testing.md).
 
-## Struktura
+## Current release and continuing development
+
+The current build is a complete playable release with a bounded gameplay loop,
+front end, difficulty settings, combat, hazards, sector transitions, weapon
+pickup, scoring, life cycle, audio, XEX distribution, and bootable ATR.
+
+Development can continue without changing that status. Candidate future work
+includes additional enemy roles, bosses, weapon pickups such as missiles and a
+laser, more levels, and a broader Gauntlet Loop. These are future directions,
+not claims about features already present in the downloadable build.
+
+## Project layout
 
 ```text
-src/                    kod 6502
-cfg/                    konfiguracja linkera
-assets/                 edytowalne źródła grafiki, muzyki i SFX
-levels/                 przyszłe data-driven definicje poziomów
-scripts/                przenośny build, preview i walidacja
-tests/                  testy formatów i kontraktów
-docs/                   projekt gry, architektura, roadmapa i ADR-y
-dist/                   wygenerowane pliki do uruchomienia
+src/                    6502 assembly runtime
+cfg/                    linker configuration
+assets/                 editable graphics, music, and SFX sources
+levels/                 data-driven level definitions
+scripts/                portable build, preview, validation, and media tools
+tests/                  format, gameplay, memory, and runtime contracts
+docs/                   design, architecture, hardware, timing, and media
+dist/                   generated XEX, ATR, boot payload, and manifest
 ```
+
+## Credits and disclaimer
+
+**Creator, project owner, and gameplay vision:** Marcin Krzetowski<br>
+**AI-assisted engineering:** Codex, supporting implementation, testing,
+analysis, and documentation under owner direction and acceptance
+
+Dark Fighter is an unofficial, non-commercial Battlestar Galactica fan-art
+project. It is not affiliated with, endorsed by, or presented as an official
+product of the owners of Battlestar Galactica. Referenced names, ships,
+silhouettes, factions, and lore remain the property of their respective owners.
+All Atari program code, runtime data, graphics, animation, and audio in this
+repository are created or rebuilt for this project.
