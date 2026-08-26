@@ -275,6 +275,8 @@ DAMAGE_CLEANUP           = 5
 FIGHTER_PROJECTILE_FREE   = 0
 FIGHTER_PROJECTILE_VIPER  = 1
 FIGHTER_PROJECTILE_RAIDER = 2
+FIGHTER_PROJECTILE_RAPID_COLOR = $80
+FIGHTER_PROJECTILE_RENDER_ID_RAPID = FIGHTER_PROJECTILE_VIPER|FIGHTER_PROJECTILE_RAPID_COLOR
 DIFFICULTY_EASY   = 0
 DIFFICULTY_MEDIUM = 1
 DIFFICULTY_HARD   = 2
@@ -355,6 +357,10 @@ PLAYER_DEATH_FLASH_FRAMES = 6
 HUD_LIFE_DIGIT_OFFSET = 18
 HUD_HULL_HUNDREDS_OFFSET = 26
 HUD_HULL_TENS_OFFSET = 27
+HUD_RF_OFFSET = 32
+HUD_RF_SECONDS_FRAMES = 50
+.assert HUD_RF_OFFSET > 29, error, "Rapid Fire HUD must not overlap SCORE/LIFE/HULL"
+.assert HUD_RF_OFFSET+4 <= GAMEPLAY_SCREEN_COLUMNS, error, "Rapid Fire HUD exceeds 40 columns"
 
 .include "capital-hulls.inc"
 .include "enemy-roster.inc"
@@ -495,6 +501,7 @@ ENTITY_SAFE_SPAWN_LEFT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_FIRST_COLUMN*
 ENTITY_SAFE_SPAWN_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_END_COLUMN*4
 ENTITY_DEBRIS_GLYPH_BASE = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
 EFFECT_FRAGMENT_GLYPH_BASE = ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT
+WEAPON_PICKUP_GLYPH_BASE = EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
 .assert CAPITAL_HULL_TURRET_COUNT = 2, error, "tracked muzzle records require exactly one turret per side"
@@ -527,8 +534,10 @@ EFFECT_FRAGMENT_GLYPH_BASE = ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT
 .assert ENTITY_DEBRIS_GLYPH_COUNT = 8, error, "debris must use exactly eight glyphs"
 .assert EFFECT_FRAGMENT_GLYPH_COUNT = 2, error, "debris fragments must use exactly two glyphs"
 .assert EFFECT_FRAGMENT_GLYPH_BASE = 118, error, "debris fragment glyph indices must begin at 118"
-.assert EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT = 120, error, "glyphs 120-127 must remain free"
-.assert 128-(EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT) >= 8, error, "Raider breakup must retain all eight currently free ANTIC 4 glyphs"
+.assert WEAPON_PICKUP_GLYPH_BASE = 120, error, "Rapid Fire glyph indices must begin at 120"
+.assert WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_GLYPH_COUNT = 124, error, "Rapid Fire must use only glyphs 120-123"
+.assert 128-(WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_GLYPH_COUNT) >= 4, error, "Rapid Fire must retain four free ANTIC 4 glyphs"
+.assert ENTITY_ACTIVE_LIMIT = 2, error, "debris and the fixed weapon-pickup slot must coexist"
 .assert EFFECT_ACTIVE_LIMIT = 5, error, "debris destruction requires one core and four fragments"
 .assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
 .assert HUD_BOTTOM = GAMEPLAY_TOP, error, "gameplay must begin immediately below the HUD"
@@ -1848,6 +1857,7 @@ main_loop:
     inc frame_counter
     jsr entity_effects_erase
     jsr erase_fighter_projectile_overlays
+    jsr render_weapon_pickup_overlay
     jsr tick_shared_fighter_explosions
     jsr tick_capital_explosions
     jsr tick_launch_flashes
@@ -2455,6 +2465,14 @@ copy_charset:
     sta CHARSET+$300,x
     inx
     bne @loop
+    ; The 2x2 RF source is kept outside the historically capped ENTITY_CODE
+    ; body. Install its four editable glyphs after the canonical 1 KiB copy.
+    ldx #(WEAPON_PICKUP_GLYPH_BYTES-1)
+@weapon_pickup:
+    lda weapon_pickup_glyph,x
+    sta CHARSET+WEAPON_PICKUP_GLYPH_BASE*8,x
+    dex
+    bpl @weapon_pickup
     rts
 
 ; Expands the two packed 32x9 hull maps once after the loader has released
@@ -2674,10 +2692,19 @@ copy_hud_glyphs:
 ; A is the only modified register and is preserved; X and Y remain untouched.
 gameplay_dli:
     pha
+    ; Both display-list headers are identical. Before ANTIC reaches the fixed
+    ; divider, continue from byte three of the selector chosen by the latest A2
+    ; rotation. This publishes the row-table/list swap in the same frame without
+    ; restarting the HUD instruction and creating an odd third DLI.
+    lda gameplay_dli_phase
+    bne @sync_hud
+    lda PLAYFIELD_ACTIVE_DLIST_LO
+    clc
+    adc #$03
+    sta DLISTL
+@sync_gameplay:
     lda #$00
     sta WSYNC
-    lda gameplay_dli_phase
-    bne @hud
 
     lda #>CHARSET
     sta CHBASE
@@ -2693,6 +2720,9 @@ gameplay_dli:
     pla
     rti
 
+@sync_hud:
+    lda #$00
+    sta WSYNC
 @hud:
     lda #>HUD_CHARSET
     sta CHBASE
@@ -2702,6 +2732,9 @@ gameplay_dli:
     sta COLPF2
     lda #$00
     sta gameplay_dli_phase
+    ; The active list's own JVB follows this final mode line and publishes its
+    ; base for the next frame; no visible-frame code writes DLISTL.
+publish_playfield_display_list = @hud
     pla
     rti
 
@@ -3000,34 +3033,17 @@ erase_bullet:
 ; glyphs avoid rewriting 16 charset bytes for every active shot every frame;
 ; each slot retains exact screen backing and a bounded swept-collision lifecycle.
 init_fighter_projectiles:
+    ; All ten slot arrays, both burst controllers and both explosion records
+    ; are one contiguous 202-byte owned block. A single cold/reset loop is
+    ; byte-exact with the former field-by-field loops and saves resident code;
+    ; its extra setup cycles never execute in the visible-frame hot path.
     lda #$00
-    ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
+    ldx #$00
 @state:
     sta FIGHTER_PROJECTILE_ACTIVE,x
-    sta FIGHTER_PROJECTILE_X,x
-    sta FIGHTER_PROJECTILE_Y,x
-    sta FIGHTER_PROJECTILE_PREV_Y,x
-    sta FIGHTER_PROJECTILE_LIFETIME,x
-    sta FIGHTER_PROJECTILE_RENDERED,x
-    sta FIGHTER_PROJECTILE_SCREEN_LO,x
-    sta FIGHTER_PROJECTILE_SCREEN_HI,x
-    sta FIGHTER_PROJECTILE_BACKUP_TOP,x
-    sta FIGHTER_PROJECTILE_BACKUP_BOTTOM,x
-    dex
-    bpl @state
-    sta VIPER_BURST_STATE
-    sta VIPER_BURST_REMAINING
-    sta VIPER_BURST_TIMER
-    sta RAIDER_BURST_STATE
-    sta RAIDER_BURST_REMAINING
-    sta RAIDER_BURST_TIMER
-    ldx #(SHARED_FIGHTER_EXPLOSION_SLOT_COUNT-1)
-@explosion_state:
-    sta FIGHTER_EXPLOSION_TIMER,x
-    sta FIGHTER_EXPLOSION_X,x
-    sta FIGHTER_EXPLOSION_Y,x
-    dex
-    bpl @explosion_state
+    inx
+    cpx #(FIGHTER_PROJECTILE_STATE_END-FIGHTER_PROJECTILE_ACTIVE)
+    bne @state
     ; Glyphs 16-46 already contain Viper phases 5-35 in the canonical charset
     ; image. Preserve frontend graphics 11-15 by copying their five replacement
     ; phases from otherwise unused source glyphs 47-51 after frontend setup.
@@ -3041,21 +3057,13 @@ init_fighter_projectiles:
     jmp build_star_glyphs
 
 clear_fighter_projectiles:
-    jsr erase_fighter_projectile_overlays
+    ; Teardown composes the two owner-specific clears. The first reverse erase
+    ; restores every backed slot; the second sees zero rendered latches, while
+    ; both burst controllers retain their former byte-exact reset semantics.
+    jsr clear_viper_projectiles
+    jsr clear_raider_projectiles
     lda #$00
     sta RAIDER_MOVE_ACCUMULATOR
-    ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
-@slot:
-    sta FIGHTER_PROJECTILE_ACTIVE,x
-    sta FIGHTER_PROJECTILE_RENDERED,x
-    dex
-    bpl @slot
-    sta VIPER_BURST_STATE
-    sta VIPER_BURST_REMAINING
-    sta VIPER_BURST_TIMER
-    sta RAIDER_BURST_STATE
-    sta RAIDER_BURST_REMAINING
-    sta RAIDER_BURST_TIMER
     rts
 
 clear_viper_projectiles:
@@ -3266,7 +3274,14 @@ update_viper_weapon:
     bcc @done                   ; rejected allocation is retried, not counted
     dec VIPER_BURST_REMAINING
     beq @finish
+    lda ENTITY_STATE+WEAPON_PICKUP_SLOT
+    cmp #WEAPON_PICKUP_STATE_RAPID
+    bne @normal_interval
+    lda #VIPER_RAPID_FIRE_INTERVAL
+    bne @set_interval
+@normal_interval:
     lda #VIPER_BURST_INTERVAL
+@set_interval:
     sta VIPER_BURST_TIMER
     rts
 @finish:
@@ -3300,6 +3315,11 @@ allocate_viper_projectile:
     rts
 @allocate:
     lda #FIGHTER_PROJECTILE_VIPER
+    ldy ENTITY_STATE+WEAPON_PICKUP_SLOT
+    cpy #WEAPON_PICKUP_STATE_RAPID
+    bne :+
+    lda #FIGHTER_PROJECTILE_RENDER_ID_RAPID
+:
     sta FIGHTER_PROJECTILE_ACTIVE,x
     lda player_x
     clc
@@ -3484,12 +3504,21 @@ render_fighter_projectile_overlays:
     sta src_ptr+1
     lda row_counter
     cmp #$07
-    bne @code_ready
+    bne @viper_color
     lda loader_repeat_value
     clc
     adc #$01
     sta src_ptr+1
-    bne @code_ready
+    bne @viper_color
+@viper_color:
+    ; D7 is spawn-owned state. Normal Viper shots take the short positive
+    ; branch; only a captured Rapid Fire shot pays for the colour transform.
+    lda FIGHTER_PROJECTILE_ACTIVE,x
+    bpl @code_ready
+    lda loader_repeat_value
+    ora #FIGHTER_PROJECTILE_RAPID_COLOR
+    sta loader_repeat_value
+    bmi @code_ready
 @raider_code:
     lda FIGHTER_PROJECTILE_X,x
     and #$02                    ; Raider allocation explicitly masks bit zero
@@ -4132,7 +4161,14 @@ resolve_enemy_damage:
     pla
     cmp #(DAMAGE_CAPITAL_CYLON+1)
     bcs @no_score
+    pha
     jsr add_archetype_score
+    pla
+    cmp #DAMAGE_PLAYER_PROJECTILE
+    bne @no_score
+    lda ENTITY_STATE+WEAPON_PICKUP_SLOT
+    bne @no_score
+    jsr weapon_pickup_record_qualified_kill
 @no_score:
     jsr play_hit_sound
 @done:
@@ -4473,7 +4509,7 @@ prebuild_next_playfield_display_list:
 
 ; Build either the current order (X=0) or the next right-rotated order (X=21).
 ; A is the page-local list address. Both lists reside on page $7F, allowing the
-; active display to be switched with one hardware write after completion.
+; active playfield continuation to be selected by the first gameplay DLI.
 build_playfield_display_list:
     sta dst_ptr
     lda #>PLAYFIELD_DLIST_A
@@ -4567,7 +4603,6 @@ rotate_playfield_table_shift_end:
     pha
     lda PLAYFIELD_NEXT_DLIST_LO
     sta PLAYFIELD_ACTIVE_DLIST_LO
-    sta DLISTL
     pla
     sta PLAYFIELD_NEXT_DLIST_LO
     inc PLAYFIELD_PREBUILD_PENDING
@@ -5174,6 +5209,7 @@ EMIT_GAMEPLAY_MUSIC_DATA
 ; The two eight-column hull masses advance at 100% of the legacy world clock.
 ; Muzzle projections are restored from source metadata after the bases move,
 ; and attached WARNING slots receive exactly the same eight-scanline step.
+.segment "ENTITY_CODE"
 scroll_hull_columns:
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_COMPLETE
@@ -5184,7 +5220,9 @@ scroll_hull_complete_done:
     rts
 :
     lda PLAYFIELD_RING_FLAGS
-    bne scroll_hull_columns_advance_scene
+    beq :+
+    jmp scroll_hull_columns_advance_scene
+:
     jsr restore_active_muzzles
 
 scroll_hull_columns_copy:
@@ -5198,7 +5236,9 @@ scroll_hull_copy_row:
     lda PLAYFIELD_ROW_HI,x
     sta dst_ptr+1
     dex
-    bmi scroll_hull_divider_source
+    bpl :+
+    jmp scroll_hull_divider_source
+:
     lda PLAYFIELD_ROW_LO,x
     sta src_ptr
     lda PLAYFIELD_ROW_HI,x
@@ -5213,7 +5253,24 @@ scroll_hull_copy_source_ready:
     lda (src_ptr),y
     sta (dst_ptr),y
     dey
-    bpl @copy_allied
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
     ldy #39
 @copy_enemy:
     lda (src_ptr),y
@@ -5222,8 +5279,24 @@ scroll_hull_copy_source_ready:
     lda (src_ptr),y
     sta (dst_ptr),y
     dey
-    cpy #(CORRIDOR_ENEMY_FIRST-1)
-    bne @copy_enemy
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
+    lda (src_ptr),y
+    sta (dst_ptr),y
+    dey
 
     dex
     bpl scroll_hull_copy_row
@@ -5265,7 +5338,9 @@ scroll_hull_divider_source:
     lda #>GAMEPLAY_DIVIDER_SCREEN
     sta src_ptr+1
     jmp scroll_hull_copy_source_ready
+scroll_hull_columns_end:
 
+.segment "BROADSIDE"
 clear_top_hull_row:
     lda #CH_SPACE
     ldy #(CORRIDOR_ALLIED_COLUMNS-1)
@@ -5992,6 +6067,10 @@ frontend_display_lists_end:
 ; Pixel values: 0=black, 1=white, 2=steel blue, 3=COLPF2 or COLPF3 when
 ; bit 7 of the screen code is set. The frontend sets COLPF3 to Kawasaki
 ; green; gameplay restores red before enabling DMA.
+weapon_pickup_glyph:
+    EMIT_WEAPON_PICKUP_GLYPHS
+weapon_pickup_glyph_end:
+
 charset_data:
     ; 0: space
     .byte $00,$00,$00,$00,$00,$00,$00,$00
@@ -6556,7 +6635,9 @@ update_broadside:
 :
     jsr schedule_broadside
 @done:
-    rts
+    ; The only caller immediately resolves damage. Tail-repair the resident
+    ; entity layer after every broadside erase/draw without another call site.
+    jmp render_weapon_pickup_overlay
 
 schedule_broadside:
     lda CAPITAL_SECTOR_STATE
@@ -6949,7 +7030,7 @@ restore_launch_flash_cell:
     ldx BROAD_WORK_SLOT
     rts
 
-; Both engine banks share one bounded three-phase timer. Only their two
+; Both engine banks share one bounded two-phase timer. Only their two
 ; dedicated charset glyphs change; PMG, palette, collision, and display-list
 ; state remain untouched.
 update_engine_animation:
@@ -6978,7 +7059,7 @@ copy_engine_animation_phase:
 @byte:
     lda engine_animation_frames,y
     sta CHARSET+CAPITAL_HULL_ALLIED_ENGINE_GLYPH*8,x
-    lda engine_animation_frames+24,y
+    lda engine_animation_frames+CAPITAL_HULL_ENGINE_ANIMATION_PHASES*8,y
     sta CHARSET+CAPITAL_HULL_ENEMY_ENGINE_GLYPH*8,x
     iny
     inx
@@ -7092,6 +7173,41 @@ update_hud_status:
     ora #CH_ZERO
 @store_tens:
     sta SCREEN+HUD_HULL_TENS_OFFSET
+    rts
+
+; HUD cells 32-35 are outside the immutable SCORE/LIFE/HULL template. Slot-1
+; owner is a 50-frame subcounter and HP owns the displayed 10..1 seconds only
+; while state is RAPID. Screen bytes change only at those second boundaries.
+tick_rapid_fire_hud:
+    dec ENTITY_OWNER+WEAPON_PICKUP_SLOT
+    bne @done
+    lda #HUD_RF_SECONDS_FRAMES
+    sta ENTITY_OWNER+WEAPON_PICKUP_SLOT
+    dec ENTITY_HP+WEAPON_PICKUP_SLOT
+    lda #CH_ZERO
+    sta SCREEN+HUD_RF_OFFSET+2
+    lda ENTITY_HP+WEAPON_PICKUP_SLOT
+    sta SCREEN+HUD_RF_OFFSET+3
+@done:
+    rts
+
+show_rapid_fire_hud:
+    ldx #$03
+@cell:
+    lda rapid_fire_hud_initial,x
+    sta SCREEN+HUD_RF_OFFSET,x
+    dex
+    bpl @cell
+    rts
+rapid_fire_hud_initial:
+    .byte CH_HUD_A+17, CH_HUD_A+5, CH_ZERO+1, CH_ZERO ; RF10
+
+clear_rapid_fire_hud:
+    ldx #$03
+@cell:
+    sta SCREEN+HUD_RF_OFFSET,x
+    dex
+    bpl @cell
     rts
 
 .segment "BROADSIDE"
@@ -7221,13 +7337,13 @@ restore_capital_explosions:
 advance_dst_to_next_physical_row:
     lda dst_ptr
     cmp #<GAMEPLAY_DIVIDER_SCREEN
-    bne @ring
+    bne advance_dst_to_next_ring_row
     lda PLAYFIELD_ROW_LO
     sta dst_ptr
     lda PLAYFIELD_ROW_HI
     sta dst_ptr+1
     rts
-@ring:
+advance_dst_to_next_ring_row:
     clc
     lda dst_ptr
     adc #40
@@ -8022,26 +8138,65 @@ erase_transient_effect_overlays:
     rts
 
 erase_interactive_entity_overlays:
-    ; The first slice deliberately admits only slot zero. Avoid scanning the
-    ; three reserved physical slots on the visible-frame path.
-    .assert ENTITY_ACTIVE_LIMIT = 1, error, "slot-zero erase requires active limit one"
-    lda ENTITY_DRAWN_MASK
-    beq @clear_slot
+    ; The pickup remains composed until the late presentation boundary. Only
+    ; the ordinary slot-zero entity is removed at frame start. The main-loop
+    ; lifecycle guard has already removed an inactive resident capsule.
+@debris:
+    lda ENTITY_SCREEN_HI
+    beq @done
+    sta dst_ptr+1
     lda ENTITY_SCREEN_LO
     sta dst_ptr
-    lda ENTITY_SCREEN_HI
-    sta dst_ptr+1
     ldy #$01
     lda ENTITY_BACKING1
     sta (dst_ptr),y
     dey
     lda ENTITY_BACKING0
     sta (dst_ptr),y
-@clear_slot:
     lda #$00
     sta ENTITY_DRAWN_MASK
     sta ENTITY_SCREEN_HI
+@done:
+    lda ENTITY_ACTIVE_MASK
+    and #WEAPON_PICKUP_ACTIVE_MASK
     sta ENTITY_RENDERED_MASK
+    ; An active capsule stays in the same four physical A2 cells. A released
+    ; resident falls through and restores its backing at this safe boundary.
+    bne weapon_pickup_erase_done
+
+; Restore the exact last-rendered 2x2 footprint at frame-start release. Logical
+; X/Y and the A2 head may already describe a reset state; erase intentionally
+; uses only the four saved physical addresses and backing bytes.
+erase_weapon_pickup_overlay:
+    ldx ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
+    beq weapon_pickup_erase_done
+erase_weapon_pickup_overlay_restore:
+    lda ENTITY_VY+WEAPON_PICKUP_SLOT
+    sta dst_ptr+1
+    lda ENTITY_VX+WEAPON_PICKUP_SLOT
+    sta dst_ptr
+    ldy #$01
+    lda ENTITY_BACKING3+WEAPON_PICKUP_SLOT
+    sta (dst_ptr),y
+    dey
+    lda ENTITY_BACKING2+WEAPON_PICKUP_SLOT
+    sta (dst_ptr),y
+    stx dst_ptr+1
+    lda ENTITY_SCREEN_LO+WEAPON_PICKUP_SLOT
+    sta dst_ptr
+    ldy #$01
+    lda ENTITY_BACKING1+WEAPON_PICKUP_SLOT
+    sta (dst_ptr),y
+    dey
+    lda ENTITY_BACKING0+WEAPON_PICKUP_SLOT
+    sta (dst_ptr),y
+    lda #$00
+    sta ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
+    sta ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
+    lda ENTITY_RENDERED_MASK
+    and #($FF-WEAPON_PICKUP_ACTIVE_MASK)
+    sta ENTITY_RENDERED_MASK
+weapon_pickup_erase_done:
     rts
 
 ; The only entity event bit is consumed in place on the active path. A
@@ -8049,7 +8204,12 @@ erase_interactive_entity_overlays:
 ; CPU cycles together with erase and render.
 entity_effects_update:
     jsr update_transient_effects
+    ldx ENTITY_STATE+WEAPON_PICKUP_SLOT
+    beq :+
+    jsr update_weapon_pickup_active
+:
     lda ENTITY_ACTIVE_MASK
+    and #$01
     bne @active
     lsr ENTITY_FRAME_EVENTS
     dec ENTITY_SPAWN_TIMER_LO
@@ -8121,11 +8281,182 @@ entity_effects_update:
     ; calls retain the guarded public entry below for boundary tests.
     jmp entity_collide_player_active
 
-; The first-free allocator is intentionally capped at one active entity even
-; though the physical SoA reserves four slots. The independent LFSR cannot
-; perturb Raider, starfield, broadside or weapon cadence.
+; Slot one is never offered to the debris allocator. Its dormant fields own
+; the qualified-kill counter and, once collected, the 16-bit Rapid Fire timer.
+; A pending capsule inherits world motion but remains absent from both masks.
+update_weapon_pickup_active:
+    cpx #WEAPON_PICKUP_STATE_RAPID
+    beq weapon_pickup_rapid_tick
+
+@motion:
+    ; ANTIC has no sub-character vertical placement here. Follow the proven
+    ; native A2/near-ring step instead of accumulating a rare independent
+    ; full-row jump. The glyph cells and their backing remain in the same
+    ; physical RAM while the ring maps them to the next visible row.
+    ; The hull pass clears PLAYFIELD_RING_FLAGS before entity update. A zero
+    ; near phase on the still-published world event is the authoritative 1/2
+    ; cadence that rotated A2 this frame.
+    lda STAR_NEAR_PHASE
+    bne @after_motion
+    lda ENTITY_FRAME_EVENTS
+    beq @after_motion
+    lda ENTITY_Y+WEAPON_PICKUP_SLOT
+    clc
+    adc #ENTITY_DEBRIS_VY
+    sta ENTITY_Y+WEAPON_PICKUP_SLOT
+@after_motion:
+    cpx #WEAPON_PICKUP_STATE_PENDING
+    beq weapon_pickup_pending_tick
+    lda ENTITY_Y+WEAPON_PICKUP_SLOT
+    cmp #(ENTITY_GAMEPLAY_BOTTOM-(WEAPON_PICKUP_HEIGHT_SCANLINES-8))
+    bcc weapon_pickup_collide_player
+    jmp weapon_pickup_release
+weapon_pickup_collide_player:
+    lda player_y
+    sec
+    sbc ENTITY_Y+WEAPON_PICKUP_SLOT
+    cmp #WEAPON_PICKUP_HEIGHT_SCANLINES
+    bcc @vertical_overlap
+    cmp #(256-PLAYER_COLLISION_LAST_ROW)
+    bcc weapon_pickup_collision_done
+@vertical_overlap:
+    lda player_x
+    sec
+    sbc ENTITY_X+WEAPON_PICKUP_SLOT
+    cmp #WEAPON_PICKUP_WIDTH_HPOS
+    bcc weapon_pickup_collect
+    cmp #(256-(PLAYER_COLLISION_WIDTH-1))
+    bcc weapon_pickup_collision_done
+weapon_pickup_collect:
+    jsr weapon_pickup_release_active_mask
+    lda #<VIPER_RAPID_FIRE_DURATION
+    sta ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    lda #>VIPER_RAPID_FIRE_DURATION
+    sta ENTITY_MOVE_ACCUMULATOR+WEAPON_PICKUP_SLOT
+    lda #HUD_RF_SECONDS_FRAMES
+    sta ENTITY_OWNER+WEAPON_PICKUP_SLOT
+    lda #(CH_ZERO+10)           ; HUD digit code for ten seconds
+    sta ENTITY_HP+WEAPON_PICKUP_SLOT
+    lda #WEAPON_PICKUP_STATE_RAPID
+    sta ENTITY_STATE+WEAPON_PICKUP_SLOT
+    jmp show_rapid_fire_hud
+weapon_pickup_collision_done:
+    rts
+weapon_pickup_rapid_tick:
+    lda ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    bne :+
+    dec ENTITY_MOVE_ACCUMULATOR+WEAPON_PICKUP_SLOT
+:
+    dec ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    lda ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    ora ENTITY_MOVE_ACCUMULATOR+WEAPON_PICKUP_SLOT
+    beq :+
+    jmp tick_rapid_fire_hud
+:
+    jmp weapon_pickup_release
+
+weapon_pickup_pending_tick:
+    dec ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    bne weapon_pickup_collision_done
+    lda ENTITY_Y+WEAPON_PICKUP_SLOT
+    cmp #WEAPON_PICKUP_SAFE_TOP
+    bcs :+
+    lda #WEAPON_PICKUP_SAFE_TOP
+:
+    cmp #(WEAPON_PICKUP_SAFE_BOTTOM+1)
+    bcc :+
+    lda #WEAPON_PICKUP_SAFE_BOTTOM
+:
+    sta ENTITY_Y+WEAPON_PICKUP_SLOT
+    lda #WEAPON_PICKUP_STATE_ACTIVE
+    sta ENTITY_STATE+WEAPON_PICKUP_SLOT
+    ora ENTITY_ACTIVE_MASK
+    sta ENTITY_ACTIVE_MASK
+    inc ENTITY_ACTIVE_COUNT
+    rts
+
+; Called only after the authoritative score path has accepted a lethal Viper
+; projectile source. Other deaths never reach this counter.
+weapon_pickup_record_qualified_kill:
+    inc ENTITY_HP+WEAPON_PICKUP_SLOT
+    lda ENTITY_HP+WEAPON_PICKUP_SLOT
+    cmp #WEAPON_PICKUP_QUALIFIED_KILLS
+    bcc @done
+    lda FIGHTER_EXPLOSION_X+FIGHTER_EXPLOSION_ENEMY_SLOT
+    clc
+    adc #$04
+    cmp #ENTITY_CORRIDOR_LEFT_HPOS
+    bcs :+
+    lda #ENTITY_CORRIDOR_LEFT_HPOS
+:
+    cmp #(ENTITY_CORRIDOR_RIGHT_HPOS-WEAPON_PICKUP_WIDTH_HPOS+1)
+    bcc :+
+    lda #(ENTITY_CORRIDOR_RIGHT_HPOS-WEAPON_PICKUP_WIDTH_HPOS)
+:
+    sta ENTITY_X+WEAPON_PICKUP_SLOT
+    lda FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_ENEMY_SLOT
+    sta ENTITY_Y+WEAPON_PICKUP_SLOT
+    lda #$00
+    sta ENTITY_HP+WEAPON_PICKUP_SLOT
+    lda #WEAPON_PICKUP_PENDING_TIMER_LOAD
+    sta ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    lda #WEAPON_PICKUP_STATE_PENDING
+    sta ENTITY_STATE+WEAPON_PICKUP_SLOT
+@done:
+    rts
+
+.segment "STARFIELD"
+weapon_pickup_release_active_mask:
+    lda ENTITY_ACTIVE_MASK
+    and #WEAPON_PICKUP_ACTIVE_MASK
+    beq @done
+    eor ENTITY_ACTIVE_MASK
+    sta ENTITY_ACTIVE_MASK
+    dec ENTITY_ACTIVE_COUNT
+    ; Normal pickup release occurs after lower-layer reverse erase and before
+    ; their late redraw, so restoring the resident capsule is sufficient.
+    jmp erase_weapon_pickup_overlay
+@done:
+    rts
+
+.segment "ENTITY_CODE"
+weapon_pickup_release:
+    jsr weapon_pickup_release_active_mask
+    lda #$00
+    sta ENTITY_STATE+WEAPON_PICKUP_SLOT
+    ; Dormant timer/subsecond fields are never read in state zero and every
+    ; pending/collected transition overwrites them before use. Avoid redundant
+    ; stores while retaining the authoritative state, counter and HUD clear.
+    sta ENTITY_HP+WEAPON_PICKUP_SLOT
+    jmp clear_rapid_fire_hud
+
+; Life loss and gameplay teardown clear pending, visible and collected states,
+; while an idle partial kill count remains owned until new-game page init.
+weapon_pickup_clear_lifecycle:
+    lda ENTITY_STATE+WEAPON_PICKUP_SLOT
+    bne weapon_pickup_release
+    rts
+
+; An uncollected capsule is sector-local. A collected Rapid Fire timer is
+; weapon state and intentionally survives a live full-sector transition.
+weapon_pickup_clear_sector:
+    lda ENTITY_STATE+WEAPON_PICKUP_SLOT
+    beq @done
+    cmp #WEAPON_PICKUP_STATE_RAPID
+    beq @done
+    ; COMPLETE is entered after late overlay rendering. Projectiles can remain
+    ; alive across that boundary, so unwind their screen backing first.
+    jsr erase_fighter_projectile_overlays
+    jmp weapon_pickup_release
+@done:
+    rts
+
+; Debris allocation is intentionally fixed to slot zero even though the
+; physical SoA reserves four slots and slot one can host RF independently.
+; The entity LFSR cannot perturb Raider, starfield, broadside or weapon cadence.
 entity_spawn_debris:
     lda ENTITY_ACTIVE_MASK
+    and #$01
     bne @done
     jsr entity_next_rng
     and #$03
@@ -8159,13 +8490,14 @@ entity_spawn_debris:
     sta ENTITY_MOVE_ACCUMULATOR
     sta ENTITY_TIMER
     sta ENTITY_OWNER
-    lda #ENTITY_TYPE_DEBRIS       ; type, state, collision and masks are all one
+    lda #ENTITY_TYPE_DEBRIS       ; type, state, collision and slot-zero mask are one
     sta ENTITY_TYPE
     sta ENTITY_STATE
     sta ENTITY_COLLISION_CATEGORY
-    sta ENTITY_ACTIVE_MASK
-    sta ENTITY_ACTIVE_COUNT
     sta ENTITY_ALLOCATION_RESULT
+    ora ENTITY_ACTIVE_MASK
+    sta ENTITY_ACTIVE_MASK
+    inc ENTITY_ACTIVE_COUNT
     lda #ENTITY_DEBRIS_HP
     sta ENTITY_HP
 @done:
@@ -8186,6 +8518,7 @@ entity_next_rng:
 ; deterministic legal boundary and restores the normal initial spawn delay.
 entity_begin_sector_complete:
     jsr clear_transient_effects
+    jsr weapon_pickup_clear_sector
     lda #PLAYFIELD_RING_ROWS
     sta ENTITY_SPAWN_TIMER_HI
     inc CAPITAL_SECTOR_STATE
@@ -8193,8 +8526,9 @@ entity_begin_sector_complete:
 
 ; COMPLETE receives exactly one full 22-rotation reconstruction pass. The
 ; following OPEN frame starts with the normal delayed entity scheduler. This
-; helper stays in the feature-owned ENTITY_CODE budget rather than consuming
-; the protected resident CODE tail.
+; helper is called only by the relocated hull/sector runtime and shares its
+; remaining BROADSIDE reservation rather than expanding packed ENTITY_CODE.
+.segment "BROADSIDE"
 entity_complete_scroll_tick:
     dec ENTITY_SPAWN_TIMER_HI
     bne @done
@@ -8204,6 +8538,8 @@ entity_complete_scroll_tick:
 @done:
     rts
 
+.segment "ENTITY_CODE"
+
 ; Viper projectiles remain the owners of their existing ascending slot scan.
 ; A destroyed debris keeps its coordinates until the end of the frame so a
 ; higher slot remains active after the lowest matching slot wins. Carry set is
@@ -8211,6 +8547,7 @@ entity_complete_scroll_tick:
 ; returns carry clear.
 entity_viper_projectile_target:
     lda ENTITY_ACTIVE_MASK
+    and #$01
     bne @active
     lda ENTITY_SPAWN_TIMER_LO
     cmp #ENTITY_SHOT_RESPAWN_DELAY
@@ -8328,9 +8665,15 @@ entity_collision_miss:
     rts
 
 entity_despawn_debris:
-    lda #$00
+    lda ENTITY_ACTIVE_MASK
+    and #$01
+    beq :+
+    dec ENTITY_ACTIVE_COUNT
+:
+    lda ENTITY_ACTIVE_MASK
+    and #$FE
     sta ENTITY_ACTIVE_MASK
-    sta ENTITY_ACTIVE_COUNT
+    lda #$00
     sta ENTITY_STATE
     sta ENTITY_ALLOCATION_RESULT
     sta ENTITY_OWNER
@@ -8423,6 +8766,11 @@ materialize_raider_breakup_effects:
 ; the next frame's reverse erase still restores the exact lower layers.
 .segment "CODE"
 clear_transient_effects:
+    lda PLAYER_LIFECYCLE
+    cmp #PLAYER_DYING
+    bne :+
+    jsr weapon_pickup_clear_lifecycle
+:
     lda #$00
     sta EFFECT_ACTIVE_MASK
     sta EFFECT_ACTIVE_COUNT
@@ -8491,36 +8839,45 @@ update_transient_effects:
 .segment "ENTITY_CODE"
 
 ; Render after scroll and after existing shell/projectile rendering. Logical Y
-; is authoritative; the exact physical cell pointer is cached only until the
-; reverse erase at the beginning of the next active frame.
+; is authoritative. Ordinary entities cache the pointer until next-frame erase;
+; the fixed pickup keeps its four physical A2 cells resident until release.
 entity_effects_render:
-    lda ENTITY_ACTIVE_MASK
-    beq @effects
-    jsr render_interactive_entity_overlays
-@effects:
     lda EFFECT_ACTIVE_MASK
-    beq :+
-    jmp render_transient_effect_overlays
-:
+    bne @with_effects
+    lda ENTITY_ACTIVE_MASK
+    bne render_interactive_entity_overlays
     rts
+@with_effects:
+    lda ENTITY_ACTIVE_MASK
+    beq :+
+    jsr render_interactive_entity_overlays
+:
+    jmp render_transient_effect_overlays
 
-.segment "CODE"
+.segment "ENTITY_CODE"
 render_interactive_entity_overlays:
-    ; Slot zero is the only allocator target while ENTITY_ACTIVE_LIMIT is one.
-    ; The remaining SoA slots stay reserved and deterministically initialised.
-    .assert ENTITY_ACTIVE_LIMIT = 1, error, "slot-zero render requires active limit one"
+    ; Keep the accepted slot-zero path specialised, then append one fixed-slot
+    ; capsule path. Both retain byte-exact two-cell backing and layer order.
+    lda ENTITY_ACTIVE_MASK
+    lsr
+    bcc render_weapon_pickup_overlay
     lda ENTITY_Y
     cmp #ENTITY_GAMEPLAY_TOP
-    bcc @done
+    bcc render_weapon_pickup_overlay
     cmp #ENTITY_GAMEPLAY_BOTTOM
-    bcs @done
+    bcs render_weapon_pickup_overlay
     sec
     sbc #ENTITY_GAMEPLAY_TOP
     lsr
     lsr
     lsr
     adc #$01                    ; mapper row zero is the fixed divider
-    jsr set_gameplay_row_ptr
+    tax
+    dex
+    lda PLAYFIELD_ROW_LO,x
+    sta dst_ptr
+    lda PLAYFIELD_ROW_HI,x
+    sta dst_ptr+1
     lda ENTITY_X
     sec
     sbc #GAMEPLAY_LEFT_HPOS
@@ -8554,8 +8911,94 @@ render_interactive_entity_overlays:
     sta (dst_ptr),y
     lda #$03
     sta ENTITY_DRAWN_MASK
+    inc ENTITY_RENDERED_MASK
+
+render_weapon_pickup_overlay:
+    lda ENTITY_ACTIVE_MASK
+    lsr
+    lsr
+    bcs :+
+    rts
+:
+    ldx ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
+    beq @new
+    lda ENTITY_SCREEN_LO+WEAPON_PICKUP_SLOT
+    sta dst_ptr
+    lda ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
+    sta dst_ptr+1
+    bne @draw_top
+@new:
+    ; ACTIVE is clamped into the viewport and released before an out-of-range
+    ; render, so the fixed slot needs no duplicate Y bounds checks.
+    lda ENTITY_Y+WEAPON_PICKUP_SLOT
+    sec
+    sbc #ENTITY_GAMEPLAY_TOP
+    lsr
+    lsr
+    lsr
+    adc #$00
+    tax
+    lda PLAYFIELD_ROW_LO,x
+    sta dst_ptr
+    lda PLAYFIELD_ROW_HI,x
+    sta dst_ptr+1
+    lda ENTITY_X+WEAPON_PICKUP_SLOT
+    sec
+    sbc #GAMEPLAY_LEFT_HPOS
+    lsr
+    lsr
+    adc dst_ptr
+    sta dst_ptr
+    sta ENTITY_SCREEN_LO+WEAPON_PICKUP_SLOT
+    bcc :+
+    inc dst_ptr+1
+:
+    lda dst_ptr+1
+    sta ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
+    ldx #$00
+    ldy #$00
+    lda (dst_ptr),y
+    sta ENTITY_BACKING0+WEAPON_PICKUP_SLOT
+    iny
+    lda (dst_ptr),y
+    sta ENTITY_BACKING1+WEAPON_PICKUP_SLOT
+@draw_top:
+    ldy #$00
+    lda #WEAPON_PICKUP_GLYPH_BASE
+    sta (dst_ptr),y
+    iny
+    lda #(WEAPON_PICKUP_GLYPH_BASE+1)
+    sta (dst_ptr),y
+
+    ; Advance the exact top cell through the ring-aware mapper. This preserves
+    ; the column and wraps the physical row at $43C0. The fixed slot's unused
+    ; VX/VY bytes retain that bottom pointer so reverse erase does not repeat
+    ; the ring mapping in the same hot frame.
+    jsr advance_dst_to_next_ring_row
+    lda dst_ptr
+    sta ENTITY_VX+WEAPON_PICKUP_SLOT
+    lda dst_ptr+1
+    sta ENTITY_VY+WEAPON_PICKUP_SLOT
+    txa
+    bne @draw_bottom
+    ldy #$00
+    lda (dst_ptr),y
+    sta ENTITY_BACKING2+WEAPON_PICKUP_SLOT
+    iny
+    lda (dst_ptr),y
+    sta ENTITY_BACKING3+WEAPON_PICKUP_SLOT
+@draw_bottom:
+    ldy #$00
+    lda #(WEAPON_PICKUP_GLYPH_BASE+2)
+    sta (dst_ptr),y
+    iny
+    lda #(WEAPON_PICKUP_GLYPH_BASE+3)
+    sta (dst_ptr),y
+    lda #$0F
+    sta ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
+    lda ENTITY_ACTIVE_MASK
     sta ENTITY_RENDERED_MASK
-@done:
+render_weapon_pickup_overlay_done:
     rts
 
 ; Effects render after the interactive layer. Slot order is core then the four
@@ -8783,13 +9226,19 @@ entity_trajectory_vx:
 .assert entity_archetype_descriptors_end-entity_archetype_descriptors = ENTITY_ARCHETYPE_DESCRIPTOR_BYTES, error, "entity descriptor size changed"
 .assert entity_debris_glyph_end-entity_debris_glyph = ENTITY_DEBRIS_GLYPH_BYTES, error, "debris glyph bank size changed"
 .assert effect_fragment_glyph_end-effect_fragment_glyph = EFFECT_FRAGMENT_GLYPH_BYTES, error, "fragment glyph bank size changed"
+.assert weapon_pickup_glyph_end-weapon_pickup_glyph = WEAPON_PICKUP_GLYPH_BYTES, error, "Rapid Fire glyph bank size changed"
 .assert *-__ENTITY_CODE_RUN__ <= ENTITY_CODE_RESERVED_BYTES, error, "ENTITY_CODE exceeds its unconditional RAM reservation"
 
 .export init_entity_effects, install_entity_effects_glyph
 .export ENTITY_DEBRIS_GLYPH_BASE
+.export WEAPON_PICKUP_GLYPH_BASE, weapon_pickup_glyph
 .export entity_effects_erase, entity_effects_update, entity_effects_render
 .export entity_spawn_debris, entity_damage_applied, entity_despawn_debris
 .export entity_begin_sector_complete, entity_complete_scroll_tick
+.export update_weapon_pickup_active
+.export weapon_pickup_collide_player, weapon_pickup_collect
+.export weapon_pickup_record_qualified_kill, weapon_pickup_release
+.export weapon_pickup_clear_lifecycle, weapon_pickup_clear_sector
 .export entity_viper_projectile_target, entity_viper_projectile_hits_debris
 .export entity_debris_shot
 .export entity_debris_hit, entity_debris_destroyed
@@ -8798,6 +9247,7 @@ entity_trajectory_vx:
 .export materialize_raider_breakup_effects
 .export update_transient_effects, render_transient_effect_overlays
 .export erase_transient_effect_overlays, erase_interactive_entity_overlays
+.export erase_weapon_pickup_overlay
 .export render_interactive_entity_overlays
 .export entity_archetype_descriptors, entity_debris_glyph, effect_fragment_glyph
 .export entity_raider_fragment_render_ids, entity_trajectory_vx

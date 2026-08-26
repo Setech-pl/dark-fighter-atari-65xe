@@ -83,12 +83,14 @@ test("protected linked segments do not regress beyond the accepted feature basel
       assert.equal(segment.freeReservedBytes, segment.reservedMaximumBytes - segment.bytes);
     }
   }
-  assert.equal(manifest.runtimeCodeBudget.baselineBytes, 13_697);
-  assert.equal(manifest.runtimeCodeBudget.approvedDeltaBytes, 768);
-  assert.ok(manifest.runtimeCodeBudget.actualDeltaBytes <=
-    manifest.runtimeCodeBudget.approvedDeltaBytes);
-  assert.equal(manifest.runtimeCodeBudget.remainingBytes,
-    manifest.runtimeCodeBudget.approvedDeltaBytes - manifest.runtimeCodeBudget.actualDeltaBytes);
+  assert.deepEqual(manifest.runtimeCodeBudget.weaponPickupRapidFire, {
+    baselineBytes: 14_316,
+    actualBytes: manifest.runtimeCodeBudget.actualBytes,
+    actualDeltaBytes: manifest.runtimeCodeBudget.actualBytes - 14_316,
+  });
+  assert.ok(manifest.runtimeCodeBudget.weaponPickupRapidFire.actualDeltaBytes <= 640,
+    `Rapid Fire runtime delta ${manifest.runtimeCodeBudget.weaponPickupRapidFire.actualDeltaBytes} exceeds 640 bytes`);
+  assert.ok(manifest.payloadBudget.weaponPickupRapidFire.remainingReserveBytes >= 512);
 });
 
 test("post-loader runtime and future entity ranges are non-overlapping", () => {

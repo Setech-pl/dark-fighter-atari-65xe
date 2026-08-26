@@ -258,17 +258,23 @@ test("entity memory and code reservations are exact and do not use BASIC ROM", (
   ], [0x8000, 0x100, 0x100, 0x9100, 0x0f00]);
   assert.ok(manifest.entityEffects.codeBytes <= manifest.entityEffects.codeReservedBytes);
   assert.equal(manifest.entityEffects.interactiveSlots, 4);
-  assert.equal(manifest.entityEffects.interactiveActiveLimit, 1);
+  assert.equal(manifest.entityEffects.interactiveActiveLimit, 2);
   assert.equal(manifest.entityEffects.effectSlots, 6);
   assert.equal(manifest.entityEffects.effectActiveLimit, 5);
-  assert.equal(manifest.entityEffects.glyphCount, 10);
-  assert.equal(manifest.entityEffects.glyphBytes, 80);
+  assert.equal(manifest.entityEffects.glyphCount, 14);
+  assert.equal(manifest.entityEffects.glyphBytes, 112);
   assert.equal(manifest.entityEffects.newGlyphsFromFoundation, 7);
-  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 120);
-  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 8);
+  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 124);
+  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 4);
   assert.equal(manifest.entityEffects.codeBudget.baselineBytes, 564);
   assert.equal(manifest.entityEffects.codeBudget.approvedDeltaBytes, 512);
-  assert.ok(manifest.entityEffects.codeBudget.actualDeltaBytes <= 512);
+  assert.ok(manifest.entityEffects.codeBudget.destructibleDebris.actualDeltaBytes <= 768);
+  assert.equal(manifest.entityEffects.codeBudget.weaponPickupRapidFire.actualBytes,
+    manifest.entityEffects.featureCodeBytes);
+  assert.equal(manifest.entityEffects.featureCodeBytes + manifest.entityEffects.sharedRuntimeBytes,
+    manifest.entityEffects.codeBytes);
+  assert.ok(manifest.entityEffects.sharedRuntimeBytes > 0,
+    "pixel-exact hull-scroll optimisation must be reported separately from entity feature code");
   assert.match(source, /ENTITY_EFFECT_STATE_END = ENTITY_STATE_ADDRESS\+ENTITY_STATE_BYTES/);
   assert.doesNotMatch(source.slice(source.indexOf('.segment "ENTITY_CODE"')), /\$A000|\$BFFF/);
 });

@@ -46,7 +46,7 @@ test("ATR uses standard single-density geometry", () => {
   assert.equal(parsed.body.subarray(0x3ffc, 0x4000).toString("ascii"), "DFB1");
 });
 
-test("resident compaction round-trips and leaves at least 1024 source-owned bytes", () => {
+test("resident compaction proof survives and Rapid Fire leaves at least 512 source-owned bytes", () => {
   const { manifest, boot, parsedXex, parsedAtr } = validateBuildDirectory(rootDirectory);
   const resident = fs.readFileSync(path.join(rootDirectory, "build", "resident-runtime.bin"));
   const suffix = fs.readFileSync(
@@ -64,7 +64,9 @@ test("resident compaction round-trips and leaves at least 1024 source-owned byte
     suffix.length,
     packed.length,
     layout.suffixRawBytes - layout.suffixPackedBytes,
-  ], [8192, 449, layout.suffixRawBytes, layout.suffixPackedBytes, 1218]);
+  ], [8192, 449, layout.suffixRawBytes, layout.suffixPackedBytes,
+    layout.suffixRawBytes - layout.suffixPackedBytes]);
+  assert.ok(layout.suffixRawBytes - layout.suffixPackedBytes >= 1218);
   assert.deepEqual(unpackBroadsideLzss(packed), suffix);
   assert.deepEqual(resident.subarray(layout.prefixBytes), suffix);
   assert.deepEqual(
@@ -72,8 +74,15 @@ test("resident compaction round-trips and leaves at least 1024 source-owned byte
       layout.packedSourceAddress - manifest.loadAddress + packed.length),
     packed,
   );
-  assert.ok(reserve.reserveBytes >= reserve.minimumReserveBytes);
-  assert.equal(reserve.minimumReserveBytes, 1024);
+  assert.equal(reserve.recoveredReserveBytes, 1097);
+  assert.equal(reserve.minimumRecoveredReserveBytes, 1024);
+  assert.ok(reserve.reserveBytes >= 512);
+  assert.deepEqual(manifest.payloadBudget.weaponPickupRapidFire, {
+    baselineReserveBytes: 1097,
+    minimumRemainingReserveBytes: 512,
+    remainingReserveBytes: reserve.reserveBytes,
+    consumedReserveBytes: 1097 - reserve.reserveBytes,
+  });
   assert.equal(reserve.reserveEndAddress, 0x5ffb);
   assert.equal(boot.subarray(reserve.reserveAddress - manifest.loadAddress,
     reserve.reserveAddress - manifest.loadAddress + reserve.reserveBytes)

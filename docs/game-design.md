@@ -227,6 +227,35 @@ flasha; pierwszy update od razu rozdziela fragmenty w cztery kierunki.
 Najnowszy rozpad debris albo Raidera zastępuje poprzedni dopiero po reverse
 erase, bez punktów, obrażeń, zmian RNG lub ghostów.
 
+Rapid Fire jest pierwszym weapon pickupem; rakiety i laser pozostają poza tym
+feature’em. Wyłącznie Raider zabity przez rzeczywiście zużyty pocisk Vipera i
+rozliczony przez istniejącą ścieżkę punktacji zwiększa licznik. Sekwencja
+`0→1→2` tworzy po trzecim takim zabiciu kapsułę RF i zeruje licznik; broadside,
+kontakt, cleanup i inne źródła śmierci go nie zmieniają. Podczas PENDING,
+widocznego pickupu lub aktywnego RF kolejny cykl nie jest liczony.
+
+Kapsuła ma footprint 2×2, gruby stalowy obrys, statyczne żółte wypełnienie
+oraz wysokie na niemal 16 pikseli, czarne litery `R`/`F` wycięte kolorem tła.
+Nie zawiera białych pikseli. W całym stanie ACTIVE używa tych samych
+czterech normalnych kodów znaków; nie miga, nie przełącza inverse ani czerwieni i
+jest renderowana nieprzerwanie w każdej aktywnej klatce.
+Pozostaje ukryta i bezkolizyjna przez 30 pełnych klatek po rozpadzie Raidera,
+potem dziedziczy natywny krok near/A2: jeden wiersz przy co drugim
+`WORLD_ROW_ADVANCED`, bez niezależnego wolnego akumulatora i bez catch-up.
+Debris i RF mogą być widoczne jednocześnie. Kontakt z Viperem nie daje
+punktów, leczenia ani obrażeń, tylko usuwa backing kapsuły i aktywuje efekt.
+
+Rapid Fire trwa dokładnie 500 aktywnych klatek PAL. Pause zatrzymuje timer;
+life loss, Game Over i new game go czyszczą, natomiast żywy gracz zachowuje go
+przez zmianę sektora. Interwał wewnątrz istniejącej dziesięciostrzałowej serii
+zmienia się z 3 na 2 klatki. Liczba strzałów, cooldown po serii, pula,
+odrzucenie pełnej puli, obrażenia i geometria pocisków pozostają bez zmian.
+Nowy pocisk utworzony podczas Rapid Fire zachowuje czerwony `COLPF3=$46`
+przez cały własny lifecycle; zwykłe i utworzone po wygaśnięciu są żółte
+`COLPF2=$1E`. Istniejący HUD pokazuje `RF10` do `RF01`, aktualizowane wyłącznie
+co 50 aktywnych klatek; pause zamraża timer i napis. Pickup nie korzysta z RNG,
+PMG, DLI ani SFX.
+
 World zachowuje 20/22,5/25 wiersza/s dla EASY/MEDIUM/HARD. Near stars mają
 10/11,25/12,5, far stars 5/5,625/6,25, a debris 12/13,5/15 wiersza/s.
 Dokładna kolejność pozostaje `far < near < debris < world`. Trace mierzy od

@@ -85,6 +85,9 @@ const profiledRoutineNames = [
   "erase_transient_effect_overlays",
   "erase_interactive_entity_overlays",
   "entity_effects_update",
+  "update_weapon_pickup_active",
+  "weapon_pickup_collide_player",
+  "weapon_pickup_record_qualified_kill",
   "entity_spawn_debris",
   "entity_collide_player",
   "entity_damage_applied",
@@ -318,6 +321,7 @@ function snapshotRuntime(cpu, entryPoints) {
     capitalSectorState: memory[addresses.capitalSectorState],
     entityActiveCount: memory[entryPoints.entityActiveCount],
     entityActiveMask: memory[entryPoints.entityActiveMask],
+    weaponPickupState: memory[entryPoints.entityState + 1],
     entityY: memory[entryPoints.entityY],
     effectActiveCount: memory[entryPoints.effectActiveCount],
     effectActiveMask: memory[entryPoints.effectActiveMask],
@@ -514,6 +518,7 @@ export function measureRuntimeCycles(build) {
     hitTimer: requiredLabel(build.labels, "hit_timer"),
     entityActiveCount: requiredLabel(build.labels, "ENTITY_ACTIVE_COUNT"),
     entityActiveMask: requiredLabel(build.labels, "ENTITY_ACTIVE_MASK"),
+    entityState: requiredLabel(build.labels, "ENTITY_STATE"),
     entityY: requiredLabel(build.labels, "ENTITY_Y"),
     entitySpawnTimer: requiredLabel(build.labels, "ENTITY_SPAWN_TIMER_LO"),
     effectActiveCount: requiredLabel(build.labels, "EFFECT_ACTIVE_COUNT"),
@@ -750,7 +755,9 @@ export function measureRuntimeCycles(build) {
     if (frame.before.musicWithSfx) {
       musicWithSfx = chooseMaximum(musicWithSfx, frame, (candidate) => candidate.cycles);
     }
-    if (frame.before.entityActiveCount === 0 && frame.before.effectActiveCount === 0 &&
+    if (frame.before.entityActiveCount === 0 && frame.before.weaponPickupState === 0 &&
+      frame.after.weaponPickupState === 0 &&
+      frame.before.effectActiveCount === 0 &&
       frame.after.effectActiveCount === 0 &&
       !frame.hits.has("entity_spawn_debris")) {
       entityEmptyPath = chooseMaximum(entityEmptyPath, frame, (candidate) => candidate.cycles);

@@ -15,6 +15,8 @@ import {
   createDestructibleDebrisTrace,
   createRaiderBreakupPreview,
   createRaiderBreakupTrace,
+  createWeaponPickupRapidFirePreview,
+  createWeaponPickupRapidFireTrace,
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   createGameplayPreview,
@@ -279,4 +281,45 @@ test("Raider owner preview is the XEX/ATR-executed eight-frame local breakup", (
     row.endsWith(",0742")));
   assert.ok(rows.slice(1).filter((row) => row.includes(",BREAKUP,")).every((row) =>
     row.endsWith(",0752")), "Raider score policy must remain byte-exact");
+});
+
+test("Rapid Fire owner preview executes the packed XEX/ATR pickup lifecycle", () => {
+  const first = createWeaponPickupRapidFirePreview(source);
+  const second = createWeaponPickupRapidFirePreview(source);
+  assert.deepEqual(first, second);
+  assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [5228, 850]);
+
+  const trace = createWeaponPickupRapidFireTrace();
+  assert.equal(trace, createWeaponPickupRapidFireTrace());
+  const rows = trace.trimEnd().split("\n");
+  assert.equal(rows.filter((row) => row.startsWith("xex,")).length, 588);
+  assert.equal(rows.filter((row) => row.startsWith("atr,")).length, 588);
+  assert.ok(rows.some((row) => row.startsWith("xex,KILL_2,0,2,0,1,2,2,0,0,")));
+  assert.ok(rows.some((row) => row.startsWith("xex,KILL_3,0,3,0,1,0,0,0,1,")));
+  assert.ok(rows.some((row) => row.startsWith("xex,PENDING,29,")));
+  assert.ok(rows.some((row) => row.includes(",ACTIVE,0,") &&
+    row.includes(",0,120,121,122,123,")));
+  for (const artifact of ["xex", "atr"]) {
+    assert.equal(rows.filter((row) => row.startsWith(`${artifact},ACTIVE,`)).slice(0, 32)
+      .every((row) => {
+        const fields = row.split(",");
+        return fields.slice(16, 21).join(",") === "0,120,121,122,123" &&
+          fields.slice(23, 27).every((value) => value === "0") && fields[31] === "15";
+      }), true);
+  }
+  assert.ok(rows.some((row) => {
+    if (!row.startsWith("xex,PICKUP,0,")) return false;
+    const fields = row.split(",");
+    return fields[9] === "3" && fields[10] === "0" && fields[11] === "0" &&
+      fields[12] === "128" && Number(fields[13]) >= 40 && Number(fields[13]) <= 184 &&
+      fields[14] === "500" && fields[15] === "50" &&
+      fields.slice(16, 21).every((value) => value === "0") &&
+      fields.slice(27, 31).join(",") === "50,38,17,16" && fields[31] === "0";
+  }));
+  assert.ok(rows.some((row) => {
+    if (!row.startsWith("xex,RAPID_TIMER,499,")) return false;
+    const fields = row.split(",");
+    return fields[9] === "0" && fields[14] === "0" && fields[16] === "0" &&
+      fields.slice(27, 31).every((value) => value === "0");
+  }));
 });

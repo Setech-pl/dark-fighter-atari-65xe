@@ -645,10 +645,52 @@ test("HUD and divider LMS remain fixed for every one of the 22 ring heads", () =
     assert.deepEqual(Array.from(memory.subarray(list + 72, list + 75)),
       [0x41, list & 0xff, 0x7f]);
 
+    const oldDlistl = memory[dlistl];
+    const oldActive = memory[activeListLo];
     runAssembledRoutine(memory, "rotate_playfield_rows");
-    assert.equal(memory[dlistl], memory[activeListLo], "publication must switch DLISTL only");
+    assert.notEqual(memory[activeListLo], oldActive,
+      "rotation must select the prepared list");
+    assert.equal(memory[dlistl], oldDlistl,
+      "rotation must defer DLISTL selection to the bounded first gameplay DLI");
     runAssembledRoutine(memory, "prebuild_next_playfield_display_list");
   }
+});
+
+test("assembled capital-engine animation is an atomic deterministic 8+8 PAL pulse", () => {
+  const memory = createLinkedRuntimeMemory();
+  const timer = labels.get("CAPITAL_EXPLOSION_SOUND_TIMER") + 1;
+  const phase = timer + 1;
+  const alliedGlyph = asset.sector.engineGlyphs.get("allied");
+  const enemyGlyph = asset.sector.engineGlyphs.get("enemy");
+  memory[timer] = 8;
+  memory[phase] = 0;
+  memory.set(alliedGlyph.animationBytes[0], 0x4400 + alliedGlyph.index * 8);
+  memory.set(enemyGlyph.animationBytes[0], 0x4400 + enemyGlyph.index * 8);
+
+  const observed = [];
+  for (let frame = 0; frame < 32; frame += 1) {
+    runAssembledRoutine(memory, "update_engine_animation");
+    observed.push([memory[timer], memory[phase]]);
+    const expectedPhase = memory[phase];
+    assert.deepEqual(
+      Array.from(memory.subarray(0x4400 + alliedGlyph.index * 8,
+        0x4400 + alliedGlyph.index * 8 + 8)),
+      Array.from(alliedGlyph.animationBytes[expectedPhase]),
+      `allied engine phase at frame ${frame}`,
+    );
+    assert.deepEqual(
+      Array.from(memory.subarray(0x4400 + enemyGlyph.index * 8,
+        0x4400 + enemyGlyph.index * 8 + 8)),
+      Array.from(enemyGlyph.animationBytes[expectedPhase]),
+      `enemy engine phase at frame ${frame}`,
+    );
+  }
+  assert.deepEqual(observed.map(([, value]) => value), [
+    ...Array(7).fill(0), ...Array(8).fill(1), ...Array(8).fill(0),
+    ...Array(8).fill(1), 0,
+  ]);
+  assert.deepEqual(observed.filter(([value]) => value === 8).map(([, value]) => value),
+    [1, 0, 1, 0]);
 });
 
 test("optimized Viper PMG keeps horizontal pixels and clears only the departed vertical row", () => {

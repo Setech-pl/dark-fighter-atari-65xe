@@ -10,19 +10,19 @@ loaderze nie są tym samym budżetem.
 | `$0080-$009F` | 32 B zero-page variables; the three unread legacy bullet mirrors were removed |
 | `$0100-$01FF` | stos 6502 |
 | `$0200-$03FF` | obszar systemowy OS i wektory |
-| `$2000-$3149` | resident CODE, 4426 B; includes bootstrap, A2 logical-row mapper, display-list publisher, fighter-flash selector, shared projectile targeting and transient-effect update/render entry points |
-| `$314A-$3FFE` | resident RODATA, 3765 B; includes palette tables, compact charset sources, fragment velocity tables, frontend records, packed maps and loader LZ-10/5 sources |
-| `$31EC-$322A` | 63 B main-menu and text frontend display lists; deliberately contained inside one ANTIC 1 KiB counter window |
-| `$33CB-$33ED` | 35 B transient LZ-10/5 source of the exact 202 B loader display list |
-| `$3832-$3FFE` | 1997 B transient loader-bitmap LZ-10/5 stream; after bitmap decoding its consumed prefix is reused as the decoded display list |
-| `$3FFF` | after cold unpack: 1 B fixed-block linker fill completing the restored 8192 B MAIN image |
+| `$2000-$30D0` | resident CODE, 4305 B; includes bootstrap, A2 logical-row mapper, display-list publisher, fighter-flash selector, shared projectile targeting and transient-effect update/render entry points |
+| `$30D1-$3FA5` | resident RODATA, 3797 B; includes palette tables, compact charset sources, fragment velocity tables, frontend records, packed maps and loader LZ-10/5 sources |
+| `$3173-$318F` | 29 B main-menu display list, deliberately contained inside one ANTIC 1 KiB counter window |
+| `$3372-$3394` | 35 B transient LZ-10/5 source of the exact 202 B loader display list |
+| `$37D9-$3FA5` | 1997 B transient loader-bitmap LZ-10/5 stream; after decoding, the fixed loader display-list destination `$3800-$38C9` may overwrite this consumed source |
+| `$3FA6-$3FFF` | 90 B deterministic fixed-block fill completing the restored 8192 B MAIN image |
 | `$2000-$21C0` | on entry: 449 B raw bootstrap prefix; load address and entry point `$201E` are unchanged |
-| `$21C1-$3B3D` | on entry: 6525 B packed LZ-10/5 resident suffix; staged at `$8100-$9A7C` and expanded back to `$21C1-$3FFF` |
-| `$3B3E-$5129` | on entry: 5612 B packed LZ-10/5 broadside/frontend/enemy/pause runtime; expanded to `$5E10-$780E` before resident restoration |
-| `$512A-$57CC` | on entry: 1699 B packed starfield/shared/music runtime, staged before loader overwrite |
-| `$57CD-$58AE` | on entry: 226 B source of the A2 kernel staged at `$7F10-$7FF1` and copied to `$9000-$90E1` |
-| `$58AF-$5BB2` | on entry: 772 B packed `ENTITY_CODE`, staged at `$9A7D-$9D80` and expanded to `$9100-$9450` |
-| `$5BB3-$5FFB` | 1097 B source-owned, zero-filled boot-payload reserve recovered by runtime compaction; not formatter padding |
+| `$21C1-$3B17` | on entry: 6487 B packed LZ-10/5 resident suffix; staged at `$8100-$9A56` and expanded back to `$21C1-$3FFF` |
+| `$3B18-$50C0` | on entry: 5545 B packed LZ-10/5 broadside/frontend/enemy/pause runtime; expanded to `$5E10-$77B0` before resident restoration |
+| `$50C1-$5783` | on entry: 1731 B packed starfield/shared/music runtime, staged before loader overwrite |
+| `$5784-$5865` | on entry: 226 B source of the A2 kernel staged at `$7F10-$7FF1` and copied to `$9000-$90E1` |
+| `$5866-$5DF5` | on entry: 1424 B packed `ENTITY_CODE`, staged at `$9A57-$9FE6` and expanded to `$9100-$9780` |
+| `$5DF6-$5FFB` | 518 B source-owned, zero-filled boot-payload reserve remaining after Rapid Fire; not formatter padding |
 | `$5FFC-$5FFF` | source-owned `DFB1` boot trailer; completes the exact 16 KiB/128-sector payload invariant |
 | `$4000-$43FF` | wspólny bufor ekranu gameplayu/frontendu, 1024 B; loader zaczyna bitmapę dopiero pod `$4010` |
 | `$4400-$47FF` | gameplay charset, dokładnie 1024 B |
@@ -47,7 +47,7 @@ loaderze nie są tym samym budżetem.
 | `$4EB0-$4EB5` | 6 B pointerów wiersza i kolumn dwóch hull-attached eksplozji |
 | `$4EB6-$4EC7` | 18 B backing dwóch footprintów 3×3 |
 | `$4EC8` | 1 B timera POKEY channel-4 capital explosion |
-| `$4EC9-$4ECA` | 2 B: timer i faza trzyfazowej animacji banków silników |
+| `$4EC9-$4ECA` | 2 B: timer i faza dwufazowej animacji banków silników; każda faza trwa osiem aktywnych klatek PAL |
 | `$4ECB` | 1 B aktywnego `ENEMY_ARCHETYPE`; normalny release ustawia `RAIDER` |
 | `$4ECC` | 1 B akumulatora ruchu bocznego Raidera `4/5` |
 | `$4ECD` | 1 B jawnego active/inactive stanu ordinary enemy |
@@ -64,28 +64,28 @@ loaderze nie są tym samym budżetem.
 | `$5000-$53FF` | dedykowany gameplay HUD charset, dokładnie 1024 B, budowany po loaderze |
 | `$5400-$54C9` | 202 B stałego stanu: 19 fighter projectiles, oba kontrolery burst oraz timer/X/Y dwóch wspólnych fighter explosions |
 | `$54CA-$5529` | 96 B czterech tablic 24 far stars: active/rendered, logical row, column and screen code |
-| `$552A-$5D99` | 2160 B relocated starfield/shared damage/music runtime in a 2278 B reservation |
-| `$5D9A-$5E0F` | 118 B currently unassigned after the loader |
+| `$552A-$5DB8` | 2191 B relocated starfield/shared damage/music runtime in a 2278 B reservation |
+| `$5DB9-$5E0F` | 87 B currently unassigned after the loader |
 | `$5000-$5E0F` | podczas loadera: drugie LMS, ANTIC F linie 102–163 i ANTIC E linie 164–191, 3600 B; po przejściu dzielone na HUD charset i wolny ogon |
-| `$5E10-$780E` | 6655 B relocated broadside/frontend/HUD/enemy/pause runtime in a 6656 B reservation |
-| `$780F` | 1 B currently unassigned between resident runtime and staging |
-| `$7810-$7F0F` | 1792 B starfield/music staging buffer; packed source uses 1699 B through `$7EAA`; after unpacking, `$7810-$7BCF` is reused as the 960 B PAUSED screen backup |
+| `$5E10-$77B0` | 6561 B relocated broadside/frontend/HUD/enemy/pause/RF runtime in a 6656 B reservation |
+| `$77B1-$780F` | 95 B currently unassigned between resident runtime and staging |
+| `$7810-$7F0F` | 1792 B starfield/music staging buffer; packed source uses 1731 B through `$7ED2`; after unpacking, `$7810-$7BCF` is reused as the 960 B PAUSED screen backup |
 | `$7F10-$7F5A` | 75 B active/inactive A2 gameplay display list A: HUD LMS, fixed divider LMS, 22 gameplay LMS instructions and JVB |
 | `$7F5B-$7FA5` | 75 B A2 gameplay display list B; built off-screen and published atomically through page-local `DLISTL` |
 | `$7FA6-$7FBB` | 22 B low bytes logical-to-physical gameplay-row table |
 | `$7FBC-$7FD1` | 22 B high bytes logical-to-physical gameplay-row table |
 | `$7FD2-$7FDA` | 9 B A2 list/ring state: active/next list, event flag, three broadside logical rows, two capital-explosion logical rows and inactive-list prebuild flag |
 | `$7FDB-$7FFF` | 37 B currently unassigned after the loader |
-| `$8000-$805F` | 96 B SoA interactive entities: 16 B global state plus 20 four-byte slot arrays; four physical slots, release active limit 1 |
+| `$8000-$805F` | 96 B SoA interactive entities: 16 B global state plus 20 four-byte slot arrays; four physical slots, release active limit 2 (slot 0 debris, slot 1 RF, slots 2–3 reserved) |
 | `$8060-$807F` | 32 B jawnie zerowanego alignment/reserve przed pulą effects |
 | `$8080-$80F3` | 116 B SoA transient effects: 8 B global state plus 18 six-byte slot arrays; six physical slots, release active limit 5 |
 | `$80F4-$80FF` | 12 B jawnie zerowanego ogona strony BSS; init zawsze zapisuje pełne `$8000-$80FF` |
-| `$8100-$9D80` | cold-start only: packed resident suffix uses `$8100-$9A7C`, then packed ENTITY_CODE uses `$9A7D-$9D80`; both are consumed before normal BSS/entity gameplay ownership begins |
+| `$8100-$9FE6` | cold-start only: packed resident suffix uses `$8100-$9A56`, then packed ENTITY_CODE uses `$9A57-$9FE6`; both are consumed before normal BSS/entity gameplay ownership begins |
 | `$8100-$8FFF` | after cold startup: 3840 B zachowanej rezerwacji na przyszły entity/effects state; gameplay jej nie zapisuje |
 | `$9000-$90E1` | 226 B product-preserving A2 kernel; bootstrap kopiuje identyczne bajty w XEX i cold-boot ATR |
 | `$90E2-$90FF` | 30 B wolne w jawnej 256 B rezerwacji A2 kernel |
-| `$9100-$9450` | 849 B `ENTITY_CODE`: unchanged gameplay/effect implementation through `$93D4`, followed by 124 B cold-only palette/charset/audio/menu initialization relocated from the compressed resident suffix |
-| `$9451-$9FFF` | 2991 B wolne po zakończeniu cold staging; nieprzydzielone bieżącemu feature |
+| `$9100-$9780` | 1665 B `ENTITY_CODE`: 221 B współdzielonej, pixel-exact kopii kolumn kadłubów oraz 1444 B entity/effect/RF i cold initialization; packed stream ma 1424 B |
+| `$9781-$9FFF` | 2175 B wolne po zakończeniu cold staging; nieprzydzielone bieżącemu feature |
 | `$A000-$BFFF` | warunkowy RAM pod BASIC ROM; celowo niewliczony do dostępnej pamięci bez dowodu PORTB dla XEX, cold-boot ATR i realnego 65XE/SIO2SD |
 | `$C000-$FFFF` | OS ROM oraz sprzętowe rejestry I/O; nie jest pulą gameplay RAM |
 
@@ -101,13 +101,13 @@ PMG dla bazy `$3800`:
 | `$3F00-$3FFF` | Player 3 — silnik gracza, `COLPM3=$28`; M3 dziedziczy ten kolor |
 
 Podczas loadera PMG i PMG DMA są wyłączone. Pakowany strumień bitmapy pod
-`$3832-$3FFE` cannot be used as an additional buffer. The exact 202-byte
-display list is stored as a separate 35-byte stream at `$33CB-$33ED`; after
+`$37D9-$3FA5` cannot be used as an additional buffer. The exact 202-byte
+display list is stored as a separate 35-byte stream at `$3372-$3394`; after
 the bitmap has been decoded, it is expanded over the consumed bitmap source
-at `$3832-$38FB`. The former starfield staging at `$3800-$3BBC` would overwrite
+at the fixed `$3800-$38C9`. The former starfield staging at `$3800-$3BBC` would overwrite
 the bitmap source before decoding, so the corrected sequence copies packed
-starfield/music to the separate `$7810-$7F0F` buffer; the current 1699 B
-occupies `$7810-$7EAA` and expands after 250 complete frames to `$552A-$5D99`. Code
+starfield/music to the separate `$7810-$7F0F` buffer; the current 1731 B
+occupies `$7810-$7ED2` and expands after 250 complete frames to `$552A-$5DB8`. Code
 następnie wyłącza NMI i DMA oraz zeruje wyłącznie rzeczywiste strony
 single-line PMG `$3B00-$3FFF`. Zakres `$3800-$3AFF` nie jest pobierany przez
 PMG DMA i pozostaje nienaruszony.
@@ -120,10 +120,10 @@ mapy side hulls do `$4C00-$4E3F`. Są to trwałe dane gameplayu, odzyskane z
 bitmapy loadera, a nie dodatkowa pamięć masowa ATR.
 
 Before unpacking the bitmap, `start` stages all sources that resident
-restoration would overwrite. It expands `$3B3E-$5129` to `$5E10-$780E`,
-restores the 7743-byte resident suffix from staged `$8100-$9A7C`, expands
-staged ENTITY_CODE `$9A7D-$9D80` to `$9100-$9450`, clears the complete BSS
-page `$8000-$80FF`, and copies staged A2 to `$9000-$90E1`. The 1699-byte
+restoration would overwrite. It expands the packed broadside stream to
+`$5E10-$77B0`, restores the 6487-byte packed resident suffix from staged
+`$8100-$9A56`, expands staged ENTITY_CODE `$9A57-$9FE6` to `$9100-$9780`, clears the complete BSS
+page `$8000-$80FF`, and copies staged A2 to `$9000-$90E1`. The 1731-byte
 starfield stream remains staged at `$7810` until after the loader. The shared
 self-modifying LZSS decoder is explicitly re-armed between streams; the
 `$A5/$5A` cold-RAM tests execute the full sequence for XEX and ATR.
@@ -142,13 +142,13 @@ harmonogramu stron, po 3 B stawek world i hull scroll, 3 B ostatnich
 bezpiecznych wierszy, 64 B granic kolizji, 192 B indeksów źródłowych modułów,
 60 B sekwencji modułów, 16 B masek engine overlay, 64 B profili prow,
 64 B granic prow, 54 B faz eksplozji i 48 B obwiedni POKEY, łącznie 945 B.
-Dziewięć glifów efektów/profili zajmuje 72 B charsetu, a trzyfazowe bitmapy
-dwóch silników dalsze 48 B
+Dziewięć glifów efektów/profili zajmuje 72 B charsetu, a dwufazowe bitmapy
+dwóch silników dalsze 32 B
 w relokowanym runtime. Maski zapisu/kasowania M1–M3 zajmują 6 B, tabele
 szerokości double/quad 6 B, a tabela offsetów 2 B. Osiem glifów neutralnego
 debris zajmuje indeksy 110–117; siedem z nich jest nowych względem foundation.
-Dwie fazy nieregularnego fragmentu zajmują indeksy 118–119, a osiem indeksów
-120–127 pozostaje wolnych.
+Dwie fazy nieregularnego fragmentu zajmują indeksy 118–119, kapsuła RF indeksy
+120–123, a cztery indeksy 124–127 pozostają wolne.
 
 Main menu używa 820 B pod `$4000-$4333`; jego display list jawnie przechodzi
 między wierszami 20 B (ANTIC 7/6) i 40 B (ANTIC 4/2). Pozostałe ekrany używają
@@ -158,8 +158,11 @@ i dokładnie 22 obrotowych wierszy gameplayu ANTIC 4 pod `$4050-$43BF`.
 Historyczne „23 gameplay rows” oznaczało divider + 22 właściwe wiersze.
 Dwie 75-bajtowe listy A2 pozostawiają HUD i divider nieruchome, a każdy z 22
 wierszy ringu ma własny LMS. Common world+hull scroll zmienia logiczną
-kolejność wyłącznie ringu i przełącza wcześniej przygotowaną listę jednym
-zapisem `DLISTL`; hull-only scroll kopiuje wyłącznie dwa ośmiokolumnowe pasy.
+kolejność wyłącznie ringu i wybiera wcześniej przygotowaną listę. Pierwszy DLI
+bieżącej klatki przełącza `DLISTL` na bajt 3 wybranej listy jeszcze przed
+dividerem i ringiem, a własny JVB tej listy zachowuje ją na kolejną klatkę.
+Hull-only scroll kopiuje
+wyłącznie dwa ośmiokolumnowe pasy.
 Wszystkie warianty mieszczą się w rezerwacji 1 KB.
 
 Entity/effects coordinates use gameplay scanlines `24..199` exclusively:
@@ -217,9 +220,48 @@ five-slot event only after the prior backing has been erased; none collides.
 The backed character order is base/ring, broadside shell, fighter projectile,
 entity, effect; erase is the exact reverse. PMG remains independent.
 
-The current payload is 16,384 B: 449 B raw bootstrap, 6525 B packed resident
-suffix, 5612 B packed broadside/pause, 1699 B packed starfield/music, 226 B A2
-kernel source, 772 B packed ENTITY_CODE, 1097 B source-owned reserve and the
+Interactive slot ownership is fixed: slot 0 is debris, slot 1 is the RF weapon
+pickup, and slots 2–3 remain reserved. Slot 1 keeps the qualified-kill counter
+in `ENTITY_HP`; `ENTITY_STATE` is `0=IDLE`, `1=PENDING`, `2=ACTIVE`,
+`3=RAPID`. During PENDING/ACTIVE, `ENTITY_X/Y` hold the captured Raider origin,
+`ENTITY_TIMER` holds the hidden countdown, and visible motion follows the
+native near/A2 `1/2` cadence without an independent accumulator. The fixed
+renderer ignores mutable `RENDER_ID`; the ACTIVE appearance has no frame
+phase. During RAPID, `ENTITY_TIMER` is the low byte and
+`ENTITY_MOVE_ACCUMULATOR` the high byte of the exact 500-frame timer,
+`ENTITY_OWNER+1` is the modulo-50 HUD subcounter, and `ENTITY_HP+1` owns the
+displayed seconds screen-code from 10 through 1. The visible 2×2 capsule uses
+slot-1 `SCREEN_LO/HI` for its top-left pointer, `VX/VY` for the bottom-left
+pointer, `BACKING0/1/2/3` respectively for top-left, top-right, bottom-left and
+bottom-right, and `DRAWN_MASK=$0F`; no BSS byte was added. Reverse erase restores
+bottom-right → bottom-left → top-right → top-left before either pointer is cleared.
+While ACTIVE, the four physical A2 addresses remain resident across native
+near-ring rotations; three bounded layer fences reassert the same codes after
+projectile/broadside work without recapturing backing or creating another
+footprint. Collection, despawn and lifecycle clear perform the single backing
+restore and invalidate the saved top/bottom pointers.
+
+Static screen codes `$78/$79/$7A/$7B` address glyphs 120–123 for every ACTIVE frame.
+ANTIC 4 routes their steel outline through `COLPF1=$84`, the letters through
+`COLBK=$00`, and the filled interior through `COLPF2=$1E`. Selector `01`
+(`COLPF0`, white) is absent: the R/F strokes are black cut-outs, not backing.
+The pickup never emits
+inverse `$F8-$FB`, never selects `COLPF3=$46`, and never hides during ACTIVE.
+Glyphs 124–127 remain free. The active entity
+limit is two, so debris and RF can coexist without allocator overlap.
+
+HUD cells 32–35 (`$4020-$4023`) are the only RF status cells; 30–31 and 36–39
+remain unused. Collection writes `RF10`, the 50-frame subcounter advances it
+through `RF01`, and release clears all four bytes. SCORE 0–10, LIFE 13–18 and
+HULL 21–29 are never touched. Normal Viper projectile slots keep active byte
+`$01` and selector `11` maps their shared glyph to `COLPF2=$1E`; a projectile
+allocated during RAPID stores `$81`, so D7 maps the same selector and glyph to
+`COLPF3=$46` for that slot's complete lifetime. Collision reads only nonzero
+active state plus X/Y geometry, so colour does not alter hitbox or damage.
+
+The current payload is 16,384 B: 449 B raw bootstrap, 6487 B packed resident
+suffix, 5545 B packed broadside/pause, 1731 B packed starfield/music, 226 B A2
+kernel source, 1424 B packed ENTITY_CODE, 518 B source-owned reserve and the
 four-byte `DFB1` trailer. It occupies exactly 128 128-byte sectors with zero
 formatter-added padding. The XEX is 16,396 B
 including headers and RUNAD; the ATR remains the standard 92,176-byte image.
@@ -323,12 +365,13 @@ slot zachowuje w istniejących `BROAD_PREV_Y/H` pierwszy kod i pozycję, a
 nieużywany po software-collision `BROAD_COLLISION` drugi kod dwóch sąsiednich
 komórek ANTIC 4. Dwa już istniejące glify (`base+18/+19`) dają 8×6 slug; D7 wybiera
 `COLPF2=$1E` dla Colonial albo `COLPF3=$46` dla Cylon. Relokowany runtime
-broadside/pause runtime occupies 6655/6656 B; relocated shared procedures,
-frontend option helpers, and both music players share the 2160/2278 B
-starfield block. The packed streams remain 5612 B and 1699 B; the separate A2
-kernel occupies 226/256 B at `$9000`, while ENTITY_CODE occupies 849/3840 B
-at `$9100-$9450` and is stored as a 772 B packed boot stream. The 124 B delta
-is cold-only initialization relocated from MAIN, not new gameplay behavior.
+broadside/pause/RF runtime occupies 6561/6656 B; relocated shared procedures,
+frontend option helpers, and both music players share the 2191/2278 B
+starfield block. The packed streams are 5545 B and 1731 B; the separate A2
+kernel occupies 226/256 B at `$9000`, while ENTITY_CODE occupies 1665/3840 B
+at `$9100-$9780` and is stored as a 1424 B packed boot stream. Of that raw
+ENTITY_CODE total, 221 B are the shared unrolled hull copier and 1444 B are
+entity/effect/RF plus the accepted cold initialization.
 `WARNING` i `IMPACT`
 korzystają z maskowych par M1–M3; M0 pozostaje wyłącznie zarezerwowane dla
 player weapon. Fighter fire używa 56 glifów fazowych: 36 dla Vipera jest

@@ -278,7 +278,7 @@ test("all score writes use one BCD award path while source ownership stays uncha
   assert.match(routine("add_archetype_score"),
     /adc enemy_scores,x[\s\S]+sta score_bcd_hi[\s\S]+jsr update_top_score[\s\S]+jmp update_score_display/);
   assert.match(routine("resolve_enemy_damage"),
-    /cmp #\(DAMAGE_CAPITAL_CYLON\+1\)\s+bcs @no_score\s+jsr add_archetype_score/);
+    /cmp #\(DAMAGE_CAPITAL_CYLON\+1\)\s+bcs @no_score\s+pha\s+jsr add_archetype_score\s+pla\s+cmp #DAMAGE_PLAYER_PROJECTILE\s+bne @no_score\s+lda ENTITY_STATE\+WEAPON_PICKUP_SLOT\s+bne @no_score\s+jsr weapon_pickup_record_qualified_kill/);
   assert.match(routine("init_state"), /sta score_bcd_lo\s+sta score_bcd_hi/);
   assert.doesNotMatch(routine("init_state"), /TOP_SCORE/);
   assert.match(routine("finish_startup_after_loader"),

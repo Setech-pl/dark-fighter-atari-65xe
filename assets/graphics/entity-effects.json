@@ -7,7 +7,7 @@
   },
   "pools": {
     "interactiveSlots": 4,
-    "interactiveActiveLimit": 1,
+    "interactiveActiveLimit": 2,
     "effectSlots": 6,
     "effectActiveLimit": 5,
     "stateAddress": 32768,
@@ -89,6 +89,31 @@
       { "id": "central", "phaseGlyphs": ["debris-fragment-0", "debris-fragment-1"] },
       { "id": "red-eye", "phaseGlyphs": ["raider-pulse-0-red", "raider-pulse-1-red"] }
     ]
+  },
+  "weaponPickupRapidFire": {
+    "slot": 1,
+    "qualifiedKillsPerDrop": 3,
+    "pendingFrames": 30,
+    "movementNumerator": 1,
+    "movementDenominator": 2,
+    "safeTopScanline": 40,
+    "safeBottomScanline": 152,
+    "widthHpos": 8,
+    "heightScanlines": 16,
+    "glyphs": [
+      [42, 191, 131, 140, 140, 131, 140, 140],
+      [168, 254, 194, 206, 206, 194, 206, 206],
+      [131, 140, 140, 140, 140, 140, 191, 42],
+      [194, 206, 206, 206, 206, 206, 254, 168]
+    ],
+    "palette": {
+      "outlineRegister": "COLPF1",
+      "outlineValue": 132,
+      "fillRegister": "COLPF2",
+      "fillValue": 30,
+      "letterRegister": "COLBK",
+      "letterValue": 0
+    }
   },
   "archetypes": [
     {

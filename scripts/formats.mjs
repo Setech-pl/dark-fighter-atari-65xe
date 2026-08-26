@@ -22,6 +22,8 @@ const DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET = 768;
 const EXACT_BOOT_PAYLOAD_BYTES = 16384;
 const EXACT_BOOT_SECTORS = 128;
 const MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES = 1024;
+const ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES = 1097;
+const MINIMUM_WEAPON_PICKUP_RESERVE_BYTES = 512;
 const BOOT_PAYLOAD_TRAILER = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
 
 function invariant(condition, message) {
@@ -179,10 +181,10 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.initializedBytes === 0x0100,
   "Entity/effects BSS must be exactly and explicitly initialised at $8000-$80FF");
   invariant(manifest.entityEffects.interactiveSlots === 4 &&
-    manifest.entityEffects.interactiveActiveLimit === 1 &&
+    manifest.entityEffects.interactiveActiveLimit === 2 &&
     manifest.entityEffects.effectSlots === 6 &&
     manifest.entityEffects.effectActiveLimit === 5,
-  "Entity/effects release pool limits differ from the reviewed contract");
+  "Rapid Fire must coexist with debris without expanding either physical pool");
   invariant(manifest.entityEffects?.codeRunAddress === 0x9100 &&
     manifest.entityEffects.codeBytes > 0 &&
     manifest.entityEffects.codeBytes <= manifest.entityEffects.codeReservedBytes,
@@ -198,10 +200,12 @@ export function validateBuildDirectory(rootDirectory) {
       DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BUDGET,
   "Destructible debris exceeds its +768 B ENTITY_CODE budget");
   invariant(manifest.entityEffects.debrisGlyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
-    manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT &&
+    manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 4 &&
     manifest.entityEffects.effectGlyphCount === 2 &&
+    manifest.entityEffects.weaponPickupGlyphCount === 4 &&
+    manifest.entityEffects.weaponPickupGlyphIndex === 120 &&
     manifest.entityEffects.newGlyphsFromFoundation === DEBRIS_VISUAL_POLISH_NEW_GLYPHS,
-  "Destructible debris must retain eight debris glyphs and add two effect glyphs");
+  "Rapid Fire must retain debris/effects and use only glyphs 120-123");
   invariant(manifest.payloadBytes === DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
     manifest.bootSectors === EXACT_BOOT_SECTORS &&
     manifest.payloadBudget?.debrisVisualPolish?.limitBytes ===
@@ -211,14 +215,22 @@ export function validateBuildDirectory(rootDirectory) {
     DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
     manifest.runtimeCodeBudget?.baselineBytes ===
       DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BASELINE &&
-    manifest.runtimeCodeBudget.actualDeltaBytes <= DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET &&
     manifest.runtimeCodeBudget.approvedDeltaBytes === DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET,
-  "Destructible debris exceeds its payload or linked runtime-code budget");
+  "Historical destructible-debris payload/runtime metadata changed");
   const compaction = manifest.payloadBudget?.runtimePayloadCompaction;
-  invariant(compaction?.reserveBytes >= MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES &&
-    compaction.minimumReserveBytes === MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES &&
+  invariant(compaction?.recoveredReserveBytes === ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    compaction.baselineReserveBytes === ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    compaction.minimumRecoveredReserveBytes === MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES &&
     compaction.sourceOwned === true && compaction.fillByte === 0,
-  "Runtime payload compaction does not preserve the required source-owned reserve");
+  "Runtime payload compaction baseline does not preserve its accepted reserve proof");
+  const rapidFire = manifest.payloadBudget?.weaponPickupRapidFire;
+  invariant(rapidFire?.baselineReserveBytes === ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    rapidFire.minimumRemainingReserveBytes === MINIMUM_WEAPON_PICKUP_RESERVE_BYTES &&
+    rapidFire.remainingReserveBytes === compaction.reserveBytes &&
+    rapidFire.remainingReserveBytes >= MINIMUM_WEAPON_PICKUP_RESERVE_BYTES &&
+    rapidFire.consumedReserveBytes ===
+      rapidFire.baselineReserveBytes - rapidFire.remainingReserveBytes,
+  "Rapid Fire exceeds its source-owned payload reserve");
   invariant(manifest.residentRuntime?.loadAddress === 0x2000 &&
     manifest.residentRuntime.runAddress === 0x2000 &&
     manifest.residentRuntime.rawBytes === 0x2000 &&

@@ -134,7 +134,7 @@ test("pause freezes every phase and frontend/resume paths cannot leak a flash co
 test("respawn, Game Over, new game and sector transitions retain their lifecycle contracts", () => {
   assert.match(routine("respawn_player", "tick_respawn_invulnerability"), /sta damage_timer/);
   assert.match(routine("init_fighter_projectiles", "clear_fighter_projectiles"),
-    /@explosion_state:[\s\S]+sta FIGHTER_EXPLOSION_TIMER,x/);
+    /ldx #\$00[\s\S]+sta FIGHTER_PROJECTILE_ACTIVE,x[\s\S]+cpx #\(FIGHTER_PROJECTILE_STATE_END-FIGHTER_PROJECTILE_ACTIVE\)/);
   assert.match(routine("main_loop", "wait_frame"),
     /update_player_death[\s\S]+clear_pmg[\s\S]+silence_audio[\s\S]+enter_game_over/);
   assert.match(routine("start_gameplay", "start_gameplay_end"),
@@ -148,6 +148,8 @@ test("respawn, Game Over, new game and sector transitions retain their lifecycle
 test("enemy death during broadside uses the same bounded profile without changing capital effects", () => {
   assert.match(routine("handle_collisions", "queue_enemy_damage"),
     /jsr update_broadside\s+jsr resolve_enemy_damage/);
+  assert.match(routine("update_broadside", "schedule_broadside"),
+    /jmp render_weapon_pickup_overlay/);
   assert.doesNotMatch(routine("tick_capital_explosions", "render_capital_explosions"), /COLBK|damage_timer/);
   assert.doesNotMatch(routine("tick_launch_flashes", "render_launch_flashes"), /COLBK|damage_timer/);
   assert.equal(explosionFlashColorForTimers(runtime, { enemyTimer: 24 }), 0x1e);
@@ -158,9 +160,10 @@ test("flash selection does not touch RNG, cadence, glyphs, or entity/effects lim
   assert.doesNotMatch(sound,
     /rng|WORLD_ROW_ADVANCED|STAR_|scroll_accumulator|DIFFICULTY|ENTITY_ACTIVE_LIMIT|EFFECT_ACTIVE_LIMIT/);
   const entityInclude = fs.readFileSync(path.join(root, "build", "entity-effects.inc"), "utf8");
-  assert.match(entityInclude, /ENTITY_ACTIVE_LIMIT\s*=\s*1/);
+  assert.match(entityInclude, /ENTITY_ACTIVE_LIMIT\s*=\s*2/);
   assert.match(entityInclude, /EFFECT_ACTIVE_LIMIT\s*=\s*5/);
   assert.match(source, /ENTITY_DEBRIS_GLYPH_COUNT\s*=\s*8/);
+  assert.match(entityInclude, /WEAPON_PICKUP_GLYPH_COUNT\s*=\s*4/);
 });
 
 test("owner previews and frame trace are deterministic source-derived evidence", () => {

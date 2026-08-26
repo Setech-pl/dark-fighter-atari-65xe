@@ -1011,15 +1011,13 @@ export function renderCapitalHullsCa65Include(asset) {
   const enemyTurret = asset.turrets.find(({ side }) => side === "enemy");
   invariant(alliedFlash && enemyFlash && alliedEngine && enemyEngine,
     "Sector effect glyphs are missing from the capital hull source");
-  invariant(alliedEngine.animationBytes?.length === 3 && enemyEngine.animationBytes?.length === 3,
-    "Each engine glyph must define exactly three animation frames");
+  invariant(alliedEngine.animationBytes?.length === 2 && enemyEngine.animationBytes?.length === 2,
+    "Each engine glyph must define exactly two animation frames");
   const engineAnimationBytes = Uint8Array.from([
     ...alliedEngine.animationBytes[0],
     ...alliedEngine.animationBytes[1],
-    ...alliedEngine.animationBytes[2],
     ...enemyEngine.animationBytes[0],
     ...enemyEngine.animationBytes[1],
-    ...enemyEngine.animationBytes[2],
   ]);
   const alliedProwEdge = asset.sector.prowEdgeGlyphs.get("allied");
   const enemyProwEdge = asset.sector.prowEdgeGlyphs.get("enemy");
@@ -1046,7 +1044,7 @@ export function renderCapitalHullsCa65Include(asset) {
     `CAPITAL_HULL_VISIBLE_ROWS = ${asset.sector.visibleRows}`,
     `CAPITAL_HULL_SECTOR_PREVIEW_ROW = ${asset.sector.previewSectorRow}`,
     `CAPITAL_HULL_ENGINE_ANIMATION_FRAMES = ${asset.sector.engineAnimationFrames}`,
-    "CAPITAL_HULL_ENGINE_ANIMATION_PHASES = 3",
+    `CAPITAL_HULL_ENGINE_ANIMATION_PHASES = ${alliedEngine.animationBytes.length}`,
     `CAPITAL_HULL_LAUNCH_FLASH_FRAMES = ${asset.sector.launchFlashFrames}`,
     `CAPITAL_HULL_ALLIED_ENGINE_MODULE = ${asset.sector.engineModuleIds.get("allied")}`,
     `CAPITAL_HULL_ENEMY_ENGINE_MODULE = ${asset.sector.engineModuleIds.get("enemy")}`,

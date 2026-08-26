@@ -45,6 +45,12 @@ import {
   raiderBreakupTraceCsv,
 } from "./debris-destruction-runtime.mjs";
 import {
+  assertWeaponPickupTraceParity,
+  executeWeaponPickupTrace,
+  executeViperProjectileColourTrace,
+  weaponPickupTraceCsv,
+} from "./weapon-pickup-runtime.mjs";
+import {
   beginEnemyDamageFrame,
   createEnemyCombatState,
   createEnemyDamageState,
@@ -377,6 +383,18 @@ export const DEFAULT_RAIDER_BREAKUP_TRACE_PATH = path.join(
   "build",
   "previews",
   "enemy-raider-breakup-trace.csv",
+);
+export const DEFAULT_WEAPON_PICKUP_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "weapon-pickup-rapid-fire-review.png",
+);
+export const DEFAULT_WEAPON_PICKUP_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "weapon-pickup-rapid-fire-trace.csv",
 );
 const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   rootDirectory,
@@ -2725,8 +2743,8 @@ export function readEngineBankSequenceRuntimeState(
 ) {
   const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
   const specs = [
-    ...[0, 1, 2].map((phase) => ({ label: `LEFT ENGINE PHASE ${phase}`, phase, sectorPhase: 22 })),
-    ...[0, 1, 2].map((phase) => ({ label: `RIGHT ENGINE PHASE ${phase}`, phase, sectorPhase: 30 })),
+    ...[0, 1].map((phase) => ({ label: `LEFT ENGINE PHASE ${phase}`, phase, sectorPhase: 22 })),
+    ...[0, 1].map((phase) => ({ label: `RIGHT ENGINE PHASE ${phase}`, phase, sectorPhase: 30 })),
     { label: "LEFT ENGINE HOUSING TO AFT", phase: 1, sectorPhase: 44 },
     { label: "RIGHT ENGINE HOUSING TO AFT", phase: 1, sectorPhase: 52 },
   ];
@@ -4050,6 +4068,106 @@ export function createRaiderBreakupPreview(
     const frameRgb = runtimeRaiderFrameRgb(record, trace, graphics, 2);
     copyRgbPanel(rgb, width, height, frameRgb, panelWidth, nativeHeight * 2, x, 350);
   });
+  return encodePng(rgb, width, height);
+}
+
+export function createWeaponPickupRapidFireTrace() {
+  const xex = executeWeaponPickupTrace({ artifact: "xex" });
+  const atr = executeWeaponPickupTrace({ artifact: "atr" });
+  assertWeaponPickupTraceParity(xex, atr);
+  const atrRows = weaponPickupTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${weaponPickupTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+}
+
+function runtimeWeaponPickupFrameRgb(record, trace, registers, scale) {
+  const display = record.display ?? record.screen;
+  const rows = display.length / SCREEN_COLUMNS;
+  const registerPixels = drawAnticScreen(registers, display,
+    { charset: trace.charset }, undefined, rows);
+  return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, rows * CHARACTER_HEIGHT, scale);
+}
+
+export function createWeaponPickupRapidFirePreview(source) {
+  const trace = executeWeaponPickupTrace({ artifact: "xex" });
+  const atr = executeWeaponPickupTrace({ artifact: "atr" });
+  const colours = executeViperProjectileColourTrace({ artifact: "xex" });
+  const atrColours = executeViperProjectileColourTrace({ artifact: "atr" });
+  assertWeaponPickupTraceParity(trace, atr);
+  if (JSON.stringify({ ...colours, artifact: "release" }) !==
+      JSON.stringify({ ...atrColours, artifact: "release" })) {
+    throw new Error("Rapid Fire projectile colours differ between release XEX and ATR");
+  }
+  const constants = parseConstants(source);
+  const registers = new Map([
+    ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+    ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+    ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+  ]);
+  const frontend = readFrontendGraphicsSource(source);
+  const select = (phase, frame) => trace.records.find((record) =>
+    record.phase === phase && record.frame === frame);
+  const colourRecord = (display) => ({ display: Uint8Array.from(display) });
+  const selected = [
+    ["1 RF CAPSULE 2X2", select("ACTIVE", 0)],
+    ["2 PICKUP", select("PICKUP", 0)],
+    ["3 HUD RF10", trace.rapidTimerFrames[0]],
+    ["4 NORMAL YELLOW", colourRecord(colours.normalDisplay)],
+    ["5 RAPID RED", colourRecord(colours.rapidDisplay)],
+    ["6 HUD RF01", trace.rapidTimerFrames[449]],
+    ["7 EXPIRY", trace.rapidTimerFrames[499]],
+    ["8 NEW YELLOW", colourRecord(colours.display)],
+  ].map(([label, record]) => ({ label, record }));
+  if (selected.some(({ record }) => !record)) throw new Error("Rapid Fire runtime preview frame missing");
+
+  const nativeWidth = SOURCE_WIDTH;
+  const nativeHeight = 24 * CHARACTER_HEIGHT;
+  const gap = 12;
+  const width = 8 * nativeWidth * 2 + 9 * gap;
+  const height = 850;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "WEAPON PICKUP RF  EXECUTED RELEASE XEX AND ATR", 24, 16,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "STATIC STEEL YELLOW 2X2 CAPSULE  BLACK RF  HUD RF10 TO RF01  RED FIRE", 24, 34,
+    frontend, yellow);
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  ACTUAL RUNTIME FRAMES", 24, 58,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const x = gap + index * (nativeWidth + gap);
+    fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
+    strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
+    drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, 1);
+    copyRgbPanel(rgb, width, height, frame, nativeWidth, nativeHeight, x, 102);
+  });
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME PACKED GLYPHS SCREEN CODES AND TIMING", 24, 324,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const panelWidth = nativeWidth * 2;
+    const x = gap + index * (panelWidth + gap);
+    drawRgbLabel(rgb, width, label, x + 4, 348, frontend, white);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, 2);
+    copyRgbPanel(rgb, width, height, frame, panelWidth, nativeHeight * 2, x, 368);
+  });
+
+  const red = atariPalRegisterToRgb(0x46);
+  drawRgbLabel(rgb, width, "EXECUTED VIPER BURST EMISSION FRAMES", 24, 778, frontend, white);
+  drawRgbLabel(rgb, width, "NORMAL YELLOW  0 3 6 9 12 15 18 21 24 27", 24, 798, frontend, yellow);
+  drawRgbLabel(rgb, width, "RAPID RED      0 2 4 6 8 10 12 14 16 18", 24, 816, frontend, red);
+  for (const frame of trace.normalBurstFrames) {
+    fillRgbRect(rgb, width, height, 700 + frame * 14, 796, 5, 10, yellow);
+  }
+  for (const frame of trace.rapidBurstFrames) {
+    fillRgbRect(rgb, width, height, 700 + frame * 14, 814, 5, 10, red);
+  }
   return encodePng(rgb, width, height);
 }
 
@@ -5500,6 +5618,25 @@ export function generateRaiderBreakupTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
+export function generateWeaponPickupRapidFirePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_WEAPON_PICKUP_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createWeaponPickupRapidFirePreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateWeaponPickupRapidFireTrace({
+  outputPath = DEFAULT_WEAPON_PICKUP_TRACE_PATH,
+} = {}) {
+  const trace = createWeaponPickupRapidFireTrace();
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateEnemyReferenceInventoryPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   outputPath = DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH,
@@ -5972,6 +6109,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Enemy Raider-breakup runtime trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, raiderBreakupTrace.outputPath)}`);
     console.log(`  rows: ${raiderBreakupTrace.rows}, ${raiderBreakupTrace.bytes} bytes`);
+
+    const weaponPickupResult = generateWeaponPickupRapidFirePreview();
+    console.log(`Rapid Fire weapon-pickup owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, weaponPickupResult.outputPath)}`);
+    console.log(
+      `  size: ${weaponPickupResult.width}x${weaponPickupResult.height}, ${weaponPickupResult.bytes} bytes`,
+    );
+    const weaponPickupTrace = generateWeaponPickupRapidFireTrace();
+    console.log(`Rapid Fire weapon-pickup runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, weaponPickupTrace.outputPath)}`);
+    console.log(`  rows: ${weaponPickupTrace.rows}, ${weaponPickupTrace.bytes} bytes`);
 
     const startMenuResult = generateStartMenuPreview();
     console.log(`Start-menu preview generated successfully`);

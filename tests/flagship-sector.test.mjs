@@ -299,9 +299,9 @@ test("engine banks are character-animated, non-weapon modules with no PMG alloca
   for (const side of ["allied", "enemy"]) {
     const engineGlyph = asset.sector.engineGlyphs.get(side);
     assert.equal(engineGlyph.tags.includes("engine"), true);
-    assert.equal(engineGlyph.animationBytes.length, 3);
-    assert.ok(new Set(engineGlyph.animationBytes.map((frame) =>
-      Buffer.from(frame).toString("hex"))).size >= 2);
+    assert.equal(engineGlyph.animationBytes.length, 2);
+    assert.equal(new Set(engineGlyph.animationBytes.map((frame) =>
+      Buffer.from(frame).toString("hex"))).size, 2);
     assert.equal(engineGlyph.animationBytes.every((frame) =>
       [...frame].flatMap(decodeAntic4Byte).every((pixel) => pixel !== 0)), true,
     `${side} core glyph contains no checkerboard holes`);
@@ -309,7 +309,7 @@ test("engine banks are character-animated, non-weapon modules with no PMG alloca
     assert.ok(asset.sector.engineOverlayMasks.get(side).some((mask) => mask !== 0));
   }
   for (const [side, expectedApertures] of [["allied", 2], ["enemy", 2]]) {
-    for (let phase = 0; phase < 3; phase += 1) {
+    for (let phase = 0; phase < 2; phase += 1) {
       const grid = engineEnergyPixels(side, phase);
       const areas = connectedAreas(grid.pixels, grid.width, grid.height);
       assert.equal(areas.length, expectedApertures,
@@ -562,9 +562,9 @@ test("section and heavy-shell previews are deterministic source-derived evidence
 test("engine, prow, and fighter-limit review sheets render the actual final runtime data", () => {
   const engineState = readEngineBankSequenceRuntimeState(source, definition);
   assert.deepEqual(engineState.panelDefinitions.map(({ phase }) => phase),
-    [0, 1, 2, 0, 1, 2, 1, 1]);
+    [0, 1, 0, 1, 1, 1]);
   const enginePng = createEngineBankSequencePreview(source, definition);
-  assert.deepEqual([inspectPng(enginePng).width, inspectPng(enginePng).height], [1920, 1272]);
+  assert.deepEqual([inspectPng(enginePng).width, inspectPng(enginePng).height], [1920, 848]);
   assert.equal(sha256(enginePng), sha256(createEngineBankSequencePreview(source, definition)));
 
   const prowState = readProwSequenceRuntimeState(source, definition);

@@ -13,6 +13,7 @@ import {
   loadLoaderBitmapDefinition,
   loaderBitmapConstants,
   loaderBitmapPixelValueAt,
+  LOADER_DISPLAY_LIST_ADDRESS,
   renderLoaderCa65Include,
 } from "../scripts/loader-assets.mjs";
 import { unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
@@ -287,8 +288,8 @@ test("generated include is canonical and contains no ANTIC 4 loader assets", () 
 
 test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
   const labels = readLabels();
-  const displayListAddress = labels.get("loader_bitmap_lzss");
-  assert.ok(Number.isInteger(displayListAddress));
+  const displayListAddress = LOADER_DISPLAY_LIST_ADDRESS;
+  assert.equal(displayListAddress & 0x3ff, 0);
   const expected = createLoaderDisplayListBytes(compiled, displayListAddress);
   assert.equal(expected.length, 202);
   assert.deepEqual(

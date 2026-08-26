@@ -261,7 +261,12 @@ test("Viper glyphs and the assembled Raider glyph builder match authoritative ru
     assert.equal(cpu.pc, stop, `${name} did not return`);
   };
   run("copy_charset");
+  memory.fill(0xa5, labels.get("FIGHTER_PROJECTILE_ACTIVE"),
+    labels.get("FIGHTER_PROJECTILE_STATE_END"));
   run("init_fighter_projectiles");
+  assert.equal(memory.subarray(labels.get("FIGHTER_PROJECTILE_ACTIVE"),
+    labels.get("FIGHTER_PROJECTILE_STATE_END")).every((byte) => byte === 0), true,
+  "the compact reset loop must clear every owned projectile/burst/explosion byte");
   const viperBytes = memory.subarray(0x4400 + weapons.glyphLayout.viperBase * 8,
     0x4400 + (weapons.glyphLayout.viperBase + weapons.glyphs.viper.length) * 8);
   const packed = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
