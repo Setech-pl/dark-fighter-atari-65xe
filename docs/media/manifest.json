@@ -170,5 +170,27 @@
         "build/capital-hulls.inc"
       ]
     }
+  ],
+  "concepts": [
+    {
+      "path": "docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg",
+      "title": "From Floppy to the Stars",
+      "caption": "Concept art — From Floppy to the Stars. An AI-assisted visualization of the project’s journey from its 1990 origins to the current release. Not an in-game screenshot.",
+      "classification": "owner-supplied AI-assisted concept art",
+      "runtime_capture": false,
+      "deterministic_runtime_capture": false,
+      "bytes": 195408,
+      "sha256": "8ed381f3d18ee292d6016ffd850988d01632aec7c97d1135ee54f69f00db2eb4"
+    },
+    {
+      "path": "docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg",
+      "title": "Gauntlet Run",
+      "caption": "Concept art — Gauntlet Run. An AI-assisted visualization of the intended scale, atmosphere and future battlefield composition. Not an in-game screenshot.",
+      "classification": "owner-supplied AI-assisted concept art",
+      "runtime_capture": false,
+      "deterministic_runtime_capture": false,
+      "bytes": 241007,
+      "sha256": "13f700e64232e43fa572992d3bf900bf1f320788ad7e79e53c4b4e6a8e4db659"
+    }
   ]
 }

@@ -11,6 +11,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
 const gameplayDirectory = path.join(rootDirectory, "docs", "media", "gameplay");
 const assetDirectory = path.join(rootDirectory, "docs", "media", "assets");
+const conceptDirectory = path.join(rootDirectory, "docs", "media", "concepts");
 const captureDirectory = path.join(rootDirectory, "build", "github-showcase");
 const runtimeTraceDirectory = path.join(rootDirectory, "build", "runtime-wall-trace");
 const manifestPath = path.join(rootDirectory, "docs", "media", "manifest.json");
@@ -472,6 +473,39 @@ function readCommittedGameplayGallery() {
   });
 }
 
+function readOwnerSuppliedConceptArt() {
+  const definitions = [
+    {
+      fileName: "dark-fighter-concept-from-floppy-to-stars.jpg",
+      title: "From Floppy to the Stars",
+      caption: "Concept art — From Floppy to the Stars. An AI-assisted visualization of the project’s journey from its 1990 origins to the current release. Not an in-game screenshot.",
+    },
+    {
+      fileName: "dark-fighter-concept-gauntlet-run.jpg",
+      title: "Gauntlet Run",
+      caption: "Concept art — Gauntlet Run. An AI-assisted visualization of the intended scale, atmosphere and future battlefield composition. Not an in-game screenshot.",
+    },
+  ];
+  return definitions.map(({ fileName, title, caption }) => {
+    const conceptPath = path.join(conceptDirectory, fileName);
+    invariant(fs.existsSync(conceptPath), `Owner-supplied concept art is missing: ${fileName}`);
+    const bytes = fs.readFileSync(conceptPath);
+    invariant(bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8 &&
+      bytes.at(-2) === 0xff && bytes.at(-1) === 0xd9,
+      `${fileName} is not a complete JPEG file`);
+    return {
+      path: path.relative(rootDirectory, conceptPath),
+      title,
+      caption,
+      classification: "owner-supplied AI-assisted concept art",
+      runtime_capture: false,
+      deterministic_runtime_capture: false,
+      bytes: bytes.length,
+      sha256: sha256(bytes),
+    };
+  });
+}
+
 export function generateShowcase({ capture = false } = {}) {
   fs.mkdirSync(gameplayDirectory, { recursive: true });
   fs.mkdirSync(assetDirectory, { recursive: true });
@@ -484,6 +518,7 @@ export function generateShowcase({ capture = false } = {}) {
     "Runtime wall trace does not match the current release XEX");
   const gameplay = capture ? createGameplayGallery() : readCommittedGameplayGallery();
   const assets = createAssetSheets();
+  const concepts = readOwnerSuppliedConceptArt();
   const manifest = {
     formatVersion: 1,
     generatedBy: "scripts/github-showcase.mjs",
@@ -496,6 +531,7 @@ export function generateShowcase({ capture = false } = {}) {
     },
     gameplay,
     assetSheets: assets,
+    concepts,
   };
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
@@ -507,10 +543,11 @@ function isMainModule() {
 
 if (isMainModule()) {
   const manifest = generateShowcase({ capture: process.argv.includes("--capture") });
-  const mediaBytes = [...manifest.gameplay, ...manifest.assetSheets]
+  const mediaBytes = [...manifest.gameplay, ...manifest.assetSheets, ...manifest.concepts]
     .reduce((sum, item) => sum + item.bytes, 0);
-  console.log("GitHub showcase media generated from the packed release runtime");
+  console.log("GitHub showcase media manifest generated successfully");
   console.log(`  gameplay : ${manifest.gameplay.length} Atari800 frames`);
   console.log(`  assets   : ${manifest.assetSheets.length} source-derived sheets`);
+  console.log(`  concepts : ${manifest.concepts.length} owner-supplied images`);
   console.log(`  media    : ${mediaBytes} bytes`);
 }

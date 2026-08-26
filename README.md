@@ -51,6 +51,10 @@ remain owner-led. Codex assists with implementation, testing, analysis, and
 documentation. Every feature is validated automatically and then played by the
 owner; commit and push happen only after owner acceptance.
 
+![AI-assisted concept art connecting a 1990 Atari computer and floppy disk with Dark Fighter's present-day space-combat release](docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg)
+
+*Concept art — From Floppy to the Stars. An AI-assisted visualization of the project’s journey from its 1990 origins to the current release. Not an in-game screenshot.*
+
 ## What you can play now
 
 - A complete loader, main menu, options, top-scores screen, pause menu, life
@@ -199,6 +203,10 @@ palettes, hard silhouettes, readable hazards, compact instrumentation, and
 bright weapon accents against deep space. Future illustrations may be added to
 this section, but every such image will be explicitly labeled **concept art**.
 Concept art will never be presented as a gameplay screenshot.
+
+![AI-assisted concept art of a Viper flying through a vast capital-ship gauntlet toward a Cylon adversary](docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg)
+
+*Concept art — Gauntlet Run. An AI-assisted visualization of the intended scale, atmosphere and future battlefield composition. Not an in-game screenshot.*
 
 ## Build and play
 

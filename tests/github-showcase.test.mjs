@@ -24,7 +24,10 @@ test("showcase manifest binds every image to the current packed release", () => 
   assert.equal(manifest.runtimeEvidence.atr.sha256, sha256(read("dist/dark-fighter.atr")));
   assert.equal(manifest.runtimeEvidence.wallTrace.sha256,
     sha256(read("docs/runtime-wall-trace.json")));
-  assert.deepEqual([manifest.gameplay.length, manifest.assetSheets.length], [8, 4]);
+  assert.deepEqual(
+    [manifest.gameplay.length, manifest.assetSheets.length, manifest.concepts.length],
+    [8, 4, 2],
+  );
 
   let totalBytes = 0;
   for (const item of [...manifest.gameplay, ...manifest.assetSheets]) {
@@ -35,6 +38,7 @@ test("showcase manifest binds every image to the current packed release", () => 
     assert.ok(bytes.length < 1_000_000, `${item.path} should remain below 1 MB`);
     totalBytes += bytes.length;
   }
+  totalBytes += manifest.concepts.reduce((sum, { bytes }) => sum + bytes, 0);
   assert.ok(totalBytes < 5_000_000, "showcase media should remain below 5 MB");
   for (const frame of manifest.gameplay) {
     assert.equal(frame.source_medium, "XEX");
@@ -45,15 +49,38 @@ test("showcase manifest binds every image to the current packed release", () => 
 });
 
 test("showcase and asset sheets regenerate without ignored capture files", () => {
+  const conceptBytes = manifest.concepts.map(({ path: relativePath }) => read(relativePath));
   const first = generateShowcase();
   const firstBytes = first.assetSheets.map(({ path: relativePath }) => read(relativePath));
   const second = generateShowcase();
   const secondBytes = second.assetSheets.map(({ path: relativePath }) => read(relativePath));
   assert.deepEqual(first, second);
   assert.deepEqual(firstBytes, secondBytes);
+  assert.deepEqual(manifest.concepts.map(({ path: relativePath }) => read(relativePath)), conceptBytes);
   assert.deepEqual(first.assetSheets.map(({ sha256: checksum }) => checksum),
     manifest.assetSheets.map(({ sha256: checksum }) => checksum));
   assert.ok(first.assetSheets.every(({ sources }) => sources.length > 0));
+});
+
+test("owner-supplied concept art is preserved and never classified as gameplay", () => {
+  const gameplayPaths = new Set(manifest.gameplay.map(({ path: relativePath }) => relativePath));
+  assert.deepEqual(manifest.concepts.map(({ path: relativePath }) => relativePath), [
+    "docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg",
+    "docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg",
+  ]);
+  for (const concept of manifest.concepts) {
+    const bytes = read(concept.path);
+    assert.equal(bytes.length, concept.bytes, `${concept.path} byte count`);
+    assert.equal(sha256(bytes), concept.sha256, `${concept.path} checksum`);
+    assert.equal(concept.classification, "owner-supplied AI-assisted concept art");
+    assert.equal(concept.runtime_capture, false);
+    assert.equal(concept.deterministic_runtime_capture, false);
+    assert.match(concept.caption, /Concept art/);
+    assert.match(concept.caption, /Not an in-game screenshot/);
+    assert.equal(gameplayPaths.has(concept.path), false);
+    assert.equal("source_medium" in concept, false);
+    assert.equal("emulator" in concept, false);
+  }
 });
 
 test("public README is English, complete, and free of stale status language", () => {
@@ -79,6 +106,15 @@ test("public README is English, complete, and free of stale status language", ()
   assert.match(prose, /The tools changed\. The target did not/);
   assert.match(prose, /return to programming for the joy of making a machine do/);
   assert.match(prose, /commit and push happen only after owner acceptance/);
+  assert.match(readme,
+    /Concept art — From Floppy to the Stars[\s\S]*Not an in-game screenshot\./);
+  assert.match(readme, /Concept art — Gauntlet Run[\s\S]*Not an in-game screenshot\./);
+  assert.ok(readme.indexOf("dark-fighter-concept-from-floppy-to-stars.jpg") >
+    readme.indexOf("## The story"));
+  assert.ok(readme.indexOf("dark-fighter-concept-from-floppy-to-stars.jpg") <
+    readme.indexOf("## What you can play now"));
+  assert.ok(readme.indexOf("dark-fighter-concept-gauntlet-run.jpg") >
+    readme.indexOf("### Art direction and concepts"));
   assert.doesNotMatch(readme,
     /\bMVP\b|vertical[ -]slice|\bslice\b|proof[ -]of[ -]concept|\bPoC\b|\bprototype\b/i);
   assert.doesNotMatch(readme, /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/);
