@@ -14,6 +14,17 @@ const DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT = 16384;
 const DEBRIS_VISUAL_POLISH_CODE_BUDGET = 512;
 const DEBRIS_VISUAL_POLISH_GLYPH_COUNT = 8;
 const DEBRIS_VISUAL_POLISH_NEW_GLYPHS = 7;
+const DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BASELINE = 714;
+const DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BUDGET = 768;
+const DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT = 10;
+const DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BASELINE = 13697;
+const DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET = 768;
+const EXACT_BOOT_PAYLOAD_BYTES = 16384;
+const EXACT_BOOT_SECTORS = 128;
+const MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES = 1024;
+const ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES = 1097;
+const MINIMUM_WEAPON_PICKUP_RESERVE_BYTES = 512;
+const BOOT_PAYLOAD_TRAILER = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
 
 function invariant(condition, message) {
   if (!condition) {
@@ -74,6 +85,8 @@ export function parseXex(buffer) {
 export function makeAtr(bootPayload) {
   invariant(bootPayload.length > 0, "ATR boot payload is empty");
   invariant(bootPayload.length <= 255 * ATR_SECTOR_SIZE, "Boot payload needs more than 255 sectors");
+  invariant(bootPayload.length % ATR_SECTOR_SIZE === 0,
+    "ATR boot payload must occupy complete source-owned sectors; formatter padding is forbidden");
 
   const bodySize = ATR_SECTOR_SIZE * ATR_SECTOR_COUNT;
   const body = Buffer.alloc(bodySize);
@@ -123,6 +136,17 @@ export function validateBuildDirectory(rootDirectory) {
   const atr = fs.readFileSync(path.join(distDirectory, "dark-fighter.atr"));
 
   invariant(boot.length === manifest.payloadBytes, "Manifest payload size differs from boot binary");
+  invariant(boot.length === EXACT_BOOT_PAYLOAD_BYTES,
+    "Release boot payload must be exactly 16384 bytes");
+  invariant(manifest.bootSectors === EXACT_BOOT_SECTORS,
+    "Release boot image must load exactly 128 sectors");
+  invariant(boot.subarray(-BOOT_PAYLOAD_TRAILER.length).equals(BOOT_PAYLOAD_TRAILER),
+    "Release boot payload is missing its source-owned DFB1 trailer");
+  invariant(manifest.bootPayloadTrailer?.address === 0x5ffc &&
+    manifest.bootPayloadTrailer.bytes === BOOT_PAYLOAD_TRAILER.length &&
+    manifest.bootPayloadTrailer.hex === BOOT_PAYLOAD_TRAILER.toString("hex") &&
+    manifest.bootPayloadTrailer.sourceOwned === true,
+  "Manifest does not describe the source-owned boot trailer at $5FFC-$5FFF");
   invariant(boot[0] === 0, "Boot flag must be zero for disk boot");
   invariant(boot[1] === manifest.bootSectors, "Boot sector count differs from manifest");
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
@@ -157,31 +181,78 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.initializedBytes === 0x0100,
   "Entity/effects BSS must be exactly and explicitly initialised at $8000-$80FF");
   invariant(manifest.entityEffects.interactiveSlots === 4 &&
-    manifest.entityEffects.interactiveActiveLimit === 1 &&
+    manifest.entityEffects.interactiveActiveLimit === 2 &&
     manifest.entityEffects.effectSlots === 6 &&
-    manifest.entityEffects.effectActiveLimit === 0,
-  "Entity/effects release pool limits differ from the reviewed contract");
+    manifest.entityEffects.effectActiveLimit === 5,
+  "Rapid Fire must coexist with debris without expanding either physical pool");
   invariant(manifest.entityEffects?.codeRunAddress === 0x9100 &&
     manifest.entityEffects.codeBytes > 0 &&
     manifest.entityEffects.codeBytes <= manifest.entityEffects.codeReservedBytes,
   "ENTITY_CODE exceeds its $9100-$9FFF runtime reservation");
-  invariant(manifest.entityEffects.codeBytes <=
-    ENTITY_CODE_FOUNDATION_BYTES + DEBRIS_VISUAL_POLISH_CODE_BUDGET &&
+  invariant(
     manifest.entityEffects.codeBudget?.baselineBytes === ENTITY_CODE_FOUNDATION_BYTES &&
-    manifest.entityEffects.codeBudget?.approvedDeltaBytes === DEBRIS_VISUAL_POLISH_CODE_BUDGET,
-  "Debris visual polish exceeds its +512 B ENTITY_CODE budget");
-  invariant(manifest.entityEffects.glyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
+    manifest.entityEffects.codeBudget?.approvedDeltaBytes === DEBRIS_VISUAL_POLISH_CODE_BUDGET &&
+    manifest.entityEffects.codeBudget?.destructibleDebris?.baselineBytes ===
+      DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BASELINE &&
+    manifest.entityEffects.codeBudget.destructibleDebris.actualDeltaBytes <=
+      DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BUDGET &&
+    manifest.entityEffects.codeBudget.destructibleDebris.approvedDeltaBytes ===
+      DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BUDGET,
+  "Destructible debris exceeds its +768 B ENTITY_CODE budget");
+  invariant(manifest.entityEffects.debrisGlyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
+    manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 4 &&
+    manifest.entityEffects.effectGlyphCount === 2 &&
+    manifest.entityEffects.weaponPickupGlyphCount === 4 &&
+    manifest.entityEffects.weaponPickupGlyphIndex === 120 &&
     manifest.entityEffects.newGlyphsFromFoundation === DEBRIS_VISUAL_POLISH_NEW_GLYPHS,
-  "Debris visual polish must use eight glyphs, exactly seven new from foundation");
-  invariant(manifest.payloadBytes <= DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
-    manifest.bootSectors <= 128 &&
+  "Rapid Fire must retain debris/effects and use only glyphs 120-123");
+  invariant(manifest.payloadBytes === DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
+    manifest.bootSectors === EXACT_BOOT_SECTORS &&
     manifest.payloadBudget?.debrisVisualPolish?.limitBytes ===
       DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT,
   "Debris visual polish exceeds the owner-approved 16384-byte / 128-sector boot limit");
-  invariant(boot.length === 0x2000 + manifest.broadsideRuntime.packedBytes +
+  invariant(manifest.payloadBudget?.destructibleDebris?.limitBytes ===
+    DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
+    manifest.runtimeCodeBudget?.baselineBytes ===
+      DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BASELINE &&
+    manifest.runtimeCodeBudget.approvedDeltaBytes === DESTRUCTIBLE_DEBRIS_RUNTIME_CODE_BUDGET,
+  "Historical destructible-debris payload/runtime metadata changed");
+  const compaction = manifest.payloadBudget?.runtimePayloadCompaction;
+  invariant(compaction?.recoveredReserveBytes === ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    compaction.baselineReserveBytes === ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    compaction.minimumRecoveredReserveBytes === MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    compaction.sourceOwned === true && compaction.fillByte === 0,
+  "Runtime payload compaction baseline does not preserve its accepted reserve proof");
+  const rapidFire = manifest.payloadBudget?.weaponPickupRapidFire;
+  invariant(rapidFire?.baselineReserveBytes === ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES &&
+    rapidFire.minimumRemainingReserveBytes === MINIMUM_WEAPON_PICKUP_RESERVE_BYTES &&
+    rapidFire.remainingReserveBytes === compaction.reserveBytes &&
+    rapidFire.remainingReserveBytes >= MINIMUM_WEAPON_PICKUP_RESERVE_BYTES &&
+    rapidFire.consumedReserveBytes ===
+      rapidFire.baselineReserveBytes - rapidFire.remainingReserveBytes,
+  "Rapid Fire exceeds its source-owned payload reserve");
+  invariant(manifest.residentRuntime?.loadAddress === 0x2000 &&
+    manifest.residentRuntime.runAddress === 0x2000 &&
+    manifest.residentRuntime.rawBytes === 0x2000 &&
+    manifest.residentRuntime.prefixBytes + manifest.residentRuntime.suffixRawBytes === 0x2000 &&
+    manifest.residentRuntime.suffixPackedBytes < manifest.residentRuntime.suffixRawBytes,
+  "Resident runtime suffix compaction metadata is inconsistent");
+  invariant(boot.length === manifest.residentRuntime.prefixBytes +
+    manifest.residentRuntime.suffixPackedBytes + manifest.broadsideRuntime.packedBytes +
     manifest.starfieldRuntime.packedBytes + manifest.a2Kernel.bytes +
-    manifest.entityEffects.packedBytes,
-  "Boot payload does not contain all packed relocation tails, A2 kernel and ENTITY_CODE");
+    manifest.entityEffects.packedBytes + compaction.reserveBytes +
+    BOOT_PAYLOAD_TRAILER.length,
+  "Boot payload does not contain the compacted runtime, relocation tails and reserve");
+  invariant(compaction.reserveAddress === manifest.loadAddress +
+    manifest.residentRuntime.prefixBytes + manifest.residentRuntime.suffixPackedBytes +
+    manifest.broadsideRuntime.packedBytes + manifest.starfieldRuntime.packedBytes +
+    manifest.a2Kernel.bytes + manifest.entityEffects.packedBytes &&
+    compaction.reserveEndAddress === manifest.bootPayloadTrailer.address - 1,
+  "Runtime payload reserve does not occupy the documented pre-trailer range");
+  const reserveOffset = compaction.reserveAddress - manifest.loadAddress;
+  invariant(boot.subarray(reserveOffset, reserveOffset + compaction.reserveBytes)
+    .every((byte) => byte === compaction.fillByte),
+  "Runtime payload reserve is not the source-owned zero-filled range from the manifest");
 
   const parsedXex = parseXex(xex);
   invariant(parsedXex.segments.length === 2, "XEX must contain the payload and RUNAD segments");
@@ -201,10 +272,8 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(parsedAtr.body.subarray(0, boot.length).equals(boot), "ATR payload differs from boot binary");
 
   const loadedBytes = manifest.bootSectors * ATR_SECTOR_SIZE;
-  invariant(
-    parsedAtr.body.subarray(boot.length, loadedBytes).every((byte) => byte === 0),
-    "Padding in the final loaded boot sector must be zero",
-  );
+  invariant(loadedBytes === boot.length,
+    "ATR loader sector count must not imply formatter-supplied payload padding");
 
   return { manifest, boot, xex, atr, parsedXex, parsedAtr };
 }

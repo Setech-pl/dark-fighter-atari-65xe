@@ -174,14 +174,15 @@ modelu kolizji oraz uszkodzeń.
 
 ## Odłamki
 
-**IMPLEMENTED FOUNDATION SLICE**
+**IMPLEMENTED FOUNDATION**
 
 Pierwszy neutralny obiekt złomu jest przeszkodą testową wspólnego entity
 engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny jest
 najwyżej jeden. Ma dwie czytelne sylwetki 2×1 znak (16×8 pikseli) — zwartą,
 asymetryczną płytę pancerza i ażurowy fragment kratownicy — po dwie fazy
-tumblingu każda. Cztery fazy używają dokładnie ośmiu glifów 110–117; indeksy
-118–127 pozostają wolne. Płyta i kratownica korzystają z kolorów pola 1/2,
+tumblingu każda. Cztery fazy używają dokładnie ośmiu glifów 110–117; dwie
+fazy fragmentu rozpadu używają 118–119, a indeksy 120–127 pozostają wolne.
+Płyta i kratownica korzystają z kolorów pola 1/2,
 więc nie są białymi odpowiednikami największych gwiazd. Każda faza wypełnia
 bounding box 16×8; armour ma 47, a truss 45 aktywnych pikseli ANTIC.
 Niezależny RNG entity deterministycznie wybiera sylwetkę, fazę początkową,
@@ -194,10 +195,66 @@ w trzech z każdych pięciu takich zdarzeń; profile boczne przesuwają obiekt o
 znak co cztery takie zdarzenia i nie wymagają odbicia od krawędzi. Kontakt
 zdejmuje jedną jednostkę HULL (10 punktów procentowych) przez wspólną damage
 gate i usuwa złom tylko wtedy, gdy obrażenie zostało przyjęte; invulnerability
-nie zużywa przeszkody. Hitbox obejmuje widoczne 16×8 pikseli, bez kolizji z
-pociskami i bez punktacji. Slice nie zmienia logiki spawn/despawn,
-nie podnosi limitów pul i nie dodaje dropów, boosterów, fragmentów ani
-transient effects.
+nie zużywa przeszkody. Hitbox obejmuje widoczne 16×8 pikseli. Debris zaczyna
+z 3 HP; każdy prawidłowy pocisk Vipera odbiera 1 HP i zostaje zużyty. Pierwsze
+dwa trafienia pozostawiają obiekt aktywny oraz pokazują dokładnie dwie klatki
+lokalnego żółto-czerwonego feedbacku. Trzecie trafienie usuwa neutralny hitbox
+przed testem kontaktu z graczem i tworzy lokalny pięcioklatkowy rdzeń oraz
+cztery bezkolizyjne fragmenty na 30 klatek (0,6 s). Fragmenty lecą
+deterministycznie lewo-góra, prawo-góra, lewo-dół i prawo-dół, zmieniają dwie
+fazy oraz przechodzą od żółtego przez czerwony do migotania. Nie używają RNG
+gameplay, nie zadają obrażeń i nie wpływają na wynik, enemy death,
+full-screen flash ani SFX. Pociski Raidera i broadside ignorują debris.
+
+Viper shots są rozstrzygane w rosnącej kolejności slotów przed kontaktem debris
+z graczem; dlatego w jednej ramce tylko najniższy trafiający slot jest zużyty,
+a finalnie zniszczony tuż przed kontaktem debris nie zadaje obrażeń. Przy
+wspólnym przecięciu z Raiderem wygrywa pierwszy cel napotkany przez pocisk
+lecący w górę, a dokładny remis wybiera debris. Następny debris używa zwykłego
+64-klatkowego repeat delay, bez natychmiastowego zastępstwa. Ta funkcja nie zmienia
+pozostałej logiki spawn/despawn i nie podnosi limitu puli interactive; pula
+effects pozostaje fizycznie sześcioslotowa, z limitem aktywnym 5 dla rdzenia
+i czterech fragmentów.
+
+Każda prawidłowa śmierć zwykłego Raidera zachowuje dotychczasowy wynik,
+dźwięk i pełnoekranowy profil `$1E,$3C,$1C,$34`, a dodatkowo uruchamia lokalny
+rozpad w pozycji PMG myśliwca. Raider i jego hitbox znikają przed efektem.
+Pięcioklatkowy rdzeń oraz cztery trzydziestoklatkowe fragmenty — lewe skrzydło,
+prawe skrzydło, czerwone oko i część centralna — używają bezkolizyjnej puli
+effects i wspólnych glifów debris/fragmentów. Materializacja następuje w
+następnej klatce PAL, podczas czerwono-pomarańczowej fazy pełnoekranowego
+flasha; pierwszy update od razu rozdziela fragmenty w cztery kierunki.
+Najnowszy rozpad debris albo Raidera zastępuje poprzedni dopiero po reverse
+erase, bez punktów, obrażeń, zmian RNG lub ghostów.
+
+Rapid Fire jest pierwszym weapon pickupem; rakiety i laser pozostają poza tym
+feature’em. Wyłącznie Raider zabity przez rzeczywiście zużyty pocisk Vipera i
+rozliczony przez istniejącą ścieżkę punktacji zwiększa licznik. Sekwencja
+`0→1→2` tworzy po trzecim takim zabiciu kapsułę RF i zeruje licznik; broadside,
+kontakt, cleanup i inne źródła śmierci go nie zmieniają. Podczas PENDING,
+widocznego pickupu lub aktywnego RF kolejny cykl nie jest liczony.
+
+Kapsuła ma footprint 2×2, gruby stalowy obrys, statyczne żółte wypełnienie
+oraz wysokie na niemal 16 pikseli, czarne litery `R`/`F` wycięte kolorem tła.
+Nie zawiera białych pikseli. W całym stanie ACTIVE używa tych samych
+czterech normalnych kodów znaków; nie miga, nie przełącza inverse ani czerwieni i
+jest renderowana nieprzerwanie w każdej aktywnej klatce.
+Pozostaje ukryta i bezkolizyjna przez 30 pełnych klatek po rozpadzie Raidera,
+potem dziedziczy natywny krok near/A2: jeden wiersz przy co drugim
+`WORLD_ROW_ADVANCED`, bez niezależnego wolnego akumulatora i bez catch-up.
+Debris i RF mogą być widoczne jednocześnie. Kontakt z Viperem nie daje
+punktów, leczenia ani obrażeń, tylko usuwa backing kapsuły i aktywuje efekt.
+
+Rapid Fire trwa dokładnie 500 aktywnych klatek PAL. Pause zatrzymuje timer;
+life loss, Game Over i new game go czyszczą, natomiast żywy gracz zachowuje go
+przez zmianę sektora. Interwał wewnątrz istniejącej dziesięciostrzałowej serii
+zmienia się z 3 na 2 klatki. Liczba strzałów, cooldown po serii, pula,
+odrzucenie pełnej puli, obrażenia i geometria pocisków pozostają bez zmian.
+Nowy pocisk utworzony podczas Rapid Fire zachowuje czerwony `COLPF3=$46`
+przez cały własny lifecycle; zwykłe i utworzone po wygaśnięciu są żółte
+`COLPF2=$1E`. Istniejący HUD pokazuje `RF10` do `RF01`, aktualizowane wyłącznie
+co 50 aktywnych klatek; pause zamraża timer i napis. Pickup nie korzysta z RNG,
+PMG, DLI ani SFX.
 
 World zachowuje 20/22,5/25 wiersza/s dla EASY/MEDIUM/HARD. Near stars mają
 10/11,25/12,5, far stars 5/5,625/6,25, a debris 12/13,5/15 wiersza/s.
@@ -453,6 +510,13 @@ explosion. Lethal damage decrements `LIFE` once with a zero floor. When the
 last life is lost, the transition enters `GAME_OVER` exactly once after the
 final explosion frame and leaves the gameplay loop, so player control, both
 weapons, damage, collision, enemy spawning, world updates, and scoring stop.
+The first six frames of Viper death set the full-screen background to bright
+yellow, bright red-orange, lower-luminance yellow, bright red-orange, medium
+red and dark red (`$1E,$3C,$1C,$3C,$38,$34`), one PAL frame each, then restore
+black. An ordinary enemy fighter destruction uses the shorter four-frame
+profile `$1E,$3C,$1C,$34`, then restores black. Viper death has priority when
+both start together; neither profile changes PMG colours, local explosion
+geometry, SFX, score, RNG or gameplay cadence.
 
 The text-mode Game Over screen uses the resident frontend charset and shows
 `GAME OVER`, the final six-column `SCORE`, the session `TOP SCORE`, and
@@ -539,7 +603,7 @@ spekulacyjnej infrastruktury.
 - Capital ships nie pojawiają się natychmiast i nie są budowane głównie z PMG.
 - Fighters nie mają sztucznej odporności na ogień własnej frakcji.
 - Paliwo, energia i punkty ich uzupełniania nie należą do zatwierdzonego
-  modelu rozgrywki. Napis `FUEL` w bieżącym vertical slice jest pozostałością
+  modelu rozgrywki. Napis `FUEL` w bieżącym wydaniu jest pozostałością
   technicznego HUD-u, a nie aktywną decyzją produktu.
 
 ## Inwarianty sprzętowe

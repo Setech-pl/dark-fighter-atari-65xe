@@ -18,8 +18,16 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.match(source, /PLAYFIELD_DLIST_BYTES\s*=\s*3\+3\+PLAYFIELD_RING_ROWS\*3\+3/);
   assert.match(source,
     /build_playfield_display_list:[\s\S]+lda #\$C2[\s\S]+lda #<GAMEPLAY_DIVIDER_SCREEN[\s\S]+cpy #\(6\+\(PLAYFIELD_RING_ROWS-1\)\*3\)[\s\S]+lda #\$C4[\s\S]+lda #\$41/);
+  const rotate = source.slice(source.indexOf("rotate_playfield_rows:"),
+    source.indexOf("init_starfield_state:"));
+  assert.doesNotMatch(rotate, /sta DLISTL/,
+    "visible-frame ring rotation must not publish DLISTL directly");
   assert.match(source,
-    /rotate_playfield_rows:[\s\S]+sta DLISTL[\s\S]+inc PLAYFIELD_PREBUILD_PENDING/);
+    /gameplay_dli:[\s\S]+lda gameplay_dli_phase\s+bne @sync_hud[\s\S]+lda PLAYFIELD_ACTIVE_DLIST_LO\s+clc\s+adc #\$03\s+sta DLISTL\s+@sync_gameplay:/,
+    "the first gameplay DLI must select byte three of the active A2 list before playfield DMA");
+  assert.match(source,
+    /@hud:[\s\S]+sta gameplay_dli_phase[\s\S]+publish_playfield_display_list = @hud\s+pla\s+rti/,
+    "the final gameplay DLI must leave next-frame publication to the active list JVB");
   assert.match(source, /\.byte \$47,<SCREEN,>SCREEN\s+; ANTIC 7 title/);
   assert.match(source, /\.byte \$02\s+; 40-column ANTIC 2 control hint/);
   assert.match(source, /lda #\$3E\s+; normal playfield, single-line PMG DMA/);

@@ -7,9 +7,9 @@
   },
   "pools": {
     "interactiveSlots": 4,
-    "interactiveActiveLimit": 1,
+    "interactiveActiveLimit": 2,
     "effectSlots": 6,
-    "effectActiveLimit": 0,
+    "effectActiveLimit": 5,
     "stateAddress": 32768,
     "stateBytes": 256,
     "codeAddress": 37120,
@@ -67,12 +67,60 @@
       }
     ]
   },
+  "debrisDestruction": {
+    "hitFlashFrames": 2,
+    "coreFrames": 5,
+    "fragmentFrames": 30,
+    "fragmentCount": 4,
+    "fragmentLocalXSpeedHpos": 2,
+    "fragmentLocalYSpeedScanlines": 2,
+    "fragmentPhases": [
+      [0, 0, 192, 240, 60, 48, 0, 0],
+      [0, 0, 12, 15, 60, 12, 0, 0]
+    ]
+  },
+  "raiderBreakup": {
+    "coreFrames": 5,
+    "fragmentFrames": 30,
+    "coreOffsetHpos": 6,
+    "fragments": [
+      { "id": "left-wing", "phaseGlyphs": ["armour-left-0", "armour-left-1"] },
+      { "id": "right-wing", "phaseGlyphs": ["armour-right-0", "armour-right-1"] },
+      { "id": "central", "phaseGlyphs": ["debris-fragment-0", "debris-fragment-1"] },
+      { "id": "red-eye", "phaseGlyphs": ["raider-pulse-0-red", "raider-pulse-1-red"] }
+    ]
+  },
+  "weaponPickupRapidFire": {
+    "slot": 1,
+    "qualifiedKillsPerDrop": 3,
+    "pendingFrames": 30,
+    "movementNumerator": 1,
+    "movementDenominator": 2,
+    "safeTopScanline": 40,
+    "safeBottomScanline": 152,
+    "widthHpos": 8,
+    "heightScanlines": 16,
+    "glyphs": [
+      [42, 191, 131, 140, 140, 131, 140, 140],
+      [168, 254, 194, 206, 206, 194, 206, 206],
+      [131, 140, 140, 140, 140, 140, 191, 42],
+      [194, 206, 206, 206, 206, 206, 254, 168]
+    ],
+    "palette": {
+      "outlineRegister": "COLPF1",
+      "outlineValue": 132,
+      "fillRegister": "COLPF2",
+      "fillValue": 30,
+      "letterRegister": "COLBK",
+      "letterValue": 0
+    }
+  },
   "archetypes": [
     {
       "id": "neutral-debris",
       "type": 1,
       "initialState": 1,
-      "flags": 55,
+      "flags": 63,
       "updateProfile": 1,
       "renderProfile": 1,
       "collisionCategory": 1,
@@ -84,7 +132,7 @@
       "movementNumerator": 3,
       "movementDenominator": 5,
       "lifetime": 0,
-      "hitPoints": 1,
+      "hitPoints": 3,
       "spawnPolicy": 1,
       "sfxEventId": 0
     }

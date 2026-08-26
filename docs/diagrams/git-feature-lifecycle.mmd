@@ -1,0 +1,8 @@
+flowchart LR
+    B[Accepted baseline] --> F[One feature branch]
+    F --> L[Local implementation]
+    L --> V[Build and validation]
+    V --> A[Owner acceptance]
+    A -->|Changes requested| L
+    A -->|Accepted| C[Commit]
+    C --> P[Push and merge]

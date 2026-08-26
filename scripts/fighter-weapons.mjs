@@ -74,9 +74,15 @@ export function loadFighterWeaponsDefinition(sourcePath) {
   }
   invariant(definition.viper.postBurstFrames === 12,
     "Viper post-burst pause must be 12 PAL frames");
+  invariant(definition.viper.rapidFireIntervalFrames === 2 &&
+    definition.viper.rapidFireDurationFrames === 500,
+  "Rapid Fire must use a two-frame interval for exactly 500 active PAL frames");
   invariant(definition.viper.colourRegister === "COLPF2" &&
     definition.viper.colourValue === 0x1e,
   "Viper projectiles must use genuine Atari yellow through COLPF2=$1E");
+  invariant(definition.viper.rapidFireColourRegister === "COLPF3" &&
+    definition.viper.rapidFireColourValue === 0x46,
+  "Rapid Fire projectiles must use the same glyph through COLPF3=$46");
   integer(definition.glyphLayout?.viperBase, "glyphLayout.viperBase", 0, 127);
   integer(definition.glyphLayout?.raiderBase, "glyphLayout.raiderBase", 0, 127);
   const explosion = definition.sharedFighterExplosion;
@@ -188,11 +194,14 @@ export function renderFighterWeaponsCa65Include(asset) {
     "WEAPON_BURST_POST = 2",
     `VIPER_BURST_COUNT = ${viper.burstCount}`,
     `VIPER_BURST_INTERVAL = ${viper.burstIntervalFrames}`,
+    `VIPER_RAPID_FIRE_INTERVAL = ${viper.rapidFireIntervalFrames}`,
+    `VIPER_RAPID_FIRE_DURATION = ${viper.rapidFireDurationFrames}`,
     `VIPER_POST_BURST_PAUSE = ${viper.postBurstFrames}`,
     `VIPER_PROJECTILE_SPEED = ${viper.speedScanlines}`,
     `VIPER_PROJECTILE_WIDTH_HPOS = ${viper.widthHpos}`,
     `VIPER_PROJECTILE_HEIGHT = ${viper.heightScanlines}`,
     `VIPER_PROJECTILE_COLOR = ${byte(viper.colourValue)}`,
+    `VIPER_RAPID_FIRE_PROJECTILE_COLOR = ${byte(viper.rapidFireColourValue)}`,
     `RAIDER_BURST_COUNT = ${raider.burstCount}`,
     `RAIDER_BURST_INTERVAL = ${raider.burstIntervalFrames}`,
     `RAIDER_POST_BURST_EASY = ${raider.postBurstFrames[0]}`,
@@ -212,6 +221,10 @@ export function renderFighterWeaponsCa65Include(asset) {
     `SHARED_FIGHTER_EXPLOSION_SLOT_COUNT = ${explosion.slots}`,
     "",
     ...emitGlyphMacro("EMIT_VIPER_PROJECTILE_GLYPHS", asset.glyphs.viper),
+    "",
+    ...emitGlyphMacro("EMIT_VIPER_PROJECTILE_GLYPHS_HEAD", asset.glyphs.viper.slice(0, 5)),
+    "",
+    ...emitGlyphMacro("EMIT_VIPER_PROJECTILE_GLYPHS_TAIL", asset.glyphs.viper.slice(5)),
     "",
     ...emitGlyphMacro("EMIT_RAIDER_PROJECTILE_GLYPHS", asset.glyphs.raider),
     "",

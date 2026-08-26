@@ -37,6 +37,20 @@ import {
   loadEntityEffectsDefinition,
 } from "./entity-effects.mjs";
 import {
+  assertDebrisDestructionTraceParity,
+  assertRaiderBreakupTraceParity,
+  debrisDestructionTraceCsv,
+  executeDebrisDestructionTrace,
+  executeRaiderBreakupTrace,
+  raiderBreakupTraceCsv,
+} from "./debris-destruction-runtime.mjs";
+import {
+  assertWeaponPickupTraceParity,
+  executeWeaponPickupTrace,
+  executeViperProjectileColourTrace,
+  weaponPickupTraceCsv,
+} from "./weapon-pickup-runtime.mjs";
+import {
   beginEnemyDamageFrame,
   createEnemyCombatState,
   createEnemyDamageState,
@@ -316,6 +330,24 @@ export const DEFAULT_SHARED_FIGHTER_EXPLOSION_TRACE_PATH = path.join(
   "previews",
   "shared-fighter-explosion-trace.csv",
 );
+export const DEFAULT_EXPLOSION_FLASH_NATIVE_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "explosion-colour-flash-native.png",
+);
+export const DEFAULT_EXPLOSION_FLASH_COMPARISON_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "explosion-colour-flash-comparison.png",
+);
+export const DEFAULT_EXPLOSION_FLASH_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "explosion-colour-flash-trace.csv",
+);
 export const DEFAULT_DEBRIS_REVIEW_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
@@ -327,6 +359,42 @@ export const DEFAULT_DEBRIS_REVIEW_TRACE_PATH = path.join(
   "build",
   "previews",
   "debris-visual-polish-trace.csv",
+);
+export const DEFAULT_DESTRUCTIBLE_DEBRIS_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "destructible-debris-review.png",
+);
+export const DEFAULT_DESTRUCTIBLE_DEBRIS_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "destructible-debris-trace.csv",
+);
+export const DEFAULT_RAIDER_BREAKUP_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-raider-breakup-review.png",
+);
+export const DEFAULT_RAIDER_BREAKUP_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "enemy-raider-breakup-trace.csv",
+);
+export const DEFAULT_WEAPON_PICKUP_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "weapon-pickup-rapid-fire-review.png",
+);
+export const DEFAULT_WEAPON_PICKUP_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "weapon-pickup-rapid-fire-trace.csv",
 );
 const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   rootDirectory,
@@ -690,6 +758,7 @@ export function readGameGraphicsSource(
     ["PLAYER_RESPAWN_Y", fighterWeapons.viewport.gameplayBottom - 16],
     ["VIPER_PROJECTILE_COLOR", fighterWeapons.viper.colourValue],
     ["RAIDER_PROJECTILE_COLOR", fighterWeapons.raider.colourValue],
+    ["SHARED_FIGHTER_EXPLOSION_TOTAL", fighterWeapons.sharedFighterExplosion.totalFrames],
     ["GAMEPLAY_COLPF2", fighterWeapons.viper.colourValue],
     ["GAMEPLAY_COLPF3", fighterWeapons.raider.colourValue],
     ["STAR_FAR_CAPACITY", starfield.farLayer.population],
@@ -715,7 +784,7 @@ export function readGameGraphicsSource(
   );
   const initialState = extractConstantStores(extractRoutine(source, "init_state"), constants);
   const frontendHardwareState = extractConstantStores(
-    extractRoutine(source, "start"),
+    extractRoutine(source, "finish_startup_after_loader"),
     constants,
   );
   const gameplayHardwareState = new Map(frontendHardwareState);
@@ -744,9 +813,9 @@ export function readGameGraphicsSource(
     source,
     "charset_data",
     constants,
-    "capital_hull_glyphs",
+    "charset_fixed_frontend_end",
   );
-  requireLength("base charset", baseCharset, 59 * CHARACTER_HEIGHT);
+  requireLength("fixed frontend charset source", baseCharset, 16 * CHARACTER_HEIGHT);
   const charset = new Uint8Array(1024);
   charset.set(baseCharset);
   charset.set(
@@ -766,6 +835,10 @@ export function readGameGraphicsSource(
     capitalHulls.definition.charsetBaseIndex * CHARACTER_HEIGHT + capitalHulls.glyphBytes.length,
   );
   const sourceCharset = Uint8Array.from(charset);
+  charset.set(
+    fighterWeapons.glyphs.viper.flat(),
+    fighterWeapons.glyphLayout.viperBase * CHARACTER_HEIGHT,
+  );
   charset.set(starfield.glyphBytes, starfield.glyphs[0].screenCode * CHARACTER_HEIGHT);
 
   const hudHardwareState = new Map(gameplayHardwareState);
@@ -1959,6 +2032,207 @@ export function createGameplayPreview(
   return encodePng(scaleAndConvertToRgb(registerPixels));
 }
 
+export function readExplosionFlashRuntimeState(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
+  const { constants } = graphics;
+  const enemyStored = extractLabeledData(
+    source,
+    "enemy_fighter_flash_colors",
+    constants,
+    "player_death_flash_colors",
+  );
+  const playerStored = extractLabeledData(
+    source,
+    "player_death_flash_colors",
+    constants,
+    "flash_color_tables_end",
+  );
+  requireLength("enemy fighter flash table", enemyStored, 4);
+  requireLength("player death flash table", playerStored, 6);
+  const colorNames = [
+    "FLASH_YELLOW_BRIGHT",
+    "FLASH_YELLOW_MID",
+    "FLASH_RED_BRIGHT",
+    "FLASH_RED_MID",
+    "FLASH_RED_DARK",
+  ];
+  const colors = Object.fromEntries(colorNames.map((name) => [name, requireValue(constants, name)]));
+  const baseColor = requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR");
+  const playerDamageColor = requireValue(constants, "PLAYER_DAMAGE_FLASH_COLOR");
+  const enemySequence = [...enemyStored].reverse();
+  const playerSequence = [...playerStored].reverse();
+  const nameByValue = new Map([
+    [baseColor, "GAMEPLAY_BACKGROUND_COLOR"],
+    [playerDamageColor, "PLAYER_DAMAGE_FLASH_COLOR"],
+    ...Object.entries(colors).map(([name, value]) => [value, name]),
+  ]);
+  const basePalette = Object.fromEntries(
+    ["COLBK", "COLPF0", "COLPF1", "COLPF2", "COLPF3", "COLPM0", "COLPM1", "COLPM2", "COLPM3"]
+      .map((register) => [register, requireValue(graphics.hardwareState, register)]),
+  );
+  return {
+    graphics,
+    colors,
+    baseColor,
+    playerDamageColor,
+    basePalette,
+    enemySequence,
+    playerSequence,
+    nameByValue,
+    totalExplosionFrames: requireValue(constants, "SHARED_FIGHTER_EXPLOSION_TOTAL"),
+  };
+}
+
+export function explosionFlashColorForTimers(runtime, {
+  playerTimer = 0,
+  enemyTimer = 0,
+  damageTimer = 0,
+  gameplayActive = true,
+} = {}) {
+  if (!gameplayActive) return runtime.baseColor;
+  const playerIndex = runtime.totalExplosionFrames - playerTimer;
+  if (playerIndex >= 0 && playerIndex < runtime.playerSequence.length) {
+    return runtime.playerSequence[playerIndex];
+  }
+  if (playerTimer > 0) return runtime.baseColor;
+  const enemyIndex = runtime.totalExplosionFrames - enemyTimer;
+  if (enemyIndex >= 0 && enemyIndex < runtime.enemySequence.length) {
+    return runtime.enemySequence[enemyIndex];
+  }
+  return damageTimer > 0 ? runtime.playerDamageColor : runtime.baseColor;
+}
+
+function explosionFlashGameplayPixels(runtime, color) {
+  const hardwareState = new Map(runtime.graphics.hardwareState);
+  hardwareState.set("COLBK", color);
+  const screen = createCanonicalScreen(runtime.graphics);
+  const pixels = drawGameplayMixedScreen(hardwareState, screen, runtime.graphics);
+  overlayCanonicalPmg(pixels, runtime.graphics);
+  return pixels;
+}
+
+export function createExplosionFlashNativePreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const runtime = readExplosionFlashRuntimeState(source, capitalHullsDefinition);
+  const displayName = (name) => name.replaceAll("_", " ");
+  const paletteFrames = Object.entries(runtime.colors).map(([name, color]) => ({
+    label: `PALETTE ${displayName(name)} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
+    color,
+  }));
+  const sequenceFrames = [
+    { label: "BASE PALETTE", color: runtime.baseColor },
+    ...runtime.enemySequence.map((color, index) => ({
+      label: `ENEMY F${index + 1} ${displayName(runtime.nameByValue.get(color))} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
+      color,
+    })),
+    { label: "ENEMY RESTORE BASE", color: runtime.baseColor },
+    ...runtime.playerSequence.map((color, index) => ({
+      label: `VIPER F${index + 1} ${displayName(runtime.nameByValue.get(color))} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
+      color,
+    })),
+    { label: "VIPER RESTORE BASE", color: runtime.baseColor },
+  ];
+  const frames = [...paletteFrames, ...sequenceFrames];
+  const columns = 3;
+  const labelHeight = 16;
+  const rows = Math.ceil(frames.length / columns);
+  const width = SOURCE_WIDTH * columns;
+  const panelHeight = SOURCE_HEIGHT + labelHeight;
+  const height = panelHeight * rows;
+  const registerPixels = new Uint8Array(width * height);
+  const frontend = readFrontendGraphicsSource(source);
+  frames.forEach((frame, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const left = column * SOURCE_WIDTH;
+    const top = row * panelHeight;
+    drawComparisonLabel(registerPixels, width, frame.label, left + 4, top + 4, frontend);
+    const pixels = explosionFlashGameplayPixels(runtime, frame.color);
+    for (let y = 0; y < SOURCE_HEIGHT; y += 1) {
+      registerPixels.set(
+        pixels.subarray(y * SOURCE_WIDTH, (y + 1) * SOURCE_WIDTH),
+        (top + labelHeight + y) * width + left,
+      );
+    }
+  });
+  return encodePng(scaleAndConvertToRgb(registerPixels, width, height, 1), width, height);
+}
+
+export function createExplosionFlashComparisonPreview(
+  source,
+  capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
+) {
+  const runtime = readExplosionFlashRuntimeState(source, capitalHullsDefinition);
+  const width = 640;
+  const height = 248;
+  const registerPixels = new Uint8Array(width * height);
+  const frontend = readFrontendGraphicsSource(source);
+  const hex = (value) => value.toString(16).padStart(2, "0").toUpperCase();
+  const displayName = (name) => name.replaceAll("_", " ");
+  drawComparisonLabel(registerPixels, width, "FIGHTER FULL-SCREEN COLBK FLASH - PAL", 8, 4, frontend);
+  drawComparisonLabel(registerPixels, width,
+    `BASE COLBK ${hex(runtime.baseColor)}  PF ${["COLPF0", "COLPF1", "COLPF2", "COLPF3"]
+      .map((name) => hex(runtime.basePalette[name])).join(" ")}`, 8, 20, frontend);
+  Object.entries(runtime.colors).forEach(([name, color], index) => {
+    const y = 40 + index * 16;
+    drawComparisonLabel(registerPixels, width, `${displayName(name)} GTIA ${hex(color)}`, 8, y + 2, frontend);
+    for (let row = y; row < y + 12; row += 1) {
+      registerPixels.fill(color, row * width + 224, row * width + width - 8);
+    }
+  });
+  const drawTimeline = (label, sequence, top, boxWidth) => {
+    drawComparisonLabel(registerPixels, width, label, 8, top, frontend);
+    const frames = [...sequence, runtime.baseColor];
+    frames.forEach((color, index) => {
+      const left = 112 + index * boxWidth;
+      const name = index < sequence.length ? `F${index + 1}` : "BASE";
+      drawComparisonLabel(registerPixels, width, `${name} ${hex(color)}`, left, top, frontend);
+      for (let y = top + 12; y < top + 32; y += 1) {
+        registerPixels.fill(color, y * width + left, y * width + left + boxWidth - 8);
+      }
+    });
+  };
+  drawTimeline("ENEMY 4F", runtime.enemySequence, 132, 100);
+  drawTimeline("VIPER 6F", runtime.playerSequence, 188, 72);
+  return encodePng(
+    scaleAndConvertToRgb(registerPixels, width, height, 2),
+    width * 2,
+    height * 2,
+  );
+}
+
+export function createExplosionFlashTrace(source) {
+  const runtime = readExplosionFlashRuntimeState(source);
+  const hex = (value) => `$${value.toString(16).padStart(2, "0").toUpperCase()}`;
+  const lines = ["profile,frame,timer,COLBK,symbol,active,elapsed_ms"];
+  for (const [profile, sequence] of [["ENEMY", runtime.enemySequence], ["VIPER", runtime.playerSequence]]) {
+    sequence.forEach((color, index) => lines.push([
+      profile,
+      index + 1,
+      runtime.totalExplosionFrames - index,
+      hex(color),
+      runtime.nameByValue.get(color),
+      1,
+      (index + 1) * 20,
+    ].join(",")));
+    lines.push([
+      profile,
+      sequence.length + 1,
+      runtime.totalExplosionFrames - sequence.length,
+      hex(runtime.baseColor),
+      "GAMEPLAY_BACKGROUND_COLOR",
+      0,
+      (sequence.length + 1) * 20,
+    ].join(","));
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 function createCapitalHullsStripScreen(graphics) {
   const rows = graphics.capitalHulls.segmentRows;
   const screen = new Uint8Array(SCREEN_COLUMNS * rows);
@@ -2469,8 +2743,8 @@ export function readEngineBankSequenceRuntimeState(
 ) {
   const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
   const specs = [
-    ...[0, 1, 2].map((phase) => ({ label: `LEFT ENGINE PHASE ${phase}`, phase, sectorPhase: 22 })),
-    ...[0, 1, 2].map((phase) => ({ label: `RIGHT ENGINE PHASE ${phase}`, phase, sectorPhase: 30 })),
+    ...[0, 1].map((phase) => ({ label: `LEFT ENGINE PHASE ${phase}`, phase, sectorPhase: 22 })),
+    ...[0, 1].map((phase) => ({ label: `RIGHT ENGINE PHASE ${phase}`, phase, sectorPhase: 30 })),
     { label: "LEFT ENGINE HOUSING TO AFT", phase: 1, sectorPhase: 44 },
     { label: "RIGHT ENGINE HOUSING TO AFT", phase: 1, sectorPhase: 52 },
   ];
@@ -3598,6 +3872,302 @@ export function createDebrisReviewPreview(
     frontend, red);
   drawRgbLabel(rgb, width, "FULL 22-ROW PASSES AND ALL WRAPS IN CSV TRACE", 670, 828,
     frontend, steel);
+  return encodePng(rgb, width, height);
+}
+
+export function createDestructibleDebrisTrace(
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const xex = executeDebrisDestructionTrace({ artifact: "xex" });
+  const atr = executeDebrisDestructionTrace({ artifact: "atr" });
+  assertDebrisDestructionTraceParity(xex, atr);
+  const atrRows = debrisDestructionTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${debrisDestructionTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+}
+
+function copyRgbPanel(destination, destinationWidth, destinationHeight,
+  source, sourceWidth, sourceHeight, x, y) {
+  for (let row = 0; row < sourceHeight; row += 1) {
+    const destinationY = y + row;
+    if (destinationY < 0 || destinationY >= destinationHeight) continue;
+    const sourceStart = row * sourceWidth * 3;
+    const destinationStart = (destinationY * destinationWidth + x) * 3;
+    source.copy(destination, destinationStart, sourceStart, sourceStart + sourceWidth * 3);
+  }
+}
+
+function runtimeDebrisFrameRgb(record, trace, graphics, scale) {
+  const registerPixels = drawAnticScreen(
+    graphics.hardwareState,
+    record.screen,
+    { charset: trace.charset },
+    undefined,
+    22,
+  );
+  return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, 22 * CHARACTER_HEIGHT, scale);
+}
+
+export function createDestructibleDebrisPreview(
+  source,
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const trace = executeDebrisDestructionTrace({ artifact: "xex" });
+  const atrTrace = executeDebrisDestructionTrace({ artifact: "atr" });
+  assertDebrisDestructionTraceParity(trace, atrTrace);
+  const constants = parseConstants(source);
+  const graphics = {
+    hardwareState: new Map([
+      ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+      ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+      ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+      ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+      ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+    ]),
+  };
+  const frontend = readFrontendGraphicsSource(source);
+  const selected = [
+    ["PRE_HIT", 0, "1 DEBRIS"],
+    ["FINAL", 0, "2 FINAL HIT"],
+    ["FINAL", 1, "3 YELLOW CORE"],
+    ["FINAL", 3, "4 FOUR FRAGMENTS"],
+    ["FINAL", 5, "5 EARLY SPREAD"],
+    ["FINAL", 12, "6 MID SPREAD"],
+    ["FINAL", 29, "7 MAX SPREAD"],
+    ["FINAL", 31, "8 CLEAN"],
+  ].map(([phase, frame, label]) => ({
+    label,
+    record: trace.records.find((candidate) => candidate.phase === phase && candidate.frame === frame),
+  }));
+  if (selected.some(({ record }) => !record)) throw new Error("Runtime debris preview frame is missing");
+
+  const nativeWidth = SOURCE_WIDTH;
+  const nativeHeight = 22 * CHARACTER_HEIGHT;
+  const panelGap = 12;
+  const width = 8 * nativeWidth * 2 + 9 * panelGap;
+  const height = 720;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "DEBRIS DESTRUCTION  EXECUTED XEX BYTES  50 FPS", 24, 16,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "CORE 5 FRAMES  FRAGMENTS 30 FRAMES  XEX ATR BYTE-EXACT TRACE PARITY", 24, 34,
+    frontend, yellow);
+
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  EIGHT ACTUAL RUNTIME FRAMES", 24, 58,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const x = panelGap + index * (nativeWidth + panelGap);
+    fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
+    strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
+    drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
+    const frameRgb = runtimeDebrisFrameRgb(record, trace, graphics, 1);
+    copyRgbPanel(rgb, width, height, frameRgb, nativeWidth, nativeHeight, x, 102);
+  });
+
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME EXECUTED FRAMES GLYPHS COLORS AND TIMINGS", 24, 306,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const panelWidth = nativeWidth * 2;
+    const x = panelGap + index * (panelWidth + panelGap);
+    drawRgbLabel(rgb, width, label, x + 4, 330, frontend, white);
+    const frameRgb = runtimeDebrisFrameRgb(record, trace, graphics, 2);
+    copyRgbPanel(rgb, width, height, frameRgb, panelWidth, nativeHeight * 2, x, 350);
+  });
+  return encodePng(rgb, width, height);
+}
+
+export function createRaiderBreakupTrace(
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const xex = executeRaiderBreakupTrace({ artifact: "xex" });
+  const atr = executeRaiderBreakupTrace({ artifact: "atr" });
+  assertRaiderBreakupTraceParity(xex, atr);
+  const atrRows = raiderBreakupTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${raiderBreakupTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+}
+
+function runtimeRaiderFrameRgb(record, trace, graphics, scale) {
+  const registers = new Map([
+    ["COLBK", record.colbk],
+    ["COLPF0", requireValue(graphics.hardwareState, "COLPF0")],
+    ["COLPF1", requireValue(graphics.hardwareState, "COLPF1")],
+    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+  ]);
+  const registerPixels = drawAnticScreen(registers, record.screen,
+    { charset: trace.charset }, undefined, 22);
+  drawPlayer(registerPixels, record.player1, record.hposp1, 0, record.sizep1,
+    record.colpm1, PMG_SCREEN_TOP, 24, 200);
+  drawPlayer(registerPixels, record.player2, record.hposp2, 0, record.sizep2,
+    record.colpm2, PMG_SCREEN_TOP, 24, 200);
+  return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, 22 * CHARACTER_HEIGHT, scale);
+}
+
+export function createRaiderBreakupPreview(
+  source,
+  _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
+) {
+  const trace = executeRaiderBreakupTrace({ artifact: "xex" });
+  const atrTrace = executeRaiderBreakupTrace({ artifact: "atr" });
+  assertRaiderBreakupTraceParity(trace, atrTrace);
+  const graphics = readGameGraphicsSource(source);
+  const frontend = readFrontendGraphicsSource(source);
+  const selected = [
+    ["PRE_HIT", 0, "1 RAIDER"],
+    ["BREAKUP", 0, "2 FINAL HIT"],
+    ["BREAKUP", 1, "3 YELLOW CORE"],
+    ["BREAKUP", 3, "4 RED CORE"],
+    ["BREAKUP", 5, "5 FOUR FRAGMENTS"],
+    ["BREAKUP", 12, "6 MID SPREAD"],
+    ["BREAKUP", 30, "7 MAX SPREAD"],
+    ["BREAKUP", 31, "8 CLEAN"],
+  ].map(([phase, frame, label]) => ({
+    label,
+    record: trace.records.find((candidate) => candidate.phase === phase && candidate.frame === frame),
+  }));
+  if (selected.some(({ record }) => !record)) throw new Error("Runtime Raider preview frame is missing");
+
+  const nativeWidth = SOURCE_WIDTH;
+  const nativeHeight = 22 * CHARACTER_HEIGHT;
+  const panelGap = 12;
+  const width = 8 * nativeWidth * 2 + 9 * panelGap;
+  const height = 720;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "RAIDER BREAKUP  EXECUTED XEX BYTES  50 FPS", 24, 16,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "FULL SCREEN FLASH UNCHANGED  LOCAL CORE 5  FOUR FRAGMENTS 30", 24, 34,
+    frontend, yellow);
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  EIGHT ACTUAL RUNTIME FRAMES", 24, 58,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const x = panelGap + index * (nativeWidth + panelGap);
+    fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
+    strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
+    drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
+    const frameRgb = runtimeRaiderFrameRgb(record, trace, graphics, 1);
+    copyRgbPanel(rgb, width, height, frameRgb, nativeWidth, nativeHeight, x, 102);
+  });
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME XEX GLYPHS PMG COLORS AND TIMINGS", 24, 306,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const panelWidth = nativeWidth * 2;
+    const x = panelGap + index * (panelWidth + panelGap);
+    drawRgbLabel(rgb, width, label, x + 4, 330, frontend, white);
+    const frameRgb = runtimeRaiderFrameRgb(record, trace, graphics, 2);
+    copyRgbPanel(rgb, width, height, frameRgb, panelWidth, nativeHeight * 2, x, 350);
+  });
+  return encodePng(rgb, width, height);
+}
+
+export function createWeaponPickupRapidFireTrace() {
+  const xex = executeWeaponPickupTrace({ artifact: "xex" });
+  const atr = executeWeaponPickupTrace({ artifact: "atr" });
+  assertWeaponPickupTraceParity(xex, atr);
+  const atrRows = weaponPickupTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${weaponPickupTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+}
+
+function runtimeWeaponPickupFrameRgb(record, trace, registers, scale) {
+  const display = record.display ?? record.screen;
+  const rows = display.length / SCREEN_COLUMNS;
+  const registerPixels = drawAnticScreen(registers, display,
+    { charset: trace.charset }, undefined, rows);
+  return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, rows * CHARACTER_HEIGHT, scale);
+}
+
+export function createWeaponPickupRapidFirePreview(source) {
+  const trace = executeWeaponPickupTrace({ artifact: "xex" });
+  const atr = executeWeaponPickupTrace({ artifact: "atr" });
+  const colours = executeViperProjectileColourTrace({ artifact: "xex" });
+  const atrColours = executeViperProjectileColourTrace({ artifact: "atr" });
+  assertWeaponPickupTraceParity(trace, atr);
+  if (JSON.stringify({ ...colours, artifact: "release" }) !==
+      JSON.stringify({ ...atrColours, artifact: "release" })) {
+    throw new Error("Rapid Fire projectile colours differ between release XEX and ATR");
+  }
+  const constants = parseConstants(source);
+  const registers = new Map([
+    ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+    ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+    ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+  ]);
+  const frontend = readFrontendGraphicsSource(source);
+  const select = (phase, frame) => trace.records.find((record) =>
+    record.phase === phase && record.frame === frame);
+  const colourRecord = (display) => ({ display: Uint8Array.from(display) });
+  const selected = [
+    ["1 RF CAPSULE 2X2", select("ACTIVE", 0)],
+    ["2 PICKUP", select("PICKUP", 0)],
+    ["3 HUD RF10", trace.rapidTimerFrames[0]],
+    ["4 NORMAL YELLOW", colourRecord(colours.normalDisplay)],
+    ["5 RAPID RED", colourRecord(colours.rapidDisplay)],
+    ["6 HUD RF01", trace.rapidTimerFrames[449]],
+    ["7 EXPIRY", trace.rapidTimerFrames[499]],
+    ["8 NEW YELLOW", colourRecord(colours.display)],
+  ].map(([label, record]) => ({ label, record }));
+  if (selected.some(({ record }) => !record)) throw new Error("Rapid Fire runtime preview frame missing");
+
+  const nativeWidth = SOURCE_WIDTH;
+  const nativeHeight = 24 * CHARACTER_HEIGHT;
+  const gap = 12;
+  const width = 8 * nativeWidth * 2 + 9 * gap;
+  const height = 850;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "WEAPON PICKUP RF  EXECUTED RELEASE XEX AND ATR", 24, 16,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "STATIC STEEL YELLOW 2X2 CAPSULE  BLACK RF  HUD RF10 TO RF01  RED FIRE", 24, 34,
+    frontend, yellow);
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  ACTUAL RUNTIME FRAMES", 24, 58,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const x = gap + index * (nativeWidth + gap);
+    fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
+    strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
+    drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, 1);
+    copyRgbPanel(rgb, width, height, frame, nativeWidth, nativeHeight, x, 102);
+  });
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME PACKED GLYPHS SCREEN CODES AND TIMING", 24, 324,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const panelWidth = nativeWidth * 2;
+    const x = gap + index * (panelWidth + gap);
+    drawRgbLabel(rgb, width, label, x + 4, 348, frontend, white);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, 2);
+    copyRgbPanel(rgb, width, height, frame, panelWidth, nativeHeight * 2, x, 368);
+  });
+
+  const red = atariPalRegisterToRgb(0x46);
+  drawRgbLabel(rgb, width, "EXECUTED VIPER BURST EMISSION FRAMES", 24, 778, frontend, white);
+  drawRgbLabel(rgb, width, "NORMAL YELLOW  0 3 6 9 12 15 18 21 24 27", 24, 798, frontend, yellow);
+  drawRgbLabel(rgb, width, "RAPID RED      0 2 4 6 8 10 12 14 16 18", 24, 816, frontend, red);
+  for (const frame of trace.normalBurstFrames) {
+    fillRgbRect(rgb, width, height, 700 + frame * 14, 796, 5, 10, yellow);
+  }
+  for (const frame of trace.rapidBurstFrames) {
+    fillRgbRect(rgb, width, height, 700 + frame * 14, 814, 5, 10, red);
+  }
   return encodePng(rgb, width, height);
 }
 
@@ -5000,6 +5570,73 @@ export function generateDebrisReviewTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
+export function generateDestructibleDebrisPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DESTRUCTIBLE_DEBRIS_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createDestructibleDebrisPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadEntityEffectsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateDestructibleDebrisTrace({
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_DESTRUCTIBLE_DEBRIS_TRACE_PATH,
+} = {}) {
+  const trace = createDestructibleDebrisTrace(loadEntityEffectsDefinition(definitionPath));
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateRaiderBreakupPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_RAIDER_BREAKUP_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createRaiderBreakupPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadEntityEffectsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateRaiderBreakupTrace({
+  definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
+  outputPath = DEFAULT_RAIDER_BREAKUP_TRACE_PATH,
+} = {}) {
+  const trace = createRaiderBreakupTrace(loadEntityEffectsDefinition(definitionPath));
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateWeaponPickupRapidFirePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_WEAPON_PICKUP_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createWeaponPickupRapidFirePreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateWeaponPickupRapidFireTrace({
+  outputPath = DEFAULT_WEAPON_PICKUP_TRACE_PATH,
+} = {}) {
+  const trace = createWeaponPickupRapidFireTrace();
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateEnemyReferenceInventoryPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   outputPath = DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH,
@@ -5162,6 +5799,44 @@ export function generateSharedFighterExplosionTrace({
     fs.readFileSync(sourcePath, "utf8"),
     loadCapitalHullsDefinition(definitionPath),
   );
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateExplosionFlashNativePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_EXPLOSION_FLASH_NATIVE_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createExplosionFlashNativePreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateExplosionFlashComparisonPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
+  outputPath = DEFAULT_EXPLOSION_FLASH_COMPARISON_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createExplosionFlashComparisonPreview(
+      fs.readFileSync(sourcePath, "utf8"),
+      loadCapitalHullsDefinition(definitionPath),
+    ),
+  );
+}
+
+export function generateExplosionFlashTrace({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_EXPLOSION_FLASH_TRACE_PATH,
+} = {}) {
+  const trace = createExplosionFlashTrace(fs.readFileSync(sourcePath, "utf8"));
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, trace);
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
@@ -5385,6 +6060,23 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`  CSV : ${path.relative(rootDirectory, sharedExplosionTrace.outputPath)}`);
     console.log(`  rows: ${sharedExplosionTrace.rows}, ${sharedExplosionTrace.bytes} bytes`);
 
+    const explosionFlashNative = generateExplosionFlashNativePreview();
+    console.log(`Explosion colour-flash native sequence generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, explosionFlashNative.outputPath)}`);
+    console.log(
+      `  size: ${explosionFlashNative.width}x${explosionFlashNative.height}, ${explosionFlashNative.bytes} bytes`,
+    );
+    const explosionFlashComparison = generateExplosionFlashComparisonPreview();
+    console.log(`Explosion colour-flash comparison generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, explosionFlashComparison.outputPath)}`);
+    console.log(
+      `  size: ${explosionFlashComparison.width}x${explosionFlashComparison.height}, ${explosionFlashComparison.bytes} bytes`,
+    );
+    const explosionFlashTrace = generateExplosionFlashTrace();
+    console.log(`Explosion colour-flash frame trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, explosionFlashTrace.outputPath)}`);
+    console.log(`  rows: ${explosionFlashTrace.rows}, ${explosionFlashTrace.bytes} bytes`);
+
     const debrisReviewResult = generateDebrisReviewPreview();
     console.log(`Debris visual-polish owner review generated successfully`);
     console.log(`  PNG : ${path.relative(rootDirectory, debrisReviewResult.outputPath)}`);
@@ -5395,6 +6087,39 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Debris visual-polish trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, debrisReviewTrace.outputPath)}`);
     console.log(`  rows: ${debrisReviewTrace.rows}, ${debrisReviewTrace.bytes} bytes`);
+
+    const destructibleDebrisResult = generateDestructibleDebrisPreview();
+    console.log(`Destructible-debris owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, destructibleDebrisResult.outputPath)}`);
+    console.log(
+      `  size: ${destructibleDebrisResult.width}x${destructibleDebrisResult.height}, ${destructibleDebrisResult.bytes} bytes`,
+    );
+    const destructibleDebrisTrace = generateDestructibleDebrisTrace();
+    console.log(`Destructible-debris acceptance trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, destructibleDebrisTrace.outputPath)}`);
+    console.log(`  rows: ${destructibleDebrisTrace.rows}, ${destructibleDebrisTrace.bytes} bytes`);
+
+    const raiderBreakupResult = generateRaiderBreakupPreview();
+    console.log(`Enemy Raider-breakup owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, raiderBreakupResult.outputPath)}`);
+    console.log(
+      `  size: ${raiderBreakupResult.width}x${raiderBreakupResult.height}, ${raiderBreakupResult.bytes} bytes`,
+    );
+    const raiderBreakupTrace = generateRaiderBreakupTrace();
+    console.log(`Enemy Raider-breakup runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, raiderBreakupTrace.outputPath)}`);
+    console.log(`  rows: ${raiderBreakupTrace.rows}, ${raiderBreakupTrace.bytes} bytes`);
+
+    const weaponPickupResult = generateWeaponPickupRapidFirePreview();
+    console.log(`Rapid Fire weapon-pickup owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, weaponPickupResult.outputPath)}`);
+    console.log(
+      `  size: ${weaponPickupResult.width}x${weaponPickupResult.height}, ${weaponPickupResult.bytes} bytes`,
+    );
+    const weaponPickupTrace = generateWeaponPickupRapidFireTrace();
+    console.log(`Rapid Fire weapon-pickup runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, weaponPickupTrace.outputPath)}`);
+    console.log(`  rows: ${weaponPickupTrace.rows}, ${weaponPickupTrace.bytes} bytes`);
 
     const startMenuResult = generateStartMenuPreview();
     console.log(`Start-menu preview generated successfully`);

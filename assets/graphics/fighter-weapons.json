@@ -15,12 +15,16 @@
     "poolSlots": 10,
     "burstCount": 10,
     "burstIntervalFrames": 3,
+    "rapidFireIntervalFrames": 2,
+    "rapidFireDurationFrames": 500,
     "postBurstFrames": 12,
     "speedScanlines": 6,
     "widthHpos": 1,
     "heightScanlines": 2,
     "colourRegister": "COLPF2",
-    "colourValue": 30
+    "colourValue": 30,
+    "rapidFireColourRegister": "COLPF3",
+    "rapidFireColourValue": 70
   },
   "sharedFighterExplosion": {
     "frameDurationFrames": 4,

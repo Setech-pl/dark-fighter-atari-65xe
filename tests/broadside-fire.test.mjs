@@ -58,6 +58,7 @@ import {
 } from "../scripts/capital-hulls.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
+import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import {
   createBroadsideAcceptanceSequencePreview,
   createBroadsideCadenceSequencePreview,
@@ -84,18 +85,8 @@ const asset = compileCapitalHulls(definition);
 const alliedTurretIndex = asset.turrets.findIndex(({ side }) => side === "allied");
 const enemyTurretIndex = asset.turrets.findIndex(({ side }) => side === "enemy");
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json")));
-const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
 const broadsideRuntime = fs.readFileSync(
   path.join(rootDirectory, "build", "broadside-runtime.bin"),
-);
-const starfieldRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "starfield-runtime.bin"),
-);
-const a2KernelRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "a2-kernel-runtime.bin"),
-);
-const entityCodeRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "entity-code-runtime.bin"),
 );
 const labels = new Map(
   fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -118,59 +109,12 @@ function routine(name, next) {
 }
 
 function xexBytesAt(address, length) {
-  const broadside = manifest.broadsideRuntime;
-  if (address >= broadside.runAddress && address + length <= broadside.runAddress + broadside.bytes) {
-    return broadsideRuntime.subarray(
-      address - broadside.runAddress,
-      address - broadside.runAddress + length,
-    );
-  }
-  const starfield = manifest.starfieldRuntime;
-  if (address >= starfield.runAddress && address + length <= starfield.runAddress + starfield.bytes) {
-    return starfieldRuntime.subarray(
-      address - starfield.runAddress,
-      address - starfield.runAddress + length,
-    );
-  }
-  const kernel = manifest.a2Kernel;
-  if (address >= kernel.runAddress && address + length <= kernel.runAddress + kernel.bytes) {
-    return a2KernelRuntime.subarray(
-      address - kernel.runAddress,
-      address - kernel.runAddress + length,
-    );
-  }
-  let offset = 0;
-  while (offset < xex.length) {
-    if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
-    assert.ok(offset + 4 <= xex.length, "truncated XEX segment header");
-    const start = xex.readUInt16LE(offset);
-    const end = xex.readUInt16LE(offset + 2);
-    offset += 4;
-    const bytes = end - start + 1;
-    assert.ok(offset + bytes <= xex.length, "truncated XEX segment data");
-    if (address >= start && address + length - 1 <= end) {
-      return xex.subarray(offset + address - start, offset + address - start + length);
-    }
-    offset += bytes;
-  }
-  assert.fail(`XEX address $${address.toString(16)} is not in a segment`);
+  return readRuntimeBytes(rootDirectory, address, length);
 }
 
 function createLinkedRuntimeMemory() {
   const memory = new Uint8Array(0x10000);
-  let offset = 0;
-  while (offset < xex.length) {
-    if (xex.readUInt16LE(offset) === 0xffff) offset += 2;
-    const start = xex.readUInt16LE(offset);
-    const end = xex.readUInt16LE(offset + 2);
-    offset += 4;
-    memory.set(xex.subarray(offset, offset + end - start + 1), start);
-    offset += end - start + 1;
-  }
-  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
-  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
-  memory.set(a2KernelRuntime, manifest.a2Kernel.runAddress);
-  memory.set(entityCodeRuntime, manifest.entityEffects.codeRunAddress);
+  installRuntimeSegments(memory, rootDirectory);
   const rowLo = labels.get("PLAYFIELD_ROW_LO");
   const rowHi = labels.get("PLAYFIELD_ROW_HI");
   for (let row = 0; row < 22; row += 1) {
@@ -298,8 +242,8 @@ test("packed resident broadside image round-trips before the loader and stays wi
   assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
   assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
   assert.ok(starPacked.length <= 0x700);
-  assert.match(routine("start", "unpack_broadside_runtime"),
-    /jsr unpack_entity_runtime[\s\S]+jsr init_entity_effects[\s\S]+jsr unpack_broadside_runtime[\s\S]+jsr stage_a2_kernel[\s\S]+jsr stage_starfield_runtime[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
+  assert.match(routine("start", "broadside_unpack_command"),
+    /jsr stage_boot_streams[\s\S]+jsr unpack_boot_broadside_runtime[\s\S]+jsr unpack_resident_runtime[\s\S]+jsr unpack_entity_runtime[\s\S]+jsr init_entity_effects[\s\S]+jsr stage_a2_kernel[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
 });
 
 test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve every other pair", () => {
@@ -701,10 +645,52 @@ test("HUD and divider LMS remain fixed for every one of the 22 ring heads", () =
     assert.deepEqual(Array.from(memory.subarray(list + 72, list + 75)),
       [0x41, list & 0xff, 0x7f]);
 
+    const oldDlistl = memory[dlistl];
+    const oldActive = memory[activeListLo];
     runAssembledRoutine(memory, "rotate_playfield_rows");
-    assert.equal(memory[dlistl], memory[activeListLo], "publication must switch DLISTL only");
+    assert.notEqual(memory[activeListLo], oldActive,
+      "rotation must select the prepared list");
+    assert.equal(memory[dlistl], oldDlistl,
+      "rotation must defer DLISTL selection to the bounded first gameplay DLI");
     runAssembledRoutine(memory, "prebuild_next_playfield_display_list");
   }
+});
+
+test("assembled capital-engine animation is an atomic deterministic 8+8 PAL pulse", () => {
+  const memory = createLinkedRuntimeMemory();
+  const timer = labels.get("CAPITAL_EXPLOSION_SOUND_TIMER") + 1;
+  const phase = timer + 1;
+  const alliedGlyph = asset.sector.engineGlyphs.get("allied");
+  const enemyGlyph = asset.sector.engineGlyphs.get("enemy");
+  memory[timer] = 8;
+  memory[phase] = 0;
+  memory.set(alliedGlyph.animationBytes[0], 0x4400 + alliedGlyph.index * 8);
+  memory.set(enemyGlyph.animationBytes[0], 0x4400 + enemyGlyph.index * 8);
+
+  const observed = [];
+  for (let frame = 0; frame < 32; frame += 1) {
+    runAssembledRoutine(memory, "update_engine_animation");
+    observed.push([memory[timer], memory[phase]]);
+    const expectedPhase = memory[phase];
+    assert.deepEqual(
+      Array.from(memory.subarray(0x4400 + alliedGlyph.index * 8,
+        0x4400 + alliedGlyph.index * 8 + 8)),
+      Array.from(alliedGlyph.animationBytes[expectedPhase]),
+      `allied engine phase at frame ${frame}`,
+    );
+    assert.deepEqual(
+      Array.from(memory.subarray(0x4400 + enemyGlyph.index * 8,
+        0x4400 + enemyGlyph.index * 8 + 8)),
+      Array.from(enemyGlyph.animationBytes[expectedPhase]),
+      `enemy engine phase at frame ${frame}`,
+    );
+  }
+  assert.deepEqual(observed.map(([, value]) => value), [
+    ...Array(7).fill(0), ...Array(8).fill(1), ...Array(8).fill(0),
+    ...Array(8).fill(1), 0,
+  ]);
+  assert.deepEqual(observed.filter(([value]) => value === 8).map(([, value]) => value),
+    [1, 0, 1, 0]);
 });
 
 test("optimized Viper PMG keeps horizontal pixels and clears only the departed vertical row", () => {

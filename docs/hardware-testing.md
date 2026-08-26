@@ -293,6 +293,22 @@ punktować; inny enemy pozostaje aktywny. Śmierć Vipera najpierw pokazuje peł
 ramek invulnerability. Zweryfikuj jednoczesną eksplozję Vipera i Raidera oraz
 brak zapisu w HUD scanlines.
 
+`npm run preview` generuje review full-screen flasha:
+
+- `build/previews/explosion-colour-flash-native.png` — każda próbka i każda
+  klatka enemy/Viper pokazana jako pełny framebuffer 320×192 w skali 1:1;
+- `build/previews/explosion-colour-flash-comparison.png` — powiększone swatche
+  nazwanych kolorów i obie osie czasu;
+- `build/previews/explosion-colour-flash-trace.csv` — timer i `COLBK` klatka po
+  klatce, łącznie z pierwszą ramką przywróconego `$00`.
+
+Na PAL enemy ma przejść `$1E→$3C→$1C→$34→$00` w pięciu kolejnych
+ramkach, a Viper `$1E→$3C→$1C→$3C→$38→$34→$00` w siedmiu. Przy
+jednoczesnej śmierci obowiązuje oś Vipera. Pause w dowolnej fazie ma pokazać
+czarną bazę i zamrozić timer; resume kontynuuje bez stuck colour. `COLPM0/2/3`
+nie mogą się zmienić, a `COLPM1` zachowuje wyłącznie wcześniejszą lokalną
+sekwencję Raidera `$44/$84`.
+
 ## Raport błędu
 
 Zapisz:

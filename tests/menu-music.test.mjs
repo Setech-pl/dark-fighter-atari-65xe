@@ -155,8 +155,8 @@ test("channel mask leaves future gameplay channels available for SFX", () => {
 });
 
 test("assembly starts only in the main menu and stops before gameplay initializes SFX", () => {
-  assert.match(routine("start", "unpack_broadside_runtime"),
-    /jsr show_loader[\s\S]+jsr unpack_starfield_runtime[\s\S]+sta sound_enabled[\s\S]+jsr music_init[\s\S]+jsr enter_main_menu/);
+  assert.match(source,
+    /jsr show_loader[\s\S]+jsr unpack_starfield_runtime[\s\S]+jmp finish_startup_after_loader[\s\S]+finish_startup_after_loader:[\s\S]+sta sound_enabled[\s\S]+jsr music_init[\s\S]+jsr enter_main_menu/);
   assert.match(routine("frontend_loop", "dispatch_frontend_input"),
     /cmp #STATE_MAIN_MENU\s+bne[\s\S]+jsr music_tick[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
   assert.match(routine("enter_frontend_state", "enter_exited_state"),

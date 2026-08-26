@@ -256,6 +256,275 @@ full paths and reverse layer erasure. The production transition replay reaches
 `DRAIN` at frame 496, `COMPLETE` at 565, the next `OPEN` at 652 and a new
 post-capital spawn event at 682 after the normal scheduler delay.
 
+## Explosion colour-flash feature gate
+
+The accepted debris visual-polish result is the baseline: 32,081 measured
+wall cycles and 3,487 cycles of physical headroom. The colour-flash contract
+permits at most +64 cycles, caps the final wall at 32,145 and also keeps the
+absolute 3,200-cycle headroom floor. The stricter delta-derived headroom is
+3,423 cycles.
+
+The final artifact measures 32,122 wall cycles, a +41 delta, leaving 3,446
+cycles of physical headroom and 23 cycles of the feature allowance. Across
+the 9,040-frame baseline, 920-frame targeted replay, three 400-frame cadence
+replays and a separate 1,600-frame no-FIRE lifecycle replay there are zero
+missed synchronisations, zero extra VBI boundaries and zero deadline overruns.
+
+The lifecycle replay observes all four enemy timer values and all six Viper
+timer values from legal gameplay. End-of-frame hardware snapshots record exact
+`COLBK` sequences `$1E,$3C,$1C,$34` and
+`$1E,$3C,$1C,$3C,$38,$34`, followed by `$00`. `COLPM0/2/3` remain
+`$0E/$46/$28`; `COLPM1` retains only its pre-existing `$44` body and `$84`
+local-explosion states. The host tracer records these registers without adding
+guest instructions or cycles.
+
+## Destructible-debris feature gate
+
+The accepted yellow-red flash artifact is the baseline: 32,122 measured wall
+cycles and 3,446 cycles of physical headroom. The owner-revised complete
+feature target is at most +640 cycles and the hard limit is +768, giving wall
+gates 32,762 and 32,890; physical headroom must remain at least 2,800.
+Separate linked-byte limits retain the inactive-debris dispatcher at +32 CPU
+cycles and the no-active-Viper path at +48.
+
+The owner-visible failure had two concrete causes. The previously reviewed
+release artifacts still contained the one-hit implementation with effect
+active limit zero; the first transient-effects candidate exceeded the fixed
+16,384-byte boot-payload gate and therefore never reached those XEX/ATR files.
+Its host preview was a separate state model, so active-slot assertions did not
+prove artifact output. In addition, that rejected candidate used sparse
+one-to-three-pixel fragments which initially mapped to the same character cell
+and overwrote one another. The current acceptance harness executes the packed
+XEX and ATR bootstrap bytes, hits debris through the released projectile
+resolver, and renders exact runtime screen codes and charset data.
+
+| Metric/path | Measured value | Feature limit |
+| --- | ---: | ---: |
+| Linked legal-heavy main loop, DMA off | 20,364 CPU | comparison only |
+| No active debris dispatcher delta | +18 CPU | +32 |
+| No active Viper projectile delta | 0 CPU | +48 |
+| Final destruction path, DMA off | 910 CPU | bounded five-effect spawn |
+| Full effects wrappers, DMA off | 1,648 CPU | core + four fragments |
+| Heaviest observed five-effect wall frame | 27,405 | 32,890 |
+| Final worst wall | 32,719 | 32,890 |
+| Final physical headroom | 2,849 | minimum 2,800 |
+
+The final wall delta is +597 cycles, leaving 43 cycles to the target gate and
+171 to the hard gate. The complete 13,960-frame replay is composed of the
+9,040-frame baseline, 920 targeted frames, 1,200 cadence frames, 1,600
+fighter-flash frames and 1,200 destruction-effect frames. The Atari800
+observer records 18 final-hit spawns and 90 frames with the exact active mask
+`$1F`, count 5 and rendered mask `$1F`; it observes update and render in the
+spawn frame and reverse erase in the following frame. At least one such spawn
+occurs after the capital sector. Missed synchronisations, deadline overruns and
+extra VBI boundaries are all zero.
+
+The target resolver keeps debris neutral. Its ascending Viper scan consumes
+only the lowest matching projectile in a frame, selects the first lower edge
+reached by upward flight when debris and Raider both intersect, and gives
+debris an exact tie. `ENTITY_HP` begins at 3; the first two hits reuse
+`ENTITY_OWNER` for exactly two local inverse frames, while the final hit spawns
+one five-frame core and four 30-frame collisionless fragments. Fixed local
+steps separate all four fragments from the first rendered frame and produce a
+span over four columns and two rows by frame 12. Slot 0 renders before slots
+1..4; erase scans admitted slots 4..0, preserving exact backing at every A2 head. Shot removal
+bypasses enemy damage, score and fighter-flash paths. The existing spawn
+timer's temporary 65 marker falls to the normal 64-frame repeat delay in the
+same frame.
+
+Linked runtime code totals 14,184 B versus the 13,697 B accepted-flash
+baseline (+487 B). ENTITY_CODE itself is 728 B versus the accepted 714 B
+(+14 B). The fixed BSS page remains `$8000-$80FF`: four physical interactive
+slots with active limit one, and six physical effect slots with active limit
+five.
+
+## Enemy-breakup-effects feature gate
+
+The accepted destructible-debris artifact is the baseline: 32,719 measured
+wall cycles and 2,849 cycles of physical headroom. The target delta is +128
+and the hard delta is +224, giving gates 32,847/32,943; physical headroom must
+remain at least 2,600. The no-active-explosion path is separately limited to
+the accepted empty wrapper plus 32 linked CPU cycles, or 123.
+
+| Metric/path | Measured value | Feature limit |
+| --- | ---: | ---: |
+| No active explosion wrappers, DMA off | 113 CPU | 123 |
+| Raider five-slot materialisation, DMA off | 464 CPU | bounded spawn |
+| Full effects wrappers, DMA off | 1,919 CPU | core + four fragments |
+| Final worst wall | 32,869 | target 32,847 / hard 32,943 |
+| Final physical headroom | 2,699 | minimum 2,600 |
+
+The final wall delta is +150 cycles. It exceeds the preferred target by 22
+but remains 74 below the explicit hard limit. The complete trace records zero
+missed synchronisations, zero deadline overruns and zero extra VBI boundaries.
+It observes 216 executions of the actual Raider materialiser with active mask
+`$1F`, active count 5, update and render in the same frame; 215 have the
+directly preceding yellow `$1E` death frame and the expected `$3C`
+materialisation frame. Four real Atari800 boot-smoke sessions (XEX/ATR × cold
+RAM `$A5/$5A`) still enter gameplay by frame 505 and run through frame 750.
+
+All canonical destruction sources converge after their existing score-source
+arbitration. `erase_enemy` removes the PMG hull and hitbox before the accepted
+PMG explosion, SFX and full-screen flash start. A two-step latch defers only
+the backed character effect by one PAL frame so the death path does not also
+pay five-slot update/render during a world/hull copy. The next frame places a
+five-frame core at the captured PMG origin plus six HPOS and updates four
+30-frame fragments before their first render. The render-ID template identifies
+left wing, right wing, red eye and centre while reusing glyphs 110–119 and the
+existing Raider pulse phase; no glyph or gameplay RNG was added.
+
+Newest-event-wins is symmetric. Frame-start reverse erase invalidates the old
+backing, and either spawner clears the pending latch plus all six existing
+`EFFECT_STATE` bytes before publishing slots 0..4. The physical sixth slot
+remains inactive. Pause freezes the latch and TTL; new game, life loss, sector
+completion and Game Over use the same clear policy. Linked runtime code is
+14,192 B, only +8 B from the 14,184 B accepted baseline. `ENTITY_CODE` is
+725 B, +11 B from 714; BSS remains exactly `$8000-$80FF`.
+
+## Runtime payload compaction gate
+
+Commit `1bf477f` is the behavioral and timing baseline. Its 16,384-byte boot
+payload had no reusable reserve. The compaction preserves the raw 449-byte
+bootstrap through `$21C0` and stores the remaining 7743-byte MAIN suffix as a
+6525-byte LZ-10/5 stream. This saves 1218 B gross. Moving 124 B of cold-only
+initialization into ENTITY_CODE changes that stream from 651 B to 772 B, a
+121-byte packed cost, leaving a net 1097 B source-owned reserve at
+`$5BB3-$5FFB`.
+
+| Metric | `1bf477f` baseline | Compacted | Delta |
+| --- | ---: | ---: | ---: |
+| Boot payload | 16,384 B | 16,384 B | 0 B |
+| Boot sectors | 128 | 128 | 0 |
+| Reusable payload reserve | 0 B | 1,097 B | +1,097 B |
+| Resident MAIN, raw | 8,192 B | 8,192 B | 0 B |
+| Resident suffix, boot storage | 7,743 B raw | 6,525 B packed | -1,218 B |
+| ENTITY_CODE, raw | 725 B | 849 B | +124 B cold-only relocation |
+| ENTITY_CODE, packed | 651 B | 772 B | +121 B |
+| Measured worst wall | 32,869 cycles | 32,869 cycles | 0 cycles |
+| Physical headroom | 2,699 cycles | 2,699 cycles | 0 cycles |
+
+The linked byte total is 14,316 B rather than 14,192 B solely because the
+same cold initialization now resides in the separately packed ENTITY_CODE
+reservation. No visible-frame routine or data asset was added. All 16 runtime
+CSV sessions match the saved baseline in every gameplay, register, event and
+per-frame wall-cycle column; only absolute clock/host-frame origins move due
+to the one-time decompression before the loader. This cold-only work adds 19
+non-visible PAL host frames before the loader milestone; the loader itself
+still owns exactly 250 visible frames, all four sessions reach `main_loop` at
+frame 505, and the captured acceptance frames are byte-identical to baseline.
+All 49 outputs generated by the canonical `npm run preview` command are also
+byte-identical. Missed synchronization, deadline overruns and extra VBI
+boundaries remain zero.
+
+## Rapid Fire weapon pickup gate
+
+The accepted runtime-compaction commit is the RF baseline: 32,869 measured
+DMA-on wall cycles, 2,699 physical headroom, 14,316 linked runtime bytes,
+849 B raw / 772 B packed ENTITY_CODE, and 1,097 B source-owned payload reserve.
+Rapid Fire plus the capital-engine display-list correction consumes 579 B of
+that reserve and leaves 518 B, above the required
+512 B floor. The fixed 16,384 B payload, 128 sectors, `$2000` load address,
+`$201E` entry, XEX/ATR formats and 256-byte BSS do not change.
+
+| Metric | Compaction baseline | Rapid Fire | Delta / gate |
+| --- | ---: | ---: | ---: |
+| Measured worst wall | 32,869 | 32,956 | +87; target +128, hard +256 |
+| Physical headroom | 2,699 | 2,612 | -87; minimum 2,400 |
+| Linked runtime code | 14,316 B | 14,948 B | +632 B; maximum +640 B |
+| ENTITY_CODE raw | 849 B | 1,665 B | 1,444 B feature/cold code plus 221 B shared hull copier |
+| ENTITY_CODE packed | 772 B | 1,424 B | +652 B |
+| Source-owned payload reserve | 1,097 B | 518 B | -579 B; minimum 512 B |
+| Interactive active limit | 1 | 2 | physical pool remains four |
+| Gameplay glyphs used | 120 | 124 | RF uses 120–123; four remain free |
+
+The PAL report adds a 3,200-frame normal-input hunt replay to the established
+9,040 baseline, 920 targeted, 1,200 cadence, 1,600 flash and 1,200 destruction
+replays. It records 24 qualified kills, eight hidden pending runs of exactly 30
+complete frames, 321 visible pickup frames,
+five collections and 1,613 RAPID frames. Two additional 3000-frame segments
+per medium execute 120 active seconds from XEX and 120 from ATR. They complete
+16 pickup/RF cycles, match gameplay state byte-for-byte between media, and
+observe zero DLI phase/order violations with exactly two gameplay DLIs per
+complete PAL frame. The hunt segment on each medium also presses physical
+`OPTION` during RAPID: the 16-bit timer remains exactly 449 across 27 paused
+host frames and the post-resume cadence has no catch-up. The heaviest measured
+frame is 32,956
+cycles; missed synchronisation,
+deadline overruns and extra VBI boundaries are all zero. XEX/ATR × `$A5/$5A`
+boot smoke still reaches gameplay by frame 750.
+
+To keep the visible-frame target, the exact 8+8 side-column copy is unrolled
+and relocated into the otherwise spacious ENTITY_CODE reservation. Its 221 B
+are reported separately from the 1,444 B entity/RF feature body; output bytes
+and ring/backing tests remain pixel-exact. Fixed-slot update avoids a generic
+pool scan. The 2×2 path follows the native near/A2 `1/2` cadence and caches its
+bottom-left pointer in slot-1 VX/VY. The four physical cells remain resident;
+three bounded layer fences reassert the entity layer without recapturing
+backing, and release restores the saved footprint exactly once.
+
+The owner-requested static negative capsule removes the slot-1 frame increment,
+inverse-code branch and three state-initialization stores used only by pickup
+colour animation. ACTIVE now emits fixed `$78/$79/$7A/$7B` in every frame. A shared
+forward clear of the complete contiguous 202-byte projectile/controller state
+replaces the former field-by-field cold initializer, recovering 57 linked bytes
+and 36 packed payload bytes without entering any visible-frame path. The final
+projectile rendering split applies D7 only to already-tagged Viper shots; it
+does not add work to the Raider path. The complete feature measures +87 cycles
+against its baseline, with 2,612 cycles physical headroom.
+
+### Display-list integrity regression and fix
+
+The owner-visible corruption was not a write into HUD or charset RAM. Before
+the fix, `rotate_playfield_rows` published `DLISTL` directly from variable-cost
+visible-frame work. In the reproducing release XEX, frame 2967 moved that store
+to raster 12: PC `$57AA` wrote hardware register `$D402` from `$1F` to `$10`.
+ANTIC then encountered an extra DLI at raster 24, so the frame executed three
+DLIs (rasters 16/24/208) and left the shared phase byte inverted. Later frames
+therefore selected gameplay charset `$44` over the HUD and HUD charset `$50`
+over gameplay even though both charset images, HUD screen bytes, LMS data and
+backing remained valid.
+
+`rotate_playfield_rows` now changes only the active-list selector. The first
+gameplay DLI reads that selector and writes `active_list_low+3` to `DLISTL`
+before ANTIC reaches the divider/ring, while the selected list's own JVB keeps
+it active on the following frame. The final DLI only restores HUD palette and
+charset. This retains exactly two DLIs and prevents both the former visible
+runtime write and a one-frame stale list. The artifact-bound observer rejects
+any phase mismatch, more or fewer than two DLIs in a complete gameplay host
+frame, an incorrect first-DLI list pointer, or XEX/ATR state divergence.
+
+### Capital-engine startup layering and cadence
+
+The first remaining bad frame was gameplay frame 4, the first A2 rotation.
+`rotate_playfield_rows/@copy_divider` at PC `$5782` correctly wrote the new
+top base row into recycled screen RAM `$439F` (`$00->$41`), but the then-current
+final-DLI publication left ANTIC on the old list for that frame. The same row
+was therefore exposed through the stale physical-bottom mapping while older
+engine rows remained at their prior visible positions, producing the apparent
+layer/duplicate. The first-DLI `active+3` publication above makes the new row
+table authoritative before the recycled copy becomes visible; it does not
+alter the already-correct booster erase/draw cycle.
+
+The asset also contained three advertised engine phases even though phase 2
+was byte-identical to phase 0. Advancing all three every eight active frames
+produced an uneven bright/bright/dim cadence perceived as a strobe. Release
+data now contains only the two distinct existing phases. Phase 0 starts every
+game, each phase lasts exactly eight active PAL frames, both banks switch in
+the same bounded charset copy, and pause executes neither timer nor catch-up.
+The full cycle is 16 frames (320 ms, 3.125 Hz).
+
+The actual-emulator engine matrix adds 24 sessions: XEX/ATR, cold RAM `$A5`
+and `$5A`, EASY/MEDIUM/HARD, and immediate/delayed menu starts. Each records
+150 gameplay frames, all 22 A2 heads, transitions only at frames
+7,15,...,143, exactly two charset hashes, and screenshot-sequence parity
+between media. Two further 3200-frame artifact sessions accelerate only the
+test setup into the production GAME OVER path, then use the normal frontend to
+start a second game without restarting Atari800; the first 150 frames of that
+new game again begin at phase 0 and retain the exact 8+8 cadence with XEX/ATR
+screenshot parity. The existing 6000-frame XEX plus 6000-frame ATR replay
+supplies 120 active seconds and verifies that pause freezes the engine
+timer/phase as well as Rapid Fire.
+
 ## Size and memory checkpoints
 
 | Checkpoint | Payload | XEX | ATR |
@@ -269,27 +538,46 @@ post-capital spawn event at 682 after the normal scheduler delay.
 | Pre-foundation / Raider `4/5` + Cylon `$44` | 15,759 B | 15,771 B | 92,176 B |
 | Entity/effects foundation + one debris | 16,299 B | 16,311 B | 92,176 B |
 | Debris visual polish + owner retest glyphs | 16,384 B | 16,396 B | 92,176 B |
+| Explosion colour flash | 16,384 B | 16,396 B | 92,176 B |
+| Destructible debris + boot handoff guard | 16,384 B | 16,396 B | 92,176 B |
+| Raider local breakup | 16,384 B | 16,396 B | 92,176 B |
+| Runtime payload compaction (1,097 B reserve) | 16,384 B | 16,396 B | 92,176 B |
+| Rapid Fire pickup + display-list/engine layering fix (518 B reserve) | 16,384 B | 16,396 B | 92,176 B |
 
-The final payload occupies exactly 128 boot sectors and leaves 0 B of padding.
-The on-disk header can technically encode up to 255 sectors, but the build now
-enforces the owner-approved 128-sector feature limit; neither loader nor format
-was changed. The dynamic-programming encoder produces a globally minimal parse
-for the existing LZ-10/5 stream, recovering enough bytes without changing its
-decoder contract.
+The final payload occupies exactly 128 boot sectors with zero formatter-added
+padding. Its source-owned layout ends with 518 zero reserve bytes at
+`$5DF6-$5FFB` and the four-byte `DFB1` trailer at `$5FFC-$5FFF`; build and
+validation reject an RF reserve below 512 B, any other payload length, sector
+count or trailer instead of truncating or padding the image. The on-disk
+header can technically encode up to 255 sectors, but the release invariant is
+exactly 128; loader code and media format are unchanged.
 
-Final protected use is MAIN 8,140/8,192 B, PROJECTILES 202/298 B,
-STARFIELD 2,178/2,278 B, BROADSIDE 6,652/6,656 B, A2 kernel 226/256 B,
-ENTITY_STATE 256/256 B and ENTITY_CODE 714/3,840 B. Packed staging uses
-1,718/1,792 B until unpacking; the separate ENTITY_CODE boot tail is 639 B.
+The boot regression was not a failed countdown or an incorrect `$201E`
+handoff. Growth had placed `main_menu_display_list` at `$37E8`, so its 63-byte
+menu/text block crossed ANTIC's 1 KiB display-list-counter boundary at
+`$37FF/$3800`; the counter wrapped and fetched unrelated bytes. The legacy
+`clear_pmg` routine at `$27B2` also wrote all eight pages `$3800-$3FFF`,
+destroying the part above `$3800`. The current repaired lists live at `$31EC-$322A`
+inside one counter window, and `clear_pmg` writes only actual single-line PMG
+DMA pages `$3B00-$3FFF`. Link-time guards cover both constraints. Four real
+Atari800 PAL/XL boot-smoke runs (XEX/ATR × cold RAM `$A5/$5A`) capture frames
+1, 250, 300, 500 and 750; all reach the visible menu and then gameplay through
+production FIRE input, with identical XEX/ATR images at frames 500 and 750.
+
+Final protected use is MAIN 8,102/8,192 B (CODE 4,305 B plus RODATA 3,797 B), PROJECTILES 202/298 B,
+STARFIELD 2,191/2,278 B, BROADSIDE 6,569/6,656 B, A2 kernel 226/256 B,
+ENTITY_STATE 256/256 B and ENTITY_CODE 1,665/3,840 B. Cold staging uses
+`$8100-$9FE6` only before gameplay ownership begins; the separate ENTITY_CODE
+boot stream is 1,424 B.
 A2 display/ring state owns
 203 B at `$7F10-$7FDA`. The kernel is copied identically by XEX and cold-boot
 ATR startup into unconditional 64 KiB RAM at `$9000-$90E1`; `$90E2-$90FF`
 remains free. Startup explicitly clears every byte `$8000-$80FF` and loads
-ENTITY_CODE at `$9100-$93C9`; `$8100-$8FFF` and `$93CA-$9FFF` remain reserved
-and untouched. `$A000-$BFFF` is excluded.
-ENTITY_CODE grows from the 564 B foundation checkpoint to 714 B (+150 B),
-well inside the approved +512 B budget. Debris uses exactly eight glyphs
-110–117 (seven new from foundation), leaving ten free glyphs 118–127.
+ENTITY_CODE at `$9100-$9780`; after cold staging, `$8100-$8FFF` and
+`$9781-$9FFF` remain reserved and untouched. `$A000-$BFFF` is excluded.
+Debris uses exactly
+eight glyphs 110–117 (seven new from foundation), effects use two fragment
+glyphs 118–119, RF uses four glyphs 120–123, and four glyphs 124–127 remain free.
 
 ## Limitations
 

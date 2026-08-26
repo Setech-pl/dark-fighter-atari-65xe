@@ -18,7 +18,8 @@ import {
   compileEnemyRoster,
   loadEnemyRosterDefinition,
 } from "../scripts/enemy-roster.mjs";
-import { parseXex } from "../scripts/formats.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
+import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import { loadCapitalHullsDefinition } from "../scripts/capital-hulls.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
@@ -30,7 +31,6 @@ const weapons = compileFighterWeapons(loadFighterWeaponsDefinition(
   path.join(root, "assets", "graphics", "fighter-weapons.json")), roster);
 const hulls = loadCapitalHullsDefinition(
   path.join(root, "assets", "graphics", "capital-hulls.json"));
-const xex = fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"));
 const labels = new Map(
   fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
     .split(/\r?\n/)
@@ -40,10 +40,7 @@ const labels = new Map(
 );
 
 function xexBytes(address, length) {
-  const segment = parseXex(xex).segments.find(({ start, end }) =>
-    address >= start && address + length - 1 <= end);
-  assert.ok(segment, `missing XEX bytes at $${address.toString(16)}`);
-  return segment.data.subarray(address - segment.start, address - segment.start + length);
+  return readRuntimeBytes(root, address, length);
 }
 
 test("assembled gameplay display keeps HUD, divider and 22 ring rows distinct", () => {
@@ -252,9 +249,26 @@ test("assembled PMG renderer shares one explosion bank between Viper and Raider 
 });
 
 test("Viper glyphs and the assembled Raider glyph builder match authoritative runtime masks", () => {
-  const viperBytes = xexBytes(labels.get("viper_projectile_glyphs"),
-    weapons.glyphs.viper.length * 8);
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
+  const memory = new Uint8Array(0x10000);
+  const { manifest } = installRuntimeSegments(memory, root);
+  const run = (name) => {
+    const cpu = new Nmos6502(memory);
+    const stop = 0x7fff;
+    cpu.push((stop - 1) >> 8);
+    cpu.push((stop - 1) & 0xff);
+    cpu.pc = labels.get(name);
+    for (let steps = 0; steps < 500_000 && cpu.pc !== stop; steps += 1) cpu.step();
+    assert.equal(cpu.pc, stop, `${name} did not return`);
+  };
+  run("copy_charset");
+  memory.fill(0xa5, labels.get("FIGHTER_PROJECTILE_ACTIVE"),
+    labels.get("FIGHTER_PROJECTILE_STATE_END"));
+  run("init_fighter_projectiles");
+  assert.equal(memory.subarray(labels.get("FIGHTER_PROJECTILE_ACTIVE"),
+    labels.get("FIGHTER_PROJECTILE_STATE_END")).every((byte) => byte === 0), true,
+  "the compact reset loop must clear every owned projectile/burst/explosion byte");
+  const viperBytes = memory.subarray(0x4400 + weapons.glyphLayout.viperBase * 8,
+    0x4400 + (weapons.glyphLayout.viperBase + weapons.glyphs.viper.length) * 8);
   const packed = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
   const runtimeBytes = (label, length) => {
     const offset = labels.get(label) - manifest.broadsideRuntime.runAddress;

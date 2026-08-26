@@ -1,6 +1,6 @@
 # Dark Fighter — roadmap implementacji
 
-Roadmap prowadzi od zaakceptowanego vertical slice do kompletnej gry opisanej
+Roadmap prowadzi od zaakceptowanej grywalnej bazy do kompletnej gry opisanej
 w `docs/game-design.md`. Każdy kamień milowy ma pozostać mały, reviewable,
 budowalny i możliwy do sprawdzenia na stockowym Atari 65XE PAL. Nie ma tu
 terminów kalendarzowych.
@@ -29,7 +29,7 @@ pamięci wymaga w tym samym change'u aktualizacji `docs/memory-map.md`.
 Pojemność ATR, limit boot payloadu, resident RAM, pamięć przejściowa loadera,
 PMG, pamięć obrazu, charset i zero page mają być raportowane osobno.
 
-## 1. Zaakceptowany vertical slice i bitmapowy loader — ukończone
+## 1. Zaakceptowana grywalna baza i bitmapowy loader — ukończone
 
 ### Zakres
 
@@ -80,7 +80,7 @@ over, fale, sektory capital ships, debris, repair drone, broadside i boss.
 - dziesięciowierszowa tabela z sesyjnym TOP w pierwszym wierszu, bez zapisu
   i inicjałów;
 - bezpieczne Atari-specific EXIT pozostające na ekranie do RESET;
-- jedna ścieżka resetu uruchamiająca istniejący vertical slice;
+- jedna ścieżka resetu uruchamiająca istniejącą grę;
 - mieszany playfield: ANTIC 7 dla tytułu, ANTIC 6 dla opcji, ANTIC 4 dla
   hangaru i gwiazd oraz ANTIC 2 dla kontrolnego hintu;
 - statyczny Viper po lewej, pionowe menu po prawej i zielony akcent `$D8`;
@@ -149,8 +149,8 @@ Kamienie 1–2 oraz aktualne map, labels i memory map.
 - dokumentowany audyt nie nazywa 32-bajtowego gapu przed `$3B00` całkowitą
   wolną pamięcią maszyny;
 - sloty mają stały, wymuszony limit i deterministyczną inicjalizację;
-- brak aktywnej encji zachowuje się identycznie jak zaakceptowany vertical
-  slice albo testowana ścieżka compatibility jest jawna;
+- brak aktywnej encji zachowuje się identycznie jak zaakceptowana baza
+  albo testowana ścieżka compatibility jest jawna;
 - przepełnienie puli jest bezpieczne i testowalne;
 - stały seed daje powtarzalny stan testowy;
 - build, test, preview, verify i ścieżka real-hardware pozostają aktywne.
@@ -415,7 +415,7 @@ batteries, advanced enemies i mid-game disk access.
 
 ### Zależności
 
-Baza wizualna działa w skończonym korytarzu vertical slice. Obecny controller
+Baza wizualna działa w skończonym korytarzu wydania. Obecny controller
 udostępnia stan `COMPLETE`; późniejszy encounter director nadal musi zdecydować
 o zapowiedzi, bonusie i przejściu do następnego sektora.
 
@@ -479,7 +479,7 @@ bonus i wybór następnego sektora pozostają późniejszą pracą.
 ### Zależności
 
 Zaakceptowana przez ownera baza grafiki i muzzle metadata z kamienia 9.
-Bieżący vertical slice nie miał pełnego modelu obrażeń, dlatego ten kamień
+Bieżąca wówczas baza nie miała pełnego modelu obrażeń, dlatego ten kamień
 dodaje tylko minimalny licznik 100–0 i deterministyczny powrót do istniejącego
 menu. Sektor udostępnia czysty stan `COMPLETE` przyszłemu encounter director.
 

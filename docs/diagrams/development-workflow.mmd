@@ -1,0 +1,14 @@
+flowchart LR
+    O[Owner vision and Definition of Done] --> B[Feature branch and measured baseline]
+    B --> I[Local implementation with AI assistance]
+    I --> T[Automated tests]
+    T --> P[Build XEX and bootable ATR]
+    P --> E[Atari800 and cold RAM verification]
+    E --> W[PAL wall trace and memory checks]
+    W --> A[Owner gameplay acceptance]
+    A -->|Accepted| C[Commit]
+    C --> R[Push or release]
+    A -->|Defect or failed validation| I
+    T -->|Failure| I
+    E -->|Failure| I
+    W -->|Failure| I

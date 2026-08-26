@@ -15,21 +15,11 @@ import {
   compileCapitalHulls,
   loadCapitalHullsDefinition,
 } from "../scripts/capital-hulls.mjs";
-import { parseXex } from "../scripts/formats.mjs";
+import { installRuntimeSegments } from "../scripts/runtime-image.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
-const manifest = JSON.parse(
-  fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"),
-);
-const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
-const broadsideRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "broadside-runtime.bin"),
-);
-const starfieldRuntime = fs.readFileSync(
-  path.join(rootDirectory, "build", "starfield-runtime.bin"),
-);
 const labels = new Map(
   fs
     .readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
@@ -56,9 +46,7 @@ function block(startLabel, endLabel) {
 
 function createRuntimeMemory() {
   const memory = new Uint8Array(0x10000);
-  for (const segment of parseXex(xex).segments) memory.set(segment.data, segment.start);
-  memory.set(broadsideRuntime, manifest.broadsideRuntime.runAddress);
-  memory.set(starfieldRuntime, manifest.starfieldRuntime.runAddress);
+  installRuntimeSegments(memory, rootDirectory);
   return memory;
 }
 

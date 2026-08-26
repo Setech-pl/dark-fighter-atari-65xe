@@ -85,10 +85,21 @@ const profiledRoutineNames = [
   "erase_transient_effect_overlays",
   "erase_interactive_entity_overlays",
   "entity_effects_update",
+  "update_weapon_pickup_active",
+  "weapon_pickup_collide_player",
+  "weapon_pickup_record_qualified_kill",
   "entity_spawn_debris",
   "entity_collide_player",
   "entity_damage_applied",
   "entity_despawn_debris",
+  "entity_viper_projectile_target",
+  "entity_viper_projectile_hits_debris",
+  "spawn_debris_destruction_effects",
+  "spawn_breakup_effects_at",
+  "spawn_raider_breakup_effects",
+  "materialize_raider_breakup_effects",
+  "update_transient_effects",
+  "render_transient_effect_overlays",
   "entity_effects_render",
   "render_interactive_entity_overlays",
 ];
@@ -162,6 +173,7 @@ function makeMachine({
 function execute(cpu, {
   stopAddresses,
   routineAddresses = new Map(),
+  eventAddresses = new Map(),
   regionAddresses = new Map(),
   maximumSteps = 20_000_000,
 }) {
@@ -211,6 +223,8 @@ function execute(cpu, {
         childInclusiveCycles: 0,
       });
     }
+    const eventName = eventAddresses.get(cpu.pc);
+    if (eventName) hits.add(eventName);
 
     const result = cpu.step();
     if (result.operation === "RTS") {
@@ -285,6 +299,11 @@ function snapshotRuntime(cpu, entryPoints) {
       entryPoints.fighterProjectileActive,
       counts.projectileSlots,
     ),
+    viperProjectileOccupancy: countNonZero(
+      memory,
+      entryPoints.fighterProjectileActive,
+      10,
+    ),
     broadsideOccupancy: countNonZero(memory, addresses.broadState, counts.broadsideSlots),
     renderedFarStars: countRenderedFarStars(memory),
     liveRaider: memory[addresses.enemyActive] === 1,
@@ -302,7 +321,10 @@ function snapshotRuntime(cpu, entryPoints) {
     capitalSectorState: memory[addresses.capitalSectorState],
     entityActiveCount: memory[entryPoints.entityActiveCount],
     entityActiveMask: memory[entryPoints.entityActiveMask],
+    weaponPickupState: memory[entryPoints.entityState + 1],
     entityY: memory[entryPoints.entityY],
+    effectActiveCount: memory[entryPoints.effectActiveCount],
+    effectActiveMask: memory[entryPoints.effectActiveMask],
   };
 }
 
@@ -344,6 +366,9 @@ function eventNames(frame) {
   if (frame.before.entityActiveCount > 0) names.push("active-debris");
   if (frame.hits.has("entity_spawn_debris")) names.push("debris-spawn");
   if (frame.hits.has("entity_damage_applied")) names.push("debris-contact");
+  if (frame.hits.has("entity_debris_shot")) names.push("debris-shot");
+  if (frame.hits.has("spawn_debris_destruction_effects")) names.push("debris-destruction");
+  if (frame.before.effectActiveCount > 0) names.push("active-effects");
   return names;
 }
 
@@ -355,11 +380,14 @@ function scenarioRecord(frame, optionPollCycles) {
     activeCpuCycles: frame.cycles,
     mainLoopCpuCycles: frame.cycles + optionPollCycles,
     projectileOccupancy: frame.before.projectileOccupancy,
+    viperProjectileOccupancy: frame.before.viperProjectileOccupancy,
     broadsideOccupancy: frame.before.broadsideOccupancy,
     renderedFarStars: frame.before.renderedFarStars,
     playerLifecycle: frame.before.playerLifecycle,
     entityActiveCount: frame.before.entityActiveCount,
     entityY: frame.before.entityY,
+    effectActiveCount: frame.before.effectActiveCount,
+    effectActiveMask: frame.before.effectActiveMask,
     events: eventNames(frame),
     procedureCycles: frame.procedureCycles,
     procedureTotalCycles: frame.procedureTotalCycles,
@@ -426,15 +454,15 @@ function gameplayDmaCycles() {
 
 function protectedSegments(segmentSizes) {
   const definitions = [
-    ["CODE", segmentSizes.code, 0x0ef0, 0x0f2d, null],
-    ["RODATA", segmentSizes.rodata, 0x10c8, 0x10c2, null],
-    ["MAIN", segmentSizes.code + segmentSizes.rodata, 0x1fb8, 0x1fea, 0x2000],
-    ["PROJECTILES", segmentSizes.projectiles, 0x00ca, 0x00ca, 0x012a],
-    ["STARFIELD", segmentSizes.starfield, 0x08d7, 0x08e0, 0x08e6],
-    ["BROADSIDE", segmentSizes.broadside, 0x1953, 0x19fd, 0x1a00],
-    ["A2_KERNEL", segmentSizes.a2Kernel, 0x0000, 0x00ff, 0x0100],
+    ["CODE", segmentSizes.code, 0x0f2d, 0x122d, null],
+    ["RODATA", segmentSizes.rodata, 0x109f, 0x139f, null],
+    ["MAIN", segmentSizes.code + segmentSizes.rodata, 0x1fcc, 0x2000, 0x2000],
+    ["PROJECTILES", segmentSizes.projectiles, 0x00ca, 0x012a, 0x012a],
+    ["STARFIELD", segmentSizes.starfield, 0x08d7, 0x08e6, 0x08e6],
+    ["BROADSIDE", segmentSizes.broadside, 0x1953, 0x1a00, 0x1a00],
+    ["A2_KERNEL", segmentSizes.a2Kernel, 0x0000, 0x0100, 0x0100],
     ["ENTITY_STATE", segmentSizes.entityState, 0x0100, 0x0100, 0x0100],
-    ["ENTITY_CODE", segmentSizes.entityCode, 0x0000, 0x0f00, 0x0f00],
+    ["ENTITY_CODE", segmentSizes.entityCode, 0x02ca, 0x05ca, 0x0f00],
   ];
   return definitions.map(([
     name, bytes, featureStartBytes, acceptedMaximumBytes, reservedMaximumBytes,
@@ -490,7 +518,13 @@ export function measureRuntimeCycles(build) {
     hitTimer: requiredLabel(build.labels, "hit_timer"),
     entityActiveCount: requiredLabel(build.labels, "ENTITY_ACTIVE_COUNT"),
     entityActiveMask: requiredLabel(build.labels, "ENTITY_ACTIVE_MASK"),
+    entityState: requiredLabel(build.labels, "ENTITY_STATE"),
     entityY: requiredLabel(build.labels, "ENTITY_Y"),
+    entitySpawnTimer: requiredLabel(build.labels, "ENTITY_SPAWN_TIMER_LO"),
+    effectActiveCount: requiredLabel(build.labels, "EFFECT_ACTIVE_COUNT"),
+    effectActiveMask: requiredLabel(build.labels, "EFFECT_ACTIVE_MASK"),
+    entityTarget: requiredLabel(build.labels, "entity_viper_projectile_target"),
+    enemyTarget: requiredLabel(build.labels, "viper_projectile_hits_enemy"),
   };
   const routineAddresses = new Map();
   for (const name of profiledRoutineNames) {
@@ -502,6 +536,13 @@ export function measureRuntimeCycles(build) {
       start: requiredLabel(build.labels, "rotate_playfield_table_shift"),
       end: requiredLabel(build.labels, "rotate_playfield_table_shift_end"),
     }],
+  ]);
+  const eventAddresses = new Map([
+    [requiredLabel(build.labels, "entity_debris_shot"), "entity_debris_shot"],
+    [requiredLabel(build.labels, "spawn_debris_destruction_effects"),
+      "spawn_debris_destruction_effects"],
+    [requiredLabel(build.labels, "materialize_raider_breakup_effects"),
+      "materialize_raider_breakup_effects"],
   ]);
 
   const referenceMachine = initialiseGameplay(build, 1, entryPoints);
@@ -527,7 +568,7 @@ export function measureRuntimeCycles(build) {
       difficulty: 2,
       policy: (fireDelay & 1) !== 0 && fireDelay !== 5 ? "evasive" : "sweep",
       fireDelay,
-      frames: 920,
+      frames: 1200,
     })),
     { difficulty: 1, policy: "evasive", fireDelay: 3, frames: 920 },
   ];
@@ -562,6 +603,7 @@ export function measureRuntimeCycles(build) {
       const measurement = execute(machine.cpu, {
         stopAddresses: [entryPoints.mainLoop, entryPoints.frontendLoop],
         routineAddresses,
+        eventAddresses,
         regionAddresses,
       });
       if (measurement.stopAddress === entryPoints.frontendLoop) break;
@@ -643,6 +685,7 @@ export function measureRuntimeCycles(build) {
   const broadMeasurement = execute(broadCpu, {
     stopAddresses: [entryPoints.mainLoop, entryPoints.frontendLoop],
     routineAddresses,
+    eventAddresses,
     regionAddresses,
   });
   invariant(broadMeasurement.stopAddress === entryPoints.mainLoop,
@@ -689,6 +732,11 @@ export function measureRuntimeCycles(build) {
   let entityActivePath;
   let entitySpawnPath;
   let entityContactPath;
+  let debrisShotPath;
+  let debrisDestructionPath;
+  let fullEffectsPath;
+  let raiderBreakupPath;
+  let noViperProjectilePath;
   for (const frame of frames) {
     if (frame.hits.has("scroll_world_columns") && frame.hits.has("erase_far_star_overlays")) {
       worldNearFullErase = chooseMaximum(worldNearFullErase, frame, (candidate) => candidate.cycles);
@@ -707,7 +755,11 @@ export function measureRuntimeCycles(build) {
     if (frame.before.musicWithSfx) {
       musicWithSfx = chooseMaximum(musicWithSfx, frame, (candidate) => candidate.cycles);
     }
-    if (frame.before.entityActiveCount === 0 && !frame.hits.has("entity_spawn_debris")) {
+    if (frame.before.entityActiveCount === 0 && frame.before.weaponPickupState === 0 &&
+      frame.after.weaponPickupState === 0 &&
+      frame.before.effectActiveCount === 0 &&
+      frame.after.effectActiveCount === 0 &&
+      !frame.hits.has("entity_spawn_debris")) {
       entityEmptyPath = chooseMaximum(entityEmptyPath, frame, (candidate) => candidate.cycles);
     }
     if (frame.before.entityActiveCount === 1 && !frame.hits.has("entity_damage_applied")) {
@@ -718,6 +770,24 @@ export function measureRuntimeCycles(build) {
     }
     if (frame.hits.has("entity_damage_applied")) {
       entityContactPath = chooseMaximum(entityContactPath, frame, (candidate) => candidate.cycles);
+    }
+    if (frame.hits.has("entity_debris_shot")) {
+      debrisShotPath = chooseMaximum(debrisShotPath, frame, (candidate) => candidate.cycles);
+    }
+    if (frame.hits.has("spawn_debris_destruction_effects")) {
+      debrisDestructionPath = chooseMaximum(debrisDestructionPath, frame,
+        (candidate) => candidate.cycles);
+    }
+    if (frame.before.effectActiveCount === 5) {
+      fullEffectsPath = chooseMaximum(fullEffectsPath, frame, (candidate) => candidate.cycles);
+    }
+    if (frame.hits.has("materialize_raider_breakup_effects")) {
+      raiderBreakupPath = chooseMaximum(raiderBreakupPath, frame,
+        (candidate) => candidate.cycles);
+    }
+    if (frame.before.viperProjectileOccupancy === 0) {
+      noViperProjectilePath = chooseMaximum(noViperProjectilePath, frame,
+        (candidate) => candidate.cycles);
     }
     legalHeavy = chooseMaximum(legalHeavy, frame, (candidate) => candidate.cycles);
   }
@@ -734,12 +804,38 @@ export function measureRuntimeCycles(build) {
   invariant(entityActivePath, "Replay did not execute one active debris path");
   invariant(entitySpawnPath, "Replay did not execute debris spawn");
   invariant(entityContactPath, "Replay did not execute successful debris contact");
+  invariant(debrisShotPath, "Replay did not execute Viper destruction of debris");
+  invariant(debrisDestructionPath, "Replay did not execute final debris destruction");
+  invariant(fullEffectsPath?.before.effectActiveMask === 0x1f,
+    "Replay did not execute one core plus four debris fragments");
+  invariant(raiderBreakupPath?.after.effectActiveMask === 0x1f &&
+    raiderBreakupPath.after.effectActiveCount === 5,
+  "Replay did not execute one Raider core plus four fragments");
+  invariant(noViperProjectilePath, "Replay did not execute a frame without Viper projectiles");
+  invariant(!noViperProjectilePath.hits.has("entity_viper_projectile_target"),
+    "Debris projectile dispatch ran without an active Viper projectile");
+
+  const measureRoutineCall = (address) => {
+    const cpu = referenceMachine.cpu.clone();
+    const stop = 0x7fff;
+    cpu.memory[entryPoints.entityActiveMask] = 0;
+    cpu.memory[entryPoints.entitySpawnTimer] = 32;
+    cpu.x = 0;
+    cpu.push((stop - 1) >> 8);
+    cpu.push((stop - 1) & 0xff);
+    cpu.pc = address;
+    return execute(cpu, { stopAddresses: [stop] }).cycles;
+  };
+  const noDebrisDispatcherDelta = measureRoutineCall(entryPoints.entityTarget) -
+    measureRoutineCall(entryPoints.enemyTarget);
+  invariant(noDebrisDispatcherDelta <= 32,
+    `No-debris projectile path added ${noDebrisDispatcherDelta}/32 CPU cycles`);
 
   const entityWrapperCycles = (frame) => [
     "entity_effects_erase", "entity_effects_update", "entity_effects_render",
   ].reduce((sum, name) => sum + (frame.procedureTotalCycles[name] ?? 0), 0);
   const emptyEnginePathCycles = entityWrapperCycles(entityEmptyPath);
-  invariant(emptyEnginePathCycles <= 100,
+  invariant(emptyEnginePathCycles <= 123,
     `Empty entity/effects path costs ${emptyEnginePathCycles} linked CPU cycles`);
 
   const heavyMainLoopCycles = legalHeavy.cycles + optionPollCycles;
@@ -784,14 +880,38 @@ export function measureRuntimeCycles(build) {
       entityActivePath: scenario(entityActivePath),
       entitySpawnPath: scenario(entitySpawnPath),
       entityContactPath: scenario(entityContactPath),
+      debrisShotPath: scenario(debrisShotPath),
+      debrisDestructionPath: scenario(debrisDestructionPath),
+      fullEffectsPath: scenario(fullEffectsPath),
+      raiderBreakupPath: scenario(raiderBreakupPath),
+      noViperProjectilePath: scenario(noViperProjectilePath),
     },
     entityEffects: {
       emptyPathCpuCycles: emptyEnginePathCycles,
-      emptyPathLimitCpuCycles: 100,
+      emptyPathLimitCpuCycles: 123,
       activePathCpuCycles: entityWrapperCycles(entityActivePath),
       spawnPathCpuCycles: entityWrapperCycles(entitySpawnPath),
       contactPathCpuCycles: entityWrapperCycles(entityContactPath),
       measurement: "inclusive JSR-to-RTS cycles from executed linked release bytes",
+    },
+    destructibleDebris: {
+      noActiveDebrisPathDeltaCpuCycles: noDebrisDispatcherDelta,
+      noActiveDebrisPathLimitCpuCycles: 32,
+      noActiveViperProjectilePathDeltaCpuCycles: 0,
+      noActiveViperProjectilePathLimitCpuCycles: 48,
+      shotPathCpuCycles: debrisShotPath.procedureTotalCycles.entity_viper_projectile_target,
+      destructionPathCpuCycles:
+        debrisDestructionPath.procedureTotalCycles.entity_viper_projectile_target,
+      fullEffectsPathCpuCycles: entityWrapperCycles(fullEffectsPath),
+      measurement: "linked target dispatch versus the unchanged enemy-only entry",
+    },
+    enemyBreakupEffects: {
+      noActiveExplosionPathCpuCycles: emptyEnginePathCycles,
+      noActiveExplosionPathLimitCpuCycles: 123,
+      spawnPathCpuCycles:
+        raiderBreakupPath.procedureTotalCycles.materialize_raider_breakup_effects,
+      fullEffectsPathCpuCycles: entityWrapperCycles(fullEffectsPath),
+      measurement: "linked release Raider death and shared five-slot effect path",
     },
     replay: {
       sessions: sessions.map(({ difficulty, policy, fireDelay, frames: frameLimit }) => ({

@@ -33,10 +33,10 @@ export function loadEntityEffectsDefinition(sourcePath) {
 
   const pools = definition.pools;
   invariant(pools?.interactiveSlots === 4, "Interactive pool must contain four slots");
-  invariant(pools.interactiveActiveLimit === 1,
-    "First debris slice must enable exactly one interactive entity");
-  invariant(pools.effectSlots === 6 && pools.effectActiveLimit === 0,
-    "Transient effects must remain disabled in the first slice");
+  invariant(pools.interactiveActiveLimit === 2,
+    "Debris and the reserved weapon-pickup slot must coexist");
+  invariant(pools.effectSlots === 6 && pools.effectActiveLimit === 5,
+    "Debris destruction must reserve one core and four fragment effect slots");
   invariant(pools.stateAddress === 0x8000 && pools.stateBytes === 0x100,
     "Entity/effects state must occupy only $8000-$80FF");
   invariant(pools.codeAddress === 0x9100 && pools.codeReservedBytes === 0x0f00,
@@ -151,6 +151,86 @@ export function loadEntityEffectsDefinition(sourcePath) {
       `debrisVisuals variant ${variantIndex} phases must remain visibly distinct`);
   }
 
+  const destruction = definition.debrisDestruction;
+  invariant(destruction?.hitFlashFrames === 2,
+    "Debris hit flash must last exactly two PAL frames");
+  invariant(destruction.coreFrames >= 4 && destruction.coreFrames <= 6,
+    "Debris explosion core must last four through six PAL frames");
+  invariant(destruction.fragmentFrames >= 28 && destruction.fragmentFrames <= 32,
+    "Debris fragments must last twenty-eight through thirty-two PAL frames");
+  invariant(destruction.fragmentCount === 4,
+    "Debris destruction must emit exactly four fragments");
+  integer(destruction.fragmentLocalXSpeedHpos,
+    "debrisDestruction.fragmentLocalXSpeedHpos", 1, 8);
+  integer(destruction.fragmentLocalYSpeedScanlines,
+    "debrisDestruction.fragmentLocalYSpeedScanlines", 1, 8);
+  invariant(Array.isArray(destruction.fragmentPhases) &&
+    destruction.fragmentPhases.length === 2,
+  "Debris fragments must define exactly two visual phases");
+  for (const [phaseIndex, rows] of destruction.fragmentPhases.entries()) {
+    invariant(Array.isArray(rows) && rows.length === 8,
+      `debrisDestruction.fragmentPhases[${phaseIndex}] must contain eight rows`);
+    let litPixels = 0;
+    for (const [rowIndex, row] of rows.entries()) {
+      integer(row, `debrisDestruction.fragmentPhases[${phaseIndex}][${rowIndex}]`, 0, 255);
+      for (let shift = 0; shift < 8; shift += 2) {
+        const selector = row >> shift & 3;
+        if (selector !== 0) {
+          invariant(selector === 3,
+            `fragment phase ${phaseIndex} must use the yellow/red switchable selector`);
+          litPixels += 1;
+        }
+      }
+    }
+    invariant(litPixels >= 4 && litPixels <= 7,
+      `fragment phase ${phaseIndex} must contain four through seven ANTIC pixels`);
+  }
+
+  const raiderBreakup = definition.raiderBreakup;
+  invariant(raiderBreakup?.coreFrames >= 5 && raiderBreakup.coreFrames <= 7,
+    "Raider breakup core must last five through seven PAL frames");
+  invariant(raiderBreakup.fragmentFrames >= 24 && raiderBreakup.fragmentFrames <= 30,
+    "Raider breakup fragments must last twenty-four through thirty PAL frames");
+  invariant(raiderBreakup.coreOffsetHpos === 6,
+    "Raider character core must centre its four-HPOS cell in the sixteen-HPOS hull");
+  invariant(Array.isArray(raiderBreakup.fragments) && raiderBreakup.fragments.length === 4,
+    "Raider breakup must define four deterministic fragment identities");
+  invariant(raiderBreakup.fragments.map(({ id }) => id).join(",") ===
+    "left-wing,right-wing,central,red-eye",
+  "Raider fragment identities or order changed");
+  invariant(raiderBreakup.fragments.every(({ phaseGlyphs }) =>
+    Array.isArray(phaseGlyphs) && phaseGlyphs.length === 2 &&
+      phaseGlyphs[0] !== phaseGlyphs[1]),
+  "Every Raider fragment must expose two distinct visual phases");
+
+  const pickup = definition.weaponPickupRapidFire;
+  invariant(pickup?.slot === 1,
+    "Rapid Fire must own the fixed interactive slot one");
+  invariant(pickup.qualifiedKillsPerDrop === 3 && pickup.pendingFrames === 30,
+    "Rapid Fire must enter pending after three qualified kills for thirty frames");
+  invariant(pickup.movementNumerator === 1 && pickup.movementDenominator === 2,
+    "Rapid Fire pickup must inherit the native near-ring cadence");
+  invariant(pickup.safeTopScanline === 40 && pickup.safeBottomScanline === 152,
+    "Rapid Fire activation must clamp to the reviewed visible Y range");
+  invariant(pickup.widthHpos === 8 && pickup.heightScanlines === 16,
+    "Rapid Fire capsule must occupy exactly two-by-two ANTIC 4 cells");
+  invariant(Array.isArray(pickup.glyphs) && pickup.glyphs.length === 4 &&
+    pickup.glyphs.every((rows) => Array.isArray(rows) && rows.length === 8),
+  "Rapid Fire must use exactly four eight-row glyphs for its two-by-two footprint");
+  pickup.glyphs.flat().forEach((row, index) =>
+    integer(row, `weaponPickupRapidFire.glyphs[${index}]`, 0, 255));
+  const selectors = pickup.glyphs.flatMap((rows) => rows.flatMap((row) =>
+    [6, 4, 2, 0].map((shift) => row >> shift & 3)));
+  invariant(selectors.filter(Boolean).length >= 75 &&
+    selectors.includes(0) && selectors.includes(2) && selectors.includes(3) &&
+    !selectors.includes(1),
+  "Rapid Fire glyphs must use only COLBK cut-outs, steel outline and yellow fill");
+  invariant(JSON.stringify(pickup.palette) === JSON.stringify({
+    outlineRegister: "COLPF1", outlineValue: 0x84,
+    fillRegister: "COLPF2", fillValue: 0x1e,
+    letterRegister: "COLBK", letterValue: 0x00,
+  }), "Rapid Fire must use the accepted static steel/yellow/black palette");
+
   invariant(Array.isArray(definition.archetypes) && definition.archetypes.length === 1,
     "First slice must contain exactly one archetype");
   const archetype = definition.archetypes[0];
@@ -167,8 +247,12 @@ export function loadEntityEffectsDefinition(sourcePath) {
     "First debris must occupy exactly two horizontal ANTIC 4 cells");
   invariant((archetype.flags & 0x02) !== 0,
     "Two-cell debris must set the MULTICELL entity flag");
+  invariant((archetype.flags & 0x08) !== 0,
+    "Neutral debris must set the SHOOTABLE entity flag");
   invariant(archetype.contactDamageUnits === 1,
     "First debris contact must cause one HULL unit of damage");
+  invariant(archetype.hitPoints === 3,
+    "Both debris variants must start with exactly three hit points");
   invariant(archetype.initialVx === 0 && archetype.initialVy === 8 &&
     archetype.movementNumerator === motion.verticalStepNumerator &&
     archetype.movementDenominator === motion.verticalStepDenominator &&
@@ -203,19 +287,26 @@ export function compileEntityEffects(definition) {
       phases.flatMap((phase) => phase.flat())),
   );
   invariant(glyphs.length === 64, "Two 2x1 debris variants must compile to eight glyphs");
+  const effectGlyphs = Uint8Array.from(definition.debrisDestruction.fragmentPhases.flat());
+  invariant(effectGlyphs.length === 16,
+    "Two fragment phases must compile to exactly two glyphs");
   const trajectoryVx = Uint8Array.from(definition.debrisMotion.trajectorySelector.map((id) =>
     definition.debrisMotion.trajectories.find((trajectory) => trajectory.id === id).vxSignedHpos));
+  const pickupGlyphs = Uint8Array.from(definition.weaponPickupRapidFire.glyphs.flat());
   return Object.freeze({
     ...definition,
     descriptor,
     glyphs,
+    effectGlyphs,
+    pickupGlyphs,
     trajectoryVx,
   });
 }
 
 export function renderEntityEffectsCa65Include(asset) {
   const { coordinateSystem: coordinates, pools, spawn,
-    debrisMotion: motion, debrisVisuals: visuals } = asset;
+    debrisMotion: motion, debrisVisuals: visuals, debrisDestruction: destruction,
+    raiderBreakup, weaponPickupRapidFire: pickup } = asset;
   return [
     "; Generated from assets/graphics/entity-effects.json by scripts/entity-effects.mjs.",
     "; Do not edit this file by hand.",
@@ -232,6 +323,7 @@ export function renderEntityEffectsCa65Include(asset) {
     `ENTITY_CODE_RESERVED_BYTES = $${pools.codeReservedBytes.toString(16).toUpperCase()}`,
     `ENTITY_INITIAL_SPAWN_DELAY = ${spawn.initialDelayFrames}`,
     `ENTITY_REPEAT_SPAWN_DELAY = ${spawn.repeatDelayFrames}`,
+    `ENTITY_SHOT_RESPAWN_DELAY = ${spawn.repeatDelayFrames + 1}`,
     `ENTITY_RNG_SEED = $${spawn.rngSeed.toString(16).padStart(2, "0").toUpperCase()}`,
     `ENTITY_CORRIDOR_SOURCE_FIRST_COLUMN = ${spawn.corridorFirstColumn}`,
     `ENTITY_CORRIDOR_SOURCE_END_COLUMN = ${spawn.corridorEndColumnExclusive}`,
@@ -247,6 +339,12 @@ export function renderEntityEffectsCa65Include(asset) {
     "ENTITY_DEBRIS_GLYPHS_PER_PHASE = 2",
     `ENTITY_DEBRIS_GLYPH_COUNT = ${asset.glyphs.length / 8}`,
     `ENTITY_DEBRIS_GLYPH_BYTES = ${asset.glyphs.length}`,
+    `EFFECT_FRAGMENT_GLYPH_COUNT = ${asset.effectGlyphs.length / 8}`,
+    `EFFECT_FRAGMENT_GLYPH_BYTES = ${asset.effectGlyphs.length}`,
+    `ENTITY_EFFECT_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length}`,
+    `WEAPON_PICKUP_GLYPH_COUNT = ${asset.pickupGlyphs.length / 8}`,
+    `WEAPON_PICKUP_GLYPH_BYTES = ${asset.pickupGlyphs.length}`,
+    `ENTITY_EFFECT_TOTAL_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length + asset.pickupGlyphs.length}`,
     "ENTITY_ARCHETYPE_DESCRIPTOR_BYTES = 16",
     "ENTITY_DESC_INITIAL_STATE = 0",
     "ENTITY_DESC_FLAGS = 1",
@@ -265,21 +363,78 @@ export function renderEntityEffectsCa65Include(asset) {
     "ENTITY_DESC_SPAWN_POLICY = 14",
     "ENTITY_DESC_SFX_EVENT = 15",
     "ENTITY_TYPE_DEBRIS = 1",
+    "ENTITY_TYPE_WEAPON_PICKUP = 2",
     "ENTITY_STATE_ACTIVE = 1",
+    "WEAPON_PICKUP_STATE_IDLE = 0",
+    "WEAPON_PICKUP_STATE_PENDING = 1",
+    "WEAPON_PICKUP_STATE_ACTIVE = 2",
+    "WEAPON_PICKUP_STATE_RAPID = 3",
     "ENTITY_FLAG_WORLD_ATTACHED = $01",
     "ENTITY_FLAG_MULTICELL = $02",
     "ENTITY_FLAG_COLLIDE_PLAYER = $04",
+    "ENTITY_FLAG_SHOOTABLE = $08",
     "ENTITY_FLAG_PERSIST_LIFE = $10",
     "ENTITY_FLAG_CLEAR_ON_SECTOR = $20",
     "ENTITY_COLLISION_PLAYER_DAMAGE = 1",
     `ENTITY_DEBRIS_INITIAL_FLAGS = ${byte(asset.archetypes[0].flags)}`,
+    `ENTITY_DEBRIS_WIDTH_HPOS = ${asset.archetypes[0].widthHpos}`,
+    `ENTITY_DEBRIS_HEIGHT_SCANLINES = ${asset.archetypes[0].heightScanlines}`,
     `ENTITY_DEBRIS_VY = ${asset.archetypes[0].initialVy}`,
+    `ENTITY_DEBRIS_HP = ${asset.archetypes[0].hitPoints}`,
+    `ENTITY_HIT_FLASH_FRAMES = ${destruction.hitFlashFrames}`,
+    `ENTITY_HIT_FLASH_TIMER_LOAD = ${destruction.hitFlashFrames + 1}`,
+    `WEAPON_PICKUP_SLOT = ${pickup.slot}`,
+    `WEAPON_PICKUP_ACTIVE_MASK = $${(1 << pickup.slot).toString(16).padStart(2, "0").toUpperCase()}`,
+    `WEAPON_PICKUP_QUALIFIED_KILLS = ${pickup.qualifiedKillsPerDrop}`,
+    `WEAPON_PICKUP_PENDING_FRAMES = ${pickup.pendingFrames}`,
+    // The trigger occurs before the entity update and Raider effects are
+    // materialised one frame later. Two preload ticks preserve thirty complete
+    // hidden frames and make the first visible frame follow effect expiry.
+    // Collision resolution precedes the entity update in the same active PAL
+    // frame. One preload tick is consumed in that partial kill frame and one
+    // keeps the capsule hidden until the 30-frame breakup has fully erased.
+    `WEAPON_PICKUP_PENDING_TIMER_LOAD = ${pickup.pendingFrames + 2}`,
+    `WEAPON_PICKUP_MOVE_NUMERATOR = ${pickup.movementNumerator}`,
+    `WEAPON_PICKUP_MOVE_DENOMINATOR = ${pickup.movementDenominator}`,
+    `WEAPON_PICKUP_SAFE_TOP = ${pickup.safeTopScanline}`,
+    `WEAPON_PICKUP_SAFE_BOTTOM = ${pickup.safeBottomScanline}`,
+    `WEAPON_PICKUP_WIDTH_HPOS = ${pickup.widthHpos}`,
+    `WEAPON_PICKUP_HEIGHT_SCANLINES = ${pickup.heightScanlines}`,
     "ENTITY_EVENT_WORLD_ROW_ADVANCED = $01",
+    "EFFECT_TYPE_DEBRIS_CORE = 1",
+    "EFFECT_TYPE_DEBRIS_FRAGMENT = 2",
+    "EFFECT_TYPE_RAIDER_CORE = 3",
+    "EFFECT_TYPE_RAIDER_LEFT_WING = 4",
+    "EFFECT_TYPE_RAIDER_RIGHT_WING = 5",
+    "EFFECT_TYPE_RAIDER_CENTRAL = 6",
+    "EFFECT_TYPE_RAIDER_RED_EYE = 7",
+    "EFFECT_STATE_ACTIVE = 1",
+    "EFFECT_FLAG_MULTICELL = $02",
+    `EFFECT_DEBRIS_CORE_FRAMES = ${destruction.coreFrames}`,
+    `EFFECT_DEBRIS_CORE_TIMER_LOAD = ${destruction.coreFrames + 1}`,
+    `EFFECT_DEBRIS_FRAGMENT_FRAMES = ${destruction.fragmentFrames}`,
+    `EFFECT_DEBRIS_FRAGMENT_TIMER_LOAD = ${destruction.fragmentFrames + 1}`,
+    `EFFECT_DEBRIS_FRAGMENT_COUNT = ${destruction.fragmentCount}`,
+    `EFFECT_FRAGMENT_LOCAL_X_SPEED = ${destruction.fragmentLocalXSpeedHpos}`,
+    `EFFECT_FRAGMENT_LOCAL_Y_SPEED = ${destruction.fragmentLocalYSpeedScanlines}`,
+    "EFFECT_DEBRIS_ACTIVE_MASK = $1F",
+    `EFFECT_RAIDER_CORE_FRAMES = ${raiderBreakup.coreFrames}`,
+    `EFFECT_RAIDER_CORE_TIMER_LOAD = ${raiderBreakup.coreFrames + 1}`,
+    `EFFECT_RAIDER_FRAGMENT_FRAMES = ${raiderBreakup.fragmentFrames}`,
+    `EFFECT_RAIDER_FRAGMENT_TIMER_LOAD = ${raiderBreakup.fragmentFrames + 1}`,
+    `EFFECT_RAIDER_CORE_X_OFFSET = ${raiderBreakup.coreOffsetHpos}`,
+    "EFFECT_RAIDER_ACTIVE_MASK = $1F",
     ".macro EMIT_ENTITY_ARCHETYPE_DESCRIPTORS",
     `    .byte ${[...asset.descriptor].map(byte).join(",")}`,
     ".endmacro",
     ".macro EMIT_ENTITY_DEBRIS_GLYPHS",
     `    .byte ${[...asset.glyphs].map(byte).join(",")}`,
+    ".endmacro",
+    ".macro EMIT_EFFECT_FRAGMENT_GLYPHS",
+    `    .byte ${[...asset.effectGlyphs].map(byte).join(",")}`,
+    ".endmacro",
+    ".macro EMIT_WEAPON_PICKUP_GLYPHS",
+    `    .byte ${[...asset.pickupGlyphs].map(byte).join(",")}`,
     ".endmacro",
     ".macro EMIT_ENTITY_TRAJECTORY_VX",
     `    .byte ${[...asset.trajectoryVx].map(byte).join(",")}`,

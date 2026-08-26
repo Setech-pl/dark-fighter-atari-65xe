@@ -9,6 +9,7 @@ import {
   compileLoaderBitmap,
   loadLoaderBitmapDefinition,
   renderLoaderCa65Include,
+  renderLoaderDisplayListCa65Include,
 } from "./loader-assets.mjs";
 import {
   compileCapitalHulls,
@@ -77,6 +78,15 @@ const entityEffectsFoundationPayloadBudget = 1024;
 const entityEffectsFoundationPayloadLimit =
   acceptedRuntimeHeadroomPayloadBytes + entityEffectsFoundationPayloadBudget;
 const debrisVisualPolishPayloadLimitBytes = 16384;
+const exactBootPayloadBytes = 16384;
+const bootPayloadTrailer = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
+const bootPayloadCoreBytes = exactBootPayloadBytes - bootPayloadTrailer.length;
+const minimumRuntimeCompactionReserveBytes = 1024;
+const acceptedRuntimeCompactionReserveBytes = 1097;
+const minimumWeaponPickupReserveBytes = 512;
+const residentRuntimeSuffixAddressExpected = 0x21c1;
+const packedResidentStagingAddress = 0x8100;
+const bootA2StagingAddress = 0x7f10;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
 const runtimeHeadroomHistoricalWallGate = 31568;
@@ -90,6 +100,35 @@ const debrisVisualPolishBaselineHeadroomCycles = 3543;
 const debrisVisualPolishApprovedWallDelta = 256;
 const debrisVisualPolishWallLimit = 32281;
 const debrisVisualPolishMinimumHeadroom = 3287;
+const explosionFlashBaselineWallCycles = 32081;
+const explosionFlashBaselineHeadroomCycles = 3487;
+const explosionFlashApprovedWallDelta = 64;
+const explosionFlashWallLimit = 32145;
+const explosionFlashAbsoluteMinimumHeadroom = 3200;
+const destructibleDebrisBaselineWallCycles = 32122;
+const destructibleDebrisBaselineHeadroomCycles = 3446;
+const destructibleDebrisTargetDeltaCycles = 640;
+const destructibleDebrisHardDeltaCycles = 768;
+const destructibleDebrisMinimumHeadroomCycles = 2800;
+const destructibleDebrisEntityCodeBaselineBytes = 714;
+const destructibleDebrisEntityCodeBudgetBytes = 768;
+const destructibleDebrisRuntimeCodeBaselineBytes = 13697;
+const destructibleDebrisRuntimeCodeBudgetBytes = 768;
+const enemyBreakupBaselineWallCycles = 32719;
+const enemyBreakupBaselineHeadroomCycles = 2849;
+const enemyBreakupTargetDeltaCycles = 128;
+const enemyBreakupHardDeltaCycles = 224;
+const enemyBreakupMinimumHeadroomCycles = 2600;
+const enemyBreakupRuntimeCodeBaselineBytes = 14184;
+const enemyBreakupRuntimeCodeBudgetBytes = 512;
+const runtimePayloadCompactionBaselineLinkedBytes = 14192;
+const runtimePayloadCompactionBaselineEntityCodeBytes = 725;
+const runtimePayloadCompactionBaselinePackedEntityBytes = 651;
+const weaponPickupRapidFireBaselineRuntimeCodeBytes = 14316;
+const weaponPickupRapidFireBaselineWallCycles = 32869;
+const weaponPickupRapidFireTargetDeltaCycles = 128;
+const weaponPickupRapidFireHardDeltaCycles = 256;
+const weaponPickupRapidFireMinimumHeadroomCycles = 2400;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -192,7 +231,11 @@ async function build() {
   const loaderDefinition = loadLoaderBitmapDefinition(loaderDefinitionPath);
   const loaderAsset = compileLoaderBitmap(loaderDefinition);
   const loaderInclude = Buffer.from(renderLoaderCa65Include(loaderAsset));
+  const loaderDisplayListInclude = Buffer.from(
+    renderLoaderDisplayListCa65Include(loaderAsset),
+  );
   writeFile(path.join(buildDirectory, "loader-screen.inc"), loaderInclude);
+  writeFile(path.join(buildDirectory, "loader-display-list.inc"), loaderDisplayListInclude);
   const capitalHullsDefinitionPath = path.join(
     rootDirectory,
     "assets",
@@ -267,6 +310,7 @@ async function build() {
     {
       "/project/src/main.s": source,
       "/project/build/loader-screen.inc": loaderInclude,
+      "/project/build/loader-display-list.inc": loaderDisplayListInclude,
       "/project/build/capital-hulls.inc": capitalHullsInclude,
       "/project/build/enemy-roster.inc": enemyRosterInclude,
       "/project/build/fighter-weapons.inc": fighterWeaponsInclude,
@@ -338,15 +382,23 @@ async function build() {
   const entityCodeLoadAddress = labels.get("__ENTITY_CODE_LOAD__");
   const entityCodeRunAddress = labels.get("__ENTITY_CODE_RUN__");
   const entityCodeBytes = labels.get("__ENTITY_CODE_SIZE__");
+  const relocatedHullStart = labels.get("scroll_hull_columns");
+  const relocatedHullEnd = labels.get("scroll_hull_columns_end");
   const entityStateRunAddress = labels.get("__ENTITY_STATE_RUN__");
   const entityStateBytes = labels.get("__ENTITY_STATE_SIZE__");
   const codeBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "CODE");
   const rodataBytes = parseLinkSegmentSize(mapFile.toString("utf8"), "RODATA");
   const projectileStateBytes = labels.get("__PROJECTILES_SIZE__");
+  const residentRuntimeSuffixAddress = labels.get("resident_runtime_suffix");
+  const residentPackedSourceOperand = labels.get("resident_packed_source");
+  const residentPackedSizeOperand = labels.get("resident_packed_size");
+  const broadsidePackedSourceOperand = labels.get("broadside_packed_source");
   const starfieldPackedSourceOperand = labels.get("starfield_packed_source");
   const starfieldPackedSizeOperand = labels.get("starfield_packed_size");
   const a2KernelSourceOperand = labels.get("a2_kernel_source");
   const entityPackedSourceOperand = labels.get("entity_packed_source");
+  const entityStagedSourceOperand = labels.get("entity_staged_source");
+  const entityPackedSizeOperand = labels.get("entity_packed_size");
   const loaderPackedAddress = labels.get("loader_bitmap_lzss");
   const musicPlayerStart = labels.get("music_player_start");
   const musicPlayerEnd = labels.get("music_player_end");
@@ -367,17 +419,26 @@ async function build() {
     !Number.isInteger(entityCodeLoadAddress) || !Number.isInteger(entityCodeRunAddress) ||
     !Number.isInteger(entityCodeBytes) || !Number.isInteger(entityStateRunAddress) ||
     !Number.isInteger(entityStateBytes) ||
+    !Number.isInteger(residentRuntimeSuffixAddress) ||
+    !Number.isInteger(residentPackedSourceOperand) ||
+    !Number.isInteger(residentPackedSizeOperand) ||
+    !Number.isInteger(broadsidePackedSourceOperand) ||
     !Number.isInteger(starfieldPackedSourceOperand) ||
     !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(a2KernelSourceOperand) ||
-    !Number.isInteger(entityPackedSourceOperand) ||
+    !Number.isInteger(entityPackedSourceOperand) || !Number.isInteger(entityStagedSourceOperand) ||
+    !Number.isInteger(entityPackedSizeOperand) ||
     !Number.isInteger(loaderPackedAddress) ||
     !Number.isInteger(musicPlayerStart) || !Number.isInteger(musicPlayerEnd) ||
     !Number.isInteger(musicDataStart) || !Number.isInteger(musicDataEnd) ||
     !Number.isInteger(gameMusicPlayerStart) || !Number.isInteger(gameMusicPlayerEnd) ||
     !Number.isInteger(gameMusicDataStart) || !Number.isInteger(gameMusicDataEnd) ||
     !Number.isInteger(codeBytes) || !Number.isInteger(rodataBytes) ||
+    !Number.isInteger(relocatedHullStart) || !Number.isInteger(relocatedHullEnd) ||
     !Number.isInteger(projectileStateBytes)) {
     throw new Error("ld65 label file is missing entry or resident relocation labels");
+  }
+  if (residentRuntimeSuffixAddress !== residentRuntimeSuffixAddressExpected) {
+    throw new Error(`Resident runtime suffix moved from its reviewed $${residentRuntimeSuffixAddressExpected.toString(16)} boundary`);
   }
   if (broadsideLoadAddress !== 0x4000 || broadsideRunAddress !== 0x5e10 ||
     broadsideRuntimeBytes > broadsideRuntimeReservedBytes) {
@@ -395,9 +456,16 @@ async function build() {
     entityCodeBytes < 1 || entityCodeBytes > 0x0f00) {
     throw new Error("ENTITY_CODE lies outside its reviewed $9100-$9FFF runtime range");
   }
-  if (!isReviewVariant && entityCodeBytes >
-    debrisVisualPolishEntityCodeBaselineBytes + debrisVisualPolishEntityCodeBudgetBytes) {
-    throw new Error("Debris visual polish exceeds its +512 B ENTITY_CODE budget");
+  const relocatedHullBytes = relocatedHullEnd - relocatedHullStart;
+  const entityFeatureCodeBytes = entityCodeBytes - relocatedHullBytes;
+  if (relocatedHullBytes < 1 || relocatedHullStart < entityCodeRunAddress ||
+    relocatedHullEnd > entityCodeRunAddress + entityCodeBytes) {
+    throw new Error("Relocated pixel-exact hull scroll does not lie wholly in ENTITY_CODE");
+  }
+  if (!isReviewVariant && entityFeatureCodeBytes >
+    destructibleDebrisEntityCodeBaselineBytes + destructibleDebrisEntityCodeBudgetBytes) {
+    throw new Error(`Destructible debris ENTITY_CODE feature body is ${entityFeatureCodeBytes} B; ` +
+      `limit is ${destructibleDebrisEntityCodeBaselineBytes + destructibleDebrisEntityCodeBudgetBytes} B`);
   }
   if (entityStateRunAddress !== 0x8000 || entityStateBytes !== 0x0100) {
     throw new Error("Entity/effects BSS must occupy exactly $8000-$80FF");
@@ -448,7 +516,40 @@ async function build() {
   const residentMain = Buffer.from(
     linkedPayload.subarray(0, broadsideLoadAddress - loadAddress),
   );
-  const packedStarfieldAddress = loadAddress + residentMain.length + packedBroadsideRuntime.length;
+  const residentPrefixBytes = residentRuntimeSuffixAddress - loadAddress;
+  const residentRuntimeSuffix = Buffer.from(residentMain.subarray(residentPrefixBytes));
+  const packedResidentRuntime = packBroadsideLzss(residentRuntimeSuffix);
+  if (!unpackBroadsideLzss(packedResidentRuntime).equals(residentRuntimeSuffix)) {
+    throw new Error("Resident runtime suffix LZSS round trip failed");
+  }
+
+  const residentPackedSourceAddress = loadAddress + residentPrefixBytes;
+  const broadsidePackedSourceAddress = residentPackedSourceAddress + packedResidentRuntime.length;
+  const packedStarfieldAddress = broadsidePackedSourceAddress + packedBroadsideRuntime.length;
+  const a2KernelSourceAddress = packedStarfieldAddress + packedStarfieldRuntime.length;
+  const entityPackedSourceAddress = a2KernelSourceAddress + a2KernelRuntime.length;
+  const entityStagedSourceAddress = packedResidentStagingAddress + packedResidentRuntime.length;
+  const entityStagedEndAddress = entityStagedSourceAddress + packedEntityCodeRuntime.length;
+  if (entityStagedSourceAddress < entityCodeRunAddress + entityCodeBytes ||
+    entityStagedEndAddress > 0xa000) {
+    throw new Error(
+      `Packed resident/entity staging $${packedResidentStagingAddress.toString(16)}-$${(entityStagedEndAddress - 1).toString(16)} ` +
+      "overlaps ENTITY_CODE output or the excluded $A000-$BFFF window",
+    );
+  }
+
+  residentMain.writeUInt16LE(
+    residentPackedSourceAddress,
+    residentPackedSourceOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
+    packedResidentRuntime.length,
+    residentPackedSizeOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
+    broadsidePackedSourceAddress,
+    broadsidePackedSourceOperand - loadAddress,
+  );
   residentMain.writeUInt16LE(
     packedStarfieldAddress,
     starfieldPackedSourceOperand - loadAddress,
@@ -457,30 +558,64 @@ async function build() {
     packedStarfieldRuntime.length,
     starfieldPackedSizeOperand - loadAddress,
   );
-  const a2KernelSourceAddress = loadAddress + residentMain.length +
-    packedBroadsideRuntime.length + packedStarfieldRuntime.length;
   residentMain.writeUInt16LE(
     a2KernelSourceAddress,
     a2KernelSourceOperand - loadAddress,
   );
-  const entityPackedSourceAddress = a2KernelSourceAddress + a2KernelRuntime.length;
   residentMain.writeUInt16LE(
     entityPackedSourceAddress,
     entityPackedSourceOperand - loadAddress,
   );
-  const rawPayload = Buffer.concat([
-    residentMain,
+  residentMain.writeUInt16LE(
+    entityStagedSourceAddress,
+    entityStagedSourceOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
+    packedEntityCodeRuntime.length,
+    entityPackedSizeOperand - loadAddress,
+  );
+
+  const residentPrefix = Buffer.from(residentMain.subarray(0, residentPrefixBytes));
+  const compactedPayloadBytes = residentPrefix.length + packedResidentRuntime.length +
+    packedBroadsideRuntime.length + packedStarfieldRuntime.length + a2KernelRuntime.length +
+    packedEntityCodeRuntime.length;
+  const runtimeCompactionReserveBytes = bootPayloadCoreBytes - compactedPayloadBytes;
+  if (runtimeCompactionReserveBytes < minimumWeaponPickupReserveBytes) {
+    throw new Error(
+      `Rapid Fire leaves only ${runtimeCompactionReserveBytes} B; ` +
+      `at least ${minimumWeaponPickupReserveBytes} B of source-owned reserve is required`,
+    );
+  }
+  const runtimeCompactionReserve = Buffer.alloc(runtimeCompactionReserveBytes);
+  const runtimeCompactionReserveAddress = loadAddress + compactedPayloadBytes;
+  const bootPayloadCore = Buffer.concat([
+    residentPrefix,
+    packedResidentRuntime,
     packedBroadsideRuntime,
     packedStarfieldRuntime,
     a2KernelRuntime,
     packedEntityCodeRuntime,
+    runtimeCompactionReserve,
   ]);
+  if (bootPayloadCore.length !== bootPayloadCoreBytes) {
+    throw new Error(
+      `Boot payload core is ${bootPayloadCore.length} bytes; expected exactly ` +
+      `${bootPayloadCoreBytes} bytes before the source-owned ${bootPayloadTrailer.length}-byte trailer`,
+    );
+  }
+  const rawPayload = Buffer.concat([bootPayloadCore, bootPayloadTrailer]);
+  if (rawPayload.length !== exactBootPayloadBytes) {
+    throw new Error(`Boot payload must be exactly ${exactBootPayloadBytes} bytes`);
+  }
   if (!isReviewVariant && rawPayload.length > entityEffectsFoundationPayloadLimit) {
     throw new Error(
       `Entity/effects foundation payload is ${rawPayload.length} bytes and exceeds ` +
       `its explicit ${entityEffectsFoundationPayloadLimit}-byte limit ` +
       `(${acceptedRuntimeHeadroomPayloadBytes} baseline + ` +
-      `${entityEffectsFoundationPayloadBudget} approved bytes)`,
+      `${entityEffectsFoundationPayloadBudget} approved bytes; ` +
+      `resident ${residentMain.length}, broadside ${packedBroadsideRuntime.length}, ` +
+      `starfield ${packedStarfieldRuntime.length}, A2 ${a2KernelRuntime.length}, ` +
+      `entity ${packedEntityCodeRuntime.length}/${entityCodeRuntime.length} packed/raw)`,
     );
   }
   if (!isReviewVariant && rawPayload.length > debrisVisualPolishPayloadLimitBytes) {
@@ -490,7 +625,8 @@ async function build() {
       `${rawPayload.length - debrisVisualPolishPayloadLimitBytes} bytes ` +
       `(resident ${residentMain.length}, broadside ${packedBroadsideRuntime.length}, ` +
       `starfield ${packedStarfieldRuntime.length}, A2 ${a2KernelRuntime.length}, ` +
-      `entity ${packedEntityCodeRuntime.length}/${entityCodeRuntime.length} packed/raw)`,
+      `entity ${packedEntityCodeRuntime.length}/${entityCodeRuntime.length} packed/raw, ` +
+      `CODE ${codeBytes}, RODATA ${rodataBytes})`,
     );
   }
 
@@ -500,6 +636,7 @@ async function build() {
   }
 
   rawPayload[1] = bootSectors;
+  residentMain[1] = bootSectors;
   if (rawPayload.readUInt16LE(2) !== loadAddress) {
     throw new Error("Assembled boot header has an unexpected load address");
   }
@@ -567,6 +704,12 @@ async function build() {
       },
     },
   };
+  const destructibleDebrisRuntimeCodeBytes = codeBytes + starfieldRuntimeBytes +
+    broadsideRuntimeBytes + a2KernelBytes + entityCodeBytes;
+  // The historical debris/Raider code budgets describe their accepted commits.
+  // New weapon code consumes only the explicit post-compaction payload reserve;
+  // the live linked total remains reported below instead of being misclassified
+  // as growth of either completed feature.
 
   const manifest = {
     formatVersion: 1,
@@ -585,6 +728,13 @@ async function build() {
     bootInitAddress,
     bootSectors,
     payloadBytes: rawPayload.length,
+    bootPayloadTrailer: {
+      address: loadAddress + bootPayloadCore.length,
+      bytes: bootPayloadTrailer.length,
+      ascii: "DFB1",
+      hex: bootPayloadTrailer.toString("hex"),
+      sourceOwned: true,
+    },
     payloadBudget: {
       historicalRuntimeHeadroom: {
         baselineBytes: acceptedMenuMusicPayloadBytes,
@@ -606,6 +756,55 @@ async function build() {
         remainingBytes: debrisVisualPolishPayloadLimitBytes - rawPayload.length,
         maximumBootSectors: 128,
       },
+      destructibleDebris: {
+        limitBytes: debrisVisualPolishPayloadLimitBytes,
+        actualBytes: rawPayload.length,
+        remainingBytes: debrisVisualPolishPayloadLimitBytes - rawPayload.length,
+        maximumBootSectors: 128,
+      },
+      enemyBreakupEffects: {
+        limitBytes: exactBootPayloadBytes,
+        actualBytes: rawPayload.length,
+        remainingBytes: exactBootPayloadBytes - rawPayload.length,
+        maximumBootSectors: 128,
+      },
+      runtimePayloadCompaction: {
+        minimumRecoveredReserveBytes: minimumRuntimeCompactionReserveBytes,
+        baselineReserveBytes: acceptedRuntimeCompactionReserveBytes,
+        reserveBytes: runtimeCompactionReserveBytes,
+        recoveredReserveBytes: acceptedRuntimeCompactionReserveBytes,
+        residentSuffixGrossSavingsBytes:
+          residentRuntimeSuffix.length - packedResidentRuntime.length,
+        relocatedColdInitBytes:
+          entityCodeBytes - runtimePayloadCompactionBaselineEntityCodeBytes,
+        relocatedColdInitPackedCostBytes:
+          packedEntityCodeRuntime.length - runtimePayloadCompactionBaselinePackedEntityBytes,
+        reserveAddress: runtimeCompactionReserveAddress,
+        reserveEndAddress: runtimeCompactionReserveAddress + runtimeCompactionReserveBytes - 1,
+        sourceOwned: true,
+        fillByte: 0,
+      },
+      weaponPickupRapidFire: {
+        baselineReserveBytes: acceptedRuntimeCompactionReserveBytes,
+        minimumRemainingReserveBytes: minimumWeaponPickupReserveBytes,
+        remainingReserveBytes: runtimeCompactionReserveBytes,
+        consumedReserveBytes:
+          acceptedRuntimeCompactionReserveBytes - runtimeCompactionReserveBytes,
+      },
+    },
+    residentRuntime: {
+      loadAddress,
+      runAddress: loadAddress,
+      rawBytes: residentMain.length,
+      prefixBytes: residentPrefix.length,
+      prefixEndAddress: residentRuntimeSuffixAddress - 1,
+      suffixAddress: residentRuntimeSuffixAddress,
+      suffixRawBytes: residentRuntimeSuffix.length,
+      suffixPackedBytes: packedResidentRuntime.length,
+      packedSourceAddress: residentPackedSourceAddress,
+      stagingAddress: packedResidentStagingAddress,
+      stagedEndAddress: packedResidentStagingAddress + packedResidentRuntime.length - 1,
+      compression: "LZ-10/5",
     },
     broadsideRuntime: {
       loadAddress: broadsideLoadAddress,
@@ -613,6 +812,7 @@ async function build() {
       bytes: broadsideRuntimeBytes,
       reservedBytes: broadsideRuntimeReservedBytes,
       packedBytes: packedBroadsideRuntime.length,
+      packedSourceAddress: broadsidePackedSourceAddress,
       compression: "LZ-10/5",
     },
     starfieldRuntime: {
@@ -621,6 +821,7 @@ async function build() {
       bytes: starfieldRuntimeBytes,
       reservedBytes: 0x08e6,
       packedBytes: packedStarfieldRuntime.length,
+      packedSourceAddress: packedStarfieldAddress,
       stagingAddress: starfieldStagingAddress,
       stagingBytes: starfieldStagingBytes,
       compression: "LZ-10/5",
@@ -629,6 +830,7 @@ async function build() {
       loadAddress: a2KernelLoadAddress,
       runAddress: a2KernelRunAddress,
       sourceAddress: a2KernelSourceAddress,
+      stagingAddress: bootA2StagingAddress,
       bytes: a2KernelBytes,
       reservedBytes: 0x0100,
       availability: "unconditional 64 KB RAM",
@@ -647,18 +849,36 @@ async function build() {
       codeLoadAddress: entityCodeLoadAddress,
       codeRunAddress: entityCodeRunAddress,
       codeBytes: entityCodeBytes,
+      sharedRuntimeBytes: relocatedHullBytes,
+      featureCodeBytes: entityFeatureCodeBytes,
       codeReservedBytes: entityEffectsAsset.pools.codeReservedBytes,
       codeBudget: {
         baselineBytes: debrisVisualPolishEntityCodeBaselineBytes,
         approvedDeltaBytes: debrisVisualPolishEntityCodeBudgetBytes,
-        actualDeltaBytes: entityCodeBytes - debrisVisualPolishEntityCodeBaselineBytes,
+        actualDeltaBytes: entityFeatureCodeBytes - debrisVisualPolishEntityCodeBaselineBytes,
         limitBytes: debrisVisualPolishEntityCodeBaselineBytes +
           debrisVisualPolishEntityCodeBudgetBytes,
         remainingBytes: debrisVisualPolishEntityCodeBaselineBytes +
-          debrisVisualPolishEntityCodeBudgetBytes - entityCodeBytes,
+          debrisVisualPolishEntityCodeBudgetBytes - entityFeatureCodeBytes,
+        destructibleDebris: {
+          baselineBytes: destructibleDebrisEntityCodeBaselineBytes,
+          approvedDeltaBytes: destructibleDebrisEntityCodeBudgetBytes,
+          actualBytes: entityFeatureCodeBytes,
+          actualDeltaBytes: entityFeatureCodeBytes - destructibleDebrisEntityCodeBaselineBytes,
+          limitBytes: destructibleDebrisEntityCodeBaselineBytes +
+            destructibleDebrisEntityCodeBudgetBytes,
+        },
+        weaponPickupRapidFire: {
+          baselineBytes: runtimePayloadCompactionBaselineEntityCodeBytes + 124,
+          actualBytes: entityFeatureCodeBytes,
+          actualDeltaBytes:
+            entityFeatureCodeBytes - (runtimePayloadCompactionBaselineEntityCodeBytes + 124),
+        },
       },
       packedBytes: packedEntityCodeRuntime.length,
       packedSourceAddress: entityPackedSourceAddress,
+      stagedSourceAddress: entityStagedSourceAddress,
+      stagedEndAddress: entityStagedEndAddress - 1,
       compression: "LZ-10/5",
       deterministicFillTestByte: 0xa5,
       gameplayTopScanline: entityEffectsAsset.coordinateSystem.gameplayTopScanline,
@@ -666,9 +886,18 @@ async function build() {
       logicalRows: entityEffectsAsset.coordinateSystem.logicalRows,
       archetypeCount: entityEffectsAsset.archetypes.length,
       descriptorBytes: entityEffectsAsset.descriptor.length,
-      glyphBytes: entityEffectsAsset.glyphs.length,
+      glyphBytes: entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length +
+        entityEffectsAsset.pickupGlyphs.length,
+      debrisGlyphBytes: entityEffectsAsset.glyphs.length,
+      effectGlyphBytes: entityEffectsAsset.effectGlyphs.length,
+      weaponPickupGlyphBytes: entityEffectsAsset.pickupGlyphs.length,
       glyphIndex: labels.get("ENTITY_DEBRIS_GLYPH_BASE"),
-      glyphCount: entityEffectsAsset.glyphs.length / 8,
+      glyphCount: (entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length +
+        entityEffectsAsset.pickupGlyphs.length) / 8,
+      debrisGlyphCount: entityEffectsAsset.glyphs.length / 8,
+      effectGlyphCount: entityEffectsAsset.effectGlyphs.length / 8,
+      weaponPickupGlyphCount: entityEffectsAsset.pickupGlyphs.length / 8,
+      weaponPickupGlyphIndex: labels.get("WEAPON_PICKUP_GLYPH_BASE"),
       newGlyphsFromFoundation: entityEffectsAsset.glyphs.length / 8 - 1,
       runtimeBudget: {
         historicalGateWallCycles: runtimeHeadroomHistoricalWallGate,
@@ -693,15 +922,125 @@ async function build() {
           approvedFeatureDeltaCycles: debrisVisualPolishApprovedWallDelta,
           featureWallLimitCycles: debrisVisualPolishWallLimit,
           minimumPhysicalHeadroomCycles: debrisVisualPolishMinimumHeadroom,
-          measuredWallCycles: wallTrace?.semantics.measured_wall_cycles_dma_on ?? null,
-          actualDeltaCycles: wallTrace === null ? null :
-            wallTrace.semantics.measured_wall_cycles_dma_on -
-              debrisVisualPolishBaselineWallCycles,
-          remainingApprovedCycles: wallTrace === null ? null :
-            debrisVisualPolishWallLimit - wallTrace.semantics.measured_wall_cycles_dma_on,
+          measuredWallCycles:
+            wallTrace?.gate.debris_visual_polish?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.debris_visual_polish?.actual_delta_cycles ?? null,
+          remainingApprovedCycles:
+            wallTrace?.gate.debris_visual_polish?.remaining_approved_cycles ?? null,
           missedSynchronization: wallTrace?.gate.missed_frames ?? null,
           deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
         },
+        enemyBreakupEffects: {
+          baselineWallCycles: enemyBreakupBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: enemyBreakupBaselineHeadroomCycles,
+          targetDeltaCycles: enemyBreakupTargetDeltaCycles,
+          hardDeltaCycles: enemyBreakupHardDeltaCycles,
+          targetWallLimitCycles: enemyBreakupBaselineWallCycles +
+            enemyBreakupTargetDeltaCycles,
+          hardWallLimitCycles: enemyBreakupBaselineWallCycles +
+            enemyBreakupHardDeltaCycles,
+          minimumPhysicalHeadroomCycles: enemyBreakupMinimumHeadroomCycles,
+          measuredWallCycles:
+            wallTrace?.gate.enemy_breakup_effects?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.enemy_breakup_effects?.actual_delta_cycles ?? null,
+          remainingTargetCycles:
+            wallTrace?.gate.enemy_breakup_effects?.remaining_target_cycles ?? null,
+          remainingHardCycles:
+            wallTrace?.gate.enemy_breakup_effects?.remaining_hard_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
+        explosionColourFlash: {
+          baselineWallCycles: explosionFlashBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: explosionFlashBaselineHeadroomCycles,
+          approvedFeatureDeltaCycles: explosionFlashApprovedWallDelta,
+          featureWallLimitCycles: explosionFlashWallLimit,
+          deltaLimitedMinimumPhysicalHeadroomCycles:
+            explosionFlashBaselineHeadroomCycles - explosionFlashApprovedWallDelta,
+          absoluteMinimumPhysicalHeadroomCycles: explosionFlashAbsoluteMinimumHeadroom,
+          measuredWallCycles:
+            wallTrace?.gate.explosion_colour_flash?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.explosion_colour_flash?.actual_delta_cycles ?? null,
+          remainingApprovedCycles:
+            wallTrace?.gate.explosion_colour_flash?.remaining_approved_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
+        destructibleDebris: {
+          baselineWallCycles: destructibleDebrisBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: destructibleDebrisBaselineHeadroomCycles,
+          targetDeltaCycles: destructibleDebrisTargetDeltaCycles,
+          hardDeltaCycles: destructibleDebrisHardDeltaCycles,
+          targetWallLimitCycles: destructibleDebrisBaselineWallCycles +
+            destructibleDebrisTargetDeltaCycles,
+          hardWallLimitCycles: destructibleDebrisBaselineWallCycles +
+            destructibleDebrisHardDeltaCycles,
+          minimumPhysicalHeadroomCycles: destructibleDebrisMinimumHeadroomCycles,
+          measuredWallCycles:
+            wallTrace?.gate.destructible_debris?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.destructible_debris?.actual_delta_cycles ?? null,
+          remainingTargetCycles:
+            wallTrace?.gate.destructible_debris?.remaining_target_cycles ?? null,
+          remainingHardCycles:
+            wallTrace?.gate.destructible_debris?.remaining_hard_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
+        weaponPickupRapidFire: {
+          baselineWallCycles: weaponPickupRapidFireBaselineWallCycles,
+          baselinePhysicalHeadroomCycles:
+            35568 - weaponPickupRapidFireBaselineWallCycles,
+          targetDeltaCycles: weaponPickupRapidFireTargetDeltaCycles,
+          hardDeltaCycles: weaponPickupRapidFireHardDeltaCycles,
+          targetWallLimitCycles:
+            weaponPickupRapidFireBaselineWallCycles + weaponPickupRapidFireTargetDeltaCycles,
+          hardWallLimitCycles:
+            weaponPickupRapidFireBaselineWallCycles + weaponPickupRapidFireHardDeltaCycles,
+          minimumPhysicalHeadroomCycles: weaponPickupRapidFireMinimumHeadroomCycles,
+          measuredWallCycles:
+            wallTrace?.gate.weapon_pickup_rapid_fire?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.weapon_pickup_rapid_fire?.actual_delta_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+        },
+      },
+    },
+    runtimeCodeBudget: {
+      measurement: "linked CODE + STARFIELD + BROADSIDE + A2_KERNEL + ENTITY_CODE bytes",
+      baselineBytes: destructibleDebrisRuntimeCodeBaselineBytes,
+      actualBytes: destructibleDebrisRuntimeCodeBytes,
+      actualDeltaBytes: destructibleDebrisRuntimeCodeBytes -
+        destructibleDebrisRuntimeCodeBaselineBytes,
+      approvedDeltaBytes: destructibleDebrisRuntimeCodeBudgetBytes,
+      remainingBytes: destructibleDebrisRuntimeCodeBaselineBytes +
+        destructibleDebrisRuntimeCodeBudgetBytes - destructibleDebrisRuntimeCodeBytes,
+      enemyBreakupEffects: {
+        baselineBytes: enemyBreakupRuntimeCodeBaselineBytes,
+        actualBytes: weaponPickupRapidFireBaselineRuntimeCodeBytes,
+        actualDeltaBytes: weaponPickupRapidFireBaselineRuntimeCodeBytes -
+          enemyBreakupRuntimeCodeBaselineBytes,
+        approvedDeltaBytes: enemyBreakupRuntimeCodeBudgetBytes,
+        remainingBytes: enemyBreakupRuntimeCodeBaselineBytes +
+          enemyBreakupRuntimeCodeBudgetBytes - weaponPickupRapidFireBaselineRuntimeCodeBytes,
+      },
+      runtimePayloadCompaction: {
+        baselineBytes: runtimePayloadCompactionBaselineLinkedBytes,
+        actualBytes: weaponPickupRapidFireBaselineRuntimeCodeBytes,
+        relocatedColdInitBytes:
+          weaponPickupRapidFireBaselineRuntimeCodeBytes -
+            runtimePayloadCompactionBaselineLinkedBytes,
+        newGameplayBytes: 0,
+      },
+      weaponPickupRapidFire: {
+        baselineBytes: weaponPickupRapidFireBaselineRuntimeCodeBytes,
+        actualBytes: destructibleDebrisRuntimeCodeBytes,
+        actualDeltaBytes:
+          destructibleDebrisRuntimeCodeBytes - weaponPickupRapidFireBaselineRuntimeCodeBytes,
       },
     },
     loaderScreen: {
@@ -926,6 +1265,9 @@ async function build() {
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
   writeFile(path.join(buildDirectory, "dark-fighter.bin"), rawPayload);
+  writeFile(path.join(buildDirectory, "resident-runtime.bin"), residentMain);
+  writeFile(path.join(buildDirectory, "resident-runtime-suffix.bin"), residentRuntimeSuffix);
+  writeFile(path.join(buildDirectory, "resident-runtime-suffix-packed.bin"), packedResidentRuntime);
   writeFile(path.join(buildDirectory, "broadside-runtime.bin"), broadsideRuntime);
   writeFile(path.join(buildDirectory, "broadside-runtime-packed.bin"), packedBroadsideRuntime);
   writeFile(path.join(buildDirectory, "starfield-runtime.bin"), starfieldRuntime);
@@ -956,6 +1298,7 @@ async function build() {
     console.log(`  entry   : $${startAddress.toString(16)}`);
     console.log(`  XEX     : ${xex.length} bytes`);
     console.log(`  ATR     : ${atr.length} bytes`);
+    console.log(`  reserve : ${runtimeCompactionReserveBytes} bytes source-owned @ $${runtimeCompactionReserveAddress.toString(16)}`);
     if (enemyReviewHarness) {
       console.log(`  variant : compile-time enemy review harness`);
       console.log(`  output  : ${path.relative(rootDirectory, artifactDirectory)}`);

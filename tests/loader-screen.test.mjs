@@ -13,10 +13,12 @@ import {
   loadLoaderBitmapDefinition,
   loaderBitmapConstants,
   loaderBitmapPixelValueAt,
+  LOADER_DISPLAY_LIST_ADDRESS,
   renderLoaderCa65Include,
 } from "../scripts/loader-assets.mjs";
 import { unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
-import { parseXex } from "../scripts/formats.mjs";
+import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import {
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
@@ -50,7 +52,6 @@ const sourcePath = path.join(rootDirectory, "src", "main.s");
 const labelsPath = path.join(rootDirectory, "build", "dark-fighter.lbl");
 const mapPath = path.join(rootDirectory, "build", "dark-fighter.map");
 const includePath = path.join(rootDirectory, "build", "loader-screen.inc");
-const xexPath = path.join(rootDirectory, "dist", "dark-fighter.xex");
 const manifestPath = path.join(
   rootDirectory,
   "dist",
@@ -76,15 +77,20 @@ function readLabels() {
 }
 
 function readXexBytes(address, length) {
-  const { segments } = parseXex(fs.readFileSync(xexPath));
-  const segment = segments.find(
-    ({ start, end }) => address >= start && address + length - 1 <= end,
-  );
-  assert.ok(segment, `XEX does not contain $${address.toString(16)}`);
-  return segment.data.subarray(
-    address - segment.start,
-    address - segment.start + length,
-  );
+  return readRuntimeBytes(rootDirectory, address, length);
+}
+
+function executeLoaderUnpack(labels) {
+  const memory = new Uint8Array(0x10000);
+  installRuntimeSegments(memory, rootDirectory);
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = labels.get("unpack_loader_bitmap");
+  for (let steps = 0; steps < 2_000_000 && cpu.pc !== stop; steps += 1) cpu.step();
+  assert.equal(cpu.pc, stop, "unpack_loader_bitmap did not return");
+  return memory;
 }
 
 function countPixels({ x, y, width, height }) {
@@ -282,12 +288,13 @@ test("generated include is canonical and contains no ANTIC 4 loader assets", () 
 
 test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
   const labels = readLabels();
-  const displayListAddress = labels.get("loader_display_list");
-  assert.ok(Number.isInteger(displayListAddress));
+  const displayListAddress = LOADER_DISPLAY_LIST_ADDRESS;
+  assert.equal(displayListAddress & 0x3ff, 0);
   const expected = createLoaderDisplayListBytes(compiled, displayListAddress);
   assert.equal(expected.length, 202);
   assert.deepEqual(
-    readXexBytes(displayListAddress, expected.length),
+    Buffer.from(executeLoaderUnpack(labels).subarray(
+      displayListAddress, displayListAddress + expected.length)),
     Buffer.from(expected),
   );
 
@@ -346,8 +353,8 @@ test("XEX and ATR use the current packed bitmap source", () => {
 });
 
 test("loader still owns exactly 250 full PAL frames and enters the main menu", () => {
-  assert.ok(source.indexOf("jsr show_loader") < source.indexOf("jsr enter_main_menu"));
-  assert.ok(source.indexOf("jsr enter_main_menu") < source.indexOf("start_gameplay:"));
+  assert.match(source,
+    /jsr show_loader[\s\S]+jsr unpack_starfield_runtime[\s\S]+jmp finish_startup_after_loader/);
   assert.match(source, /lda #LOADER_DURATION_FRAMES\s+sta loader_frame_count/);
   assert.match(
     source,
@@ -366,8 +373,8 @@ test("loader-only tail may use PMG bytes but stays below screen memory", () => {
   assert.ok(mainEnd);
   assert.ok(Number.parseInt(mainEnd[1], 16) < 0x4000);
   const labels = readLabels();
-  assert.ok(labels.get("loader_bitmap_lzss") < labels.get("loader_display_list"));
-  assert.ok(labels.get("loader_display_list") < 0x4000);
+  assert.ok(labels.get("loader_display_list_lzss") < labels.get("loader_bitmap_lzss"));
+  assert.ok(labels.get("loader_bitmap_lzss") < 0x4000);
   assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_frontend_charset/);
   assert.equal(compiled.bitmapAddress, 0x4010);
   assert.equal(compiled.bitmapAddress + compiled.bitmapBytes.length - 1, 0x5e0f);
