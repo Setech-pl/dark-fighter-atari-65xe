@@ -75,8 +75,8 @@ test("Rapid Fire owns fixed slot one without extending BSS or physical pools", (
   assert.equal(manifest.entityEffects.effectSlots, 6);
   assert.equal(manifest.entityEffects.weaponPickupGlyphIndex, 120);
   assert.equal(manifest.entityEffects.weaponPickupGlyphCount, 4);
-  assert.equal(manifest.entityEffects.glyphCount, 14);
-  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 4);
+  assert.equal(manifest.entityEffects.glyphCount, 18);
+  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 0);
 });
 
 test("four dense R/F glyphs cut tall black letters from a static 2x2 capsule", () => {
@@ -112,11 +112,11 @@ test("four dense R/F glyphs cut tall black letters from a static 2x2 capsule", (
   });
   const renderer = source.slice(source.indexOf("render_weapon_pickup_overlay:"),
     source.indexOf("; Effects render after"));
-  assert.doesNotMatch(renderer, /ENTITY_OWNER\+WEAPON_PICKUP_SLOT|ora #\$80|WEAPON_PICKUP_PHASE/);
+  assert.doesNotMatch(renderer, /ENTITY_OWNER\+WEAPON_PICKUP_SLOT|WEAPON_PICKUP_PHASE/);
   assert.match(renderer,
-    /lda #WEAPON_PICKUP_GLYPH_BASE[\s\S]+lda #\(WEAPON_PICKUP_GLYPH_BASE\+1\)/);
+    /lda ENTITY_RENDER_ID\+WEAPON_PICKUP_SLOT[\s\S]+adc #\$01/);
   assert.match(renderer,
-    /jsr advance_dst_to_next_ring_row[\s\S]+lda #\(WEAPON_PICKUP_GLYPH_BASE\+2\)[\s\S]+lda #\(WEAPON_PICKUP_GLYPH_BASE\+3\)/);
+    /jsr advance_dst_to_next_ring_row[\s\S]+lda ENTITY_RENDER_ID\+WEAPON_PICKUP_SLOT[\s\S]+adc #\$02/);
   assert.doesNotMatch(renderer, /@render_pickup_pair/);
 });
 
@@ -171,11 +171,7 @@ test("active capsule renders one static 2x2 code block continuously and cannot b
   assert.equal(active.slice(0, 32).every(({
     leftCode, rightCode, bottomLeftCode, bottomRightCode, renderId, drawnMask,
   }) => leftCode === 120 && rightCode === 121 && bottomLeftCode === 122 &&
-    bottomRightCode === 123 && renderId === 0 && drawnMask === 15), true);
-  assert.doesNotMatch(source.slice(source.indexOf("weapon_pickup_record_qualified_kill:"),
-    source.indexOf("weapon_pickup_release_active_mask:")),
-  /sta ENTITY_RENDER_ID\+WEAPON_PICKUP_SLOT/,
-  "the fixed-slot renderer must not spend state/code on a mutable render ID");
+    bottomRightCode === 123 && renderId === 120 && drawnMask === 15), true);
   assert.equal(active.every(({
     leftCode, rightCode, bottomLeftCode, bottomRightCode, animationFrame, drawnMask,
   }) => leftCode === 120 && rightCode === 121 && bottomLeftCode === 122 &&

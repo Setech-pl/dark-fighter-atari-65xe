@@ -45,9 +45,13 @@ import {
   raiderBreakupTraceCsv,
 } from "./debris-destruction-runtime.mjs";
 import {
+  assertSpreadShotTraceParity,
   assertWeaponPickupTraceParity,
+  executeSpreadShotHullVolleyTrace,
+  executeSpreadShotTrace,
   executeWeaponPickupTrace,
   executeViperProjectileColourTrace,
+  spreadShotTraceCsv,
   weaponPickupTraceCsv,
 } from "./weapon-pickup-runtime.mjs";
 import {
@@ -395,6 +399,30 @@ export const DEFAULT_WEAPON_PICKUP_TRACE_PATH = path.join(
   "build",
   "previews",
   "weapon-pickup-rapid-fire-trace.csv",
+);
+export const DEFAULT_SPREAD_SHOT_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "weapon-pickup-spread-shot-review.png",
+);
+export const DEFAULT_SPREAD_SHOT_TRACE_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "weapon-pickup-spread-shot-trace.csv",
+);
+export const DEFAULT_SPREAD_SHOT_HULL_XEX_PREVIEW_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-pickup-spread-shot-hulls-xex.png",
+);
+export const DEFAULT_SPREAD_SHOT_HULL_ATR_PREVIEW_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-pickup-spread-shot-hulls-atr.png",
+);
+export const DEFAULT_SPREAD_SHOT_HULL_XEX_TRACE_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-pickup-spread-shot-hulls-xex.csv",
+);
+export const DEFAULT_SPREAD_SHOT_HULL_ATR_TRACE_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-pickup-spread-shot-hulls-atr.csv",
 );
 const DEFAULT_CAPITAL_HULLS_DEFINITION_PATH = path.join(
   rootDirectory,
@@ -4080,10 +4108,11 @@ export function createWeaponPickupRapidFireTrace() {
 }
 
 function runtimeWeaponPickupFrameRgb(record, trace, registers, scale) {
-  const display = record.display ?? record.screen;
+  const display = record.display ?? record.screen ?? record.during;
   const rows = display.length / SCREEN_COLUMNS;
+  const charset = record.charsetDuring ?? trace.charset;
   const registerPixels = drawAnticScreen(registers, display,
-    { charset: trace.charset }, undefined, rows);
+    { charset: Uint8Array.from(charset) }, undefined, rows);
   return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, rows * CHARACTER_HEIGHT, scale);
 }
 
@@ -4168,6 +4197,188 @@ export function createWeaponPickupRapidFirePreview(source) {
   for (const frame of trace.rapidBurstFrames) {
     fillRgbRect(rgb, width, height, 700 + frame * 14, 814, 5, 10, red);
   }
+  return encodePng(rgb, width, height);
+}
+
+export function createSpreadShotTrace() {
+  const xex = executeSpreadShotTrace({ artifact: "xex" });
+  const atr = executeSpreadShotTrace({ artifact: "atr" });
+  assertSpreadShotTraceParity(xex, atr);
+  const atrRows = spreadShotTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${spreadShotTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+}
+
+export function createSpreadShotPreview(source) {
+  const trace = executeSpreadShotTrace({ artifact: "xex" });
+  const atr = executeSpreadShotTrace({ artifact: "atr" });
+  assertSpreadShotTraceParity(trace, atr);
+  const constants = parseConstants(source);
+  const registers = new Map([
+    ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+    ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+    ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.viper.rapidFireColourValue],
+  ]);
+  const frontend = readFrontendGraphicsSource(source);
+  const selected = [
+    ["1 SP CAPSULE F0", trace.spreadCapsuleFrames[0]],
+    ["2 SP MOVED F1", trace.spreadCapsuleFrames[1]],
+    ["3 PICKUP HUD SP10", trace.spreadPickup],
+    ["4 FAN FRAME 1", trace.trajectoryFrames[1]],
+    ["5 FAN FRAME 2", trace.trajectoryFrames[2]],
+    ["6 FAN FRAME 3", trace.trajectoryFrames[3]],
+    ["7 FAN FRAME 4", trace.trajectoryFrames[4]],
+    ["8 CLEAN EXIT", trace.projectilesAfterCleanup],
+  ].map(([label, record]) => ({ label, record }));
+  if (selected.some(({ record }) => !record)) throw new Error("Spread Shot runtime preview frame missing");
+
+  const nativeWidth = SOURCE_WIDTH;
+  const nativeHeight = 24 * CHARACTER_HEIGHT;
+  const gap = 12;
+  const width = 8 * nativeWidth * 2 + 9 * gap;
+  const height = 850;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  const red = atariPalRegisterToRgb(0x46);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width, "SPREAD SHOT  EXECUTED RELEASE XEX AND ATR", 24, 16,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "RED 2X2 FAN CAPSULE  HUD SP10  THREE YELLOW VIPER SHOTS  50 FPS", 24, 34,
+    frontend, red);
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  ACTUAL CONSECUTIVE RUNTIME FRAMES", 24, 58,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const x = gap + index * (nativeWidth + gap);
+    fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
+    strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
+    drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, 1);
+    copyRgbPanel(rgb, width, height, frame, nativeWidth, nativeHeight, x, 102);
+  });
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME PACKED BYTES BACKING AND TRAJECTORIES", 24, 324,
+    frontend, steel);
+  selected.forEach(({ label, record }, index) => {
+    const panelWidth = nativeWidth * 2;
+    const x = gap + index * (panelWidth + gap);
+    drawRgbLabel(rgb, width, label, x + 4, 348, frontend, white);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, 2);
+    copyRgbPanel(rgb, width, height, frame, panelWidth, nativeHeight * 2, x, 368);
+  });
+  drawRgbLabel(rgb, width, "INITIAL X OFFSET 4 HPOS  SIDE STEP 2  Y STEP 6 SCANLINES", 24, 778,
+    frontend, yellow);
+  drawRgbLabel(rgb, width, "FOUR CONSECUTIVE FAN FRAMES THEN BYTE-CLEAN REVERSE ERASE", 24, 802,
+    frontend, red);
+  drawRgbLabel(rgb, width, "XEX ATR TRACE PARITY  NO CONCEPT OR PSEUDO GAMEPLAY", 24, 826,
+    frontend, steel);
+  return encodePng(rgb, width, height);
+}
+
+function spreadShotHullCases(artifact) {
+  return [
+    ["COL ENG", "colonial", "engines", 32],
+    ["COL MID", "colonial", "midship", 128],
+    ["COL PROW", "colonial", "prow", 224],
+    ["CYL ENG", "cylon", "engines", 32],
+    ["CYL MID", "cylon", "midship", 128],
+    ["CYL PROW", "cylon", "prow", 224],
+  ].map(([label, faction, section, topPhase]) => ({
+    label,
+    faction,
+    section,
+    topPhase,
+    trace: executeSpreadShotHullVolleyTrace({
+      artifact, faction, topPhase, head: 21, frames: 12,
+    }),
+  }));
+}
+
+export function createSpreadShotHullTrace(artifact = "xex") {
+  const header = [
+    "artifact", "faction", "section", "a2_head", "top_phase", "frame",
+    "render_cycles", "erase_cycles", "restore_mismatches",
+    "left_active", "left_x", "left_y", "left_code", "left_backing",
+    "centre_active", "centre_x", "centre_y", "centre_code", "centre_backing",
+    "right_active", "right_x", "right_y", "right_code", "right_backing",
+  ];
+  const rows = spreadShotHullCases(artifact).flatMap(({ faction, section, topPhase, trace }) =>
+    trace.records.map((record) => {
+      const projectileFields = record.projectiles.flatMap((projectile) => [
+        projectile.active, projectile.x, projectile.y,
+        projectile.projectileCode, projectile.backingCode,
+      ]);
+      return [
+        artifact, faction, section, trace.head, topPhase, record.frame,
+        record.renderCycles, record.eraseCycles, record.restoreMismatches,
+        ...projectileFields,
+      ].join(",");
+    }));
+  return `${header.join(",")}\n${rows.join("\n")}\n`;
+}
+
+export function createSpreadShotHullPreview(source, artifact = "xex") {
+  const activation = executeSpreadShotTrace({ artifact });
+  const hullCases = spreadShotHullCases(artifact);
+  const constants = parseConstants(source);
+  const registers = new Map([
+    ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+    ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+    ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+    ["COLPF2", activation.manifest.fighterWeapons.viper.colourValue],
+    ["COLPF3", activation.manifest.fighterWeapons.raider.colourValue],
+  ]);
+  const frontend = readFrontendGraphicsSource(source);
+  const panels = [
+    { label: "ACTIVATE", record: activation.spreadPickup, trace: activation },
+    { label: "FAN F0", record: activation.trajectoryFrames[0], trace: activation },
+    { label: "FAN F2", record: activation.trajectoryFrames[2], trace: activation },
+    { label: "FAN F4", record: activation.trajectoryFrames[4], trace: activation },
+    ...hullCases.flatMap(({ label, trace }) => trace.records.map((record) => ({
+      label: `${label} F${record.frame.toString().padStart(2, "0")}`,
+      record,
+      trace,
+    }))),
+  ];
+  const columns = 8;
+  const gap = 12;
+  const panelStepY = 222;
+  const rows = Math.ceil(panels.length / columns);
+  const width = columns * SOURCE_WIDTH + (columns + 1) * gap;
+  const height = 80 + rows * panelStepY + 28;
+  const rgb = Buffer.alloc(width * height * 3);
+  const background = [3, 5, 9];
+  const panel = [10, 15, 23];
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, background);
+  drawRgbLabel(rgb, width,
+    `SPREAD SHOT HULL RESTORE  EXECUTED ${artifact.toUpperCase()} BYTES`, 24, 14,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "THREE YELLOW VIPER SHOTS  ENGINES MIDSHIP PROW  A2 HEAD 21 WRAP", 24, 32,
+    frontend, yellow);
+  drawRgbLabel(rgb, width,
+    "TWELVE CONSECUTIVE FRAMES PER SECTION  CURRENT BACKING  NO REDRAW MODEL", 24, 50,
+    frontend, steel);
+  panels.forEach(({ label, record, trace }, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const x = gap + column * (SOURCE_WIDTH + gap);
+    const y = 72 + row * panelStepY;
+    fillRgbRect(rgb, width, height, x - 2, y, SOURCE_WIDTH + 4, 214, panel);
+    strokeRgbRect(rgb, width, height, x - 2, y, SOURCE_WIDTH + 4, 214, steel);
+    drawRgbLabel(rgb, width, label, x + 4, y + 5, frontend, white);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, 1);
+    copyRgbPanel(rgb, width, height, frame, SOURCE_WIDTH,
+      (record.display ?? record.screen ?? record.during).length / SCREEN_COLUMNS * CHARACTER_HEIGHT,
+      x, y + 20);
+  });
   return encodePng(rgb, width, height);
 }
 
@@ -5637,6 +5848,48 @@ export function generateWeaponPickupRapidFireTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
+export function generateSpreadShotPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_SPREAD_SHOT_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createSpreadShotPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateSpreadShotTrace({
+  outputPath = DEFAULT_SPREAD_SHOT_TRACE_PATH,
+} = {}) {
+  const trace = createSpreadShotTrace();
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
+export function generateSpreadShotHullPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  artifact = "xex",
+  outputPath = artifact === "xex" ? DEFAULT_SPREAD_SHOT_HULL_XEX_PREVIEW_PATH :
+    DEFAULT_SPREAD_SHOT_HULL_ATR_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createSpreadShotHullPreview(fs.readFileSync(sourcePath, "utf8"), artifact),
+  );
+}
+
+export function generateSpreadShotHullTrace({
+  artifact = "xex",
+  outputPath = artifact === "xex" ? DEFAULT_SPREAD_SHOT_HULL_XEX_TRACE_PATH :
+    DEFAULT_SPREAD_SHOT_HULL_ATR_TRACE_PATH,
+} = {}) {
+  const trace = createSpreadShotHullTrace(artifact);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateEnemyReferenceInventoryPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   outputPath = DEFAULT_ENEMY_REFERENCE_INVENTORY_PREVIEW_PATH,
@@ -6120,6 +6373,28 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Rapid Fire weapon-pickup runtime trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, weaponPickupTrace.outputPath)}`);
     console.log(`  rows: ${weaponPickupTrace.rows}, ${weaponPickupTrace.bytes} bytes`);
+
+    const spreadShotResult = generateSpreadShotPreview();
+    console.log(`Spread Shot weapon-pickup owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, spreadShotResult.outputPath)}`);
+    console.log(
+      `  size: ${spreadShotResult.width}x${spreadShotResult.height}, ${spreadShotResult.bytes} bytes`,
+    );
+    const spreadShotTrace = generateSpreadShotTrace();
+    console.log(`Spread Shot XEX/ATR runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, spreadShotTrace.outputPath)}`);
+    console.log(`  rows: ${spreadShotTrace.rows}, ${spreadShotTrace.bytes} bytes`);
+    for (const artifact of ["xex", "atr"]) {
+      const hullPreview = generateSpreadShotHullPreview({ artifact });
+      console.log(`Spread Shot ${artifact.toUpperCase()} hull owner sequence generated successfully`);
+      console.log(`  PNG : ${path.relative(rootDirectory, hullPreview.outputPath)}`);
+      console.log(
+        `  size: ${hullPreview.width}x${hullPreview.height}, ${hullPreview.bytes} bytes`,
+      );
+      const hullTrace = generateSpreadShotHullTrace({ artifact });
+      console.log(`  CSV : ${path.relative(rootDirectory, hullTrace.outputPath)}`);
+      console.log(`  rows: ${hullTrace.rows}, ${hullTrace.bytes} bytes`);
+    }
 
     const startMenuResult = generateStartMenuPreview();
     console.log(`Start-menu preview generated successfully`);

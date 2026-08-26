@@ -26,7 +26,7 @@ test("showcase manifest binds every image to the current packed release", () => 
     sha256(read("docs/runtime-wall-trace.json")));
   assert.deepEqual(
     [manifest.gameplay.length, manifest.assetSheets.length, manifest.concepts.length],
-    [8, 4, 2],
+    [9, 4, 2],
   );
 
   let totalBytes = 0;
@@ -46,6 +46,13 @@ test("showcase manifest binds every image to the current packed release", () => 
     assert.deepEqual([frame.width, frame.height], [320, 240]);
     assert.match(frame.source_sha256, /^[0-9a-f]{64}$/);
   }
+  const spread = manifest.gameplay.find(({ path: relativePath }) =>
+    relativePath.endsWith("09-spread-shot-active.png"));
+  assert.ok(spread, "showcase must include an authentic Spread Shot Atari800 frame");
+  assert.equal(spread.source, "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png");
+  assert.equal(spread.frame,
+    JSON.parse(read("docs/runtime-wall-trace.json")).coverage
+      .weapon_pickup_spread_shot.screenshot.capture_frame);
 });
 
 test("showcase and asset sheets regenerate without ignored capture files", () => {

@@ -181,7 +181,8 @@ engine, a nie opisaną niżej klasą dużego odłamka. Jednocześnie aktywny jes
 najwyżej jeden. Ma dwie czytelne sylwetki 2×1 znak (16×8 pikseli) — zwartą,
 asymetryczną płytę pancerza i ażurowy fragment kratownicy — po dwie fazy
 tumblingu każda. Cztery fazy używają dokładnie ośmiu glifów 110–117; dwie
-fazy fragmentu rozpadu używają 118–119, a indeksy 120–127 pozostają wolne.
+fazy fragmentu rozpadu używają 118–119, Rapid Fire używa 120–123, a Spread
+Shot 124–127. Gameplay charset nie ma już wolnych glifów.
 Płyta i kratownica korzystają z kolorów pola 1/2,
 więc nie są białymi odpowiednikami największych gwiazd. Każda faza wypełnia
 bounding box 16×8; armour ma 47, a truss 45 aktywnych pikseli ANTIC.
@@ -227,12 +228,16 @@ flasha; pierwszy update od razu rozdziela fragmenty w cztery kierunki.
 Najnowszy rozpad debris albo Raidera zastępuje poprzedni dopiero po reverse
 erase, bez punktów, obrażeń, zmian RNG lub ghostów.
 
-Rapid Fire jest pierwszym weapon pickupem; rakiety i laser pozostają poza tym
-feature’em. Wyłącznie Raider zabity przez rzeczywiście zużyty pocisk Vipera i
-rozliczony przez istniejącą ścieżkę punktacji zwiększa licznik. Sekwencja
-`0→1→2` tworzy po trzecim takim zabiciu kapsułę RF i zeruje licznik; broadside,
-kontakt, cleanup i inne źródła śmierci go nie zmieniają. Podczas PENDING,
-widocznego pickupu lub aktywnego RF kolejny cykl nie jest liczony.
+Rapid Fire i Spread Shot są zaimplementowanymi weapon pickupami; Shield,
+rakiety i laser pozostają poza tym feature’em. Wyłącznie Raider zabity przez
+rzeczywiście zużyty pocisk Vipera i rozliczony przez istniejącą ścieżkę
+punktacji zwiększa licznik. Sekwencja `0→1→2` tworzy po trzecim takim zabiciu
+kapsułę i zeruje licznik; broadside, kontakt, cleanup, debris i inne źródła
+śmierci go nie zmieniają. Każda skutecznie utworzona kapsuła przełącza
+deterministyczny typ `Rapid→Spread→Rapid→Spread`; fresh New Game zawsze zaczyna
+od Rapid. PENDING albo widoczny pickup blokuje następny cykl, ale aktywny
+booster nie: nowa kapsuła może zostać zdobyta i zebrana, aby naturalnie
+zastąpić lub odnowić bieżący tryb. Na ekranie istnieje najwyżej jedna kapsuła.
 
 Kapsuła ma footprint 2×2, gruby stalowy obrys, statyczne żółte wypełnienie
 oraz wysokie na niemal 16 pikseli, czarne litery `R`/`F` wycięte kolorem tła.
@@ -242,7 +247,11 @@ jest renderowana nieprzerwanie w każdej aktywnej klatce.
 Pozostaje ukryta i bezkolizyjna przez 30 pełnych klatek po rozpadzie Raidera,
 potem dziedziczy natywny krok near/A2: jeden wiersz przy co drugim
 `WORLD_ROW_ADVANCED`, bez niezależnego wolnego akumulatora i bez catch-up.
-Debris i RF mogą być widoczne jednocześnie. Kontakt z Viperem nie daje
+Debris i kapsuła mogą być widoczne jednocześnie. Kapsuła Spread używa osobnych
+glifów 124–127: ma stalowy obrys, jasnoczerwoną obudowę `COLPF3=$46` i duży
+czarny symbol trzech rozchodzących się pocisków wycięty kolorem tła, bez małej
+litery `S`. Tak jak Rapid pozostaje statyczna, niemigocząca i używa tego samego
+czterokomórkowego backingu przy każdym ruchu. Kontakt z Viperem nie daje
 punktów, leczenia ani obrażeń, tylko usuwa backing kapsuły i aktywuje efekt.
 
 Rapid Fire trwa dokładnie 500 aktywnych klatek PAL. Pause zatrzymuje timer;
@@ -255,6 +264,19 @@ przez cały własny lifecycle; zwykłe i utworzone po wygaśnięciu są żółte
 `COLPF2=$1E`. Istniejący HUD pokazuje `RF10` do `RF01`, aktualizowane wyłącznie
 co 50 aktywnych klatek; pause zamraża timer i napis. Pickup nie korzysta z RNG,
 PMG, DLI ani SFX.
+
+Spread Shot również trwa dokładnie 500 aktywnych klatek PAL i używa `SP10` do
+`SP01`. Pause zamraża timer, life loss/Game Over/New Game go czyszczą, a żywy
+gracz zachowuje go przez zmianę sektora. Rapid i Spread wzajemnie się
+zastępują; zebranie bieżącego typu odnawia pełne 500 klatek. Spread zachowuje
+zwykły interwał 3 klatek i tworzy atomowo trzy logiczne pociski: żółty środkowy
+leci pionowo, a dwa czerwone boczne przesuwają się dodatkowo o 2 HPOS na klatkę
+w lewo/prawo. Cała trójka porusza się o 6 scanlines w górę, korzysta ze
+wspólnej dziesięcioslotowej puli Vipera i zostaje odrzucona bez częściowego
+zapisu, jeśli wolne są mniej niż trzy sloty. Pociski trafiają Raidera i debris;
+debris nadal nie daje punktów. Reverse erase usuwa je przy górnej lub bocznej
+granicy bez ghostów, zmian HUD albo charsetu. Spread nie łączy się z interwałem
+Rapid, nie zwiększa puli effects i nie dodaje DLI, PMG ani globalnej palety.
 
 World zachowuje 20/22,5/25 wiersza/s dla EASY/MEDIUM/HARD. Near stars mają
 10/11,25/12,5, far stars 5/5,625/6,25, a debris 12/13,5/15 wiersza/s.

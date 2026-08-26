@@ -231,6 +231,24 @@ export function loadEntityEffectsDefinition(sourcePath) {
     letterRegister: "COLBK", letterValue: 0x00,
   }), "Rapid Fire must use the accepted static steel/yellow/black palette");
 
+  const spreadPickup = definition.weaponPickupSpreadShot;
+  invariant(Array.isArray(spreadPickup?.glyphs) && spreadPickup.glyphs.length === 4 &&
+    spreadPickup.glyphs.every((rows) => Array.isArray(rows) && rows.length === 8),
+  "Spread Shot must use exactly four eight-row glyphs for its two-by-two footprint");
+  spreadPickup.glyphs.flat().forEach((row, index) =>
+    integer(row, `weaponPickupSpreadShot.glyphs[${index}]`, 0, 255));
+  const spreadSelectors = spreadPickup.glyphs.flatMap((rows) => rows.flatMap((row) =>
+    [6, 4, 2, 0].map((shift) => row >> shift & 3)));
+  invariant(spreadSelectors.filter(Boolean).length >= 90 &&
+    spreadSelectors.includes(0) && spreadSelectors.includes(2) &&
+    spreadSelectors.includes(3) && !spreadSelectors.includes(1),
+  "Spread Shot glyphs must use black cut-outs, steel corners and a dense red casing");
+  invariant(JSON.stringify(spreadPickup.palette) === JSON.stringify({
+    outlineRegister: "COLPF1", outlineValue: 0x84,
+    casingRegister: "COLPF3", casingValue: 0x46,
+    symbolRegister: "COLBK", symbolValue: 0x00,
+  }), "Spread Shot must use the existing static steel/red/black palette");
+
   invariant(Array.isArray(definition.archetypes) && definition.archetypes.length === 1,
     "First slice must contain exactly one archetype");
   const archetype = definition.archetypes[0];
@@ -293,12 +311,14 @@ export function compileEntityEffects(definition) {
   const trajectoryVx = Uint8Array.from(definition.debrisMotion.trajectorySelector.map((id) =>
     definition.debrisMotion.trajectories.find((trajectory) => trajectory.id === id).vxSignedHpos));
   const pickupGlyphs = Uint8Array.from(definition.weaponPickupRapidFire.glyphs.flat());
+  const spreadPickupGlyphs = Uint8Array.from(definition.weaponPickupSpreadShot.glyphs.flat());
   return Object.freeze({
     ...definition,
     descriptor,
     glyphs,
     effectGlyphs,
     pickupGlyphs,
+    spreadPickupGlyphs,
     trajectoryVx,
   });
 }
@@ -344,7 +364,9 @@ export function renderEntityEffectsCa65Include(asset) {
     `ENTITY_EFFECT_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length}`,
     `WEAPON_PICKUP_GLYPH_COUNT = ${asset.pickupGlyphs.length / 8}`,
     `WEAPON_PICKUP_GLYPH_BYTES = ${asset.pickupGlyphs.length}`,
-    `ENTITY_EFFECT_TOTAL_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length + asset.pickupGlyphs.length}`,
+    `WEAPON_PICKUP_SPREAD_GLYPH_COUNT = ${asset.spreadPickupGlyphs.length / 8}`,
+    `WEAPON_PICKUP_SPREAD_GLYPH_BYTES = ${asset.spreadPickupGlyphs.length}`,
+    `ENTITY_EFFECT_TOTAL_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length + asset.pickupGlyphs.length + asset.spreadPickupGlyphs.length}`,
     "ENTITY_ARCHETYPE_DESCRIPTOR_BYTES = 16",
     "ENTITY_DESC_INITIAL_STATE = 0",
     "ENTITY_DESC_FLAGS = 1",
@@ -369,6 +391,9 @@ export function renderEntityEffectsCa65Include(asset) {
     "WEAPON_PICKUP_STATE_PENDING = 1",
     "WEAPON_PICKUP_STATE_ACTIVE = 2",
     "WEAPON_PICKUP_STATE_RAPID = 3",
+    "WEAPON_PICKUP_STATE_SPREAD = 4",
+    "WEAPON_PICKUP_TYPE_RAPID = 0",
+    "WEAPON_PICKUP_TYPE_SPREAD = 1",
     "ENTITY_FLAG_WORLD_ATTACHED = $01",
     "ENTITY_FLAG_MULTICELL = $02",
     "ENTITY_FLAG_COLLIDE_PLAYER = $04",
@@ -384,6 +409,8 @@ export function renderEntityEffectsCa65Include(asset) {
     `ENTITY_HIT_FLASH_FRAMES = ${destruction.hitFlashFrames}`,
     `ENTITY_HIT_FLASH_TIMER_LOAD = ${destruction.hitFlashFrames + 1}`,
     `WEAPON_PICKUP_SLOT = ${pickup.slot}`,
+    "WEAPON_PICKUP_NEXT_TYPE_SLOT = 2",
+    "WEAPON_BOOSTER_SLOT = 2",
     `WEAPON_PICKUP_ACTIVE_MASK = $${(1 << pickup.slot).toString(16).padStart(2, "0").toUpperCase()}`,
     `WEAPON_PICKUP_QUALIFIED_KILLS = ${pickup.qualifiedKillsPerDrop}`,
     `WEAPON_PICKUP_PENDING_FRAMES = ${pickup.pendingFrames}`,
@@ -435,6 +462,9 @@ export function renderEntityEffectsCa65Include(asset) {
     ".endmacro",
     ".macro EMIT_WEAPON_PICKUP_GLYPHS",
     `    .byte ${[...asset.pickupGlyphs].map(byte).join(",")}`,
+    ".endmacro",
+    ".macro EMIT_WEAPON_PICKUP_SPREAD_GLYPHS",
+    `    .byte ${[...asset.spreadPickupGlyphs].map(byte).join(",")}`,
     ".endmacro",
     ".macro EMIT_ENTITY_TRAJECTORY_VX",
     `    .byte ${[...asset.trajectoryVx].map(byte).join(",")}`,

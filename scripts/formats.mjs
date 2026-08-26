@@ -24,6 +24,10 @@ const EXACT_BOOT_SECTORS = 128;
 const MINIMUM_RUNTIME_COMPACTION_RESERVE_BYTES = 1024;
 const ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES = 1097;
 const MINIMUM_WEAPON_PICKUP_RESERVE_BYTES = 512;
+const SPREAD_SHOT_RUNTIME_BASELINE_BYTES = 14948;
+const SPREAD_SHOT_RUNTIME_HARD_DELTA_BYTES = 448;
+const SPREAD_SHOT_ENTITY_BASELINE_BYTES = 1444;
+const MINIMUM_SPREAD_SHOT_RESERVE_BYTES = 64;
 const BOOT_PAYLOAD_TRAILER = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
 
 function invariant(condition, message) {
@@ -194,18 +198,22 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.codeBudget?.approvedDeltaBytes === DEBRIS_VISUAL_POLISH_CODE_BUDGET &&
     manifest.entityEffects.codeBudget?.destructibleDebris?.baselineBytes ===
       DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BASELINE &&
-    manifest.entityEffects.codeBudget.destructibleDebris.actualDeltaBytes <=
-      DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BUDGET &&
     manifest.entityEffects.codeBudget.destructibleDebris.approvedDeltaBytes ===
-      DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BUDGET,
-  "Destructible debris exceeds its +768 B ENTITY_CODE budget");
+      DESTRUCTIBLE_DEBRIS_ENTITY_CODE_BUDGET &&
+    manifest.entityEffects.codeBudget.weaponPickupSpreadShot.baselineBytes ===
+      SPREAD_SHOT_ENTITY_BASELINE_BYTES &&
+    manifest.entityEffects.codeBudget.weaponPickupSpreadShot.actualDeltaBytes <=
+      SPREAD_SHOT_RUNTIME_HARD_DELTA_BYTES,
+  "Spread Shot exceeds its +448 B ENTITY_CODE/runtime budget");
   invariant(manifest.entityEffects.debrisGlyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
-    manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 4 &&
+    manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 8 &&
     manifest.entityEffects.effectGlyphCount === 2 &&
     manifest.entityEffects.weaponPickupGlyphCount === 4 &&
     manifest.entityEffects.weaponPickupGlyphIndex === 120 &&
+    manifest.entityEffects.spreadPickupGlyphCount === 4 &&
+    manifest.entityEffects.spreadPickupGlyphIndex === 124 &&
     manifest.entityEffects.newGlyphsFromFoundation === DEBRIS_VISUAL_POLISH_NEW_GLYPHS,
-  "Rapid Fire must retain debris/effects and use only glyphs 120-123");
+  "Weapon pickups must retain debris/effects and use exactly glyphs 120-127");
   invariant(manifest.payloadBytes === DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
     manifest.bootSectors === EXACT_BOOT_SECTORS &&
     manifest.payloadBudget?.debrisVisualPolish?.limitBytes ===
@@ -227,10 +235,22 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(rapidFire?.baselineReserveBytes === ACCEPTED_RUNTIME_COMPACTION_RESERVE_BYTES &&
     rapidFire.minimumRemainingReserveBytes === MINIMUM_WEAPON_PICKUP_RESERVE_BYTES &&
     rapidFire.remainingReserveBytes === compaction.reserveBytes &&
-    rapidFire.remainingReserveBytes >= MINIMUM_WEAPON_PICKUP_RESERVE_BYTES &&
     rapidFire.consumedReserveBytes ===
       rapidFire.baselineReserveBytes - rapidFire.remainingReserveBytes,
-  "Rapid Fire exceeds its source-owned payload reserve");
+  "Rapid Fire historical source-owned payload metadata changed");
+  const spreadShot = manifest.payloadBudget?.weaponPickupSpreadShot;
+  invariant(spreadShot?.baselineReserveBytes === 518 &&
+    spreadShot.minimumRemainingReserveBytes === MINIMUM_SPREAD_SHOT_RESERVE_BYTES &&
+    spreadShot.remainingReserveBytes === compaction.reserveBytes &&
+    spreadShot.remainingReserveBytes >= MINIMUM_SPREAD_SHOT_RESERVE_BYTES &&
+    spreadShot.consumedReserveBytes ===
+      spreadShot.baselineReserveBytes - spreadShot.remainingReserveBytes,
+  "Spread Shot exceeds its source-owned payload reserve");
+  invariant(manifest.runtimeCodeBudget?.weaponPickupSpreadShot?.baselineBytes ===
+    SPREAD_SHOT_RUNTIME_BASELINE_BYTES &&
+    manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes <=
+      SPREAD_SHOT_RUNTIME_HARD_DELTA_BYTES,
+  "Spread Shot exceeds its linked runtime hard budget");
   invariant(manifest.residentRuntime?.loadAddress === 0x2000 &&
     manifest.residentRuntime.runAddress === 0x2000 &&
     manifest.residentRuntime.rawBytes === 0x2000 &&

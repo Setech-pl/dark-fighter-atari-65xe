@@ -11,7 +11,8 @@
 Pilot a Colonial Viper through open space and the narrow crossfire corridor
 between opposing capital ships. Fight Cylon Raiders, dodge or destroy drifting
 debris, survive heavy broadside fire, and collect the Rapid Fire weapon capsule.
-The current release is fully playable in an emulator and on an Atari through
+Successful capsules now alternate between Rapid Fire and the red Spread Shot
+booster. The current release is fully playable in an emulator and on an Atari through
 SIO2SD.
 
 ## Gameplay gallery
@@ -31,6 +32,8 @@ artifact hashes are recorded in [`docs/media/manifest.json`](docs/media/manifest
 | **Rapid Fire pickup** — a large 2×2 ANTIC 4 capsule appears after three qualifying Raider kills. | **Rapid Fire active** — the HUD counts down while newly fired Viper shots are red and use the faster firing cadence. |
 | ![Capital-ship corridor combat with broadside fire](docs/media/gameplay/07-capital-broadside.png) | ![Animated capital-ship engine modules in the scrolling corridor](docs/media/gameplay/08-capital-engines.png) |
 | **Capital broadside** — opposing hulls exchange deterministic heavy fire around the player. | **Capital engines** — the existing two engine phases pulse at an exact 8+8-frame cadence. |
+| ![Spread Shot active with SP HUD countdown and a yellow-centre red-side projectile fan](docs/media/gameplay/09-spread-shot-active.png) | |
+| **Spread Shot active** — the normal firing cadence emits three logical projectiles in a clearly diverging fan. | |
 
 ## The story
 
@@ -72,10 +75,12 @@ owner; commit and push happen only after owner acceptance.
   trajectories, local hit feedback, a breakup core, and four non-colliding
   fragments.
 - Local Raider breakup effects that reuse the fixed transient-effects system.
-- A 2×2 Rapid Fire weapon capsule earned after every third qualifying Raider
-  projectile kill: 30 active frames pending, then a collectible that enables
-  exactly 500 active PAL frames of 2-frame burst spacing, red projectiles, and
-  an `RF10` through `RF01` HUD countdown.
+- Alternating 2×2 Rapid Fire and Spread Shot capsules earned after every third
+  qualifying Raider projectile kill. Each booster lasts exactly 500 active PAL
+  frames and replaces or refreshes the other: Rapid uses two-frame burst
+  spacing and red projectiles, while Spread keeps the normal cadence and emits
+  an atomic yellow-centre/red-side three-shot fan. The HUD counts down from
+  `RF10`/`SP10` through `RF01`/`SP01`.
 - POKEY music and sound effects, including weapon, collision,
   explosion, broadside, and capital-hull feedback.
 - A self-contained XEX and a bootable 90 KB ATR for emulators or SIO2SD.
@@ -93,14 +98,14 @@ and tested by the repository.
 | Toolchain | ca65/ld65 through the pinned WebAssembly package |
 | Distribution | 16,396-byte XEX and 92,176-byte bootable ATR |
 | Boot payload | Exactly 16,384 bytes in 128 sectors, loaded at `$2000`, entry `$201E` |
-| Payload reserve | 518 source-owned bytes after runtime payload compaction |
+| Payload reserve | 285 source-owned bytes after Spread Shot |
 | Runtime BSS | `$8000–$80FF`, exactly 256 bytes |
 | Entity engine | Four physical interactive slots, up to two active |
 | Effects engine | Six physical transient slots, up to five active |
-| Entity code | `$9100–$9780`, 1,665 of 3,840 bytes before packing |
+| Entity code | `$9100–$97CF`, 1,744 of 3,840 bytes before packing |
 | Gameplay layers | base/ring → broadside → projectile → entity → effect; reverse erase |
-| Charset budget | Glyphs 0–123 used; glyphs 124–127 free |
-| Measured PAL wall | 32,956 cycles worst case; 2,612 cycles physical headroom |
+| Charset budget | All 128 gameplay glyphs used; Spread occupies 124–127 |
+| Measured PAL wall | 33,036 cycles worst case; 2,532 cycles physical headroom |
 | Synchronization | Zero missed frames, deadline overruns, or extra VBI boundaries in the full trace |
 
 Visible-frame work is deterministic and bounded. Pools have fixed capacity;
@@ -182,7 +187,7 @@ is invented for the sheets.
 
 ![Actual projectile glyphs and local explosion masks used by the release](docs/media/assets/weapons-and-effects.png)
 
-![Actual debris, breakup fragments, and Rapid Fire capsule glyphs used by the release](docs/media/assets/debris-and-pickups.png)
+![Actual debris, breakup fragments, and Rapid Fire and Spread Shot capsule glyphs used by the release](docs/media/assets/debris-and-pickups.png)
 
 ![Compiled ANTIC 4 capital-ship modules used by the release](docs/media/assets/capital-ship-modules.png)
 
@@ -287,7 +292,7 @@ dist/                   generated XEX, ATR, boot payload, and manifest
 
 ## Credits and disclaimer
 
-**Creator, project owner, and gameplay vision:** Marcin Krzetowski<br>
+**Creator, project owner, developer and gameplay vision:** Marcin Krzetowski<br>
 **AI-assisted engineering:** Codex, supporting implementation, testing,
 analysis, and documentation under owner direction and acceptance
 

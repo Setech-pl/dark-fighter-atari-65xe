@@ -411,6 +411,7 @@ function requireCaptureSources() {
     debris: path.join(captureDirectory, "neutral-combat-113.png"),
     pickup: path.join(runtimeTraceDirectory, "weapon-pickup-static-atari800.png"),
     rapid: path.join(runtimeTraceDirectory, "weapon-pickup-rapid-projectiles-atari800.png"),
+    spread: path.join(runtimeTraceDirectory, "weapon-pickup-spread-projectiles-atari800.png"),
     broadside: path.join(captureDirectory, "neutral-combat-100.png"),
     engines: path.join(runtimeTraceDirectory, "engine-xex-a5-0-immediate-096.png"),
   };
@@ -424,6 +425,12 @@ function requireCaptureSources() {
 
 export function createGameplayGallery() {
   const sources = requireCaptureSources();
+  const runtimeReport = JSON.parse(fs.readFileSync(
+    path.join(rootDirectory, "docs", "runtime-wall-trace.json"), "utf8"));
+  const spreadCaptureFrame =
+    runtimeReport.coverage?.weapon_pickup_spread_shot?.screenshot?.capture_frame;
+  invariant(Number.isInteger(spreadCaptureFrame),
+    "Runtime report is missing the authentic Spread Shot capture frame");
   const definitions = [
     ["01-title-loader.png", sources.loader, "XEX", 250, "Loader title and recovered BSG ship art"],
     ["02-standard-combat.png", sources.standard, "XEX", 25, "Viper, Raider, starfield and capital hull corridor"],
@@ -433,6 +440,7 @@ export function createGameplayGallery() {
     ["06-rapid-fire-active.png", sources.rapid, "XEX", 449, "RF HUD countdown and red Rapid Fire projectiles"],
     ["07-capital-broadside.png", sources.broadside, "XEX", 100, "Capital corridor combat and broadside fire"],
     ["08-capital-engines.png", sources.engines, "XEX", 96, "Capital engine bank in its deterministic 8-frame phase"],
+    ["09-spread-shot-active.png", sources.spread, "XEX", spreadCaptureFrame, "SP HUD countdown and yellow-centre/red-side three-projectile fan"],
   ];
   return definitions.map(([fileName, sourcePath, medium, frame, description]) => {
     const { sourceBytes, png, width, height } = cropRuntimeFrame(sourcePath);
@@ -458,8 +466,8 @@ function readCommittedGameplayGallery() {
   invariant(fs.existsSync(manifestPath),
     "The committed gameplay manifest is missing; rerun npm run showcase -- --capture");
   const committed = JSON.parse(fs.readFileSync(manifestPath, "utf8")).gameplay;
-  invariant(Array.isArray(committed) && committed.length === 8,
-    "The committed gameplay manifest must contain eight Atari800 frames");
+  invariant(Array.isArray(committed) && committed.length === 9,
+    "The committed gameplay manifest must contain nine Atari800 frames");
   return committed.map((item) => {
     const outputPath = path.join(rootDirectory, item.path);
     invariant(fs.existsSync(outputPath), `Committed showcase frame is missing: ${item.path}`);

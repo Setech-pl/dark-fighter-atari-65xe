@@ -27,7 +27,7 @@ test("linked release replay covers every reviewed runtime timing scenario", () =
   assert.equal(timing.scenarios.threeBroadside.broadsideOccupancy, 3);
   assert.equal(timing.legalHeavyCombination.origin, "deterministic legal replay");
   assert.ok(timing.legalHeavyCombination.events.includes("hull-copy"));
-  assert.ok(timing.legalHeavyCombination.events.includes("music+sfx"));
+  assert.ok(timing.scenarios.musicWithSfx.events.includes("music+sfx"));
   assert.ok(timing.scenarios.debrisShotPath.events.includes("active-debris"));
   assert.ok(timing.scenarios.debrisShotPath.events.includes("debris-shot"));
   assert.ok(timing.scenarios.debrisShotPath.viperProjectileOccupancy > 0);
@@ -83,14 +83,16 @@ test("protected linked segments do not regress beyond the accepted feature basel
       assert.equal(segment.freeReservedBytes, segment.reservedMaximumBytes - segment.bytes);
     }
   }
-  assert.deepEqual(manifest.runtimeCodeBudget.weaponPickupRapidFire, {
-    baselineBytes: 14_316,
+  assert.deepEqual(manifest.runtimeCodeBudget.weaponPickupSpreadShot, {
+    baselineBytes: 14_948,
     actualBytes: manifest.runtimeCodeBudget.actualBytes,
-    actualDeltaBytes: manifest.runtimeCodeBudget.actualBytes - 14_316,
+    actualDeltaBytes: manifest.runtimeCodeBudget.actualBytes - 14_948,
+    targetDeltaBytes: 320,
+    hardDeltaBytes: 448,
   });
-  assert.ok(manifest.runtimeCodeBudget.weaponPickupRapidFire.actualDeltaBytes <= 640,
-    `Rapid Fire runtime delta ${manifest.runtimeCodeBudget.weaponPickupRapidFire.actualDeltaBytes} exceeds 640 bytes`);
-  assert.ok(manifest.payloadBudget.weaponPickupRapidFire.remainingReserveBytes >= 512);
+  assert.ok(manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448,
+    `Spread Shot runtime delta ${manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes} exceeds 448 bytes`);
+  assert.ok(manifest.payloadBudget.weaponPickupSpreadShot.remainingReserveBytes >= 64);
 });
 
 test("post-loader runtime and future entity ranges are non-overlapping", () => {

@@ -77,6 +77,14 @@ export function loadFighterWeaponsDefinition(sourcePath) {
   invariant(definition.viper.rapidFireIntervalFrames === 2 &&
     definition.viper.rapidFireDurationFrames === 500,
   "Rapid Fire must use a two-frame interval for exactly 500 active PAL frames");
+  invariant(definition.viper.spreadShotDurationFrames === 500,
+    "Spread Shot must last exactly 500 active PAL frames");
+  invariant(definition.viper.spreadShotProjectileCount === 3,
+    "Spread Shot must allocate exactly three logical projectiles");
+  invariant(definition.viper.spreadShotInitialOffsetHpos === 4,
+    "Spread Shot side projectiles must start one character from the centre shot");
+  invariant(definition.viper.spreadShotLateralStepHpos === 2,
+    "Spread Shot side projectiles must move two HPOS units per active frame");
   invariant(definition.viper.colourRegister === "COLPF2" &&
     definition.viper.colourValue === 0x1e,
   "Viper projectiles must use genuine Atari yellow through COLPF2=$1E");
@@ -196,6 +204,10 @@ export function renderFighterWeaponsCa65Include(asset) {
     `VIPER_BURST_INTERVAL = ${viper.burstIntervalFrames}`,
     `VIPER_RAPID_FIRE_INTERVAL = ${viper.rapidFireIntervalFrames}`,
     `VIPER_RAPID_FIRE_DURATION = ${viper.rapidFireDurationFrames}`,
+    `VIPER_SPREAD_SHOT_DURATION = ${viper.spreadShotDurationFrames}`,
+    `VIPER_SPREAD_PROJECTILE_COUNT = ${viper.spreadShotProjectileCount}`,
+    `VIPER_SPREAD_INITIAL_OFFSET = ${viper.spreadShotInitialOffsetHpos}`,
+    `VIPER_SPREAD_LATERAL_STEP = ${viper.spreadShotLateralStepHpos}`,
     `VIPER_POST_BURST_PAUSE = ${viper.postBurstFrames}`,
     `VIPER_PROJECTILE_SPEED = ${viper.speedScanlines}`,
     `VIPER_PROJECTILE_WIDTH_HPOS = ${viper.widthHpos}`,

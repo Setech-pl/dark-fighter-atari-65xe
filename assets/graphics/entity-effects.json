@@ -115,6 +115,22 @@
       "letterValue": 0
     }
   },
+  "weaponPickupSpreadShot": {
+    "glyphs": [
+      [191, 255, 204, 204, 240, 243, 252, 252],
+      [254, 255, 51, 51, 15, 207, 63, 63],
+      [252, 252, 252, 252, 252, 255, 255, 191],
+      [63, 63, 63, 63, 63, 255, 255, 254]
+    ],
+    "palette": {
+      "outlineRegister": "COLPF1",
+      "outlineValue": 132,
+      "casingRegister": "COLPF3",
+      "casingValue": 70,
+      "symbolRegister": "COLBK",
+      "symbolValue": 0
+    }
+  },
   "archetypes": [
     {
       "id": "neutral-debris",

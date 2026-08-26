@@ -1,0 +1,370 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  compileEntityEffects,
+  loadEntityEffectsDefinition,
+  renderEntityEffectsCa65Include,
+} from "../scripts/entity-effects.mjs";
+import {
+  compileFighterWeapons,
+  loadFighterWeaponsDefinition,
+} from "../scripts/fighter-weapons.mjs";
+import { compileEnemyRoster, loadEnemyRosterDefinition } from "../scripts/enemy-roster.mjs";
+import {
+  executeSpreadShotCollisionTrace,
+  executeSpreadShotHullArtifactTrace,
+  executeSpreadShotOverlapTrace,
+  executeSpreadShotPoolTrace,
+  executeSpreadShotTrace,
+  executeWeaponBoosterReplacementTrace,
+  executeWeaponPickupBackingTrace,
+  executeWeaponPickupLifecycleTrace,
+} from "../scripts/weapon-pickup-runtime.mjs";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const source = fs.readFileSync(path.join(root, "src", "main.s"), "utf8");
+const entityPath = path.join(root, "assets", "graphics", "entity-effects.json");
+const weaponPath = path.join(root, "assets", "graphics", "fighter-weapons.json");
+const rosterPath = path.join(root, "assets", "graphics", "enemy-roster.json");
+const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
+
+function assets() {
+  const entities = compileEntityEffects(loadEntityEffectsDefinition(entityPath));
+  const roster = compileEnemyRoster(loadEnemyRosterDefinition(rosterPath));
+  return {
+    entities,
+    weapons: compileFighterWeapons(loadFighterWeaponsDefinition(weaponPath), roster),
+  };
+}
+
+test("Spread Shot owns four final glyphs and a static red 2x2 fan capsule", () => {
+  const { entities } = assets();
+  assert.deepEqual(entities.weaponPickupSpreadShot, {
+    glyphs: [
+      [191, 255, 204, 204, 240, 243, 252, 252],
+      [254, 255, 51, 51, 15, 207, 63, 63],
+      [252, 252, 252, 252, 252, 255, 255, 191],
+      [63, 63, 63, 63, 63, 255, 255, 254],
+    ],
+    palette: {
+      outlineRegister: "COLPF1", outlineValue: 0x84,
+      casingRegister: "COLPF3", casingValue: 0x46,
+      symbolRegister: "COLBK", symbolValue: 0,
+    },
+  });
+  assert.deepEqual([
+    manifest.entityEffects.spreadPickupGlyphIndex,
+    manifest.entityEffects.spreadPickupGlyphCount,
+    manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount,
+  ], [124, 4, 128]);
+  const selectors = [...entities.spreadPickupGlyphs].flatMap((row) =>
+    [6, 4, 2, 0].map((shift) => row >> shift & 3));
+  assert.deepEqual([...new Set(selectors)].sort(), [0, 2, 3]);
+  assert.equal(selectors.includes(1), false, "capsule must not use a white text selector");
+  assert.ok(selectors.filter((selector) => selector === 0).length >= 16,
+    "the fan must be cut through the casing as black/transparent space");
+  assert.ok(selectors.filter((selector) => selector === 3).length >= 80,
+    "the capsule must remain a large dense red silhouette");
+  const include = renderEntityEffectsCa65Include(entities);
+  assert.match(include, /WEAPON_PICKUP_SPREAD_GLYPH_COUNT = 4/);
+  assert.match(include, /WEAPON_PICKUP_TYPE_SPREAD = 1/);
+  assert.doesNotMatch(source.slice(source.indexOf("render_weapon_pickup_overlay:"),
+    source.indexOf("; Effects render after")), /animation|phase/i);
+});
+
+test("release XEX and ATR execute the deterministic Rapid Spread Rapid drop cycle", () => {
+  const xex = executeSpreadShotTrace({ root, artifact: "xex" });
+  const atr = executeSpreadShotTrace({ root, artifact: "atr" });
+  const cycle = (trace) => trace.drops.map((drop) => [
+    drop.pickupType, drop.nextPickupType, drop.renderId, drop.state,
+  ]);
+  assert.deepEqual(cycle(xex), [[0, 1, 120, 1], [1, 0, 252, 1], [0, 1, 120, 1]]);
+  assert.deepEqual(cycle(atr), cycle(xex));
+  assert.equal(xex.drops[1].boosterState, 3,
+    "Spread capsule must be earned naturally while Rapid Fire is still active");
+  assert.equal(xex.spreadCapsuleFrames.every(({ capsuleState, boosterState }) =>
+    capsuleState === 2 && boosterState === 3), true,
+  "visible Spread capsule must coexist with the non-rendered Rapid controller");
+  assert.deepEqual([
+    xex.spreadPickup.capsuleState, xex.spreadPickup.boosterState, xex.spreadPickup.timer,
+  ], [0, 4, 500], "collecting Spread must naturally replace Rapid at full duration");
+  assert.equal(xex.killRecords.length, 9);
+  assert.equal(xex.killRecords.every(({ damageSource, projectileConsumed }) =>
+    damageSource === 0 && projectileConsumed), true);
+  assert.deepEqual(xex.killRecords.map(({ scoreLo }) => scoreLo),
+    [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90]);
+  assert.deepEqual(atr.killRecords.map(({ scoreLo }) => scoreLo),
+    xex.killRecords.map(({ scoreLo }) => scoreLo));
+});
+
+test("both capsule types spawn and Spread moves through every A2 step without ghosts", () => {
+  const trace = executeSpreadShotTrace({ root, artifact: "xex" });
+  assert.deepEqual([
+    trace.rapidCapsule.state, trace.rapidCapsule.drawnMask,
+    trace.rapidCapsule.leftCode, trace.rapidCapsule.rightCode,
+    trace.rapidCapsule.bottomLeftCode, trace.rapidCapsule.bottomRightCode,
+  ], [2, 15, 120, 121, 122, 123]);
+  assert.deepEqual(trace.spreadCapsuleFrames.map((frame) => [
+    frame.state, frame.drawnMask, frame.leftCode, frame.rightCode,
+    frame.bottomLeftCode, frame.bottomRightCode,
+  ]), Array.from({ length: 8 }, () => [2, 15, 252, 253, 254, 255]));
+  assert.deepEqual(trace.spreadCapsuleFrames.map(({ y }) => y),
+    [43, 51, 51, 59, 59, 67, 67, 75]);
+  assert.deepEqual(trace.spreadCapsuleFrames.map(({ a2Head }) => a2Head),
+    [0, 21, 21, 20, 20, 19, 19, 18]);
+  for (const frame of trace.spreadCapsuleFrames) {
+    assert.equal([...frame.screen].filter((code) => code >= 252).length, 4,
+      `frame ${frame.frame} retained a second capsule position`);
+    assert.deepEqual(frame.backing, [0, 0, 0, 0]);
+  }
+});
+
+test("Spread four-cell reverse erase restores byte-exact backing at every A2 head", () => {
+  for (let head = 0; head < 22; head += 1) {
+    const xex = executeWeaponPickupBackingTrace({
+      root, artifact: "xex", head, pickupType: "spread",
+    });
+    const atr = executeWeaponPickupBackingTrace({
+      root, artifact: "atr", head, pickupType: "spread",
+    });
+    assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
+    assert.deepEqual([
+      xex.rendered.leftCode, xex.rendered.rightCode,
+      xex.rendered.bottomLeftCode, xex.rendered.bottomRightCode,
+      xex.rendered.drawnMask,
+    ], [252, 253, 254, 255, 15]);
+    assert.deepEqual(xex.rendered.backing, xex.original);
+    assert.deepEqual(xex.restored, xex.original);
+    assert.deepEqual([
+      xex.drawnMaskAfterErase, xex.renderedMaskAfterErase, xex.topLatchAfterErase,
+    ], [0, 0, 0]);
+    assert.notEqual(xex.top, xex.bottom);
+  }
+});
+
+test("Spread collection lasts exactly 500 active PAL frames and pause freezes it", () => {
+  const trace = executeSpreadShotTrace({ root, artifact: "xex" });
+  assert.deepEqual([
+    trace.spreadPickup.state, trace.spreadPickup.timer, trace.spreadPickup.hudCodes,
+  ], [4, 500, [51, 48, 17, 16]]);
+  assert.equal(trace.spreadTimerFrames.length, 500);
+  assert.deepEqual(trace.spreadTimerFrames.map(({ timer }) => timer),
+    Array.from({ length: 500 }, (_, index) => 499 - index));
+  assert.equal(trace.frozenTimer, 449);
+  assert.equal(trace.pauseFrames.length, 10);
+  assert.equal(trace.pauseFrames.every(({ timer, hudCodes }) =>
+    timer === 449 && hudCodes.join() === "51,48,16,25"), true);
+  assert.deepEqual(trace.spreadTimerFrames[449].hudCodes, [51, 48, 16, 17]);
+  assert.deepEqual([
+    trace.spreadExpired.state, trace.spreadExpired.timer, trace.spreadExpired.hudCodes,
+  ], [0, 0, [0, 0, 0, 0]]);
+});
+
+test("Rapid and Spread replace or refresh one another without combining cadence", () => {
+  const trace = executeWeaponBoosterReplacementTrace({ root, artifact: "xex" });
+  assert.deepEqual([
+    trace.rapid.state, trace.rapid.timer, trace.rapid.hudCodes,
+  ], [3, 500, [50, 38, 17, 16]]);
+  assert.deepEqual([
+    trace.spreadReplacesRapid.state, trace.spreadReplacesRapid.timer,
+    trace.spreadReplacesRapid.hudCodes,
+  ], [4, 500, [51, 48, 17, 16]]);
+  assert.deepEqual([
+    trace.spreadRefresh.state, trace.spreadRefresh.timer,
+    trace.rapidReplacesSpread.state, trace.rapidReplacesSpread.timer,
+  ], [4, 500, 3, 500]);
+  assert.match(source,
+    /cmp #WEAPON_PICKUP_STATE_RAPID[\s\S]+lda #VIPER_RAPID_FIRE_INTERVAL[\s\S]+lda #VIPER_BURST_INTERVAL/);
+  const cadence = source.slice(source.indexOf("update_viper_weapon:"),
+    source.indexOf("allocate_viper_projectile:"));
+  assert.doesNotMatch(cadence, /WEAPON_PICKUP_STATE_SPREAD/);
+});
+
+test("one Spread emission is an unambiguous three-projectile fan", () => {
+  const { weapons } = assets();
+  assert.deepEqual([
+    weapons.viper.spreadShotDurationFrames,
+    weapons.viper.spreadShotProjectileCount,
+    weapons.viper.spreadShotInitialOffsetHpos,
+    weapons.viper.spreadShotLateralStepHpos,
+    weapons.viper.burstIntervalFrames,
+  ], [500, 3, 4, 2, 3]);
+  const frames = executeSpreadShotTrace({ root, artifact: "xex" }).trajectoryFrames;
+  assert.deepEqual(frames[0].slots.slice(0, 3).map(({ active, x, y }) => [active, x, y]), [
+    [0x41, 124, 182], [0x11, 128, 182], [0x21, 132, 182],
+  ]);
+  for (let frame = 1; frame < frames.length; frame += 1) {
+    assert.deepEqual(frames[frame].slots.slice(0, 3).map(({ active, x, y }) =>
+      [active, x, y]), [
+      [0x41, 124 - frame * 2, 182 - frame * 6],
+      [0x11, 128, 182 - frame * 6],
+      [0x21, 132 + frame * 2, 182 - frame * 6],
+    ]);
+    assert.equal([...frames[frame].screen].filter(Boolean).length, 3,
+      `frame ${frame} retained an erased projectile cell`);
+    assert.equal(frames[frame].slots.slice(0, 3).every(({ active }) => active < 0x80), true,
+      "every Spread projectile must select the Viper's yellow COLPF2 bank");
+  }
+});
+
+test("all three yellow projectiles preserve both capital hulls at sections, A2 heads and wrap", () => {
+  const sectionPhases = [32, 128, 224]; // engines, combat midship, broad prow
+  for (const faction of ["colonial", "cylon"]) {
+    for (const topPhase of sectionPhases) {
+      for (const selectedSlot of [0, 1, 2]) {
+        const xex = executeSpreadShotHullArtifactTrace({
+          root, artifact: "xex", faction, topPhase, head: 21, selectedSlot, frames: 12,
+        });
+        const atr = executeSpreadShotHullArtifactTrace({
+          root, artifact: "atr", faction, topPhase, head: 21, selectedSlot, frames: 12,
+        });
+        assert.deepEqual(atr.records, xex.records,
+          `${faction} phase ${topPhase} slot ${selectedSlot} differs in ATR`);
+        assert.equal(xex.records.some(({ backingCode }) => backingCode !== 0), true,
+          `${faction} phase ${topPhase} slot ${selectedSlot} missed the hull`);
+        for (const record of xex.records) {
+          assert.equal(record.restoreMismatches, 0,
+            `${faction} phase ${topPhase} slot ${selectedSlot} left a screen scar`);
+          assert.equal(record.backingPixelsPreserved, true,
+            `${faction} phase ${topPhase} slot ${selectedSlot} punched a hull hole`);
+          assert.equal(record.inverse, 0, "a Spread projectile selected the Cylon colour bank");
+          assert.equal(record.changedOffsets.every((offset) => offset >= 80), true,
+            "projectile overlay changed the protected HUD/divider rows");
+        }
+      }
+    }
+  }
+
+  for (let head = 0; head < 22; head += 1) {
+    for (const faction of ["colonial", "cylon"]) {
+      for (const selectedSlot of [0, 1, 2]) {
+        const trace = executeSpreadShotHullArtifactTrace({
+          root, artifact: "xex", faction, topPhase: 128, head, selectedSlot, frames: 4,
+        });
+        assert.equal(trace.records.every(({ restoreMismatches, backingPixelsPreserved }) =>
+          restoreMismatches === 0 && backingPixelsPreserved), true,
+        `${faction} slot ${selectedSlot} failed at A2 head ${head}`);
+        const changedCharsetOffsets = trace.finalCharset
+          .map((byte, offset) => byte === trace.initialCharset[offset] ? -1 : offset)
+          .filter((offset) => offset >= 0);
+        assert.equal(changedCharsetOffsets.every((offset) =>
+          offset >= 47 * 8 && offset < 57 * 8), true,
+        `A2 head ${head} changed charset bytes outside slot-owned scratch glyphs`);
+      }
+    }
+  }
+
+  for (const [faction, selectedSlot] of [["colonial", 0], ["cylon", 1]]) {
+    for (const topPhase of [31, 32, 55, 56, 183, 184, 207, 208, 239, 240]) {
+      const trace = executeSpreadShotHullArtifactTrace({
+        root, artifact: "xex", faction, topPhase, head: 21, selectedSlot, frames: 12,
+      });
+      assert.equal(trace.records.every(({ restoreMismatches, backingPixelsPreserved }) =>
+        restoreMismatches === 0 && backingPixelsPreserved), true,
+      `${faction} boundary phase ${topPhase} corrupted a module edge`);
+    }
+  }
+});
+
+test("overlapping Spread shots compose without erasing the remaining shot or Cylon hull", () => {
+  const xex = executeSpreadShotOverlapTrace({ root, artifact: "xex", head: 21 });
+  const atr = executeSpreadShotOverlapTrace({ root, artifact: "atr", head: 21 });
+  assert.deepEqual({ ...atr, artifact: "release" }, { ...xex, artifact: "release" });
+  assert.ok(xex.reference[xex.displayOffset] & 0x80, "fixture must use a red Cylon hull cell");
+  assert.deepEqual([xex.bothCode, xex.oneCode], [48, 48]);
+  assert.notDeepEqual(xex.bothGlyph, xex.oneGlyph,
+    "two shots in one cell must retain both masks until one leaves");
+  assert.deepEqual(xex.afterBothErase, xex.reference);
+  assert.deepEqual(xex.afterFinalErase, xex.reference);
+  for (const glyph of [xex.bothGlyph, xex.oneGlyph]) {
+    assert.equal(glyph.every((byte, row) => [6, 4, 2, 0].every((shift) =>
+      ((xex.initialCharset[(xex.reference[xex.displayOffset] & 0x7f) * 8 + row] >> shift) & 3) === 0 ||
+      ((byte >> shift) & 3) !== 0)), true, "overlap punched an empty vertical line");
+  }
+});
+
+test("all three projectiles leave the screen cleanly without HUD or charset corruption", () => {
+  const trace = executeSpreadShotTrace({ root, artifact: "xex" });
+  assert.equal(trace.projectilesAfterCleanup.slots.every(({ active, rendered }) =>
+    active === 0 && rendered === 0), true);
+  assert.equal([...trace.projectilesAfterCleanup.screen].every((code) => code === 0), true,
+    "reverse erase must remove every final projectile cell");
+  assert.deepEqual(trace.charset, trace.initialCharset);
+  const hudBefore = trace.spreadPickup.display.subarray(0, 40);
+  for (const frame of trace.spreadTimerFrames.slice(0, 51)) {
+    const changed = Array.from({ length: 40 }, (_, offset) => offset)
+      .filter((offset) => frame.display[offset] !== hudBefore[offset]);
+    assert.equal(changed.every((offset) => offset >= 32 && offset <= 35), true,
+      `PAL frame ${frame.frame} changed a protected HUD cell`);
+  }
+});
+
+test("the ten-slot physical pool admits three atomically and never expands", () => {
+  const trace = executeSpreadShotPoolTrace({ root, artifact: "xex" });
+  assert.deepEqual([
+    manifest.fighterWeapons.viper.poolSlots,
+    trace.empty.activeCount,
+    trace.sevenOccupied.activeCount,
+  ], [10, 3, 10]);
+  assert.deepEqual(trace.empty.after.slice(0, 3), [0x41, 0x11, 0x21]);
+  assert.deepEqual(trace.sevenOccupied.after.slice(7), [0x41, 0x11, 0x21]);
+  assert.deepEqual(trace.eightOccupied.after, trace.eightOccupied.before,
+    "two free slots must reject the whole volley without partial writes");
+  assert.deepEqual(trace.full.after, trace.full.before);
+  assert.equal(manifest.fighterWeapons.viper.poolSlots, 10);
+  assert.equal(manifest.entityEffects.effectActiveLimit, 5);
+});
+
+test("all three directions collide with debris and Raider scoring resolves only once", () => {
+  const trace = executeSpreadShotCollisionTrace({ root, artifact: "xex" });
+  assert.deepEqual(trace.debris.map(({ direction, projectileConsumed, debrisHp, score }) =>
+    [direction, projectileConsumed, debrisHp, score]), [
+    [0x40, true, 2, 0], [0, true, 2, 0], [0x20, true, 2, 0],
+  ]);
+  assert.deepEqual(trace.raider, {
+    pendingDamage: 3,
+    consumed: [0, 0, 0],
+    enemyState: 2,
+    scoreAfterFirstResolve: 0x10,
+    scoreAfterSecondResolve: 0x10,
+  });
+});
+
+test("Spread follows Rapid lifecycle semantics for life, New Game, Game Over and sector", () => {
+  const lifecycle = executeWeaponPickupLifecycleTrace({ root, artifact: "xex" });
+  for (const record of [
+    lifecycle.newGameSpread, lifecycle.lifeLossSpread, lifecycle.gameOverSpread,
+  ]) {
+    assert.equal(record.state, 0);
+    assert.deepEqual(record.hudCodes, [0, 0, 0, 0]);
+  }
+  assert.deepEqual([
+    lifecycle.sectorSpread.state,
+    lifecycle.sectorSpread.timer,
+    lifecycle.sectorSpread.hudCodes,
+  ], [4, 500, [51, 48, 17, 16]]);
+  assert.equal(lifecycle.newGameSpread.nextPickupType, 0,
+    "New Game must restore Rapid as the first drop");
+});
+
+test("Spread stays inside the fixed BSS, payload, glyph and runtime-code budgets", () => {
+  assert.deepEqual([
+    manifest.entityEffects.stateAddress,
+    manifest.entityEffects.stateBytes,
+    manifest.entityEffects.interactiveSlots,
+    manifest.entityEffects.interactiveActiveLimit,
+    manifest.entityEffects.effectSlots,
+    manifest.entityEffects.effectActiveLimit,
+  ], [0x8000, 0x100, 4, 2, 6, 5]);
+  assert.ok(manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
+  assert.ok(manifest.entityEffects.codeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
+  assert.ok(manifest.payloadBudget.weaponPickupSpreadShot.remainingReserveBytes >= 64);
+  assert.equal(manifest.payloadBytes, 16_384);
+  assert.equal(manifest.bootSectors, 128);
+  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 128);
+  assert.doesNotMatch(source.slice(source.indexOf('.segment "ENTITY_CODE"')), /\$A000|\$BFFF/);
+});

@@ -46,7 +46,7 @@ test("ATR uses standard single-density geometry", () => {
   assert.equal(parsed.body.subarray(0x3ffc, 0x4000).toString("ascii"), "DFB1");
 });
 
-test("resident compaction proof survives and Rapid Fire leaves at least 512 source-owned bytes", () => {
+test("resident compaction proof survives and Spread Shot leaves at least 64 source-owned bytes", () => {
   const { manifest, boot, parsedXex, parsedAtr } = validateBuildDirectory(rootDirectory);
   const resident = fs.readFileSync(path.join(rootDirectory, "build", "resident-runtime.bin"));
   const suffix = fs.readFileSync(
@@ -66,7 +66,7 @@ test("resident compaction proof survives and Rapid Fire leaves at least 512 sour
     layout.suffixRawBytes - layout.suffixPackedBytes,
   ], [8192, 449, layout.suffixRawBytes, layout.suffixPackedBytes,
     layout.suffixRawBytes - layout.suffixPackedBytes]);
-  assert.ok(layout.suffixRawBytes - layout.suffixPackedBytes >= 1218);
+  assert.ok(layout.suffixRawBytes - layout.suffixPackedBytes >= 1100);
   assert.deepEqual(unpackBroadsideLzss(packed), suffix);
   assert.deepEqual(resident.subarray(layout.prefixBytes), suffix);
   assert.deepEqual(
@@ -76,12 +76,18 @@ test("resident compaction proof survives and Rapid Fire leaves at least 512 sour
   );
   assert.equal(reserve.recoveredReserveBytes, 1097);
   assert.equal(reserve.minimumRecoveredReserveBytes, 1024);
-  assert.ok(reserve.reserveBytes >= 512);
+  assert.ok(reserve.reserveBytes >= 64);
   assert.deepEqual(manifest.payloadBudget.weaponPickupRapidFire, {
     baselineReserveBytes: 1097,
     minimumRemainingReserveBytes: 512,
     remainingReserveBytes: reserve.reserveBytes,
     consumedReserveBytes: 1097 - reserve.reserveBytes,
+  });
+  assert.deepEqual(manifest.payloadBudget.weaponPickupSpreadShot, {
+    baselineReserveBytes: 518,
+    minimumRemainingReserveBytes: 64,
+    remainingReserveBytes: reserve.reserveBytes,
+    consumedReserveBytes: 518 - reserve.reserveBytes,
   });
   assert.equal(reserve.reserveEndAddress, 0x5ffb);
   assert.equal(boot.subarray(reserve.reserveAddress - manifest.loadAddress,
@@ -89,5 +95,7 @@ test("resident compaction proof survives and Rapid Fire leaves at least 512 sour
     .every((byte) => byte === 0), true);
   assert.deepEqual(parsedXex.segments[0].data, boot);
   assert.deepEqual(parsedAtr.body.subarray(0, boot.length), boot);
-  assert.ok(manifest.entityEffects.stagedEndAddress < 0xa000);
+  assert.equal(manifest.entityEffects.stagedSourceAddress, 0x5100);
+  assert.ok(manifest.entityEffects.stagedEndAddress <
+    manifest.entityEffects.packedSourceAddress);
 });

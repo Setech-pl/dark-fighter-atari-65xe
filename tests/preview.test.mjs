@@ -17,6 +17,10 @@ import {
   createRaiderBreakupTrace,
   createWeaponPickupRapidFirePreview,
   createWeaponPickupRapidFireTrace,
+  createSpreadShotPreview,
+  createSpreadShotTrace,
+  createSpreadShotHullPreview,
+  createSpreadShotHullTrace,
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
   createGameplayPreview,
@@ -298,12 +302,12 @@ test("Rapid Fire owner preview executes the packed XEX/ATR pickup lifecycle", ()
   assert.ok(rows.some((row) => row.startsWith("xex,KILL_3,0,3,0,1,0,0,0,1,")));
   assert.ok(rows.some((row) => row.startsWith("xex,PENDING,29,")));
   assert.ok(rows.some((row) => row.includes(",ACTIVE,0,") &&
-    row.includes(",0,120,121,122,123,")));
+    row.includes(",120,120,121,122,123,")));
   for (const artifact of ["xex", "atr"]) {
     assert.equal(rows.filter((row) => row.startsWith(`${artifact},ACTIVE,`)).slice(0, 32)
       .every((row) => {
         const fields = row.split(",");
-        return fields.slice(16, 21).join(",") === "0,120,121,122,123" &&
+        return fields.slice(16, 21).join(",") === "120,120,121,122,123" &&
           fields.slice(23, 27).every((value) => value === "0") && fields[31] === "15";
       }), true);
   }
@@ -313,13 +317,63 @@ test("Rapid Fire owner preview executes the packed XEX/ATR pickup lifecycle", ()
     return fields[9] === "3" && fields[10] === "0" && fields[11] === "0" &&
       fields[12] === "128" && Number(fields[13]) >= 40 && Number(fields[13]) <= 184 &&
       fields[14] === "500" && fields[15] === "50" &&
-      fields.slice(16, 21).every((value) => value === "0") &&
+      fields[16] === "120" && fields.slice(17, 21).every((value) => value === "0") &&
       fields.slice(27, 31).join(",") === "50,38,17,16" && fields[31] === "0";
   }));
   assert.ok(rows.some((row) => {
     if (!row.startsWith("xex,RAPID_TIMER,499,")) return false;
     const fields = row.split(",");
-    return fields[9] === "0" && fields[14] === "0" && fields[16] === "0" &&
+    return fields[9] === "0" && fields[14] === "0" && fields[16] === "120" &&
       fields.slice(27, 31).every((value) => value === "0");
   }));
+});
+
+test("Spread Shot owner preview is deterministic executed XEX/ATR gameplay", () => {
+  const first = createSpreadShotPreview(source);
+  const second = createSpreadShotPreview(source);
+  assert.deepEqual(first, second);
+  assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [5228, 850]);
+
+  const trace = createSpreadShotTrace();
+  assert.equal(trace, createSpreadShotTrace());
+  const rows = trace.trimEnd().split("\n");
+  assert.equal(rows.filter((row) => row.startsWith("xex,")).length, 27);
+  assert.equal(rows.filter((row) => row.startsWith("atr,")).length, 27);
+  assert.deepEqual(rows.filter((row) => row.startsWith("xex,DROP_"))
+    .map((row) => row.split(",").slice(1, 7)), [
+    ["DROP_1", "0", "1", "0", "1", "120"],
+    ["DROP_2", "0", "1", "1", "0", "252"],
+    ["DROP_3", "0", "1", "0", "1", "120"],
+  ]);
+  assert.ok(rows.includes(
+    "xex,SPREAD_VOLLEY,0,4,1,0,,,,,,3,65,124,182,17,128,182,33,132,182"));
+  assert.ok(rows.includes(
+    "atr,SPREAD_VOLLEY,1,4,1,0,,,,,,3,65,122,176,17,128,176,33,134,176"));
+  assert.ok(rows.some((row) => row.startsWith("xex,SPREAD_CLEAN,51,") &&
+    row.split(",")[11] === "0"));
+});
+
+test("Spread Shot hull owner sequences execute identical XEX and ATR backing paths", () => {
+  const xexPreview = createSpreadShotHullPreview(source, "xex");
+  const atrPreview = createSpreadShotHullPreview(source, "atr");
+  assert.deepEqual([inspectPng(xexPreview).width, inspectPng(xexPreview).height], [2668, 2328]);
+  assert.deepEqual([inspectPng(atrPreview).width, inspectPng(atrPreview).height], [2668, 2328]);
+  assert.deepEqual(createSpreadShotHullPreview(source, "xex"), xexPreview,
+    "XEX hull owner sequence must be deterministic");
+
+  const xexRows = createSpreadShotHullTrace("xex").trimEnd().split("\n");
+  const atrRows = createSpreadShotHullTrace("atr").trimEnd().split("\n");
+  assert.equal(xexRows.length, 73);
+  assert.equal(atrRows.length, 73);
+  assert.deepEqual(atrRows.slice(1).map((row) => row.replace(/^atr,/, "xex,")), xexRows.slice(1));
+  for (const [rowIndex, row] of xexRows.slice(1).entries()) {
+    const fields = row.split(",").map((value, index) => index < 3 ? value : Number(value));
+    assert.equal(fields[8], 0, "owner sequence contains a backing mismatch");
+    const activeIds = [fields[9], fields[14], fields[19]];
+    assert.equal(activeIds.every((active, slot) => active === 0 || active === [65, 17, 33][slot]), true);
+    if (rowIndex % 12 === 0) assert.deepEqual(activeIds, [65, 17, 33]);
+    const screenCodes = [fields[12], fields[17], fields[22]];
+    assert.equal(screenCodes.every((code, slot) => activeIds[slot] === 0 || code < 128), true,
+      "owner sequence contains a red/inverse Spread projectile");
+  }
 });

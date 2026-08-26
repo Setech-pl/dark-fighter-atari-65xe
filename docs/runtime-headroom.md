@@ -472,6 +472,60 @@ projectile rendering split applies D7 only to already-tagged Viper shots; it
 does not add work to the Raider path. The complete feature measures +87 cycles
 against its baseline, with 2,612 cycles physical headroom.
 
+## Spread Shot weapon pickup gate
+
+The accepted Rapid Fire artifact is the Spread baseline. Spread Shot keeps the
+same 16,384-byte payload, 128 sectors, XEX/ATR formats, 256-byte BSS, four-slot
+interactive pool, ten-slot physical Viper projectile pool and six-slot effects
+pool. It allocates no transient effect and does not increase either active
+limit.
+
+| Metric | Rapid baseline | Spread Shot | Delta / gate |
+| --- | ---: | ---: | ---: |
+| Measured worst wall | 32,956 | 33,036 | +80; target +256, hard +384 |
+| Physical headroom | 2,612 | 2,532 | -80; minimum 2,200 |
+| Linked runtime/code/data | 14,948 B | 15,207 B | +259 B; target +320 B, hard +448 B |
+| ENTITY_CODE feature/cold body | 1,444 B | 1,523 B | +79 B |
+| ENTITY_CODE packed | 1,424 B | 1,493 B | +69 B |
+| Source-owned payload reserve | 518 B | 285 B | -233 B; minimum 64 B |
+| Gameplay glyphs used | 124 | 128 | Spread uses 124–127; none remain free |
+| Physical Viper projectile slots | 10 | 10 | one atomic volley uses 3; pool can reach 10/10 |
+| Interactive/effects active limits | 2 / 5 | 2 / 5 | unchanged |
+
+The artifact-bound report observes the successful creation sequence
+`120,252,120,252,120,252,120`, i.e. Rapid→Spread→Rapid without coupling the
+toggle to collection. It records 1,245 active SPREAD frames, 1,226 frames with
+a logical three-shot Spread volley, 695 legal frames combining one active
+capsule with at least three Viper projectiles, and 518 frames with a capsule
+coexisting with an active booster. The heaviest legal capsule/projectile frame
+contains one active 2×2 capsule, eight Viper projectiles, one broadside
+projectile and both tracked muzzles; it is the measured 33,036-cycle worst case.
+
+Spread emits only when three slots are available. The left, centre and right
+logical shots use active bytes `$C1/$01/$A1`, move by -2/0/+2 HPOS per active
+frame and share the existing upward step, swept Raider/debris collision,
+backing and reverse-erase paths. Two available slots reject the entire volley;
+seven occupied slots accept it and reach 10/10 without overflow. The normal
+three-frame fire interval remains in force while state 4 is active.
+
+Both booster states use the exact 500-active-frame timer in the non-rendered
+slot-2 controller. Physical `OPTION` pause freezes it without catch-up; slot 1
+can host the next capsule while that controller remains active, so collection
+naturally replaces the other type or refreshes the current type. Sector
+transition preserves an active timer, and
+life loss, Game Over and New Game keep the accepted Rapid lifecycle contract.
+`preview.mjs` now emits 51 deterministic outputs and the canonical
+`npm run preview` adds two starfield outputs, for 53 total. Its artifact-executed
+Spread acceptance evidence is
+`build/previews/weapon-pickup-spread-shot-review.png` plus the paired
+`build/previews/weapon-pickup-spread-shot-trace.csv`; both execute the current
+XEX and confirm XEX/ATR payload parity rather than drawing a separate preview
+model.
+Cold XEX/ATR sessions with `$A5` and `$5A` fills pass. Missed synchronisation,
+deadline overruns and additional VBI boundaries are all zero. The result keeps
+176 cycles to the target wall, 304 to the hard wall, and 332 cycles above the
+minimum physical-headroom gate.
+
 ### Display-list integrity regression and fix
 
 The owner-visible corruption was not a write into HUD or charset RAM. Before
@@ -543,12 +597,13 @@ timer/phase as well as Rapid Fire.
 | Raider local breakup | 16,384 B | 16,396 B | 92,176 B |
 | Runtime payload compaction (1,097 B reserve) | 16,384 B | 16,396 B | 92,176 B |
 | Rapid Fire pickup + display-list/engine layering fix (518 B reserve) | 16,384 B | 16,396 B | 92,176 B |
+| Spread Shot pickup (285 B reserve) | 16,384 B | 16,396 B | 92,176 B |
 
 The final payload occupies exactly 128 boot sectors with zero formatter-added
-padding. Its source-owned layout ends with 518 zero reserve bytes at
-`$5DF6-$5FFB` and the four-byte `DFB1` trailer at `$5FFC-$5FFF`; build and
-validation reject an RF reserve below 512 B, any other payload length, sector
-count or trailer instead of truncating or padding the image. The on-disk
+padding. Its source-owned layout ends with 285 zero reserve bytes at
+`$5EDF-$5FFB` and the four-byte `DFB1` trailer at `$5FFC-$5FFF`; build and
+validation reject a Spread reserve below 64 B, any other payload length,
+sector count or trailer instead of truncating or padding the image. The on-disk
 header can technically encode up to 255 sectors, but the release invariant is
 exactly 128; loader code and media format are unchanged.
 
@@ -564,20 +619,21 @@ Atari800 PAL/XL boot-smoke runs (XEX/ATR × cold RAM `$A5/$5A`) capture frames
 1, 250, 300, 500 and 750; all reach the visible menu and then gameplay through
 production FIRE input, with identical XEX/ATR images at frames 500 and 750.
 
-Final protected use is MAIN 8,102/8,192 B (CODE 4,305 B plus RODATA 3,797 B), PROJECTILES 202/298 B,
-STARFIELD 2,191/2,278 B, BROADSIDE 6,569/6,656 B, A2 kernel 226/256 B,
-ENTITY_STATE 256/256 B and ENTITY_CODE 1,665/3,840 B. Cold staging uses
-`$8100-$9FE6` only before gameplay ownership begins; the separate ENTITY_CODE
-boot stream is 1,424 B.
+Final protected use is MAIN 8,190/8,192 B (CODE 4,393 B plus RODATA 3,797 B), PROJECTILES 202/298 B,
+STARFIELD 2,191/2,278 B, BROADSIDE 6,653/6,656 B, A2 kernel 226/256 B,
+ENTITY_STATE 256/256 B and ENTITY_CODE 1,744/3,840 B. Cold staging uses
+`$8100-$9AA3` for the resident suffix and transient `$5200-$57D4` for the
+separate 1,493 B ENTITY_CODE boot stream before gameplay ownership begins.
 A2 display/ring state owns
 203 B at `$7F10-$7FDA`. The kernel is copied identically by XEX and cold-boot
 ATR startup into unconditional 64 KiB RAM at `$9000-$90E1`; `$90E2-$90FF`
 remains free. Startup explicitly clears every byte `$8000-$80FF` and loads
-ENTITY_CODE at `$9100-$9780`; after cold staging, `$8100-$8FFF` and
-`$9781-$9FFF` remain reserved and untouched. `$A000-$BFFF` is excluded.
+ENTITY_CODE at `$9100-$97CF`; after cold staging, `$8100-$8FFF` and
+`$97D0-$9FFF` remain reserved and untouched. `$A000-$BFFF` is excluded.
 Debris uses exactly
 eight glyphs 110–117 (seven new from foundation), effects use two fragment
-glyphs 118–119, RF uses four glyphs 120–123, and four glyphs 124–127 remain free.
+glyphs 118–119, RF uses four glyphs 120–123, and Spread uses glyphs 124–127.
+All 128 gameplay glyphs are occupied.
 
 ## Limitations
 

@@ -234,6 +234,61 @@ test("real Atari800 pickup trace retains one 2x2 footprint through native A2 mot
   assert.ok(pickup.release_frames > 0);
 });
 
+test("Spread Shot passes PAL wall budget with a legal capsule and projectile-heavy frame", () => {
+  const feature = report.gate.weapon_pickup_spread_shot;
+  assert.deepEqual([
+    feature.baseline_wall_cycles,
+    feature.baseline_physical_headroom,
+    feature.target_delta_cycles,
+    feature.hard_delta_cycles,
+    feature.target_wall_cycles,
+    feature.maximum_wall_cycles,
+    feature.minimum_physical_headroom,
+  ], [32_956, 2_612, 256, 384, 33_212, 33_340, 2_200]);
+  assert.deepEqual([
+    feature.measured_wall_cycles,
+    feature.measured_physical_headroom,
+    feature.actual_delta_cycles,
+    feature.remaining_target_cycles,
+    feature.remaining_hard_cycles,
+  ], [33_172, 2_396, 216, 40, 168]);
+  assert.deepEqual(feature.created_capsule_render_ids.slice(0, 7),
+    [120, 252, 120, 252, 120, 252, 120]);
+  assert.ok(feature.spread_frames > 0);
+  assert.ok(feature.spread_volley_frames > 0);
+  assert.ok(feature.active_capsule_three_projectile_frames > 0);
+  assert.ok(feature.active_capsule_during_booster_frames > 0);
+  assert.ok(feature.worst_legal_capsule_three_projectiles.state.viper_projectiles >= 3);
+  assert.equal(feature.worst_legal_capsule_three_projectiles.state.weapon_pickup.state, 2);
+  assert.deepEqual([
+    feature.target_overrun_frames,
+    feature.hard_overrun_frames,
+    report.gate.missed_frames,
+    report.gate.deadline_overrun_frames,
+    report.gate.extra_vbi_boundaries,
+    feature.passed,
+  ], [0, 0, 0, 0, 0, true]);
+  assert.equal(report.coverage.weapon_pickup_spread_shot.logical_three_projectile_volley.observed,
+    true);
+  assert.equal(report.coverage.weapon_pickup_spread_shot
+    .active_capsule_with_three_viper_projectiles.observed, true);
+  assert.equal(report.coverage.weapon_pickup_spread_shot
+    .active_capsule_during_booster.observed, true);
+  assert.deepEqual(manifest.entityEffects.runtimeBudget.weaponPickupSpreadShot, {
+    baselineWallCycles: 32_956,
+    baselinePhysicalHeadroomCycles: 2_612,
+    targetDeltaCycles: 256,
+    hardDeltaCycles: 384,
+    targetWallLimitCycles: 33_212,
+    hardWallLimitCycles: 33_340,
+    minimumPhysicalHeadroomCycles: 2_200,
+    measuredWallCycles: 33_172,
+    actualDeltaCycles: 216,
+    missedSynchronization: 0,
+    deadlineOverruns: 0,
+  });
+});
+
 test("wall trace records the required legal runtime coverage without incoherent RAM seeding", () => {
   for (const name of [
     "world_near_with_far_erase",
@@ -303,10 +358,10 @@ test("wall trace records the required legal runtime coverage without incoherent 
     session: "2-neutral-fire0",
     open_gameplay_frame: 0,
     drain_frame: 496,
-    complete_frame: 565,
-    next_open_frame: 652,
-    post_capital_spawn_frame: 682,
-    post_capital_spawn_active_frame: 683,
+    complete_frame: 542,
+    next_open_frame: 628,
+    post_capital_spawn_frame: 658,
+    post_capital_spawn_active_frame: 663,
     configured_spawn_delay_scheduler_ticks: 32,
     observable_open_to_spawn_frame_delta: 30,
   });

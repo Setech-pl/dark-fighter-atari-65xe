@@ -62,6 +62,7 @@ typedef struct {
 	unsigned entity_render_id;
 	unsigned entity_active_mask;
 	unsigned pickup_state;
+	unsigned pickup_booster_state;
 	unsigned pickup_counter;
 	unsigned pickup_x;
 	unsigned pickup_y;
@@ -87,6 +88,7 @@ typedef struct {
 	unsigned effect_active_count;
 	unsigned effect_rendered_mask;
 	unsigned rapid_projectiles;
+	unsigned viper_projectiles;
 	unsigned rapid_projectile_slot;
 	unsigned rapid_projectile_address;
 	unsigned rapid_projectile_screen_code;
@@ -330,6 +332,8 @@ static unsigned dftrace_pickup_sequence_count;
 static unsigned dftrace_pickup_hunt_active_frames;
 static const char *dftrace_rapid_screenshot;
 static unsigned dftrace_rapid_screenshot_frame = 0xffffffffu;
+static const char *dftrace_spread_screenshot;
+static unsigned dftrace_spread_screenshot_frame = 0xffffffffu;
 static int dftrace_dli_integrity_enabled;
 static unsigned dftrace_dli_integrity_host_frame = 0xffffffffu;
 static unsigned dftrace_dli_integrity_count;
@@ -618,11 +622,15 @@ static unsigned dftrace_pickup_glyph_cells(void)
 {
 	unsigned address;
 	unsigned count = 0;
+	unsigned base = MEMORY_mem[dftrace_entity_render_id + 1u];
 	for (address = DFTRACE_RING_SCREEN; address < DFTRACE_RING_END; ++address) {
 		unsigned code = MEMORY_mem[address];
-		if (code >= DFTRACE_PICKUP_GLYPH_BASE &&
-			code < DFTRACE_PICKUP_GLYPH_BASE + 4u)
-			++count;
+		unsigned index;
+		for (index = 0; index < 4u; ++index)
+			if (code == ((base + index) & 0xffu)) {
+				++count;
+				break;
+			}
 	}
 	return count;
 }
@@ -631,8 +639,9 @@ static unsigned dftrace_pickup_footprints(void)
 {
 	unsigned address;
 	unsigned count = 0;
+	unsigned base = MEMORY_mem[dftrace_entity_render_id + 1u];
 	for (address = DFTRACE_RING_SCREEN; address < DFTRACE_RING_END; ++address)
-		if (MEMORY_mem[address] == DFTRACE_PICKUP_GLYPH_BASE)
+		if (MEMORY_mem[address] == base)
 			++count;
 	return count;
 }
@@ -716,6 +725,7 @@ static void dftrace_pickup_frame_end(DFTraceFrame *frame)
 static void dftrace_pickup_watch(DFTraceFrame *frame, unsigned pc)
 {
 	unsigned index;
+	unsigned base = MEMORY_mem[dftrace_entity_render_id + 1u];
 	if (frame->pickup_first_overwrite_pc != 0u ||
 		MEMORY_mem[dftrace_entity_state + 1u] != 2u ||
 		(MEMORY_mem[dftrace_entity_drawn_mask + 1u] & 15u) != 15u)
@@ -723,7 +733,7 @@ static void dftrace_pickup_watch(DFTraceFrame *frame, unsigned pc)
 	for (index = 0; index < 4u; ++index) {
 		unsigned address = frame->pickup_old_address[index];
 		if (dftrace_pickup_screen_address_valid(address) &&
-			MEMORY_mem[address] != DFTRACE_PICKUP_GLYPH_BASE + index) {
+			MEMORY_mem[address] != ((base + index) & 0xffu)) {
 			frame->pickup_first_overwrite_pc = pc;
 			frame->pickup_first_overwrite_address = address;
 			frame->pickup_first_overwrite_value = MEMORY_mem[address];
@@ -739,6 +749,8 @@ static void dftrace_snapshot_rapid_projectile(DFTraceFrame *frame)
 	frame->rapid_projectile_slot = 0xffffffffu;
 	for (slot = 0; slot < 10u; ++slot) {
 		unsigned state = MEMORY_mem[dftrace_projectile_active + slot];
+		if (state != 0u && MEMORY_mem[dftrace_projectile_rendered + slot] != 0u)
+			frame->viper_projectiles++;
 		if ((state & 0x80u) != 0u && MEMORY_mem[dftrace_projectile_rendered + slot] != 0u) {
 			unsigned address = MEMORY_mem[dftrace_projectile_screen_lo + slot] |
 				(MEMORY_mem[dftrace_projectile_screen_hi + slot] << 8);
@@ -894,8 +906,8 @@ static void dftrace_set_frontend_input(void)
 
 static unsigned dftrace_pickup_timer(void)
 {
-	return MEMORY_mem[dftrace_entity_timer + 1u] |
-		((unsigned) MEMORY_mem[dftrace_entity_move_accumulator + 1u] << 8);
+	return MEMORY_mem[dftrace_entity_timer + 2u] |
+		((unsigned) MEMORY_mem[dftrace_entity_move_accumulator + 2u] << 8);
 }
 
 static unsigned dftrace_hash_bytes(unsigned address, unsigned length)
@@ -1033,7 +1045,7 @@ static void dftrace_watch_recycled_write(DFTraceFrame *frame)
 }
 
 /* The optional integrity replay presses the physical OPTION key through the
- * production latch while Rapid Fire is active. Host-only observation records
+ * production latch while Spread Shot is active. Host-only observation records
  * the timer on both sides; no guest state is seeded or repaired. */
 static void dftrace_drive_pause_test(void)
 {
@@ -1047,7 +1059,7 @@ static void dftrace_drive_pause_test(void)
 	timer = dftrace_pickup_timer();
 	INPUT_key_consol = INPUT_CONSOL_NONE;
 	if (dftrace_pause_stage == 0u && state == 6u &&
-		MEMORY_mem[dftrace_entity_state + 1u] == 3u &&
+		MEMORY_mem[dftrace_entity_state + 2u] == 4u &&
 		timer >= 100u && timer <= 450u) {
 		dftrace_pause_timer_before = timer;
 		dftrace_pause_engine_timer_before = MEMORY_mem[dftrace_engine_timer];
@@ -1124,13 +1136,18 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->entity_vertical_accumulator = MEMORY_mem[dftrace_entity_vertical_accumulator];
 	frame->entity_render_id = MEMORY_mem[dftrace_entity_render_id];
 	frame->entity_active_mask = MEMORY_mem[dftrace_entity_active_mask];
-	frame->pickup_state = MEMORY_mem[dftrace_entity_state + 1u];
+	frame->pickup_booster_state = MEMORY_mem[dftrace_entity_state + 2u];
+	frame->pickup_state = MEMORY_mem[dftrace_entity_state + 1u] != 0u ?
+		MEMORY_mem[dftrace_entity_state + 1u] : frame->pickup_booster_state;
 	frame->pickup_counter = MEMORY_mem[dftrace_entity_hp + 1u];
 	frame->pickup_x = MEMORY_mem[dftrace_entity_x + 1u];
 	frame->pickup_y = MEMORY_mem[dftrace_entity_y + 1u];
-	frame->pickup_timer_lo = MEMORY_mem[dftrace_entity_timer + 1u];
-	frame->pickup_timer_hi = MEMORY_mem[dftrace_entity_move_accumulator + 1u];
-	frame->pickup_animation = MEMORY_mem[dftrace_entity_owner + 1u];
+	frame->pickup_timer_lo = MEMORY_mem[dftrace_entity_timer +
+		(frame->pickup_booster_state != 0u ? 2u : 1u)];
+	frame->pickup_timer_hi = MEMORY_mem[dftrace_entity_move_accumulator +
+		(frame->pickup_booster_state != 0u ? 2u : 1u)];
+	frame->pickup_animation = MEMORY_mem[dftrace_entity_owner +
+		(frame->pickup_booster_state != 0u ? 2u : 1u)];
 	frame->pickup_render_id = MEMORY_mem[dftrace_entity_render_id + 1u];
 	frame->pickup_drawn_mask = MEMORY_mem[dftrace_entity_drawn_mask + 1u];
 	frame->score_lo = MEMORY_mem[dftrace_score_lo];
@@ -1164,13 +1181,18 @@ static void dftrace_snapshot_flash(DFTraceFrame *frame)
 	frame->entity_move_accumulator = MEMORY_mem[dftrace_entity_move_accumulator];
 	frame->entity_vertical_accumulator = MEMORY_mem[dftrace_entity_vertical_accumulator];
 	frame->entity_render_id = MEMORY_mem[dftrace_entity_render_id];
-	frame->pickup_state = MEMORY_mem[dftrace_entity_state + 1u];
+	frame->pickup_booster_state = MEMORY_mem[dftrace_entity_state + 2u];
+	frame->pickup_state = MEMORY_mem[dftrace_entity_state + 1u] != 0u ?
+		MEMORY_mem[dftrace_entity_state + 1u] : frame->pickup_booster_state;
 	frame->pickup_counter = MEMORY_mem[dftrace_entity_hp + 1u];
 	frame->pickup_x = MEMORY_mem[dftrace_entity_x + 1u];
 	frame->pickup_y = MEMORY_mem[dftrace_entity_y + 1u];
-	frame->pickup_timer_lo = MEMORY_mem[dftrace_entity_timer + 1u];
-	frame->pickup_timer_hi = MEMORY_mem[dftrace_entity_move_accumulator + 1u];
-	frame->pickup_animation = MEMORY_mem[dftrace_entity_owner + 1u];
+	frame->pickup_timer_lo = MEMORY_mem[dftrace_entity_timer +
+		(frame->pickup_booster_state != 0u ? 2u : 1u)];
+	frame->pickup_timer_hi = MEMORY_mem[dftrace_entity_move_accumulator +
+		(frame->pickup_booster_state != 0u ? 2u : 1u)];
+	frame->pickup_animation = MEMORY_mem[dftrace_entity_owner +
+		(frame->pickup_booster_state != 0u ? 2u : 1u)];
 	frame->pickup_render_id = MEMORY_mem[dftrace_entity_render_id + 1u];
 	frame->pickup_drawn_mask = MEMORY_mem[dftrace_entity_drawn_mask + 1u];
 	frame->score_lo = MEMORY_mem[dftrace_score_lo];
@@ -1196,7 +1218,7 @@ static void dftrace_write(void)
 		perror("darkfighter trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation\n");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,viper_projectiles,pickup_booster_state,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -1239,6 +1261,7 @@ static void dftrace_write(void)
 			frame->pause_engine_timer_before, frame->pause_engine_timer_after,
 			frame->pause_engine_phase_before, frame->pause_engine_phase_after,
 			frame->pause_host_frames);
+		fprintf(file, ",%u,%u", frame->viper_projectiles, frame->pickup_booster_state);
 		fprintf(file,
 			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
 			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
@@ -1450,6 +1473,7 @@ static void dftrace_init(void)
 	dftrace_pickup_screenshot = getenv("DFTRACE_PICKUP_SCREENSHOT");
 	dftrace_pickup_sequence_prefix = getenv("DFTRACE_PICKUP_SEQUENCE_PREFIX");
 	dftrace_rapid_screenshot = getenv("DFTRACE_RAPID_SCREENSHOT");
+	dftrace_spread_screenshot = getenv("DFTRACE_SPREAD_SCREENSHOT");
 	dftrace_pause_test_enabled = getenv("DFTRACE_PAUSE_TEST") != NULL;
 	dftrace_engine_screenshot_prefix = getenv("DFTRACE_ENGINE_SCREENSHOT_PREFIX");
 	dftrace_initialised = 1;
@@ -1519,13 +1543,15 @@ static void DFTrace_Observe(unsigned pc)
 		}
 		if (dftrace_rapid_screenshot != NULL && *dftrace_rapid_screenshot != '\0' &&
 			dftrace_rapid_screenshot_frame == 0xffffffffu &&
-			MEMORY_mem[dftrace_entity_state + 1u] == 3u) {
+			MEMORY_mem[dftrace_entity_state + 2u] == 3u) {
 			DFTraceFrame rapid;
 			memset(&rapid, 0, sizeof(rapid));
 			dftrace_snapshot_rapid_projectile(&rapid);
 			if (rapid.rapid_projectiles >= 3u &&
 				MEMORY_mem[dftrace_effect_active_count] == 0u &&
-				rapid.rapid_projectile_screen_code == 0x8fu &&
+				(rapid.rapid_projectile_screen_code & 0x80u) != 0u &&
+				(rapid.rapid_projectile_screen_code & 0x7fu) >= 11u &&
+				(rapid.rapid_projectile_screen_code & 0x7fu) < 47u &&
 				rapid.rapid_projectile_address >= 0x4050u &&
 				rapid.rapid_projectile_address < 0x43c0u) {
 				if (!Screen_SaveScreenshot(dftrace_rapid_screenshot, 0)) {
@@ -1534,6 +1560,22 @@ static void DFTrace_Observe(unsigned pc)
 					exit(2);
 				}
 				dftrace_rapid_screenshot_frame = dftrace_count;
+			}
+		}
+		if (dftrace_spread_screenshot != NULL && *dftrace_spread_screenshot != '\0' &&
+			dftrace_spread_screenshot_frame == 0xffffffffu &&
+			MEMORY_mem[dftrace_entity_state + 2u] == 4u) {
+			DFTraceFrame spread;
+			memset(&spread, 0, sizeof(spread));
+			dftrace_snapshot_rapid_projectile(&spread);
+			if (spread.viper_projectiles >= 3u &&
+				MEMORY_mem[dftrace_effect_active_count] == 0u) {
+				if (!Screen_SaveScreenshot(dftrace_spread_screenshot, 0)) {
+					fprintf(stderr, "darkfighter trace: Spread Shot screenshot failed: %s\n",
+						dftrace_spread_screenshot);
+					exit(2);
+				}
+				dftrace_spread_screenshot_frame = dftrace_count;
 			}
 		}
 		/* Capture only after a complete ANTIC pass of the resident backed render

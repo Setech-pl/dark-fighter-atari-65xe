@@ -261,14 +261,14 @@ test("entity memory and code reservations are exact and do not use BASIC ROM", (
   assert.equal(manifest.entityEffects.interactiveActiveLimit, 2);
   assert.equal(manifest.entityEffects.effectSlots, 6);
   assert.equal(manifest.entityEffects.effectActiveLimit, 5);
-  assert.equal(manifest.entityEffects.glyphCount, 14);
-  assert.equal(manifest.entityEffects.glyphBytes, 112);
+  assert.equal(manifest.entityEffects.glyphCount, 18);
+  assert.equal(manifest.entityEffects.glyphBytes, 144);
   assert.equal(manifest.entityEffects.newGlyphsFromFoundation, 7);
-  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 124);
-  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 4);
+  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 128);
+  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 0);
   assert.equal(manifest.entityEffects.codeBudget.baselineBytes, 564);
   assert.equal(manifest.entityEffects.codeBudget.approvedDeltaBytes, 512);
-  assert.ok(manifest.entityEffects.codeBudget.destructibleDebris.actualDeltaBytes <= 768);
+  assert.ok(manifest.entityEffects.codeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
   assert.equal(manifest.entityEffects.codeBudget.weaponPickupRapidFire.actualBytes,
     manifest.entityEffects.featureCodeBytes);
   assert.equal(manifest.entityEffects.featureCodeBytes + manifest.entityEffects.sharedRuntimeBytes,
@@ -279,60 +279,62 @@ test("entity memory and code reservations are exact and do not use BASIC ROM", (
   assert.doesNotMatch(source.slice(source.indexOf('.segment "ENTITY_CODE"')), /\$A000|\$BFFF/);
 });
 
-test("$A5 cold RAM is fully and identically initialised for XEX and ATR", () => {
+test("$A5 and $5A cold RAM are fully and identically initialised for XEX and ATR", () => {
   const payloads = [
     parseXex(xex).segments[0],
     { start: manifest.loadAddress, data: parseAtr(atr).body.subarray(0, manifest.payloadBytes) },
   ];
-  const results = [];
-  for (const payload of payloads) {
-    const memory = new Uint8Array(0x10000).fill(0xa5);
-    memory.set(payload.data, payload.start);
-    runRoutine(memory, "stage_boot_streams");
-    runRoutine(memory, "unpack_boot_broadside_runtime");
-    runRoutine(memory, "unpack_resident_runtime");
-    const residentSuffixOffset = manifest.residentRuntime.suffixAddress -
-      manifest.residentRuntime.runAddress;
-    assert.deepEqual(
-      [...memory.slice(manifest.residentRuntime.suffixAddress,
-        manifest.residentRuntime.runAddress + residentRuntime.length)],
-      [...residentRuntime.subarray(residentSuffixOffset)],
-    );
-    runRoutine(memory, "unpack_entity_runtime");
-    assert.deepEqual(
-      [...memory.slice(manifest.entityEffects.codeRunAddress,
-        manifest.entityEffects.codeRunAddress + manifest.entityEffects.codeBytes)],
-      [...entityCodeRuntime],
-    );
-    assert.deepEqual(
-      [...memory.slice(manifest.broadsideRuntime.runAddress,
-        manifest.broadsideRuntime.runAddress + broadsideRuntime.length)],
-      [...broadsideRuntime],
-      "ENTITY_CODE bootstrap must re-arm the shared LZSS decoder for broadside",
-    );
-    runRoutine(memory, "stage_a2_kernel");
-    assert.deepEqual(
-      [...memory.slice(manifest.a2Kernel.runAddress,
-        manifest.a2Kernel.runAddress + a2KernelRuntime.length)],
-      [...a2KernelRuntime],
-    );
-    runRoutine(memory, "unpack_starfield_runtime");
-    assert.deepEqual(
-      [...memory.slice(manifest.starfieldRuntime.runAddress,
-        manifest.starfieldRuntime.runAddress + starfieldRuntime.length)],
-      [...starfieldRuntime],
-    );
-    const lowerSentinel = memory[0x7fff];
-    const upperSentinel = memory[0x8100];
-    runRoutine(memory, "init_entity_effects");
-    assert.equal(memory[0x7fff], lowerSentinel);
-    assert.equal(memory[0x8100], upperSentinel);
-    const state = memory.slice(addresses.state, addresses.stateEnd);
-    assert.equal(state.every((byte, index) =>
-      byte === (index === 3 ? 32 : index === 6 ? 0x65 : 0)), true);
-    results.push(state);
+  for (const fill of [0xa5, 0x5a]) {
+    const results = [];
+    for (const payload of payloads) {
+      const memory = new Uint8Array(0x10000).fill(fill);
+      memory.set(payload.data, payload.start);
+      runRoutine(memory, "stage_boot_streams");
+      runRoutine(memory, "unpack_boot_broadside_runtime");
+      runRoutine(memory, "unpack_resident_runtime");
+      const residentSuffixOffset = manifest.residentRuntime.suffixAddress -
+        manifest.residentRuntime.runAddress;
+      assert.deepEqual(
+        [...memory.slice(manifest.residentRuntime.suffixAddress,
+          manifest.residentRuntime.runAddress + residentRuntime.length)],
+        [...residentRuntime.subarray(residentSuffixOffset)],
+      );
+      runRoutine(memory, "unpack_entity_runtime");
+      assert.deepEqual(
+        [...memory.slice(manifest.entityEffects.codeRunAddress,
+          manifest.entityEffects.codeRunAddress + manifest.entityEffects.codeBytes)],
+        [...entityCodeRuntime],
+      );
+      assert.deepEqual(
+        [...memory.slice(manifest.broadsideRuntime.runAddress,
+          manifest.broadsideRuntime.runAddress + broadsideRuntime.length)],
+        [...broadsideRuntime],
+        "ENTITY_CODE bootstrap must re-arm the shared LZSS decoder for broadside",
+      );
+      runRoutine(memory, "stage_a2_kernel");
+      assert.deepEqual(
+        [...memory.slice(manifest.a2Kernel.runAddress,
+          manifest.a2Kernel.runAddress + a2KernelRuntime.length)],
+        [...a2KernelRuntime],
+      );
+      runRoutine(memory, "unpack_starfield_runtime");
+      assert.deepEqual(
+        [...memory.slice(manifest.starfieldRuntime.runAddress,
+          manifest.starfieldRuntime.runAddress + starfieldRuntime.length)],
+        [...starfieldRuntime],
+      );
+      const lowerSentinel = memory[0x7fff];
+      const upperSentinel = memory[0x8100];
+      runRoutine(memory, "init_entity_effects");
+      assert.equal(memory[0x7fff], lowerSentinel);
+      assert.equal(memory[0x8100], upperSentinel);
+      const state = memory.slice(addresses.state, addresses.stateEnd);
+      assert.equal(state.every((byte, index) =>
+        byte === (index === 3 ? 32 : index === 6 ? 0x65 : 0)), true);
+      results.push(state);
+    }
+    assert.deepEqual(results[0], results[1]);
   }
-  assert.deepEqual(results[0], results[1]);
 });
 
 test("all four 2x1 debris phases map both cells through every logical row and A2 ring head", () => {

@@ -167,7 +167,7 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   ]) {
     assert.match(silence, new RegExp(`sta ${register}`));
   }
-  assert.match(routine("allocate_viper_projectile"), /lda sound_enabled\s+beq @accepted/);
+  assert.match(routine("play_viper_projectile_sound"), /lda sound_enabled\s+beq @accepted/);
   assert.match(routine("play_hit_sound"), /lda sound_enabled\s+beq @done/);
   assert.match(
     routine("update_sound"),

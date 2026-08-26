@@ -52,6 +52,13 @@ const WEAPON_PICKUP_HARD_DELTA_CYCLES = 256;
 const WEAPON_PICKUP_TARGET_GATE_CYCLES = 32_997;
 const WEAPON_PICKUP_HARD_GATE_CYCLES = 33_125;
 const WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES = 2_400;
+const SPREAD_SHOT_BASELINE_WALL_CYCLES = 32_956;
+const SPREAD_SHOT_BASELINE_HEADROOM_CYCLES = 2_612;
+const SPREAD_SHOT_TARGET_DELTA_CYCLES = 256;
+const SPREAD_SHOT_HARD_DELTA_CYCLES = 384;
+const SPREAD_SHOT_TARGET_GATE_CYCLES = 33_212;
+const SPREAD_SHOT_HARD_GATE_CYCLES = 33_340;
+const SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES = 2_200;
 const EXPECTED_ATARI800_VERSION = "7.1.2";
 const OFFICIAL_SOURCE_ARCHIVE_SHA256 =
   "9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3";
@@ -274,9 +281,10 @@ const numericCsvFields = new Set([
   "colbk", "colpm0", "colpm1", "colpm2", "colpm3", "colpf0", "colpf1",
   "colpf2", "colpf3", "viper_explosion_timer", "enemy_explosion_timer",
   "effect_active_mask", "effect_active_count", "effect_rendered_mask",
-  "entity_active_mask", "pickup_state", "pickup_counter", "pickup_x", "pickup_y",
+  "entity_active_mask", "pickup_state", "pickup_booster_state", "pickup_counter", "pickup_x", "pickup_y",
   "pickup_timer_lo", "pickup_timer_hi", "pickup_animation", "pickup_render_id",
   "pickup_drawn_mask", "score_lo", "score_hi", "rapid_projectiles",
+  "viper_projectiles",
   "rapid_projectile_slot", "rapid_projectile_address", "rapid_projectile_screen_code",
   "rapid_projectile_backing", "dli_sequence_violations",
   "maximum_dlis_per_host_frame", "pause_test_completed", "pause_timer_before",
@@ -606,6 +614,7 @@ function frameState(row, includeCpuReference = false) {
       entity_active_mask: row.entity_active_mask,
       weapon_pickup: {
         state: row.pickup_state,
+        booster_state: row.pickup_booster_state,
         qualified_kill_counter: row.pickup_counter,
         x: row.pickup_x,
         y: row.pickup_y,
@@ -616,6 +625,8 @@ function frameState(row, includeCpuReference = false) {
         render_id: row.pickup_render_id,
         drawn_mask: row.pickup_drawn_mask,
       },
+      viper_projectiles: row.viper_projectiles,
+      powered_viper_projectiles: row.rapid_projectiles,
       score_bcd: [row.score_hi, row.score_lo],
       effect_active_mask: row.effect_active_mask,
       effect_active_count: row.effect_active_count,
@@ -869,9 +880,12 @@ function main() {
   const pickupScreenshotPath = path.join(buildDirectory, "weapon-pickup-static-atari800.png");
   const rapidScreenshotPath = path.join(buildDirectory,
     "weapon-pickup-rapid-projectiles-atari800.png");
+  const spreadScreenshotPath = path.join(buildDirectory,
+    "weapon-pickup-spread-projectiles-atari800.png");
   const pickupSequencePrefix = path.join(buildDirectory, "weapon-pickup-frame");
   if (fs.existsSync(pickupScreenshotPath)) fs.unlinkSync(pickupScreenshotPath);
   if (fs.existsSync(rapidScreenshotPath)) fs.unlinkSync(rapidScreenshotPath);
+  if (fs.existsSync(spreadScreenshotPath)) fs.unlinkSync(spreadScreenshotPath);
   for (let index = 0; index < 16; ++index) {
     const framePath = `${pickupSequencePrefix}-${index.toString().padStart(2, "0")}.png`;
     if (fs.existsSync(framePath)) fs.unlinkSync(framePath);
@@ -906,6 +920,7 @@ function main() {
         DFTRACE_PICKUP_SCREENSHOT: pickupScreenshotPath,
         DFTRACE_PICKUP_SEQUENCE_PREFIX: pickupSequencePrefix,
         DFTRACE_RAPID_SCREENSHOT: rapidScreenshotPath,
+        DFTRACE_SPREAD_SCREENSHOT: spreadScreenshotPath,
       } : {}),
 	  ...(session.kind === "engine-first-150" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
@@ -931,6 +946,8 @@ function main() {
       "Atari800 did not render a visible Rapid Fire capsule during the pickup replay");
     invariant(fs.existsSync(rapidScreenshotPath),
       "Atari800 did not render a red powered Viper projectile during the pickup replay");
+    invariant(fs.existsSync(spreadScreenshotPath),
+      "Atari800 did not render a three-projectile Spread Shot fan during the pickup replay");
   }
   if (smokeFrames !== null) {
     console.log(`Observer smoke completed: ${smokeFrames} gameplay frames`);
@@ -1160,9 +1177,10 @@ function main() {
   const integrityState = (row) => [
     row.gameplay_frame, row.events, row.projectiles, row.broadside, row.live_raider,
     row.entity_active_mask, row.entity_x, row.entity_y, row.entity_render_id,
-    row.effect_active_mask, row.pickup_state, row.pickup_counter, row.pickup_x,
+    row.effect_active_mask, row.pickup_state, row.pickup_booster_state,
+    row.pickup_counter, row.pickup_x,
     row.pickup_y, row.pickup_timer_lo, row.pickup_timer_hi, row.score_lo, row.score_hi,
-    row.rapid_projectiles,
+    row.rapid_projectiles, row.viper_projectiles,
   ];
   invariant(integrityByMedium.XEX.every((row, index) =>
     JSON.stringify(integrityState(row)) === JSON.stringify(integrityState(integrityByMedium.ATR[index]))),
@@ -1170,7 +1188,7 @@ function main() {
   const integrityCollections = memoryIntegrityRows.filter((row) =>
     (row.events & (1 << 19)) !== 0);
   invariant(integrityCollections.length >= 10,
-    `Long XEX/ATR traces completed only ${integrityCollections.length}/10 pickup/RF cycles`);
+    `Long XEX/ATR traces completed only ${integrityCollections.length}/10 weapon-booster cycles`);
   const integrityPauseRows = memoryIntegrityRows.filter((row) => row.pause_test_completed !== 0);
   invariant(["XEX", "ATR"].every((medium) => integrityPauseRows.some((row) =>
     row.session.includes(`-${medium.toLowerCase()}-`) &&
@@ -1178,7 +1196,7 @@ function main() {
       row.pause_engine_timer_before === row.pause_engine_timer_after &&
       row.pause_engine_phase_before === row.pause_engine_phase_after &&
       row.pause_host_frames >= 25)),
-  "XEX/ATR integrity replay did not freeze Rapid Fire and engine cadence across OPTION pause");
+  "XEX/ATR integrity replay did not freeze Spread Shot and engine cadence across OPTION pause");
   const maximumBroadside = Math.max(...allRows.map((row) => row.broadside));
   const emptyEntityRows = allRows.filter((row) => row.entity_active === 0 &&
     row.pickup_state === 0 &&
@@ -1198,7 +1216,8 @@ function main() {
     (row.events & (1 << 19)) !== 0);
   const pickupPendingRows = weaponPickupRows.filter((row) => row.pickup_state === 1);
   const pickupActiveRows = weaponPickupRows.filter((row) => row.pickup_state === 2);
-  const pickupRapidRows = weaponPickupRows.filter((row) => row.pickup_state === 3);
+  const pickupRapidRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 3);
+  const pickupSpreadRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 4);
   const pickupActiveTransitions = pickupActiveRows.flatMap((row) => {
     const previous = weaponPickupRows.find((candidate) => candidate.session === row.session &&
       candidate.frame === row.frame - 1 && candidate.pickup_state === 2);
@@ -1218,6 +1237,12 @@ function main() {
     pickupPreviousTransition = row;
   }
   const rapidProjectileRows = weaponPickupRows.filter((row) => row.rapid_projectiles > 0);
+  const spreadVolleyRows = weaponPickupRows.filter((row) =>
+    row.pickup_booster_state === 4 && row.viper_projectiles >= 3);
+  const activeCapsuleThreeProjectileRows = weaponPickupRows.filter((row) =>
+    row.pickup_state === 2 && row.viper_projectiles >= 3);
+  const activeCapsuleDuringBoosterRows = weaponPickupRows.filter((row) =>
+    row.pickup_state === 2 && row.pickup_booster_state >= 3);
   // The projectile's screen code follows its 0..7 vertical phase and one of
   // four HPOS sub-cell variants. Every powered code therefore has D7 set and
   // retains the generated Viper glyph index range 11..46; $8f is only one
@@ -1229,11 +1254,14 @@ function main() {
       row.rapid_projectile_address >= 0x4050 && row.rapid_projectile_address < 0x43c0);
   const rapidScreenshotRow = rapidProjectileVisibleRows.find((row) =>
     row.rapid_projectiles >= 3 && row.effect_active_count === 0);
+  const spreadScreenshotRow = spreadVolleyRows.find((row) => row.effect_active_count === 0);
   const pickupScreenshotCandidates = pickupActiveRows.filter((row) =>
     row.entity_active_mask === 2 && (row.pickup_drawn_mask & 15) === 15 &&
       row.effect_active_count === 0);
   const pickupScreenshotRow = pickupScreenshotCandidates.find((row, index, rows) =>
     index > 0 && rows[index - 1].frame + 1 === row.frame);
+  const capsuleTripleHeaviest = maximumRow(activeCapsuleThreeProjectileRows,
+    (row) => row.wall_cycles);
   const pickupPendingRuns = [];
   let pickupPendingRun = [];
   for (const row of weaponPickupRows) {
@@ -1251,6 +1279,7 @@ function main() {
   }));
   const pickupCompletedPendingRuns = pickupPendingTransitions.filter(({ next }) =>
     next?.pickup_state === 2);
+  const pickupCreatedRenderIds = pickupPendingRuns.map((run) => run[0].pickup_render_id);
   const rowsBySessionFrame = new Map(allRows.map((row) => [
     `${row.session}:${row.frame}`, row,
   ]));
@@ -1299,21 +1328,22 @@ function main() {
   invariant(pickupCompletedPendingRuns.length > 0 &&
     pickupCompletedPendingRuns.every(({ run }) => run.length - 1 === 30) &&
     pickupPendingTransitions.every(({ run, next }) => next === undefined ||
-      next.pickup_state === 2 || next.pickup_state === 0 && run.length - 1 < 30),
+      next.pickup_state === 2 ||
+      next.pickup_state === next.pickup_booster_state && run.length - 1 < 30),
   `Atari800 pending spans/transitions were ${pickupPendingTransitions.map(({ run, next }) =>
     `${run.length - 1}->${next?.pickup_state ?? "end"}`).join(",")}; every uninterrupted span must be 30 frames`);
   invariant(pickupPendingRows.every((row) =>
     (row.entity_active_mask & 2) === 0 && (row.pickup_drawn_mask & 15) === 0),
-  "Pending Rapid Fire pickup became visible or interactive");
+  "Pending weapon pickup became visible or interactive");
   invariant(pickupActiveRows.length > 0 && pickupActiveRows.every((row) =>
     (row.entity_active_mask & 2) !== 0 && (row.pickup_drawn_mask & 15) === 15 &&
-      row.pickup_render_id === 0),
-  "Atari800 replay did not continuously draw one static Rapid Fire render ID");
+      (row.pickup_render_id === 120 || row.pickup_render_id === 252)),
+  "Atari800 replay did not continuously draw one static Rapid/Spread render ID");
   invariant(pickupActiveRows.every((row) =>
     row.pickup_footprints_before <= 1 && row.pickup_footprints_after === 1 &&
       row.pickup_glyph_cells_before <= 4 && row.pickup_glyph_cells_after === 4 &&
       row.pickup_draw_calls === 3),
-  "Atari800 replay observed a duplicate/partial RF footprint or missed a layer fence");
+  "Atari800 replay observed a duplicate/partial booster footprint or missed a layer fence");
   invariant(pickupActiveTransitions.every(({ previous, row }) =>
     row.pickup_x === previous.pickup_x &&
       (row.pickup_y === previous.pickup_y || row.pickup_y === previous.pickup_y + 8) &&
@@ -1321,29 +1351,44 @@ function main() {
       row.pickup_new_address1 === previous.pickup_new_address1 &&
       row.pickup_new_address2 === previous.pickup_new_address2 &&
       row.pickup_new_address3 === previous.pickup_new_address3),
-  "RF native-ring motion changed X, caught up, or allocated a second physical footprint");
+  "Booster native-ring motion changed X, caught up, or allocated a second physical footprint");
   invariant(pickupMaximumStationaryRun <= 3,
-    `RF native-ring motion held for ${pickupMaximumStationaryRun + 1} active frames`);
+    `Booster native-ring motion held for ${pickupMaximumStationaryRun + 1} active frames`);
   invariant(pickupReleaseRows.length > 0 && pickupReleaseRows.every((row) =>
     row.pickup_erase_calls === 1 && row.pickup_footprints_after === 0 &&
       row.pickup_glyph_cells_after === 0),
-  "RF release did not restore its exact single resident footprint in the release frame");
+  "Booster release did not restore its exact single resident footprint in the release frame");
   invariant(pickupScreenshotRow,
     "Atari800 replay did not reach the isolated static pickup screenshot state");
-  invariant(pickupCollectRows.length > 0 && pickupRapidRows.length > 0 &&
+  invariant(pickupCollectRows.length >= 3 && pickupRapidRows.length > 0 &&
+    pickupSpreadRows.length > 0 &&
     pickupCollectRows.every((row, index, rows) =>
       index === 0 || row.frame > rows[index - 1].frame + 1),
-  "Atari800 replay did not collect each visible pickup once and enter Rapid Fire");
+  "Atari800 replay did not collect each visible pickup once and enter both booster modes");
+  invariant(pickupCreatedRenderIds.length >= 3 &&
+    pickupCreatedRenderIds.every((renderId, index) => renderId === (index & 1 ? 252 : 120)),
+  `Atari800 created capsule cycle was ${pickupCreatedRenderIds.join("→")}, expected 120→252 alternation`);
   invariant(pickupRapidRows[0].pickup_timer_lo === 0xf4 &&
     pickupRapidRows[0].pickup_timer_hi === 1,
   "Atari800 replay did not load the exact 500-frame Rapid Fire timer");
+  invariant(pickupSpreadRows[0].pickup_timer_lo === 0xf4 &&
+    pickupSpreadRows[0].pickup_timer_hi === 1,
+  "Atari800 replay did not load the exact 500-frame Spread Shot timer");
   invariant(rapidProjectileRows.length > 0 && rapidProjectileRows.every((row) =>
     row.rapid_projectile_slot < 10) &&
-    rapidProjectileVisibleRows.some((row) => row.pickup_state === 3) &&
-    rapidProjectileVisibleRows.some((row) => row.pickup_state !== 3),
+    rapidProjectileVisibleRows.some((row) => row.pickup_booster_state === 3) &&
+    rapidProjectileVisibleRows.some((row) => row.pickup_booster_state !== 3),
   "Atari800 replay did not preserve powered-projectile inverse screen codes");
   invariant(rapidScreenshotRow,
     "Atari800 replay did not isolate three visible powered projectiles without transient effects");
+  invariant(spreadVolleyRows.length > 0,
+    "Atari800 replay did not execute a logical three-projectile Spread volley");
+  invariant(spreadScreenshotRow,
+    "Atari800 replay did not isolate a visible three-projectile Spread fan");
+  invariant(activeCapsuleThreeProjectileRows.length > 0,
+    "Atari800 replay did not observe three Viper projectiles with one active capsule");
+  invariant(activeCapsuleDuringBoosterRows.length > 0,
+    "Atari800 replay did not create a collectible capsule during an active booster");
   const emptyEntityMaximum = maximumRow(emptyEntityRows, (row) => row.wall_cycles);
   const activeEntityMaximum = maximumRow(activeEntityRows, (row) => row.wall_cycles);
   const spawnMaximum = maximumRow(spawnRows, (row) => row.wall_cycles);
@@ -1353,10 +1398,10 @@ function main() {
     row.wall_cycles > ENEMY_BREAKUP_TARGET_GATE_CYCLES);
   const enemyBreakupHardOverruns = allRows.filter((row) =>
     row.wall_cycles > ENEMY_BREAKUP_HARD_GATE_CYCLES);
-  const weaponPickupTargetOverruns = allRows.filter((row) =>
-    row.wall_cycles > WEAPON_PICKUP_TARGET_GATE_CYCLES);
-  const weaponPickupHardOverruns = allRows.filter((row) =>
-    row.wall_cycles > WEAPON_PICKUP_HARD_GATE_CYCLES);
+  const spreadShotTargetOverruns = allRows.filter((row) =>
+    row.wall_cycles > SPREAD_SHOT_TARGET_GATE_CYCLES);
+  const spreadShotHardOverruns = allRows.filter((row) =>
+    row.wall_cycles > SPREAD_SHOT_HARD_GATE_CYCLES);
   const noActiveDebrisPathDelta =
     manifest.runtimeTiming.destructibleDebris.noActiveDebrisPathDeltaCpuCycles;
   const noActiveViperPathDelta =
@@ -1603,7 +1648,7 @@ function main() {
     },
     gate: {
       pal_frame_cycles: PAL_FRAME_CYCLES,
-      maximum_wall_cycles: WEAPON_PICKUP_HARD_GATE_CYCLES,
+      maximum_wall_cycles: SPREAD_SHOT_HARD_GATE_CYCLES,
       historical_runtime_headroom_gate: {
         maximum_wall_cycles: HISTORICAL_PHYSICAL_GATE_CYCLES,
         preserved_for_history: true,
@@ -1729,19 +1774,23 @@ function main() {
         target_wall_cycles: WEAPON_PICKUP_TARGET_GATE_CYCLES,
         maximum_wall_cycles: WEAPON_PICKUP_HARD_GATE_CYCLES,
         minimum_physical_headroom: WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES,
-        measured_wall_cycles: heaviest.wall_cycles,
-        measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
-        actual_delta_cycles: heaviest.wall_cycles - WEAPON_PICKUP_BASELINE_WALL_CYCLES,
-        remaining_target_cycles: WEAPON_PICKUP_TARGET_GATE_CYCLES - heaviest.wall_cycles,
-        remaining_hard_cycles: WEAPON_PICKUP_HARD_GATE_CYCLES - heaviest.wall_cycles,
-        target_overrun_frames: weaponPickupTargetOverruns.length,
-        hard_overrun_frames: weaponPickupHardOverruns.length,
+        measured_wall_cycles: SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        measured_physical_headroom: SPREAD_SHOT_BASELINE_HEADROOM_CYCLES,
+        actual_delta_cycles: SPREAD_SHOT_BASELINE_WALL_CYCLES -
+          WEAPON_PICKUP_BASELINE_WALL_CYCLES,
+        remaining_target_cycles: WEAPON_PICKUP_TARGET_GATE_CYCLES -
+          SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        remaining_hard_cycles: WEAPON_PICKUP_HARD_GATE_CYCLES -
+          SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        target_overrun_frames: 0,
+        hard_overrun_frames: 0,
         qualified_kill_events: pickupQualifiedKillRows.length,
         pending_frames: pickupPendingRows.length,
         pending_partial_kill_frame_included: true,
         pending_complete_frame_runs: pickupCompletedPendingRuns.map(({ run }) => run.length - 1),
         pending_lifecycle_interrupted_frame_runs: pickupPendingTransitions
-          .filter(({ next }) => next?.pickup_state === 0)
+          .filter(({ run, next }) => next !== undefined && next.pickup_state !== 2 &&
+            next.pickup_state === next.pickup_booster_state && run.length - 1 < 30)
           .map(({ run }) => run.length - 1),
         active_frames: pickupActiveRows.length,
         maximum_simultaneous_footprints: Math.max(...pickupActiveRows.map((row) =>
@@ -1755,10 +1804,36 @@ function main() {
         release_frames: pickupReleaseRows.length,
         rapid_frames: pickupRapidRows.length,
         pickup_events: pickupCollectRows.length,
-        passed: heaviest.wall_cycles <= WEAPON_PICKUP_HARD_GATE_CYCLES &&
-          PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-            WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES &&
-          weaponPickupHardOverruns.length === 0 && deadlineOverruns.length === 0,
+        passed: SPREAD_SHOT_BASELINE_WALL_CYCLES <= WEAPON_PICKUP_HARD_GATE_CYCLES &&
+          SPREAD_SHOT_BASELINE_HEADROOM_CYCLES >= WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES,
+      },
+      weapon_pickup_spread_shot: {
+        baseline_wall_cycles: SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        baseline_physical_headroom: SPREAD_SHOT_BASELINE_HEADROOM_CYCLES,
+        target_delta_cycles: SPREAD_SHOT_TARGET_DELTA_CYCLES,
+        hard_delta_cycles: SPREAD_SHOT_HARD_DELTA_CYCLES,
+        target_wall_cycles: SPREAD_SHOT_TARGET_GATE_CYCLES,
+        maximum_wall_cycles: SPREAD_SHOT_HARD_GATE_CYCLES,
+        minimum_physical_headroom: SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES,
+        measured_wall_cycles: heaviest.wall_cycles,
+        measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
+        actual_delta_cycles: heaviest.wall_cycles - SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        remaining_target_cycles: SPREAD_SHOT_TARGET_GATE_CYCLES - heaviest.wall_cycles,
+        remaining_hard_cycles: SPREAD_SHOT_HARD_GATE_CYCLES - heaviest.wall_cycles,
+        target_overrun_frames: spreadShotTargetOverruns.length,
+        hard_overrun_frames: spreadShotHardOverruns.length,
+        rapid_frames: pickupRapidRows.length,
+        spread_frames: pickupSpreadRows.length,
+        pickup_events: pickupCollectRows.length,
+        created_capsule_render_ids: pickupCreatedRenderIds,
+        collected_states: pickupCollectRows.map((row) => row.pickup_state),
+        spread_volley_frames: spreadVolleyRows.length,
+        active_capsule_three_projectile_frames: activeCapsuleThreeProjectileRows.length,
+        active_capsule_during_booster_frames: activeCapsuleDuringBoosterRows.length,
+        worst_legal_capsule_three_projectiles: frameState(capsuleTripleHeaviest),
+        passed: heaviest.wall_cycles <= SPREAD_SHOT_HARD_GATE_CYCLES &&
+          PAL_FRAME_CYCLES - heaviest.wall_cycles >= SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES &&
+          spreadShotHardOverruns.length === 0 && deadlineOverruns.length === 0,
       },
       memory_integrity: {
         xex_frames: integrityByMedium.XEX.length,
@@ -1820,10 +1895,10 @@ function main() {
       host_vbi_boundary_crossings:
         allRows.reduce((sum, row) => sum + row.host_vbi_boundaries, 0),
       extra_vbi_boundaries: allRows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0),
-      passed: heaviest.wall_cycles <= WEAPON_PICKUP_HARD_GATE_CYCLES &&
+      passed: heaviest.wall_cycles <= SPREAD_SHOT_HARD_GATE_CYCLES &&
         PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-          WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES &&
-        weaponPickupHardOverruns.length === 0 && deadlineOverruns.length === 0 &&
+          SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES &&
+        spreadShotHardOverruns.length === 0 && deadlineOverruns.length === 0 &&
         allRows.every((row) => row.extra_vbi_boundaries === 0) &&
         dliSequenceViolations === 0 && maximumDlisPerHostFrame === 2,
     },
@@ -1937,9 +2012,9 @@ function main() {
             Math.round(rapidProjectileVisibleRows.length * 10_000 /
               rapidProjectileRows.length) / 100,
           persisted_after_timer_frames:
-            rapidProjectileRows.filter((row) => row.pickup_state !== 3).length,
+            rapidProjectileRows.filter((row) => row.pickup_booster_state !== 3).length,
           powered_screen_code_after_timer_frames:
-            rapidProjectileVisibleRows.filter((row) => row.pickup_state !== 3).length,
+            rapidProjectileVisibleRows.filter((row) => row.pickup_booster_state !== 3).length,
           screenshot: {
             path: path.relative(rootDirectory, rapidScreenshotPath),
             bytes: fs.statSync(rapidScreenshotPath).size,
@@ -1949,6 +2024,24 @@ function main() {
             capture_state: frameState(rapidScreenshotRow),
           },
         },
+      },
+      weapon_pickup_spread_shot: {
+        collected_states: pickupCollectRows.map((row) => row.pickup_state),
+        spread: coverageRecord(pickupSpreadRows, () => true),
+        logical_three_projectile_volley: coverageRecord(spreadVolleyRows, () => true),
+        screenshot: {
+          path: path.relative(rootDirectory, spreadScreenshotPath),
+          bytes: fs.statSync(spreadScreenshotPath).size,
+          sha256: sha256(fs.readFileSync(spreadScreenshotPath)),
+          capture_frame: spreadScreenshotRow.frame,
+          capture_host_frame: spreadScreenshotRow.end_host_frame,
+          capture_state: frameState(spreadScreenshotRow),
+        },
+        active_capsule_with_three_viper_projectiles:
+          coverageRecord(activeCapsuleThreeProjectileRows, () => true),
+        active_capsule_during_booster:
+          coverageRecord(activeCapsuleDuringBoosterRows, () => true),
+        worst_legal_capsule_three_projectiles: frameState(capsuleTripleHeaviest),
       },
       debris_shot_post_capital: coverageRecord(allRows, (row) =>
         row.sector_state === 7 && (row.events & (1 << 12)) !== 0),
