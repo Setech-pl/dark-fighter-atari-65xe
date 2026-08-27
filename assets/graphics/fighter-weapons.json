@@ -13,11 +13,13 @@
   },
   "viper": {
     "poolSlots": 10,
-    "burstCount": 10,
+    "burstCount": 8,
     "burstIntervalFrames": 3,
+    "rapidFireBurstCount": 10,
     "rapidFireIntervalFrames": 2,
     "rapidFireDurationFrames": 500,
     "spreadShotDurationFrames": 500,
+    "spreadShotBurstCount": 8,
     "spreadShotProjectileCount": 3,
     "spreadShotInitialOffsetHpos": 4,
     "spreadShotLateralStepHpos": 2,
@@ -27,8 +29,8 @@
     "heightScanlines": 2,
     "colourRegister": "COLPF2",
     "colourValue": 30,
-    "rapidFireColourRegister": "COLPF3",
-    "rapidFireColourValue": 70
+    "rapidFireColourRegister": "COLPF2",
+    "rapidFireColourValue": 30
   },
   "sharedFighterExplosion": {
     "frameDurationFrames": 4,

@@ -21,7 +21,9 @@ import {
   executeWeaponPickupCollisionTrace,
   executeWeaponPickupLifecycleTrace,
   executeWeaponPickupTrace,
+  executeViperBurstBalanceTrace,
   executeViperProjectileColourTrace,
+  executeViperProjectileColourLifecycleTrace,
   weaponPickupTraceCsv,
 } from "../scripts/weapon-pickup-runtime.mjs";
 
@@ -266,9 +268,9 @@ test("pickup collection is single-shot and changes neither score, HULL nor LIFE"
     Array.from(before.display.subarray(0, 30)), "SCORE/LIFE/HULL cells must remain byte-exact");
 });
 
-test("Rapid Fire lasts 500 active frames, freezes in pause and keeps ten-shot geometry", () => {
+test("Rapid Fire lasts 500 active frames and keeps its ten-shot accelerated burst", () => {
   const trace = executeWeaponPickupTrace({ root, artifact: "xex" });
-  assert.deepEqual(trace.normalBurstFrames, [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]);
+  assert.deepEqual(trace.normalBurstFrames, [0, 3, 6, 9, 12, 15, 18, 21]);
   assert.deepEqual(trace.rapidBurstFrames, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
   assert.equal(trace.activeRapidFrames, 500);
   assert.equal(trace.rapidTimerFrames.length, 500);
@@ -293,30 +295,59 @@ test("Rapid Fire lasts 500 active frames, freezes in pause and keeps ten-shot ge
   assert.deepEqual([expired.state, expired.timer], [0, 0]);
   const { weapons } = assets();
   assert.deepEqual([
-    weapons.viper.burstCount, weapons.viper.burstIntervalFrames,
+    weapons.viper.burstCount, weapons.viper.rapidFireBurstCount,
+    weapons.viper.spreadShotBurstCount, weapons.viper.burstIntervalFrames,
     weapons.viper.rapidFireIntervalFrames, weapons.viper.rapidFireDurationFrames,
     weapons.viper.poolSlots, weapons.viper.speedScanlines,
     weapons.viper.widthHpos, weapons.viper.heightScanlines,
-  ], [10, 3, 2, 500, 10, 6, 1, 2]);
+  ], [8, 10, 8, 3, 2, 500, 10, 6, 1, 2]);
 });
 
-test("release projectiles capture yellow or red at spawn without changing geometry", () => {
+test("packed runtime distinguishes 8-shot normal, 10-shot Rapid and 8-salvo Spread", () => {
+  const xex = executeViperBurstBalanceTrace({ root, artifact: "xex" });
+  const atr = executeViperBurstBalanceTrace({ root, artifact: "atr" });
+  assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
+  const summary = xex.traces.map((mode) => [
+    mode.mode, mode.expectedBurst, mode.intervalFrames, mode.postBurstFrames,
+    mode.firstBurstSalvos, mode.firstBurstProjectiles, mode.emittedProjectiles,
+    mode.maximumPoolOccupancy,
+  ]);
+  assert.deepEqual(summary, [
+    ["NORMAL", 8, 3, 12, 8, 8, 21, 8],
+    ["RAPID", 10, 2, 12, 10, 10, 30, 10],
+    ["SPREAD", 8, 3, 12, 8, 24, 27, 9],
+  ]);
+  const firstBurstFrames = (mode) => mode.records
+    .filter(({ allocatedProjectiles }) => allocatedProjectiles > 0)
+    .slice(0, mode.expectedBurst)
+    .map(({ frame }) => frame);
+  assert.deepEqual(firstBurstFrames(xex.traces[0]), [0, 3, 6, 9, 12, 15, 18, 21]);
+  assert.deepEqual(firstBurstFrames(xex.traces[1]),
+    [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+  assert.deepEqual(firstBurstFrames(xex.traces[2]), [0, 3, 6, 28, 31, 34, 56, 59]);
+});
+
+test("Normal and Rapid projectiles render through the Viper yellow bank", () => {
   const xex = executeViperProjectileColourTrace({ root, artifact: "xex" });
   const atr = executeViperProjectileColourTrace({ root, artifact: "atr" });
   assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
   assert.deepEqual([
     xex.normalAtSpawn, xex.normalAfterPickup, xex.rapidAtSpawn,
     xex.rapidAfterExpiry, xex.normalAfterExpiry,
-  ], [0x01, 0x01, 0x81, 0x81, 0x01]);
+  ], [0x01, 0x01, 0x01, 0x01, 0x01]);
   assert.equal(xex.rapidTimerAtSpawn, 500);
   assert.deepEqual(xex.rendered.map(({ activeRenderId, code, screenCodeAfter }) =>
-    [activeRenderId, code, screenCodeAfter]), [[1, 15, 15], [0x81, 0x8f, 0x8f], [1, 15, 15]]);
-  assert.deepEqual(xex.rendered.map(({ inverse }) => inverse), [0, 1, 0]);
+    [activeRenderId, code, screenCodeAfter]), [[1, 15, 15], [1, 15, 15], [1, 15, 15]]);
+  assert.deepEqual(xex.rendered.map(({ inverse }) => inverse), [0, 0, 0]);
   assert.equal(new Set(xex.rendered.map(({ glyphCode }) => glyphCode)).size, 1,
-    "yellow and red projectiles must use byte-identical glyph geometry");
-  assert.deepEqual([xex.normalColour, xex.rapidColour], [0x1e, 0x46]);
-  assert.equal(xex.rendered[1].pixelPairs.flat().includes(3), true,
-    "powered projectile glyph must exercise the inverse-switched selector 11");
+    "Normal and Rapid projectiles must use byte-identical glyph geometry");
+  assert.deepEqual([xex.normalColour, xex.rapidColour], [0x1e, 0x1e]);
+  assert.equal(xex.rendered.every(({ colourRegister, colourValue }) =>
+    colourRegister === "COLPF2" && colourValue === 0x1e), true);
+  assert.deepEqual([
+    xex.raiderRendered.activeRenderId, xex.raiderRendered.inverse,
+    xex.raiderRendered.colourRegister, xex.raiderRendered.colourValue,
+  ], [2, 1, "COLPF3", 0x46]);
   const { weapons } = assets();
   assert.deepEqual([
     weapons.viper.widthHpos, weapons.viper.heightScanlines,
@@ -326,6 +357,41 @@ test("release projectiles capture yellow or red at spawn without changing geomet
     source.indexOf("allocate_viper_projectile:"));
   assert.match(collisionPath, /lda FIGHTER_PROJECTILE_ACTIVE,x\s+beq @viper_next/);
   assert.doesNotMatch(collisionPath, /FIGHTER_PROJECTILE_RAPID_COLOR|and #\$7F/);
+});
+
+test("packed XEX and ATR keep every implemented Viper lifecycle path yellow under cold RAM", () => {
+  for (const coldFill of [0xa5, 0x5a]) {
+    const xex = executeViperProjectileColourLifecycleTrace({
+      root, artifact: "xex", coldFill,
+    });
+    const atr = executeViperProjectileColourLifecycleTrace({
+      root, artifact: "atr", coldFill,
+    });
+    assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
+    assert.deepEqual(xex.palette, { COLPF2: 0x1e, COLPF3: 0x46 });
+    assert.deepEqual(xex.captures.map(({ phase, boosterState, projectiles }) => [
+      phase,
+      boosterState,
+      projectiles.length,
+      projectiles.every(({ inverse, colourRegister, colourValue }) =>
+        inverse === 0 && colourRegister === "COLPF2" && colourValue === 0x1e),
+    ]), [
+      ["NORMAL", 0, 1, true],
+      ["RAPID", 3, 1, true],
+      ["SPREAD", 4, 3, true],
+      ["PAUSE_BEFORE", 3, 1, true],
+      ["PAUSE_RESUME", 3, 1, true],
+      ["SECTOR_TRANSITION", 4, 3, true],
+      ["RAPID_EXPIRED", 0, 1, true],
+      ["SPREAD_EXPIRED", 0, 1, true],
+      ["LIFE_LOSS", 0, 1, true],
+      ["NEW_GAME", 0, 1, true],
+    ]);
+    assert.deepEqual([
+      xex.raider.activeRenderId, xex.raider.inverse,
+      xex.raider.colourRegister, xex.raider.colourValue,
+    ], [2, 1, "COLPF3", 0x46]);
+  }
 });
 
 test("new game, life loss and Game Over clear RF while a live sector transition preserves it", () => {

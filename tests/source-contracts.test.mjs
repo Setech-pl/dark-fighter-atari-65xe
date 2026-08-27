@@ -63,10 +63,16 @@ test("current documentation keeps implemented, planned and historical state dist
   assert.match(gameDesign, /Shield Booster — planned/);
   assert.doesNotMatch(currentSources, /\$8100-\$99A3/);
   assert.doesNotMatch(currentSources, /\$8100-\$(?:9AA3|9A3D)/);
-  assert.match(architecture, /stages it at `\$8100-\$9A3E`/);
+  assert.match(architecture, /stages it at `\$8100-\$9A38`/);
   assert.match(architecture, /packs them to \*\*1,997 bytes\*\*/);
   assert.doesNotMatch(currentSources, /\b2,?027[- ]bytes\b/i);
   assert.doesNotMatch(artDirection, /\bresidual\b/i);
   assert.doesNotMatch(roadmap, /next[^\n]*entity\/effects foundation/i);
   assert.doesNotMatch(runtimeHeadroom, /feature\/runtime-headroom/);
+  assert.match(gameDesign,
+    /Rapid Fire[\s\S]+projectiles retain the Viper's established\s+yellow\/gold/);
+  assert.match(gameDesign,
+    /normal Viper weapon fires an eight-projectile burst[\s\S]+Rapid Fire[\s\S]+burst to ten projectiles[\s\S]+normal eight-salvo burst/);
+  assert.doesNotMatch(gameDesign, /normal Viper weapon fires a ten-projectile burst/);
+  assert.doesNotMatch(currentSources, /Rapid Fire projectile:[^\n]*red/i);
 });

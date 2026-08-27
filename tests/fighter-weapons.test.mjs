@@ -89,16 +89,27 @@ test("Raider PMG drawing clips every frame to the gameplay viewport", () => {
   assert.match(renderer, /cpy #GAMEPLAY_TOP[\s\S]+bcc @accent_done/);
 });
 
-test("held FIRE emits an exact ten-shot Viper burst at three-frame intervals", () => {
+test("held FIRE emits an exact eight-shot normal Viper burst at three-frame intervals", () => {
   const simulation = simulateViperBurst(weapons, 40);
   const allocations = simulation.trace.filter(({ allocationResult }) =>
     allocationResult === "ALLOCATED");
+  assert.deepEqual(allocations.slice(0, 8).map(({ frame }) => frame),
+    [1, 4, 7, 10, 13, 16, 19, 22]);
+  assert.equal(allocations[7].burstState, "POST_BURST_COOLDOWN");
+  assert.equal(allocations[7].timer, 12);
+  assert.equal(allocations[8].frame, 34);
+  assert.ok(Math.max(...simulation.trace.map(({ active }) => active.length)) >= 8);
+});
+
+test("Rapid keeps ten shots, its two-frame interval and the common post-burst pause", () => {
+  const simulation = simulateViperBurst(weapons, 32, { weaponMode: "RAPID" });
+  const allocations = simulation.trace.filter(({ allocationResult }) =>
+    allocationResult === "ALLOCATED");
   assert.deepEqual(allocations.slice(0, 10).map(({ frame }) => frame),
-    [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]);
+    [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]);
   assert.equal(allocations[9].burstState, "POST_BURST_COOLDOWN");
   assert.equal(allocations[9].timer, 12);
-  assert.equal(allocations[10].frame, 40);
-  assert.ok(Math.max(...simulation.trace.map(({ active }) => active.length)) >= 8);
+  assert.equal(allocations[10].frame, 31);
 });
 
 test("FIRE release stops new emissions while launched Viper shots remain independent", () => {
@@ -120,7 +131,7 @@ test("Viper pool rejection neither overwrites shots nor counts a rejected emissi
   state = stepViperBurst(weapons, state, { fireHeld: true });
   assert.equal(state.shotsEmitted, 0);
   assert.deepEqual(state.pool.map(({ x }) => x), before);
-  assert.equal(state.burstRemaining, 10);
+  assert.equal(state.burstRemaining, 8);
 });
 
 test("fighter projectiles use fixed pools and remain independent of DRAIN and M0-M3", () => {
@@ -352,6 +363,8 @@ test("capital shells remain materially longer than both fighter projectile class
 test("assembled burst controllers use accepted counts, intervals, speeds and damage", () => {
   assert.deepEqual({
     viperCount: weapons.viper.burstCount,
+    viperRapidCount: weapons.viper.rapidFireBurstCount,
+    viperSpreadCount: weapons.viper.spreadShotBurstCount,
     viperInterval: weapons.viper.burstIntervalFrames,
     viperSpeed: weapons.viper.speedScanlines,
     viperPost: weapons.viper.postBurstFrames,
@@ -361,11 +374,13 @@ test("assembled burst controllers use accepted counts, intervals, speeds and dam
     raiderPost: weapons.raider.postBurstFrames,
     raiderDamage: weapons.raider.damage,
   }, {
-    viperCount: 10, viperInterval: 3, viperSpeed: 6, viperPost: 12,
+    viperCount: 8, viperRapidCount: 10, viperSpreadCount: 8,
+    viperInterval: 3, viperSpeed: 6, viperPost: 12,
     raiderCount: 10, raiderInterval: 4, raiderSpeed: 5,
     raiderPost: [60, 50, 40], raiderDamage: 10,
   });
-  assert.match(source, /update_viper_weapon:[\s\S]+VIPER_BURST_COUNT[\s\S]+VIPER_BURST_INTERVAL/);
+  assert.match(source,
+    /update_viper_weapon:[\s\S]+VIPER_RAPID_FIRE_BURST_COUNT-VIPER_NORMAL_BURST_COUNT[\s\S]+VIPER_BURST_INTERVAL-VIPER_RAPID_FIRE_INTERVAL/);
   assert.match(source, /update_enemy_weapon_runtime:[\s\S]+RAIDER_BURST_COUNT[\s\S]+RAIDER_BURST_INTERVAL/);
   assert.match(source, /update_fighter_projectiles:[\s\S]+raider_projectile_hits_player[\s\S]+ENEMY_PULSE_DAMAGE_UNITS[\s\S]+apply_player_damage/);
 });

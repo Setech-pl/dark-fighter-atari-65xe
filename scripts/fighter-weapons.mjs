@@ -65,7 +65,7 @@ export function loadFighterWeaponsDefinition(sourcePath) {
 
   for (const [id, weapon] of [["viper", definition.viper]]) {
     integer(weapon?.poolSlots, `${id}.poolSlots`, 1, 16);
-    invariant(weapon.burstCount === 10, `${id} burst must contain exactly ten shots`);
+    invariant(weapon.burstCount === 8, `${id} normal burst must contain exactly eight shots`);
     integer(weapon.burstIntervalFrames, `${id}.burstIntervalFrames`, 1, 16);
     integer(weapon.speedScanlines, `${id}.speedScanlines`, 1, 16);
     integer(weapon.widthHpos, `${id}.widthHpos`, 1, 2);
@@ -74,11 +74,14 @@ export function loadFighterWeaponsDefinition(sourcePath) {
   }
   invariant(definition.viper.postBurstFrames === 12,
     "Viper post-burst pause must be 12 PAL frames");
-  invariant(definition.viper.rapidFireIntervalFrames === 2 &&
+  invariant(definition.viper.rapidFireBurstCount === 10 &&
+    definition.viper.rapidFireBurstCount <= definition.viper.poolSlots &&
+    definition.viper.rapidFireIntervalFrames === 2 &&
     definition.viper.rapidFireDurationFrames === 500,
-  "Rapid Fire must use a two-frame interval for exactly 500 active PAL frames");
-  invariant(definition.viper.spreadShotDurationFrames === 500,
-    "Spread Shot must last exactly 500 active PAL frames");
+  "Rapid Fire must use ten shots, a two-frame interval and exactly 500 active PAL frames");
+  invariant(definition.viper.spreadShotBurstCount === definition.viper.burstCount &&
+    definition.viper.spreadShotDurationFrames === 500,
+  "Spread Shot must use the eight-salvo normal burst for exactly 500 active PAL frames");
   invariant(definition.viper.spreadShotProjectileCount === 3,
     "Spread Shot must allocate exactly three logical projectiles");
   invariant(definition.viper.spreadShotInitialOffsetHpos === 4,
@@ -88,9 +91,9 @@ export function loadFighterWeaponsDefinition(sourcePath) {
   invariant(definition.viper.colourRegister === "COLPF2" &&
     definition.viper.colourValue === 0x1e,
   "Viper projectiles must use genuine Atari yellow through COLPF2=$1E");
-  invariant(definition.viper.rapidFireColourRegister === "COLPF3" &&
-    definition.viper.rapidFireColourValue === 0x46,
-  "Rapid Fire projectiles must use the same glyph through COLPF3=$46");
+  invariant(definition.viper.rapidFireColourRegister === definition.viper.colourRegister &&
+    definition.viper.rapidFireColourValue === definition.viper.colourValue,
+  "Rapid Fire projectiles must remain in the Viper's yellow COLPF2 bank");
   integer(definition.glyphLayout?.viperBase, "glyphLayout.viperBase", 0, 127);
   integer(definition.glyphLayout?.raiderBase, "glyphLayout.raiderBase", 0, 127);
   const explosion = definition.sharedFighterExplosion;
@@ -200,7 +203,9 @@ export function renderFighterWeaponsCa65Include(asset) {
     "WEAPON_BURST_WAITING = 0",
     "WEAPON_BURST_FIRING = 1",
     "WEAPON_BURST_POST = 2",
-    `VIPER_BURST_COUNT = ${viper.burstCount}`,
+    `VIPER_NORMAL_BURST_COUNT = ${viper.burstCount}`,
+    `VIPER_RAPID_FIRE_BURST_COUNT = ${viper.rapidFireBurstCount}`,
+    `VIPER_SPREAD_BURST_COUNT = ${viper.spreadShotBurstCount}`,
     `VIPER_BURST_INTERVAL = ${viper.burstIntervalFrames}`,
     `VIPER_RAPID_FIRE_INTERVAL = ${viper.rapidFireIntervalFrames}`,
     `VIPER_RAPID_FIRE_DURATION = ${viper.rapidFireDurationFrames}`,
@@ -324,12 +329,19 @@ export function createViperBurstState(asset) {
 
 export function stepViperBurst(asset, state, {
   fireHeld = true,
+  weaponMode = "NORMAL",
   playerX = 124,
   playerY = 184,
   gameplayActive = true,
   drain = false,
   sectorComplete = false,
 } = {}) {
+  invariant(["NORMAL", "RAPID"].includes(weaponMode),
+    "Viper burst simulation supports NORMAL or RAPID mode");
+  const burstCount = weaponMode === "RAPID"
+    ? asset.viper.rapidFireBurstCount : asset.viper.burstCount;
+  const burstInterval = weaponMode === "RAPID"
+    ? asset.viper.rapidFireIntervalFrames : asset.viper.burstIntervalFrames;
   const next = {
     ...state,
     frame: state.frame + 1,
@@ -362,13 +374,13 @@ export function stepViperBurst(asset, state, {
   }
   if (next.burstState === "WAITING") {
     next.burstState = "FIRING_BURST";
-    next.burstRemaining = asset.viper.burstCount;
+    next.burstRemaining = burstCount;
     next.timer = 0;
   } else if (next.burstState === "POST_BURST_COOLDOWN") {
     if (next.timer > 0) next.timer -= 1;
     if (next.timer > 0) return next;
     next.burstState = "FIRING_BURST";
-    next.burstRemaining = asset.viper.burstCount;
+    next.burstRemaining = burstCount;
   }
   if (next.timer > 0) next.timer -= 1;
   if (next.timer > 0) return next;
@@ -389,7 +401,7 @@ export function stepViperBurst(asset, state, {
     next.burstState = "POST_BURST_COOLDOWN";
     next.timer = asset.viper.postBurstFrames;
   } else {
-    next.timer = asset.viper.burstIntervalFrames;
+    next.timer = burstInterval;
   }
   return next;
 }

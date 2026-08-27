@@ -626,7 +626,7 @@ function frameState(row, includeCpuReference = false) {
         drawn_mask: row.pickup_drawn_mask,
       },
       viper_projectiles: row.viper_projectiles,
-      powered_viper_projectiles: row.rapid_projectiles,
+      rapid_viper_projectiles: row.rapid_projectiles,
       score_bcd: [row.score_hi, row.score_lo],
       effect_active_mask: row.effect_active_mask,
       effect_active_count: row.effect_active_count,
@@ -945,7 +945,7 @@ function main() {
     invariant(fs.existsSync(pickupScreenshotPath),
       "Atari800 did not render a visible Rapid Fire capsule during the pickup replay");
     invariant(fs.existsSync(rapidScreenshotPath),
-      "Atari800 did not render a red powered Viper projectile during the pickup replay");
+      "Atari800 did not render a yellow Rapid Fire Viper projectile during the pickup replay");
     invariant(fs.existsSync(spreadScreenshotPath),
       "Atari800 did not render a three-projectile Spread Shot fan during the pickup replay");
   }
@@ -1248,13 +1248,12 @@ function main() {
   const activeCapsuleDuringBoosterRows = weaponPickupRows.filter((row) =>
     row.pickup_state === 2 && row.pickup_booster_state >= 3);
   // The projectile's screen code follows its 0..7 vertical phase and one of
-  // four HPOS sub-cell variants. Every powered code therefore has D7 set and
-  // retains the generated Viper glyph index range 11..46; $8f is only one
-  // valid phase, not the full release-render contract.
+  // four HPOS sub-cell variants. Every Viper code keeps D7 clear so selector 3
+  // stays on the yellow COLPF2 bank; $0f is only one valid phase.
   const rapidProjectileVisibleRows = rapidProjectileRows.filter((row) =>
-    (row.rapid_projectile_screen_code & 0x80) !== 0 &&
-      (row.rapid_projectile_screen_code & 0x7f) >= 11 &&
-      (row.rapid_projectile_screen_code & 0x7f) < 47 &&
+    (row.rapid_projectile_screen_code & 0x80) === 0 &&
+      row.rapid_projectile_screen_code >= 11 &&
+      row.rapid_projectile_screen_code < 47 &&
       row.rapid_projectile_address >= 0x4050 && row.rapid_projectile_address < 0x43c0);
   const rapidScreenshotRow = rapidProjectileVisibleRows.find((row) =>
     row.rapid_projectiles >= 3 && row.effect_active_count === 0);
@@ -1379,12 +1378,11 @@ function main() {
     pickupSpreadRows[0].pickup_timer_hi === 1,
   "Atari800 replay did not load the exact 500-frame Spread Shot timer");
   invariant(rapidProjectileRows.length > 0 && rapidProjectileRows.every((row) =>
-    row.rapid_projectile_slot < 10) &&
-    rapidProjectileVisibleRows.some((row) => row.pickup_booster_state === 3) &&
-    rapidProjectileVisibleRows.some((row) => row.pickup_booster_state !== 3),
-  "Atari800 replay did not preserve powered-projectile inverse screen codes");
+    row.rapid_projectile_slot < 10 && row.pickup_booster_state === 3) &&
+    rapidProjectileVisibleRows.length > 0,
+  "Atari800 replay did not preserve yellow Rapid Fire projectile screen codes");
   invariant(rapidScreenshotRow,
-    "Atari800 replay did not isolate three visible powered projectiles without transient effects");
+    "Atari800 replay did not isolate three visible yellow Rapid Fire projectiles without transient effects");
   invariant(spreadVolleyRows.length > 0,
     "Atari800 replay did not execute a logical three-projectile Spread volley");
   invariant(spreadScreenshotRow,
@@ -2022,18 +2020,22 @@ function main() {
           first_visible_frame: pickupActiveRows.find((row) =>
             (row.pickup_drawn_mask & 15) === 15 && row.effect_active_count === 0)?.frame,
         },
-        powered_projectiles: {
+        yellow_projectiles: {
           ...coverageRecord(rapidProjectileRows, () => true),
-          powered_screen_code_frames: rapidProjectileVisibleRows.length,
+          viper_screen_code_frames: rapidProjectileVisibleRows.length,
           other_code_or_occluded_frames:
             rapidProjectileRows.length - rapidProjectileVisibleRows.length,
-          powered_screen_code_percent:
+          viper_screen_code_percent:
             Math.round(rapidProjectileVisibleRows.length * 10_000 /
               rapidProjectileRows.length) / 100,
-          persisted_after_timer_frames:
-            rapidProjectileRows.filter((row) => row.pickup_booster_state !== 3).length,
-          powered_screen_code_after_timer_frames:
-            rapidProjectileVisibleRows.filter((row) => row.pickup_booster_state !== 3).length,
+          screen_code_minimum: Math.min(...rapidProjectileVisibleRows.map((row) =>
+            row.rapid_projectile_screen_code)),
+          screen_code_maximum: Math.max(...rapidProjectileVisibleRows.map((row) =>
+            row.rapid_projectile_screen_code)),
+          all_screen_codes_select_colpf2: rapidProjectileVisibleRows.every((row) =>
+            (row.rapid_projectile_screen_code & 0x80) === 0),
+          colour_register: "COLPF2",
+          colour_value: 0x1e,
           screenshot: {
             path: path.relative(rootDirectory, rapidScreenshotPath),
             bytes: fs.statSync(rapidScreenshotPath).size,

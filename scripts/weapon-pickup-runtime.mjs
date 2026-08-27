@@ -108,11 +108,12 @@ function logicalDisplay(memory, labels) {
   return display;
 }
 
-function initialiseRuntime(root, artifact) {
+function initialiseRuntime(root, artifact, coldFill = 0) {
   const manifest = JSON.parse(fs.readFileSync(
     path.join(root, "dist", "dark-fighter-manifest.json"), "utf8"));
   const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
   const memory = new Uint8Array(0x10000);
+  memory.fill(coldFill);
   const payload = loadPayload(root, artifact, manifest);
   memory.set(payload.data, payload.start);
   for (const routine of [
@@ -247,7 +248,7 @@ function killRaiderWithViper(memory, labels) {
   return { damageSource, projectileConsumed };
 }
 
-function runBurst(memory, labels, { rapid, onFrame = () => {} }) {
+function runBurst(memory, labels, { rapid, expectedCount, onFrame = () => {} }) {
   runRoutine(memory, labels, "clear_viper_projectiles");
   const boosterState = memory[requiredLabel(labels, "ENTITY_STATE") + 2];
   if (rapid && boosterState !== 3) throw new Error("Rapid burst requires collected runtime state");
@@ -256,7 +257,7 @@ function runBurst(memory, labels, { rapid, onFrame = () => {} }) {
   const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
   const emissions = [];
   let previousCount = 0;
-  for (let frame = 0; frame < 48 && emissions.length < 10; frame += 1) {
+  for (let frame = 0; frame < 48 && emissions.length < expectedCount; frame += 1) {
     runRoutine(memory, labels, "update_viper_weapon");
     const currentCount = countActive(memory, active, 10);
     if (currentCount > previousCount) emissions.push(frame);
@@ -345,6 +346,7 @@ export function executeWeaponPickupTrace({
   const rapidTimerFrames = [];
   const rapidBurstFrames = runBurst(memory, labels, {
     rapid: true,
+    expectedCount: manifest.fighterWeapons.viper.rapidFireBurstCount,
     onFrame: ({ frame, emitted }) => rapidTimerFrames.push(pickupSnapshot(
       memory, labels, manifest, { phase: "RAPID_TIMER", frame, projectileConsumed: emitted })),
   });
@@ -368,7 +370,10 @@ export function executeWeaponPickupTrace({
     { phase: "EXPIRED", frame: activeRapidFrames }));
 
   const normal = initialiseRuntime(root, artifact);
-  const normalBurstFrames = runBurst(normal.memory, normal.labels, { rapid: false });
+  const normalBurstFrames = runBurst(normal.memory, normal.labels, {
+    rapid: false,
+    expectedCount: normal.manifest.fighterWeapons.viper.burstCount,
+  });
 
   return {
     artifact,
@@ -385,10 +390,134 @@ export function executeWeaponPickupTrace({
   };
 }
 
-export function executeViperProjectileColourTrace({
-  root = defaultRoot, artifact = "xex",
+export function executeViperBurstBalanceTrace({
+  root = defaultRoot, artifact = "xex", coldFill = 0xa5, windowFrames = 80,
 } = {}) {
-  const { memory, labels, manifest } = initialiseRuntime(root, artifact);
+  const modes = [
+    ["NORMAL", 0],
+    ["RAPID", 3],
+    ["SPREAD", 4],
+  ];
+  const traces = modes.map(([mode, boosterState]) => {
+    const { memory, labels, manifest } = initialiseRuntime(root, artifact, coldFill);
+    const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
+    const burstState = requiredLabel(labels, "VIPER_BURST_STATE");
+    const burstRemaining = requiredLabel(labels, "VIPER_BURST_REMAINING");
+    const burstTimer = requiredLabel(labels, "VIPER_BURST_TIMER");
+    const booster = requiredLabel(labels, "ENTITY_STATE") + 2;
+    memory[requiredLabel(labels, "player_x")] = 124;
+    memory[requiredLabel(labels, "player_y")] = 184;
+    memory[booster] = boosterState;
+    if (boosterState !== 0) {
+      memory[requiredLabel(labels, "ENTITY_TIMER") + 2] = 0xf4;
+      memory[requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2] = 1;
+    }
+    memory[0xd010] = 0;
+    const records = [];
+    let emittedProjectiles = 0;
+    let emittedSalvos = 0;
+    let maximumPoolOccupancy = 0;
+    let firstBurstComplete = false;
+    let firstBurstProjectiles = 0;
+    let firstBurstSalvos = 0;
+    for (let frame = 0; frame < windowFrames; frame += 1) {
+      runRoutine(memory, labels, "erase_fighter_projectile_overlays");
+      runRoutine(memory, labels, "update_fighter_projectiles");
+      const before = Array.from(memory.subarray(active, active + 10));
+      const stateBefore = memory[burstState];
+      const remainingBefore = memory[burstRemaining];
+      const timerBefore = memory[burstTimer];
+      runRoutine(memory, labels, "update_viper_weapon");
+      const after = Array.from(memory.subarray(active, active + 10));
+      const allocatedSlots = after.flatMap((value, slot) =>
+        before[slot] === 0 && value !== 0 ? [slot] : []);
+      const allocatedProjectiles = allocatedSlots.length;
+      const allocationDue = stateBefore === 0 ||
+        (stateBefore === 1 && timerBefore <= 1) ||
+        (stateBefore === 2 && timerBefore <= 1);
+      if (allocatedProjectiles > 0) {
+        emittedProjectiles += allocatedProjectiles;
+        emittedSalvos += 1;
+        if (!firstBurstComplete) {
+          firstBurstProjectiles += allocatedProjectiles;
+          firstBurstSalvos += 1;
+        }
+      }
+      if (!firstBurstComplete && memory[burstState] === 2) firstBurstComplete = true;
+      const activeCount = countActive(memory, active, 10);
+      maximumPoolOccupancy = Math.max(maximumPoolOccupancy, activeCount);
+      runRoutine(memory, labels, "render_fighter_projectile_overlays");
+      records.push(viperProjectileSnapshot(memory, labels, {
+        mode,
+        frame,
+        stateBefore,
+        stateAfter: memory[burstState],
+        remainingBefore,
+        remainingAfter: memory[burstRemaining],
+        timerBefore,
+        timerAfter: memory[burstTimer],
+        allocationDue,
+        allocatedSlots,
+        allocatedProjectiles,
+        activeCount,
+      }));
+      if (boosterState !== 0) {
+        runRoutine(memory, labels, "update_weapon_booster_active", { x: boosterState });
+      }
+    }
+    memory[0xd010] = 1;
+    const expectedBurst = mode === "RAPID" ? manifest.fighterWeapons.viper.rapidFireBurstCount :
+      mode === "SPREAD" ? manifest.fighterWeapons.viper.spreadShotBurstCount :
+        manifest.fighterWeapons.viper.burstCount;
+    const intervalFrames = mode === "RAPID" ?
+      manifest.fighterWeapons.viper.rapidFireIntervalFrames :
+      manifest.fighterWeapons.viper.burstIntervalFrames;
+    return {
+      mode,
+      expectedBurst,
+      intervalFrames,
+      postBurstFrames: manifest.fighterWeapons.viper.postBurstFrames,
+      emittedProjectiles,
+      emittedSalvos,
+      maximumPoolOccupancy,
+      firstBurstProjectiles,
+      firstBurstSalvos,
+      records,
+      charset: Array.from(memory.subarray(0x4400, 0x4800)),
+    };
+  });
+  return {
+    artifact,
+    coldFill,
+    windowFrames,
+    traces,
+    manifest: initialiseRuntime(root, artifact, coldFill).manifest,
+  };
+}
+
+export function viperBurstBalanceTraceCsv(trace) {
+  const rows = [[
+    "artifact", "mode", "frame", "state_before", "state_after",
+    "remaining_before", "remaining_after", "timer_before", "timer_after",
+    "allocation_due", "allocated_projectiles", "allocated_slots", "active_count",
+  ].join(",")];
+  for (const mode of trace.traces) {
+    for (const record of mode.records) {
+      rows.push([
+        trace.artifact, mode.mode, record.frame, record.stateBefore, record.stateAfter,
+        record.remainingBefore, record.remainingAfter, record.timerBefore, record.timerAfter,
+        Number(record.allocationDue), record.allocatedProjectiles,
+        record.allocatedSlots.join("|"), record.activeCount,
+      ].join(","));
+    }
+  }
+  return `${rows.join("\n")}\n`;
+}
+
+export function executeViperProjectileColourTrace({
+  root = defaultRoot, artifact = "xex", coldFill = 0,
+} = {}) {
+  const { memory, labels, manifest } = initialiseRuntime(root, artifact, coldFill);
   const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
   const xAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_X");
   const yAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_Y");
@@ -396,6 +525,8 @@ export function executeViperProjectileColourTrace({
   const lifetimeAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_LIFETIME");
   const screenLow = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_LO");
   const screenHigh = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_HI");
+  memory[0xd018] = manifest.fighterWeapons.viper.colourValue;
+  memory[0xd019] = manifest.fighterWeapons.raider.colourValue;
   const setProjectile = (slot, x) => {
     memory[xAddress + slot] = x;
     memory[yAddress + slot] = 100;
@@ -448,13 +579,32 @@ export function executeViperProjectileColourTrace({
       screenCodeAfter: memory[address],
       glyphCode,
       inverse: code >> 7,
+      colourRegister: code & 0x80 ? "COLPF3" : "COLPF2",
+      colourValue: memory[code & 0x80 ? 0xd019 : 0xd018],
       glyphBytes,
       pixelPairs: glyphBytes.map((byte) =>
         [6, 4, 2, 0].map((shift) => byte >> shift & 3)),
     };
   });
+  runRoutine(memory, labels, "erase_fighter_projectile_overlays");
+  memory.fill(0, active, active + 19);
+  const raiderSlot = 10;
+  memory[active + raiderSlot] = 2;
+  setProjectile(raiderSlot, 100);
+  runRoutine(memory, labels, "render_fighter_projectile_overlays");
+  const raiderAddress = memory[screenLow + raiderSlot] | memory[screenHigh + raiderSlot] << 8;
+  const raiderCode = memory[raiderAddress];
+  const raiderRendered = {
+    activeRenderId: memory[active + raiderSlot],
+    code: raiderCode,
+    glyphCode: raiderCode & 0x7f,
+    inverse: raiderCode >> 7,
+    colourRegister: raiderCode & 0x80 ? "COLPF3" : "COLPF2",
+    colourValue: memory[raiderCode & 0x80 ? 0xd019 : 0xd018],
+  };
   return {
     artifact,
+    coldFill,
     normalAtSpawn,
     normalAfterPickup,
     rapidAtSpawn,
@@ -464,6 +614,7 @@ export function executeViperProjectileColourTrace({
     a2Head: ((memory[requiredLabel(labels, "PLAYFIELD_ROW_LO")] |
       memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - 0x4050) / 40,
     rendered,
+    raiderRendered,
     normalDisplay: Array.from(normalDisplay),
     rapidDisplay: Array.from(rapidDisplay),
     screen: logicalScreen(memory, labels),
@@ -472,6 +623,150 @@ export function executeViperProjectileColourTrace({
     hudDuringRapid,
     normalColour: manifest.fighterWeapons.viper.colourValue,
     rapidColour: manifest.fighterWeapons.viper.rapidFireColourValue,
+    raiderColour: manifest.fighterWeapons.raider.colourValue,
+  };
+}
+
+export function executeViperProjectileColourLifecycleTrace({
+  root = defaultRoot, artifact = "xex", coldFill = 0,
+} = {}) {
+  const { memory, labels, manifest } = initialiseRuntime(root, artifact, coldFill);
+  const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
+  const xAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_X");
+  const yAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_Y");
+  const previousYAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_PREV_Y");
+  const lifetimeAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_LIFETIME");
+  const screenLow = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_LO");
+  const screenHigh = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_HI");
+  const boosterState = requiredLabel(labels, "ENTITY_STATE") + 2;
+  const boosterTimerLow = requiredLabel(labels, "ENTITY_TIMER") + 2;
+  const boosterTimerHigh = requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2;
+  memory[0xd018] = manifest.fighterWeapons.viper.colourValue;
+  memory[0xd019] = manifest.fighterWeapons.raider.colourValue;
+
+  const captureViper = (phase) => {
+    runRoutine(memory, labels, "erase_fighter_projectile_overlays");
+    runRoutine(memory, labels, "clear_viper_projectiles");
+    runRoutine(memory, labels, "allocate_viper_projectile");
+    const slots = [];
+    for (let slot = 0; slot < 10; slot += 1) {
+      if (memory[active + slot] === 0) continue;
+      memory[xAddress + slot] = 88 + slot * 12;
+      memory[yAddress + slot] = 100;
+      memory[previousYAddress + slot] = 100;
+      memory[lifetimeAddress + slot] = 10;
+      slots.push(slot);
+    }
+    runRoutine(memory, labels, "render_fighter_projectile_overlays");
+    const projectiles = slots.map((slot) => {
+      const address = memory[screenLow + slot] | memory[screenHigh + slot] << 8;
+      const screenCode = memory[address];
+      const registerAddress = screenCode & 0x80 ? 0xd019 : 0xd018;
+      return {
+        slot,
+        activeRenderId: memory[active + slot],
+        address,
+        screenCode,
+        glyphCode: screenCode & 0x7f,
+        inverse: screenCode >> 7,
+        colourRegister: registerAddress === 0xd018 ? "COLPF2" : "COLPF3",
+        colourValue: memory[registerAddress],
+      };
+    });
+    const result = {
+      phase,
+      boosterState: memory[boosterState],
+      projectiles,
+      display: Array.from(logicalDisplay(memory, labels)),
+    };
+    runRoutine(memory, labels, "erase_fighter_projectile_overlays");
+    return result;
+  };
+
+  const captures = [];
+  memory[boosterState] = 0;
+  captures.push(captureViper("NORMAL"));
+  memory[boosterState] = 3;
+  captures.push(captureViper("RAPID"));
+  memory[boosterState] = 4;
+  captures.push(captureViper("SPREAD"));
+
+  memory[boosterState] = 3;
+  captures.push(captureViper("PAUSE_BEFORE"));
+  captures.push(captureViper("PAUSE_RESUME"));
+
+  memory[boosterState] = 4;
+  runRoutine(memory, labels, "weapon_pickup_clear_sector");
+  captures.push(captureViper("SECTOR_TRANSITION"));
+
+  memory[boosterState] = 3;
+  memory[boosterTimerLow] = 1;
+  memory[boosterTimerHigh] = 0;
+  runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
+  captures.push(captureViper("RAPID_EXPIRED"));
+
+  memory[boosterState] = 4;
+  memory[boosterTimerLow] = 1;
+  memory[boosterTimerHigh] = 0;
+  runRoutine(memory, labels, "update_weapon_booster_active", { x: 4 });
+  captures.push(captureViper("SPREAD_EXPIRED"));
+
+  memory[boosterState] = 3;
+  runRoutine(memory, labels, "weapon_pickup_clear_lifecycle");
+  captures.push(captureViper("LIFE_LOSS"));
+
+  memory[boosterState] = 4;
+  runRoutine(memory, labels, "init_entity_effects");
+  captures.push(captureViper("NEW_GAME"));
+
+  runRoutine(memory, labels, "clear_viper_projectiles");
+  const raiderSlot = 10;
+  memory[active + raiderSlot] = 2;
+  memory[xAddress + raiderSlot] = 124;
+  memory[yAddress + raiderSlot] = 100;
+  memory[previousYAddress + raiderSlot] = 100;
+  memory[lifetimeAddress + raiderSlot] = 10;
+  runRoutine(memory, labels, "render_fighter_projectile_overlays");
+  const raiderAddress = memory[screenLow + raiderSlot] |
+    memory[screenHigh + raiderSlot] << 8;
+  const raiderScreenCode = memory[raiderAddress];
+  const raiderDisplay = Array.from(logicalDisplay(memory, labels));
+
+  runRoutine(memory, labels, "erase_fighter_projectile_overlays");
+  memory.fill(0, active, active + 19);
+  memory[active] = 1;
+  memory[xAddress] = 96;
+  memory[yAddress] = 100;
+  memory[previousYAddress] = 100;
+  memory[lifetimeAddress] = 10;
+  memory[active + raiderSlot] = 2;
+  memory[xAddress + raiderSlot] = 132;
+  memory[yAddress + raiderSlot] = 100;
+  memory[previousYAddress + raiderSlot] = 100;
+  memory[lifetimeAddress + raiderSlot] = 10;
+  runRoutine(memory, labels, "render_fighter_projectile_overlays");
+
+  return {
+    artifact,
+    coldFill,
+    captures,
+    raider: {
+      activeRenderId: memory[active + raiderSlot],
+      address: raiderAddress,
+      screenCode: raiderScreenCode,
+      glyphCode: raiderScreenCode & 0x7f,
+      inverse: raiderScreenCode >> 7,
+      colourRegister: raiderScreenCode & 0x80 ? "COLPF3" : "COLPF2",
+      colourValue: memory[raiderScreenCode & 0x80 ? 0xd019 : 0xd018],
+      display: raiderDisplay,
+    },
+    mixedDisplay: Array.from(logicalDisplay(memory, labels)),
+    charset: Array.from(memory.subarray(0x4400, 0x4800)),
+    manifest,
+    palette: {
+      COLPF2: memory[0xd018],
+      COLPF3: memory[0xd019],
+    },
   };
 }
 

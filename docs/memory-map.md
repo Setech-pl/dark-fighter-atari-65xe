@@ -12,17 +12,17 @@ lifetime phases and are not additive free memory.
 | `$0080-$009F` | 32 B | zero-page runtime variables |
 | `$0100-$01FF` | 256 B | 6502 stack |
 | `$0200-$03FF` | 512 B | OS workspace and vectors |
-| `$2000-$3093` | 4,244 B | resident `CODE` |
-| `$3094-$3F68` | 3,797 B | resident `RODATA` |
+| `$2000-$308D` | 4,238 B | resident `CODE` |
+| `$308E-$3F62` | 3,797 B | resident `RODATA` |
 | `$5400-$54C9` | 202 B | `PROJECTILES`: 19 fighter slots, burst controllers, and two shared fighter explosions |
 | `$552A-$5DB8` | 2,191 B | relocated `STARFIELD` runtime; 2,278 B reserved through `$5E0F` |
 | `$5E10-$780C` | 6,653 B | relocated `BROADSIDE`/frontend/enemy/weapon runtime; 6,656 B reserved through `$780F` |
 | `$8000-$80FF` | 256 B | `ENTITY_STATE` BSS |
 | `$9000-$90E1` | 226 B | relocated A2 kernel; 256 B reserved through `$90FF` |
-| `$9100-$9912` | 2,067 B | relocated `ENTITY_CODE`; 3,840 B reserved through `$9FFF` |
+| `$9100-$98FE` | 2,047 B | relocated `ENTITY_CODE`; 3,840 B reserved through `$9FFF` |
 
 The linked runtime/code/data budget is `CODE + STARFIELD + BROADSIDE +
-A2_KERNEL + ENTITY_CODE = 15,381 B`.
+A2_KERNEL + ENTITY_CODE = 15,355 B`.
 
 ## Boot payload layout
 
@@ -32,15 +32,15 @@ Its entry point is `$201E`.
 | Payload range on entry | Size | Stored form and startup destination |
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
-| `$21C1-$3AFF` | 6,463 B | packed 7,743-byte resident suffix; staged at `$8100-$9A3E`, restored to `$21C1-$3FFF` |
-| `$3B00-$50FE` | 5,631 B | packed 6,653-byte broadside runtime; expands to `$5E10-$780C` |
-| `$50FF-$57C1` | 1,731 B | packed 2,191-byte starfield/music runtime; staged at `$7810-$7ED2`, expands to `$552A-$5DB8` |
-| `$57C2-$58A3` | 226 B | A2 kernel source; staged at `$7F10-$7FF1`, copied to `$9000-$90E1` |
-| `$58A4-$5F9D` | 1,786 B | packed 2,067-byte entity/effect code; staged at `$5100-$57F9`, expands to `$9100-$9912` |
-| `$5F9E-$5FFB` | 94 B | source-owned zero-filled reserve |
+| `$21C1-$3AF9` | 6,457 B | packed 7,743-byte resident suffix; staged at `$8100-$9A38`, restored to `$21C1-$3FFF` |
+| `$3AFA-$50F8` | 5,631 B | packed 6,653-byte broadside runtime; expands to `$5E10-$780C` |
+| `$50F9-$57BB` | 1,731 B | packed 2,191-byte starfield/music runtime; staged at `$7810-$7ED2`, expands to `$552A-$5DB8` |
+| `$57BC-$589D` | 226 B | A2 kernel source; staged at `$7F10-$7FF1`, copied to `$9000-$90E1` |
+| `$589E-$5F83` | 1,766 B | packed 2,047-byte entity/effect code; staged at `$5100-$57E5`, expands to `$9100-$98FE` |
+| `$5F84-$5FFB` | 120 B | source-owned zero-filled reserve |
 | `$5FFC-$5FFF` | 4 B | source-owned `DFB1` trailer |
 
-The 94-byte range is real payload reserve, not formatter padding. Formatter
+The 120-byte range is real payload reserve, not formatter padding. Formatter
 padding is zero.
 
 ## Loader-time ownership
@@ -91,12 +91,12 @@ this lifetime.
 | `$8060-$807F` | 32 B | initialized alignment/reserve |
 | `$8080-$80F3` | 116 B | six physical effect slots plus global state; release active limit 5 |
 | `$80F4-$80FF` | 12 B | initialized BSS tail |
-| `$8100-$9A3E` | 6,463 B | cold-start resident-suffix staging only |
+| `$8100-$9A38` | 6,457 B | cold-start resident-suffix staging only |
 | `$8100-$8FFF` | 3,840 B | unowned after cold startup; retained reservation, not current gameplay state |
 | `$9000-$90E1` | 226 B | A2 kernel |
 | `$90E2-$90FF` | 30 B | free A2 reservation tail |
-| `$9100-$9912` | 2,067 B | entity/effect/booster/projectile-composite runtime |
-| `$9913-$9FFF` | 1,773 B | free entity-code reservation tail after cold staging |
+| `$9100-$98FE` | 2,047 B | entity/effect/booster/projectile-composite runtime |
+| `$98FF-$9FFF` | 1,793 B | free entity-code reservation tail after cold staging |
 | `$A000-$BFFF` | 8,192 B | deliberately unused BASIC-ROM window |
 | `$C000-$FFFF` | 16,384 B | OS ROM and I/O; not gameplay RAM |
 

@@ -2,7 +2,7 @@
 
 ### A complete vertical space-combat game for the Atari 65XE, built for PAL in NMOS 6502 assembly
 
-![Dark Fighter gameplay with the Viper, capital ships, the Rapid Fire HUD indicator, and red powered projectiles](docs/media/gameplay/06-rapid-fire-active.png)
+![Dark Fighter gameplay with the Viper, capital ships, and the Rapid Fire HUD indicator](docs/media/gameplay/06-rapid-fire-active.png)
 
 **Atari 65XE · 64 KB · PAL · 50 FPS · NMOS 6502 assembly**
 
@@ -31,8 +31,8 @@ artifact hashes are recorded in [`docs/media/manifest.json`](docs/media/manifest
 | **Loader and title art** — the boot handoff begins with a timed PAL presentation. | **Standard combat** — Viper, Raider, projectiles, starfield, and scrolling capital hulls. |
 | ![A Cylon Raider breaking into local explosion fragments](docs/media/gameplay/03-raider-breakup.png) | ![Neutral debris breaking into four transient fragments](docs/media/gameplay/04-debris-breakup.png) |
 | **Raider breakup** — a local core and four deterministic fragments accompany the yellow-red screen flash. | **Destructible debris** — three hits break a neutral obstacle apart without awarding points. |
-| ![The static yellow and steel-blue RF weapon capsule in active gameplay](docs/media/gameplay/05-rapid-fire-pickup.png) | ![Rapid Fire active with RF10 in the HUD and red Viper projectiles](docs/media/gameplay/06-rapid-fire-active.png) |
-| **Rapid Fire pickup** — a large 2×2 ANTIC 4 capsule appears after three qualifying Raider kills. | **Rapid Fire active** — the HUD counts down while newly fired Viper shots are red and use the faster firing cadence. |
+| ![The static yellow and steel-blue RF weapon capsule in active gameplay](docs/media/gameplay/05-rapid-fire-pickup.png) | ![Rapid Fire active with RF10 in the HUD and yellow Viper projectiles](docs/media/gameplay/06-rapid-fire-active.png) |
+| **Rapid Fire pickup** — a large 2×2 ANTIC 4 capsule appears after three qualifying Raider kills. | **Rapid Fire active** — the HUD counts down while newly fired Viper shots stay yellow and use the faster firing cadence. |
 | ![Capital-ship corridor combat with broadside fire](docs/media/gameplay/07-capital-broadside.png) | ![Animated capital-ship engine modules in the scrolling corridor](docs/media/gameplay/08-capital-engines.png) |
 | **Capital broadside** — opposing hulls exchange deterministic heavy fire around the player. | **Capital engines** — the existing two engine phases pulse at an exact 8+8-frame cadence. |
 | ![Spread Shot active with SP HUD countdown and an all-yellow three-projectile fan](docs/media/gameplay/09-spread-shot-active.png) | |
@@ -65,8 +65,8 @@ owner; commit and push happen only after owner acceptance.
 
 - A complete loader, main menu, options, top-scores screen, pause menu, life
   cycle, respawn, and Game Over flow.
-- Joystick control in port 1 and ten-shot Viper bursts from the single fire
-  button.
+- Joystick control in port 1, eight-shot normal bursts, and ten-shot Rapid Fire
+  bursts from the single fire button.
 - Three exact world-speed settings: EASY at 20 rows/s, MEDIUM at 22.5 rows/s,
   and HARD at 25 rows/s.
 - A PMG Viper and Cylon Raider with deterministic movement, firing, collision,
@@ -80,9 +80,10 @@ owner; commit and push happen only after owner acceptance.
 - Local Raider breakup effects that reuse the fixed transient-effects system.
 - Alternating 2×2 Rapid Fire and Spread Shot capsules earned after every third
   qualifying Raider projectile kill. Each booster lasts exactly 500 active PAL
-  frames and replaces or refreshes the other: Rapid uses two-frame burst
-  spacing and red projectiles, while Spread keeps the normal cadence and emits
-  an atomic all-yellow three-shot fan. The HUD counts down from
+  frames and replaces or refreshes the other: Rapid uses ten-shot bursts with
+  two-frame spacing, while Spread uses eight salvos at the normal cadence and
+  emits only complete all-yellow three-shot fans. Every Viper projectile stays
+  yellow. The HUD counts down from
   `RF10`/`SP10` through `RF01`/`SP01`.
 - POKEY music and sound effects, including weapon, collision,
   explosion, broadside, and capital-hull feedback.
@@ -101,14 +102,14 @@ and tested by the repository.
 | Toolchain | ca65/ld65 through the pinned WebAssembly package |
 | Distribution | 16,396-byte XEX and 92,176-byte bootable ATR |
 | Boot payload | Exactly 16,384 bytes in 128 sectors, loaded at `$2000`, entry `$201E` |
-| Payload reserve | 94 source-owned bytes after Spread Shot; zero formatter padding |
+| Payload reserve | 120 source-owned bytes; zero formatter padding |
 | Runtime BSS | `$8000–$80FF`, exactly 256 bytes |
 | Entity engine | Four physical interactive slots, up to two active |
 | Effects engine | Six physical transient slots, up to five active |
-| Entity code | `$9100–$9912`, 2,067 of 3,840 bytes before packing |
+| Entity code | `$9100–$98FE`, 2,047 of 3,840 bytes before packing |
 | Gameplay layers | base/ring → broadside → projectile → entity → effect; reverse erase |
 | Charset budget | All 128 gameplay glyphs used; Spread scratch uses 47–56 and its capsule uses 124–127 |
-| Measured PAL wall | 33,172 cycles worst case; 2,396 cycles physical headroom |
+| Measured PAL wall | 33,074 cycles worst case; 2,494 cycles physical headroom |
 | Synchronization | Zero missed frames, deadline overruns, or extra VBI boundaries in the full trace |
 
 Visible-frame work is deterministic and bounded. Pools have fixed capacity;

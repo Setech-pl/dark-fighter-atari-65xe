@@ -32,7 +32,7 @@ Viper weapon colours are:
 
 - normal projectile: yellow (`$1E`);
 - Spread Shot centre, left, and right projectiles: the same yellow Viper colour;
-- Rapid Fire projectile: the established powered red (`$46`).
+- Rapid Fire projectile: the established Viper yellow/gold (`$1E`).
 
 Cylon Raider pulses remain red (`$46`) and retain their wider shape. Spread
 Shot side projectiles must be identified by their symmetric fan geometry, not
@@ -70,7 +70,8 @@ and display-list wrap.
 Spread Shot begins as a compact Viper salvo and opens into an immediately
 readable medium-width, symmetric fan. Side shots move smoothly by equal and
 opposite horizontal increments while all three continue upward at the normal
-weapon speed.
+weapon speed. Normal and Spread use the normal eight-event burst envelope;
+Rapid uses a longer ten-shot burst as well as its faster in-burst cadence.
 
 Breakups are brief and local. Debris uses two shapes and two tumble phases;
 Raider breakup preserves the recognizable wings, central body, and red eye.

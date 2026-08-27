@@ -32,7 +32,7 @@ The gameplay HUD contains `SCORE`, `LIFE`, and `HULL`.
 
 ### Combat and scoring
 
-The normal Viper weapon fires a ten-projectile burst at one projectile every
+The normal Viper weapon fires an eight-projectile burst at one projectile every
 three active frames, followed by a 12-frame pause. Projectiles travel upward by
 six scanlines per active frame. The physical Viper pool has ten slots.
 
@@ -94,16 +94,17 @@ transition preserves them.
 
 ### Rapid Fire — implemented
 
-Rapid Fire lasts exactly 500 active PAL frames (10 seconds). It keeps the
-ten-shot burst and 12-frame post-burst pause but reduces the in-burst interval
-from three frames to two. Its projectiles use the established rapid-fire red.
-The 2x2 capsule uses a steel/yellow casing with a black `RF` symbol.
+Rapid Fire lasts exactly 500 active PAL frames (10 seconds). It expands the
+burst to ten projectiles, keeps the 12-frame post-burst pause, and reduces the
+in-burst interval from three frames to two. Its projectiles retain the Viper's established
+yellow/gold. The 2x2 capsule uses a steel/yellow casing with a black `RF` symbol.
 
 ### Spread Shot — implemented
 
 Spread Shot lasts exactly 500 active PAL frames (10 seconds) and retains the
-normal firing cadence; it never combines with Rapid Fire. Each trigger event is
-atomic: it either allocates three free Viper slots or creates no projectile.
+normal eight-salvo burst, three-frame cadence, and 12-frame post-burst pause; it
+never combines with Rapid Fire. Each salvo is atomic: it either allocates three
+free Viper slots or creates no projectile and waits without consuming the salvo.
 
 The volley begins as a compact formation. The centre projectile travels
 vertically; the side projectiles start four horizontal-position units from the
@@ -119,6 +120,28 @@ capsule has a bright red casing and a black three-shot fan symbol.
 Shield Booster is the intended third pickup type. Its duration, replacement
 rules, visual language, memory cost, and balance must be specified and measured
 before implementation. It is not present in the current runtime.
+
+### Nova Missile — planned
+
+Nova Missile is a future boss-only special-weapon pickup, not a member of the
+planned Rapid Fire / Spread Shot / Shield drop rotation. It may appear only
+during a boss encounter, never in standard sectors or through the qualifying
+Raider-kill counter. Its capsule is planned as a large, readable 2x2 missile.
+
+Collecting it arms exactly one missile independently of the current weapon
+booster and Shield. A held FIRE input at collection must not launch it: the
+player must release FIRE and press it again. That next new press launches Nova
+Missile instead of the normal shot, after which the Viper returns to its
+preserved normal, Rapid Fire, or Spread Shot weapon state.
+
+A boss hit is planned to trigger a large multi-phase space-detonation: a bright
+central flash, yellow-red core, and expanding energy wave. Boss damage is
+applied exactly once at detonation; later animation phases cannot deal damage
+again. The weapon is intended to cause very high boss damage, but its exact
+damage, guidance, speed, spawn condition, and pickup count remain deliberately
+unspecified until boss lifecycle, boss HULL, and the large-explosion runtime
+budget are designed together. Nova Missile is not present in the current
+runtime.
 
 Additional enemy archetypes, longer level structures, bosses, and further
 audio/visual polish remain future work. They are not implied by the current

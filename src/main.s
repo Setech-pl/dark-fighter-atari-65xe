@@ -275,8 +275,6 @@ DAMAGE_CLEANUP           = 5
 FIGHTER_PROJECTILE_FREE   = 0
 FIGHTER_PROJECTILE_VIPER  = 1
 FIGHTER_PROJECTILE_RAIDER = 2
-FIGHTER_PROJECTILE_RAPID_COLOR = $80
-FIGHTER_PROJECTILE_RENDER_ID_RAPID = FIGHTER_PROJECTILE_VIPER|FIGHTER_PROJECTILE_RAPID_COLOR
 FIGHTER_PROJECTILE_SPREAD_CENTER = $10
 FIGHTER_PROJECTILE_SPREAD_RIGHT = $20
 FIGHTER_PROJECTILE_SPREAD_LEFT = $40
@@ -3301,7 +3299,9 @@ update_viper_weapon:
 @begin:
     lda #WEAPON_BURST_FIRING
     sta VIPER_BURST_STATE
-    lda #VIPER_BURST_COUNT
+    lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
+    and #(VIPER_RAPID_FIRE_BURST_COUNT-VIPER_NORMAL_BURST_COUNT)
+    ora #VIPER_NORMAL_BURST_COUNT
     sta VIPER_BURST_REMAINING
     lda #$00
     sta VIPER_BURST_TIMER
@@ -3316,13 +3316,9 @@ update_viper_weapon:
     dec VIPER_BURST_REMAINING
     beq @finish
     lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
-    cmp #WEAPON_PICKUP_STATE_RAPID
-    bne @normal_interval
-    lda #VIPER_RAPID_FIRE_INTERVAL
-    bne @set_interval
-@normal_interval:
-    lda #VIPER_BURST_INTERVAL
-@set_interval:
+    and #(VIPER_BURST_INTERVAL-VIPER_RAPID_FIRE_INTERVAL+1)
+    lsr
+    eor #VIPER_BURST_INTERVAL
     sta VIPER_BURST_TIMER
     rts
 @finish:
@@ -3351,10 +3347,6 @@ allocate_viper_projectile:
     jmp allocate_viper_spread_projectiles
 :
     lda #FIGHTER_PROJECTILE_VIPER
-    cpy #WEAPON_PICKUP_STATE_RAPID
-    bne :+
-    lda #FIGHTER_PROJECTILE_RENDER_ID_RAPID
-:
     jsr allocate_viper_projectile_one
     bcs :+
     rts
@@ -3605,21 +3597,12 @@ render_fighter_projectile_overlays:
     sta src_ptr+1
     lda row_counter
     cmp #$07
-    bne @viper_color
+    bne @code_ready
     lda loader_repeat_value
     clc
     adc #$01
     sta src_ptr+1
-    bne @viper_color
-@viper_color:
-    ; D7 is spawn-owned state. Normal Viper shots take the short positive
-    ; branch; only a captured Rapid Fire shot pays for the colour transform.
-    lda FIGHTER_PROJECTILE_ACTIVE,x
-    bpl @code_ready
-    lda loader_repeat_value
-    ora #FIGHTER_PROJECTILE_RAPID_COLOR
-    sta loader_repeat_value
-    bmi @code_ready
+    bne @code_ready
 @raider_code:
     lda FIGHTER_PROJECTILE_X,x
     and #$02                    ; Raider allocation explicitly masks bit zero
@@ -9473,10 +9456,6 @@ compose_viper_projectile_glyph:
     lda #$00                    ; composite never writes a second screen cell
     sta src_ptr+1
     lda ENTITY_SCRATCH1
-    ldy FIGHTER_PROJECTILE_ACTIVE,x
-    bpl :+
-    ora #FIGHTER_PROJECTILE_RAPID_COLOR
-:
     sta loader_repeat_value
     rts
 

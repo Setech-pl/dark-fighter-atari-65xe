@@ -19,6 +19,9 @@ import {
   createWeaponPickupRapidFireTrace,
   createSpreadShotPreview,
   createSpreadShotTrace,
+  createViperProjectileColourPreview,
+  createViperBurstBalancePreview,
+  createViperBurstBalanceTrace,
   createSpreadShotHullPreview,
   createSpreadShotHullTrace,
   PREVIEW_HEIGHT,
@@ -326,6 +329,33 @@ test("Rapid Fire owner preview executes the packed XEX/ATR pickup lifecycle", ()
     return fields[9] === "0" && fields[14] === "0" && fields[16] === "120" &&
       fields.slice(27, 31).every((value) => value === "0");
   }));
+});
+
+test("projectile colour owner previews use identical packed XEX and ATR runtime frames", () => {
+  const xex = createViperProjectileColourPreview(source, "xex");
+  const atr = createViperProjectileColourPreview(source, "atr");
+  assert.deepEqual(xex, atr);
+  assert.deepEqual([inspectPng(xex).width, inspectPng(xex).height], [3924, 476]);
+});
+
+test("burst-balance owner previews compare identical 80-frame XEX and ATR executions", () => {
+  const xex = createViperBurstBalancePreview(source, "xex");
+  const atr = createViperBurstBalancePreview(source, "atr");
+  assert.deepEqual(xex, createViperBurstBalancePreview(source, "xex"));
+  assert.deepEqual(atr, createViperBurstBalancePreview(source, "atr"));
+  assert.deepEqual([inspectPng(xex).width, inspectPng(xex).height], [1968, 620]);
+  assert.deepEqual([inspectPng(atr).width, inspectPng(atr).height], [1968, 620]);
+  const xexRows = createViperBurstBalanceTrace("xex").trimEnd().split("\n");
+  const atrRows = createViperBurstBalanceTrace("atr").trimEnd().split("\n");
+  assert.equal(xexRows.length, 241);
+  assert.deepEqual(atrRows.slice(1).map((row) => row.replace(/^atr,/, "xex,")),
+    xexRows.slice(1));
+  const emitted = (mode) => xexRows.slice(1)
+    .filter((row) => row.startsWith(`xex,${mode},`))
+    .reduce((sum, row) => sum + Number(row.split(",")[10]), 0);
+  assert.deepEqual([emitted("NORMAL"), emitted("RAPID"), emitted("SPREAD")], [21, 30, 27]);
+  assert.equal(xexRows.filter((row) => row.startsWith("xex,SPREAD,"))
+    .every((row) => [0, 3].includes(Number(row.split(",")[10]))), true);
 });
 
 test("Spread Shot owner preview is deterministic executed XEX/ATR gameplay", () => {

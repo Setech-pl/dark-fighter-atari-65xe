@@ -19,8 +19,8 @@ runtime tests bind both media to the same required payload bytes.
 ## Cold startup and loader
 
 The payload enters at `$201E` with a 449-byte raw bootstrap prefix. The remaining
-7,743-byte resident suffix is stored as a 6,463-byte LZ-10/5 stream. Startup
-stages it at `$8100-$9A3E` (the manifest records the inclusive end address),
+7,743-byte resident suffix is stored as a 6,457-byte LZ-10/5 stream. Startup
+stages it at `$8100-$9A38` (the manifest records the inclusive end address),
 expands broadside and relocated modules in dependency order, then
 restores the resident image at `$21C1-$3FFF`.
 
@@ -40,7 +40,7 @@ Cold staging also copies:
 - packed broadside/runtime data to its final `$5E10-$780C` run range;
 - packed starfield/music data through `$7810-$7ED2` to `$552A-$5DB8`;
 - the 226-byte A2 kernel through `$7F10-$7FF1` to `$9000-$90E1`;
-- packed entity/effect code through `$5100-$57F9` to `$9100-$9912`.
+- packed entity/effect code through `$5100-$57E5` to `$9100-$98FE`.
 
 The BSS is exactly `$8000-$80FF` and is initialized deterministically. The
 runtime does not use `$A000-$BFFF`; compatibility never assumes that BASIC ROM
@@ -115,8 +115,12 @@ head, and ring wrap.
 | Transient effects | 6 | 5 | one core plus four fragments |
 
 Pool scans are bounded by compile-time counts. Spread Shot checks for three free
-Viper slots before writing any of them. The effects pool is not used for pickup
-capsules or powered-projectile state.
+Viper slots before writing any of them; a rejected attempt preserves the
+eight-salvo burst counter and is retried. Normal and Spread initialize an
+eight-shot/eight-salvo burst at the normal three-frame interval. Rapid alone
+initializes ten shots and uses its two-frame interval. All modes retain the
+12-frame post-burst pause. The effects pool is not used for pickup capsules or
+persistent projectile state.
 
 ## Enemies, debris, and boosters
 
@@ -137,10 +141,10 @@ Rapid Fire on New Game. Slot 2 holds the non-rendered timed-booster controller
 and next-type selector. Rapid Fire and Spread Shot are mutually exclusive,
 500-active-frame states.
 
-Rapid Fire uses the existing powered-projectile render flag. Spread Shot uses
-three logical Viper projectiles: centre, left, and right. All three use the
-yellow Viper colour. Side directions are encoded in the existing render/state
-byte, avoiding another allocation.
+Rapid Fire uses the existing Viper projectile renderer and yellow colour bank.
+Spread Shot uses three logical Viper projectiles: centre, left, and right. All
+three use the yellow Viper colour. Side directions are encoded in the existing
+render/state byte, avoiding another allocation.
 
 ## Character and PMG ownership
 

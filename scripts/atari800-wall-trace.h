@@ -751,17 +751,18 @@ static void dftrace_snapshot_rapid_projectile(DFTraceFrame *frame)
 		unsigned state = MEMORY_mem[dftrace_projectile_active + slot];
 		if (state != 0u && MEMORY_mem[dftrace_projectile_rendered + slot] != 0u)
 			frame->viper_projectiles++;
-		if ((state & 0x80u) != 0u && MEMORY_mem[dftrace_projectile_rendered + slot] != 0u) {
+		if (state == 1u && MEMORY_mem[dftrace_projectile_rendered + slot] != 0u &&
+			MEMORY_mem[dftrace_entity_state + 2u] == 3u) {
 			unsigned address = MEMORY_mem[dftrace_projectile_screen_lo + slot] |
 				(MEMORY_mem[dftrace_projectile_screen_hi + slot] << 8);
 			unsigned screen_code = MEMORY_mem[address];
 			frame->rapid_projectiles++;
-			/* Prefer the exact powered Viper code ($8f), not merely any inverse
-			 * code: a later debris/effect glyph may also have D7 set. */
+			/* Prefer the exact yellow Viper code ($0f), not merely any positive
+			 * code: a later base/broadside glyph may occupy the same cell. */
 			if (frame->rapid_projectile_slot == 0xffffffffu ||
-				((frame->rapid_projectile_screen_code != 0x8fu ||
+				((frame->rapid_projectile_screen_code != 0x0fu ||
 				  frame->rapid_projectile_address < 0x4050u ||
-				  frame->rapid_projectile_address >= 0x43c0u) && screen_code == 0x8fu &&
+				  frame->rapid_projectile_address >= 0x43c0u) && screen_code == 0x0fu &&
 				 address >= 0x4050u && address < 0x43c0u)) {
 				frame->rapid_projectile_slot = slot;
 				frame->rapid_projectile_address = address;
@@ -1549,9 +1550,9 @@ static void DFTrace_Observe(unsigned pc)
 			dftrace_snapshot_rapid_projectile(&rapid);
 			if (rapid.rapid_projectiles >= 3u &&
 				MEMORY_mem[dftrace_effect_active_count] == 0u &&
-				(rapid.rapid_projectile_screen_code & 0x80u) != 0u &&
-				(rapid.rapid_projectile_screen_code & 0x7fu) >= 11u &&
-				(rapid.rapid_projectile_screen_code & 0x7fu) < 47u &&
+				(rapid.rapid_projectile_screen_code & 0x80u) == 0u &&
+				rapid.rapid_projectile_screen_code >= 11u &&
+				rapid.rapid_projectile_screen_code < 47u &&
 				rapid.rapid_projectile_address >= 0x4050u &&
 				rapid.rapid_projectile_address < 0x43c0u) {
 				if (!Screen_SaveScreenshot(dftrace_rapid_screenshot, 0)) {

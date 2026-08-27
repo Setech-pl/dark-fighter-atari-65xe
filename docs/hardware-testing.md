@@ -17,7 +17,9 @@ For both XEX and ATR:
 - [ ] Menu, options, top scores, music toggle, and exit screen respond normally.
 - [ ] A new game shows `SCORE`, `LIFE`, and `HULL`; values do not corrupt nearby
       characters.
-- [ ] Viper movement and normal fire remain responsive at 50 FPS PAL.
+- [ ] Viper movement and normal fire remain responsive at 50 FPS PAL; a held
+      FIRE input emits exactly eight shots at three-frame intervals, then the
+      existing 12-frame post-burst pause.
 - [ ] Pause freezes world motion, capital-engine phase, active pickup movement,
       and booster timer; resume restores the exact visible gameplay state.
 - [ ] Colonial and Cylon hulls remain continuous through prow, modules, engine
@@ -27,10 +29,14 @@ For both XEX and ATR:
 - [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
       Raider breakup, and debris breakup behave normally.
 - [ ] Rapid Fire capsule moves as one stable 2x2 footprint; collection displays
-      `RF`, changes only in-burst cadence, and expires after ten active seconds.
+      `RF`, emits ten yellow shots at two-frame intervals with the existing
+      12-frame post-burst pause, and expires after ten active seconds.
 - [ ] Spread Shot capsule is a stable red 2x2 footprint with a black fan symbol.
 - [ ] Collecting Spread displays `SP` and produces three yellow Viper projectiles:
       one vertical and two smoothly diverging, symmetric side shots.
+- [ ] One held Spread burst contains exactly eight complete salvos. When fewer
+      than three Viper slots are free, the next salvo waits; no one- or two-shot
+      partial fan appears.
 - [ ] Rapid and Spread replace each other; collecting the active type refreshes
       its countdown; neither timer advances during pause.
 - [ ] Spread projectiles cross empty space and successive Colonial hull segments
@@ -66,6 +72,8 @@ the XEX through the owner's normal real-hardware loader path when available.
       allowed to expire; pause freezes both timers.
 - [ ] All three Spread Shot projectiles are yellow and form a clear symmetric
       fan without flicker or sudden horizontal jumps.
+- [ ] Normal, Rapid Fire, and Spread Shot Viper projectiles all remain yellow;
+      Raider projectiles retain their separate Cylon red/purple bank.
 - [ ] Spread projectiles pass over both capital ships, including prow, midship,
       engines, module boundaries, and wrap, with exact backing restoration.
 - [ ] Long combat produces no ghosts, HUD damage, charset corruption, stuck

@@ -20,6 +20,7 @@ import {
   executeSpreadShotOverlapTrace,
   executeSpreadShotPoolTrace,
   executeSpreadShotTrace,
+  executeViperBurstBalanceTrace,
   executeWeaponBoosterReplacementTrace,
   executeWeaponPickupBackingTrace,
   executeWeaponPickupLifecycleTrace,
@@ -178,7 +179,7 @@ test("Rapid and Spread replace or refresh one another without combining cadence"
     trace.rapidReplacesSpread.state, trace.rapidReplacesSpread.timer,
   ], [4, 500, 3, 500]);
   assert.match(source,
-    /cmp #WEAPON_PICKUP_STATE_RAPID[\s\S]+lda #VIPER_RAPID_FIRE_INTERVAL[\s\S]+lda #VIPER_BURST_INTERVAL/);
+    /and #\(VIPER_BURST_INTERVAL-VIPER_RAPID_FIRE_INTERVAL\+1\)[\s\S]+eor #VIPER_BURST_INTERVAL/);
   const cadence = source.slice(source.indexOf("update_viper_weapon:"),
     source.indexOf("allocate_viper_projectile:"));
   assert.doesNotMatch(cadence, /WEAPON_PICKUP_STATE_SPREAD/);
@@ -303,7 +304,7 @@ test("all three projectiles leave the screen cleanly without HUD or charset corr
   }
 });
 
-test("the ten-slot physical pool admits three atomically and never expands", () => {
+test("the ten-slot physical pool admits three atomically and retries a saturated salvo", () => {
   const trace = executeSpreadShotPoolTrace({ root, artifact: "xex" });
   assert.deepEqual([
     manifest.fighterWeapons.viper.poolSlots,
@@ -315,6 +316,21 @@ test("the ten-slot physical pool admits three atomically and never expands", () 
   assert.deepEqual(trace.eightOccupied.after, trace.eightOccupied.before,
     "two free slots must reject the whole volley without partial writes");
   assert.deepEqual(trace.full.after, trace.full.before);
+  const controller = executeViperBurstBalanceTrace({ root, artifact: "xex" })
+    .traces.find(({ mode }) => mode === "SPREAD");
+  assert.equal(controller.firstBurstSalvos, 8);
+  assert.equal(controller.firstBurstProjectiles, 24);
+  assert.equal(controller.records.every(({ allocatedProjectiles }) =>
+    allocatedProjectiles === 0 || allocatedProjectiles === 3), true,
+  "a Spread controller update must never allocate a partial fan");
+  const rejected = controller.records.filter(({ allocationDue, allocatedProjectiles }) =>
+    allocationDue && allocatedProjectiles === 0);
+  assert.ok(rejected.length > 0, "the runtime trace must exercise saturation retries");
+  assert.equal(rejected.every(({ remainingBefore, remainingAfter }) =>
+    remainingBefore === remainingAfter), true,
+  "a rejected atomic salvo must not consume the burst counter");
+  assert.equal(Math.max(...executeViperBurstBalanceTrace({ root, artifact: "xex" })
+    .traces.map(({ maximumPoolOccupancy }) => maximumPoolOccupancy)), 10);
   assert.equal(manifest.fighterWeapons.viper.poolSlots, 10);
   assert.equal(manifest.entityEffects.effectActiveLimit, 5);
 });

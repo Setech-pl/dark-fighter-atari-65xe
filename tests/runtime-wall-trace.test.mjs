@@ -230,6 +230,7 @@ test("real XEX/ATR startup traces keep one atomic two-phase engine pulse", () =>
 
 test("real Atari800 pickup trace retains one 2x2 footprint through native A2 motion", () => {
   const pickup = report.gate.weapon_pickup_rapid_fire;
+  const colour = report.coverage.weapon_pickup_rapid_fire.yellow_projectiles;
   assert.deepEqual([
     pickup.maximum_simultaneous_footprints,
     pickup.maximum_pickup_glyph_cells,
@@ -239,6 +240,11 @@ test("real Atari800 pickup trace retains one 2x2 footprint through native A2 mot
     pickup.physical_address_changes_during_native_motion,
   ], [1, 4, 3, 4, 8, 0]);
   assert.ok(pickup.release_frames > 0);
+  assert.equal(colour.colour_register, "COLPF2");
+  assert.equal(colour.colour_value, 0x1e);
+  assert.equal(colour.all_screen_codes_select_colpf2, true);
+  assert.ok(colour.screen_code_minimum >= 11);
+  assert.ok(colour.screen_code_maximum < 47);
 });
 
 test("Spread Shot passes PAL wall budget with a legal capsule and projectile-heavy frame", () => {
@@ -258,7 +264,7 @@ test("Spread Shot passes PAL wall budget with a legal capsule and projectile-hea
     feature.actual_delta_cycles,
     feature.remaining_target_cycles,
     feature.remaining_hard_cycles,
-  ], [33_172, 2_396, 216, 40, 168]);
+  ], [33_074, 2_494, 118, 138, 266]);
   assert.deepEqual(feature.created_capsule_render_ids.slice(0, 7),
     [120, 252, 120, 252, 120, 252, 120]);
   assert.ok(feature.spread_frames > 0);
@@ -289,8 +295,8 @@ test("Spread Shot passes PAL wall budget with a legal capsule and projectile-hea
     targetWallLimitCycles: 33_212,
     hardWallLimitCycles: 33_340,
     minimumPhysicalHeadroomCycles: 2_200,
-    measuredWallCycles: 33_172,
-    actualDeltaCycles: 216,
+    measuredWallCycles: 33_074,
+    actualDeltaCycles: 118,
     missedSynchronization: 0,
     deadlineOverruns: 0,
   });

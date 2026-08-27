@@ -49,9 +49,12 @@ import {
   assertWeaponPickupTraceParity,
   executeSpreadShotHullVolleyTrace,
   executeSpreadShotTrace,
+  executeViperBurstBalanceTrace,
   executeWeaponPickupTrace,
   executeViperProjectileColourTrace,
+  executeViperProjectileColourLifecycleTrace,
   spreadShotTraceCsv,
+  viperBurstBalanceTraceCsv,
   weaponPickupTraceCsv,
 } from "./weapon-pickup-runtime.mjs";
 import {
@@ -411,6 +414,24 @@ export const DEFAULT_SPREAD_SHOT_TRACE_PATH = path.join(
   "build",
   "previews",
   "weapon-pickup-spread-shot-trace.csv",
+);
+export const DEFAULT_PROJECTILE_COLOUR_XEX_PREVIEW_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-projectile-colour-regression-xex.png",
+);
+export const DEFAULT_PROJECTILE_COLOUR_ATR_PREVIEW_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-projectile-colour-regression-atr.png",
+);
+export const DEFAULT_VIPER_BURST_BALANCE_XEX_PREVIEW_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-burst-balance-xex.png",
+);
+export const DEFAULT_VIPER_BURST_BALANCE_ATR_PREVIEW_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-burst-balance-atr.png",
+);
+export const DEFAULT_VIPER_BURST_BALANCE_XEX_TRACE_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-burst-balance-xex.csv",
+);
+export const DEFAULT_VIPER_BURST_BALANCE_ATR_TRACE_PATH = path.join(
+  rootDirectory, "build", "previews", "weapon-burst-balance-atr.csv",
 );
 export const DEFAULT_SPREAD_SHOT_HULL_XEX_PREVIEW_PATH = path.join(
   rootDirectory, "build", "previews", "weapon-pickup-spread-shot-hulls-xex.png",
@@ -4143,7 +4164,7 @@ export function createWeaponPickupRapidFirePreview(source) {
     ["2 PICKUP", select("PICKUP", 0)],
     ["3 HUD RF10", trace.rapidTimerFrames[0]],
     ["4 NORMAL YELLOW", colourRecord(colours.normalDisplay)],
-    ["5 RAPID RED", colourRecord(colours.rapidDisplay)],
+    ["5 RAPID YELLOW", colourRecord(colours.rapidDisplay)],
     ["6 HUD RF01", trace.rapidTimerFrames[449]],
     ["7 EXPIRY", trace.rapidTimerFrames[499]],
     ["8 NEW YELLOW", colourRecord(colours.display)],
@@ -4165,7 +4186,7 @@ export function createWeaponPickupRapidFirePreview(source) {
   drawRgbLabel(rgb, width, "WEAPON PICKUP RF  EXECUTED RELEASE XEX AND ATR", 24, 16,
     frontend, white);
   drawRgbLabel(rgb, width,
-    "STATIC STEEL YELLOW 2X2 CAPSULE  BLACK RF  HUD RF10 TO RF01  RED FIRE", 24, 34,
+    "STATIC STEEL YELLOW 2X2 CAPSULE  BLACK RF  HUD RF10 TO RF01  YELLOW FIRE", 24, 34,
     frontend, yellow);
   drawRgbLabel(rgb, width, "NATIVE 1 TO 1  ACTUAL RUNTIME FRAMES", 24, 58,
     frontend, steel);
@@ -4187,15 +4208,14 @@ export function createWeaponPickupRapidFirePreview(source) {
     copyRgbPanel(rgb, width, height, frame, panelWidth, nativeHeight * 2, x, 368);
   });
 
-  const red = atariPalRegisterToRgb(0x46);
   drawRgbLabel(rgb, width, "EXECUTED VIPER BURST EMISSION FRAMES", 24, 778, frontend, white);
-  drawRgbLabel(rgb, width, "NORMAL YELLOW  0 3 6 9 12 15 18 21 24 27", 24, 798, frontend, yellow);
-  drawRgbLabel(rgb, width, "RAPID RED      0 2 4 6 8 10 12 14 16 18", 24, 816, frontend, red);
+  drawRgbLabel(rgb, width, "NORMAL YELLOW  0 3 6 9 12 15 18 21", 24, 798, frontend, yellow);
+  drawRgbLabel(rgb, width, "RAPID YELLOW   0 2 4 6 8 10 12 14 16 18", 24, 816, frontend, yellow);
   for (const frame of trace.normalBurstFrames) {
     fillRgbRect(rgb, width, height, 700 + frame * 14, 796, 5, 10, yellow);
   }
   for (const frame of trace.rapidBurstFrames) {
-    fillRgbRect(rgb, width, height, 700 + frame * 14, 814, 5, 10, red);
+    fillRgbRect(rgb, width, height, 700 + frame * 14, 814, 5, 10, yellow);
   }
   return encodePng(rgb, width, height);
 }
@@ -4208,6 +4228,128 @@ export function createSpreadShotTrace() {
   return `${spreadShotTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
 }
 
+export function createViperProjectileColourPreview(source, artifact = "xex") {
+  const trace = executeViperProjectileColourLifecycleTrace({ artifact, coldFill: 0xa5 });
+  const parity = executeViperProjectileColourLifecycleTrace({
+    artifact: artifact === "xex" ? "atr" : "xex", coldFill: 0xa5,
+  });
+  if (JSON.stringify({ ...trace, artifact: "release" }) !==
+      JSON.stringify({ ...parity, artifact: "release" })) {
+    throw new Error("Viper projectile colour preview differs between packed XEX and ATR");
+  }
+  const constants = parseConstants(source);
+  const registers = new Map([
+    ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+    ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+    ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+    ["COLPF2", trace.palette.COLPF2],
+    ["COLPF3", trace.palette.COLPF3],
+  ]);
+  const frontend = readFrontendGraphicsSource(source);
+  const capture = (phase) => trace.captures.find((record) => record.phase === phase);
+  const selected = [
+    ["1 NORMAL YELLOW", capture("NORMAL")],
+    ["2 RAPID YELLOW", capture("RAPID")],
+    ["3 SPREAD YELLOW", capture("SPREAD")],
+    ["4 AFTER EXPIRY", capture("RAPID_EXPIRED")],
+    ["5 VIPER AND RAIDER", { display: trace.mixedDisplay }],
+    ["6 RAIDER COLPF3", trace.raider],
+  ].map(([label, record]) => ({ label, record }));
+  if (selected.some(({ record }) => !record)) throw new Error("Projectile colour frame missing");
+
+  const scale = 2;
+  const panelWidth = SOURCE_WIDTH * scale;
+  const panelHeight = 24 * CHARACTER_HEIGHT * scale;
+  const gap = 12;
+  const width = selected.length * panelWidth + (selected.length + 1) * gap;
+  const height = panelHeight + 92;
+  const rgb = Buffer.alloc(width * height * 3);
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, [3, 5, 9]);
+  drawRgbLabel(rgb, width,
+    "PROJECTILE COLOUR REGRESSION  PACKED XEX AND ATR PARITY  COLD RAM A5",
+    24, 14, frontend, white);
+  drawRgbLabel(rgb, width,
+    "VIPER NORMAL RAPID SPREAD COLPF2 $1E    RAIDER COLPF3 $46", 24, 34,
+    frontend, yellow);
+  selected.forEach(({ label, record }, index) => {
+    const x = gap + index * (panelWidth + gap);
+    drawRgbLabel(rgb, width, label, x + 4, 58, frontend, steel);
+    const frame = runtimeWeaponPickupFrameRgb(record, trace, registers, scale);
+    copyRgbPanel(rgb, width, height, frame, panelWidth, panelHeight, x, 80);
+  });
+  return encodePng(rgb, width, height);
+}
+
+export function createViperBurstBalancePreview(source, artifact = "xex") {
+  const trace = executeViperBurstBalanceTrace({ artifact });
+  const parity = executeViperBurstBalanceTrace({ artifact: artifact === "xex" ? "atr" : "xex" });
+  if (JSON.stringify({ ...trace, artifact: "release" }) !==
+      JSON.stringify({ ...parity, artifact: "release" })) {
+    throw new Error("Viper burst-balance preview differs between packed XEX and ATR");
+  }
+  const constants = parseConstants(source);
+  const registers = new Map([
+    ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
+    ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
+    ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
+    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+  ]);
+  const frontend = readFrontendGraphicsSource(source);
+  const scale = 2;
+  const panelWidth = SOURCE_WIDTH * scale;
+  const panelHeight = 24 * CHARACTER_HEIGHT * scale;
+  const gap = 12;
+  const width = trace.traces.length * panelWidth + (trace.traces.length + 1) * gap;
+  const height = 620;
+  const rgb = Buffer.alloc(width * height * 3);
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, [3, 5, 9]);
+  drawRgbLabel(rgb, width,
+    `VIPER BURST BALANCE  EXECUTED ${artifact.toUpperCase()}  80 PAL FRAMES HELD FIRE`,
+    24, 14, frontend, white);
+  drawRgbLabel(rgb, width,
+    "NORMAL 8 AT I3    RAPID 10 AT I2    SPREAD 8 FULL SALVOS AT I3    POST 12",
+    24, 34, frontend, yellow);
+  trace.traces.forEach((mode, index) => {
+    const x = gap + index * (panelWidth + gap);
+    const record = mode.records.find(({ activeCount }) =>
+      activeCount === mode.maximumPoolOccupancy);
+    const emitted = mode.mode === "SPREAD"
+      ? `${mode.emittedProjectiles} PROJECTILES  ${mode.emittedSalvos} SALVOS`
+      : `${mode.emittedProjectiles} PROJECTILES`;
+    drawRgbLabel(rgb, width,
+      `${mode.mode}  BURST ${mode.expectedBurst}  ${emitted}  POOL ${mode.maximumPoolOccupancy}/10`,
+      x + 4, 58, frontend, steel);
+    const frame = runtimeWeaponPickupFrameRgb(record,
+      { charset: Uint8Array.from(mode.charset) }, registers, scale);
+    copyRgbPanel(rgb, width, height, frame, panelWidth, panelHeight, x, 80);
+  });
+  drawRgbLabel(rgb, width,
+    "ALLOCATIONS IN THE SAME 80-FRAME WINDOW  SPREAD MARKS ARE ATOMIC THREE-SHOT SALVOS",
+    24, 482, frontend, white);
+  trace.traces.forEach((mode, index) => {
+    const y = 510 + index * 30;
+    drawRgbLabel(rgb, width, mode.mode, 24, y, frontend, steel);
+    for (const record of mode.records) {
+      if (record.allocatedProjectiles === 0) continue;
+      const x = 250 + record.frame * 19;
+      fillRgbRect(rgb, width, height, x, y - 2, 6,
+        record.allocatedProjectiles === 3 ? 18 : 10, yellow);
+    }
+  });
+  return encodePng(rgb, width, height);
+}
+
+export function createViperBurstBalanceTrace(artifact = "xex") {
+  return viperBurstBalanceTraceCsv(executeViperBurstBalanceTrace({ artifact }));
+}
+
 export function createSpreadShotPreview(source) {
   const trace = executeSpreadShotTrace({ artifact: "xex" });
   const atr = executeSpreadShotTrace({ artifact: "atr" });
@@ -4218,7 +4360,7 @@ export function createSpreadShotPreview(source) {
     ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
     ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
     ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
-    ["COLPF3", trace.manifest.fighterWeapons.viper.rapidFireColourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
   ]);
   const frontend = readFrontendGraphicsSource(source);
   const selected = [
@@ -5867,6 +6009,41 @@ export function generateSpreadShotTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
+export function generateViperProjectileColourPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  artifact = "xex",
+  outputPath = artifact === "xex" ? DEFAULT_PROJECTILE_COLOUR_XEX_PREVIEW_PATH :
+    DEFAULT_PROJECTILE_COLOUR_ATR_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createViperProjectileColourPreview(fs.readFileSync(sourcePath, "utf8"), artifact),
+  );
+}
+
+export function generateViperBurstBalancePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  artifact = "xex",
+  outputPath = artifact === "xex" ? DEFAULT_VIPER_BURST_BALANCE_XEX_PREVIEW_PATH :
+    DEFAULT_VIPER_BURST_BALANCE_ATR_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createViperBurstBalancePreview(fs.readFileSync(sourcePath, "utf8"), artifact),
+  );
+}
+
+export function generateViperBurstBalanceTrace({
+  artifact = "xex",
+  outputPath = artifact === "xex" ? DEFAULT_VIPER_BURST_BALANCE_XEX_TRACE_PATH :
+    DEFAULT_VIPER_BURST_BALANCE_ATR_TRACE_PATH,
+} = {}) {
+  const trace = createViperBurstBalanceTrace(artifact);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, trace);
+  return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
+}
+
 export function generateSpreadShotHullPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   artifact = "xex",
@@ -6384,6 +6561,23 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Spread Shot XEX/ATR runtime trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, spreadShotTrace.outputPath)}`);
     console.log(`  rows: ${spreadShotTrace.rows}, ${spreadShotTrace.bytes} bytes`);
+    for (const artifact of ["xex", "atr"]) {
+      const colourPreview = generateViperProjectileColourPreview({ artifact });
+      console.log(`Projectile-colour ${artifact.toUpperCase()} owner review generated successfully`);
+      console.log(`  PNG : ${path.relative(rootDirectory, colourPreview.outputPath)}`);
+      console.log(
+        `  size: ${colourPreview.width}x${colourPreview.height}, ${colourPreview.bytes} bytes`,
+      );
+      const burstPreview = generateViperBurstBalancePreview({ artifact });
+      console.log(`Viper burst-balance ${artifact.toUpperCase()} owner review generated successfully`);
+      console.log(`  PNG : ${path.relative(rootDirectory, burstPreview.outputPath)}`);
+      console.log(
+        `  size: ${burstPreview.width}x${burstPreview.height}, ${burstPreview.bytes} bytes`,
+      );
+      const burstTrace = generateViperBurstBalanceTrace({ artifact });
+      console.log(`  CSV : ${path.relative(rootDirectory, burstTrace.outputPath)}`);
+      console.log(`  rows: ${burstTrace.rows}, ${burstTrace.bytes} bytes`);
+    }
     for (const artifact of ["xex", "atr"]) {
       const hullPreview = generateSpreadShotHullPreview({ artifact });
       console.log(`Spread Shot ${artifact.toUpperCase()} hull owner sequence generated successfully`);

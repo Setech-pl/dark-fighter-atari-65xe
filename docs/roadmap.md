@@ -21,13 +21,14 @@ The repository currently contains:
 - Rapid Fire Booster;
 - Spread Shot Booster, including the accepted backing/erase correction,
   all-yellow Viper fan, and symmetric readable trajectory;
+- mode-specific Viper burst balance: eight shots for Normal, ten for Rapid, and
+  eight atomic three-projectile salvos for Spread;
 - deterministic cold-RAM, XEX/ATR parity, memory-integrity, and PAL wall traces.
 
 ## Immediate work
 
-1. **Documentation current-state cleanup** — this branch. Establish the
-   documentation map, remove contradictory current values, archive historical
-   checkpoints, and add narrow anti-drift contracts.
+1. **Owner retest of Viper weapon presentation** — confirm the all-yellow
+   player-weapon colour and the current 8/10/8 Normal/Rapid/Spread balance.
 2. **Shield Booster** — design and measure the third pickup type without
    assuming memory, timing, duration, or stacking behavior before review.
 3. **Pickup drop-cadence tuning** — use owner playtest feedback to revisit the
@@ -43,6 +44,11 @@ measurement:
 - additional enemy archetypes from the existing review roster;
 - level progression and authored encounter data;
 - mines, additional capital-ship attack patterns, and bosses;
+- **Nova Missile** — after Shield Booster, design the fourth pickup as a
+  boss-only, single-shot special weapon outside the ordinary pickup rotation.
+  Specify it together with boss lifecycle/HULL and the budget for its
+  single-damage, multi-phase detonation; it must never spawn in standard
+  sectors or from the Raider-kill counter;
 - further sound, music, feedback, and presentation polish;
 - physical Atari/SIO2SD acceptance and release packaging.
 

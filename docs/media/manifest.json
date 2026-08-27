@@ -5,16 +5,16 @@
     "xex": {
       "path": "dist/dark-fighter.xex",
       "bytes": 16396,
-      "sha256": "a56f73b65510c97acf4909908b56bfa9bbb549079e3b2ff3ccc97d2490e52011"
+      "sha256": "5d44145ee7d0502b3ec622fe5a3b8a6a90155b5761c664ad4f2cc4f12c42ba9e"
     },
     "atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "42696821c63c09259faa5d6e87abe0b93de2b663cbade02a651d818b08251ce4"
+      "sha256": "3d8833b950c2c81657a87f535d531c7483da69bda74b5957ad16f20e1d4fcb70"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "29a452e80c1391af401c1d40fe6da8358a222cec921203578be3469db9616fa2"
+      "sha256": "e9e78f24ff9de83da7f5870a8ba78a4316b03d2cfb4a166e92cd8f988723d247"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
@@ -86,7 +86,7 @@
     },
     {
       "path": "docs/media/gameplay/06-rapid-fire-active.png",
-      "description": "RF HUD countdown and red Rapid Fire projectiles",
+      "description": "RF HUD countdown and yellow Rapid Fire projectiles",
       "source": "build/runtime-wall-trace/weapon-pickup-rapid-projectiles-atari800.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",

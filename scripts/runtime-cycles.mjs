@@ -322,6 +322,7 @@ function snapshotRuntime(cpu, entryPoints) {
     entityActiveCount: memory[entryPoints.entityActiveCount],
     entityActiveMask: memory[entryPoints.entityActiveMask],
     weaponPickupState: memory[entryPoints.entityState + 1],
+    weaponBoosterState: memory[entryPoints.entityState + 2],
     entityY: memory[entryPoints.entityY],
     effectActiveCount: memory[entryPoints.effectActiveCount],
     effectActiveMask: memory[entryPoints.effectActiveMask],
@@ -757,6 +758,7 @@ export function measureRuntimeCycles(build) {
     }
     if (frame.before.entityActiveCount === 0 && frame.before.weaponPickupState === 0 &&
       frame.after.weaponPickupState === 0 &&
+      frame.before.weaponBoosterState === 0 && frame.after.weaponBoosterState === 0 &&
       frame.before.effectActiveCount === 0 &&
       frame.after.effectActiveCount === 0 &&
       !frame.hits.has("entity_spawn_debris")) {

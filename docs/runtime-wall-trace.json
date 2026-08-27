@@ -4,7 +4,7 @@
   "artifact": {
     "path": "dist/dark-fighter.xex",
     "bytes": 16396,
-    "sha256": "a56f73b65510c97acf4909908b56bfa9bbb549079e3b2ff3ccc97d2490e52011"
+    "sha256": "5d44145ee7d0502b3ec622fe5a3b8a6a90155b5761c664ad4f2cc4f12c42ba9e"
   },
   "emulator": {
     "name": "Atari800",
@@ -32,7 +32,7 @@
     "expected_addresses": {
       "start": 8222,
       "loader_dlist": 14336,
-      "main_menu_dlist": 12598,
+      "main_menu_dlist": 12592,
       "playfield_dlist_a": 32528,
       "playfield_dlist_b": 32603,
       "playfield_dlist_bytes": 75,
@@ -48,7 +48,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 16396,
-          "sha256": "a56f73b65510c97acf4909908b56bfa9bbb549079e3b2ff3ccc97d2490e52011"
+          "sha256": "5d44145ee7d0502b3ec622fe5a3b8a6a90155b5761c664ad4f2cc4f12c42ba9e"
         },
         "snapshots": [
           {
@@ -86,8 +86,8 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 300,
@@ -105,8 +105,8 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 500,
@@ -115,7 +115,7 @@
             "cycle": 10,
             "loader_timer": 0,
             "game_state": 1,
-            "dlist": 12598,
+            "dlist": 12592,
             "charset_address": 18432,
             "pm_base": 14336,
             "dma_ctl": 58,
@@ -125,13 +125,13 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 1674097484,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 750,
-            "pc": 28918,
+            "pc": 28916,
             "scanline": 0,
-            "cycle": 10,
+            "cycle": 12,
             "loader_timer": 0,
             "game_state": 6,
             "dlist": 32528,
@@ -144,7 +144,7 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 621157080,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           }
         ],
         "milestones": {
@@ -196,7 +196,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 16396,
-          "sha256": "a56f73b65510c97acf4909908b56bfa9bbb549079e3b2ff3ccc97d2490e52011"
+          "sha256": "5d44145ee7d0502b3ec622fe5a3b8a6a90155b5761c664ad4f2cc4f12c42ba9e"
         },
         "snapshots": [
           {
@@ -234,8 +234,8 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 300,
@@ -253,8 +253,8 @@
             "runad": 8222,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 500,
@@ -263,7 +263,7 @@
             "cycle": 10,
             "loader_timer": 0,
             "game_state": 1,
-            "dlist": 12598,
+            "dlist": 12592,
             "charset_address": 18432,
             "pm_base": 14336,
             "dma_ctl": 58,
@@ -273,13 +273,13 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 1674097484,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 750,
-            "pc": 28918,
+            "pc": 28916,
             "scanline": 0,
-            "cycle": 10,
+            "cycle": 12,
             "loader_timer": 0,
             "game_state": 6,
             "dlist": 32528,
@@ -292,7 +292,7 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 621157080,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           }
         ],
         "milestones": {
@@ -344,7 +344,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "42696821c63c09259faa5d6e87abe0b93de2b663cbade02a651d818b08251ce4"
+          "sha256": "3d8833b950c2c81657a87f535d531c7483da69bda74b5957ad16f20e1d4fcb70"
         },
         "snapshots": [
           {
@@ -382,8 +382,8 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 300,
@@ -401,8 +401,8 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 500,
@@ -411,7 +411,7 @@
             "cycle": 9,
             "loader_timer": 0,
             "game_state": 1,
-            "dlist": 12598,
+            "dlist": 12592,
             "charset_address": 18432,
             "pm_base": 14336,
             "dma_ctl": 58,
@@ -421,13 +421,13 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 1674097484,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 750,
-            "pc": 28918,
+            "pc": 28916,
             "scanline": 0,
-            "cycle": 10,
+            "cycle": 12,
             "loader_timer": 0,
             "game_state": 6,
             "dlist": 32528,
@@ -440,7 +440,7 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 621157080,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           }
         ],
         "milestones": {
@@ -492,7 +492,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "42696821c63c09259faa5d6e87abe0b93de2b663cbade02a651d818b08251ce4"
+          "sha256": "3d8833b950c2c81657a87f535d531c7483da69bda74b5957ad16f20e1d4fcb70"
         },
         "snapshots": [
           {
@@ -530,8 +530,8 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 300,
@@ -549,8 +549,8 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 4241556082,
-            "frontend_dlist_checksum": 2378691236
+            "screen_checksum": 1055492821,
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 500,
@@ -559,7 +559,7 @@
             "cycle": 9,
             "loader_timer": 0,
             "game_state": 1,
-            "dlist": 12598,
+            "dlist": 12592,
             "charset_address": 18432,
             "pm_base": 14336,
             "dma_ctl": 58,
@@ -569,13 +569,13 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 1674097484,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           },
           {
             "frame": 750,
-            "pc": 28918,
+            "pc": 28916,
             "scanline": 0,
-            "cycle": 10,
+            "cycle": 12,
             "loader_timer": 0,
             "game_state": 6,
             "dlist": 32528,
@@ -588,7 +588,7 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 621157080,
-            "frontend_dlist_checksum": 2378691236
+            "frontend_dlist_checksum": 1017534744
           }
         ],
         "milestones": {
@@ -639,11 +639,11 @@
     "passed": true
   },
   "semantics": {
-    "cpu_cycles_dma_off": 20562,
-    "cpu_comparison_headroom": 15006,
-    "measured_wall_cycles_dma_on": 33172,
-    "measured_physical_headroom": 2396,
-    "estimated_additive_cycles": 33454
+    "cpu_cycles_dma_off": 20490,
+    "cpu_comparison_headroom": 15078,
+    "measured_wall_cycles_dma_on": 33074,
+    "measured_physical_headroom": 2494,
+    "estimated_additive_cycles": 33382
   },
   "gate": {
     "pal_frame_cycles": 35568,
@@ -724,7 +724,7 @@
       "remaining_hard_cycles": 171,
       "target_overrun_frames": 0,
       "hard_overrun_frames": 0,
-      "no_active_debris_path_delta_cpu_cycles": 21,
+      "no_active_debris_path_delta_cpu_cycles": 20,
       "no_active_debris_path_limit_cpu_cycles": 32,
       "no_active_viper_projectile_path_delta_cpu_cycles": 0,
       "no_active_viper_projectile_path_limit_cpu_cycles": 48,
@@ -734,8 +734,8 @@
         "frame": 463,
         "gameplay_frame": 207,
         "difficulty": 2,
-        "wall_cycles": 32475,
-        "physical_headroom": 3093,
+        "wall_cycles": 32145,
+        "physical_headroom": 3423,
         "start": {
           "clock": 30969945,
           "host_frame": 870,
@@ -743,13 +743,13 @@
           "cycle": 21
         },
         "end": {
-          "clock": 31002420,
+          "clock": 31002090,
           "host_frame": 871,
-          "scanline": 199,
-          "cycle": 6
+          "scanline": 196,
+          "cycle": 18
         },
         "next_start": {
-          "clock": 31005512,
+          "clock": 31005508,
           "host_frame": 871
         },
         "host_vbi_boundaries": 1,
@@ -785,7 +785,7 @@
             "drawn_mask": 0
           },
           "viper_projectiles": 9,
-          "powered_viper_projectiles": 9,
+          "rapid_viper_projectiles": 9,
           "score_bcd": [
             0,
             112
@@ -897,11 +897,11 @@
       "target_wall_cycles": 33212,
       "maximum_wall_cycles": 33340,
       "minimum_physical_headroom": 2200,
-      "measured_wall_cycles": 33172,
-      "measured_physical_headroom": 2396,
-      "actual_delta_cycles": 216,
-      "remaining_target_cycles": 40,
-      "remaining_hard_cycles": 168,
+      "measured_wall_cycles": 33074,
+      "measured_physical_headroom": 2494,
+      "actual_delta_cycles": 118,
+      "remaining_target_cycles": 138,
+      "remaining_hard_cycles": 266,
       "target_overrun_frames": 0,
       "hard_overrun_frames": 0,
       "rapid_frames": 865,
@@ -944,22 +944,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -995,7 +995,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -1130,7 +1130,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-xex-a5-0-delayed",
@@ -1198,7 +1198,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-xex-a5-1-immediate",
@@ -1266,7 +1266,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "1c4fe645eafa0b66915f99f9bbd9d45e02ea24b38a952ca7daf27bd27edc3f11"
         },
         {
           "id": "engine-xex-a5-1-delayed",
@@ -1334,7 +1334,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "55cdc46c62a21396dc34e5fa311d5549ce7c592b6f9009b1b0209b6844424cbf"
         },
         {
           "id": "engine-xex-a5-2-immediate",
@@ -1402,7 +1402,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-xex-a5-2-delayed",
@@ -1470,7 +1470,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-xex-5a-0-immediate",
@@ -1538,7 +1538,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-xex-5a-0-delayed",
@@ -1606,7 +1606,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-xex-5a-1-immediate",
@@ -1674,7 +1674,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "1c4fe645eafa0b66915f99f9bbd9d45e02ea24b38a952ca7daf27bd27edc3f11"
         },
         {
           "id": "engine-xex-5a-1-delayed",
@@ -1742,7 +1742,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "55cdc46c62a21396dc34e5fa311d5549ce7c592b6f9009b1b0209b6844424cbf"
         },
         {
           "id": "engine-xex-5a-2-immediate",
@@ -1810,7 +1810,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-xex-5a-2-delayed",
@@ -1878,7 +1878,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-atr-a5-0-immediate",
@@ -1946,7 +1946,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-atr-a5-0-delayed",
@@ -2014,7 +2014,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-atr-a5-1-immediate",
@@ -2082,7 +2082,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "1c4fe645eafa0b66915f99f9bbd9d45e02ea24b38a952ca7daf27bd27edc3f11"
         },
         {
           "id": "engine-atr-a5-1-delayed",
@@ -2150,7 +2150,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "55cdc46c62a21396dc34e5fa311d5549ce7c592b6f9009b1b0209b6844424cbf"
         },
         {
           "id": "engine-atr-a5-2-immediate",
@@ -2218,7 +2218,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-atr-a5-2-delayed",
@@ -2286,7 +2286,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-atr-5a-0-immediate",
@@ -2354,7 +2354,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-atr-5a-0-delayed",
@@ -2422,7 +2422,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "6de6fb0d411307445f476ff94d5b8053c28e09fbfadb889faad2673fefd1dc9b"
+          "screenshot_sequence_sha256": "db9815ad1c35daa619e5f68c19da4ff1869b18a2fa21caeb239f02f4682e8224"
         },
         {
           "id": "engine-atr-5a-1-immediate",
@@ -2490,7 +2490,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "1c4fe645eafa0b66915f99f9bbd9d45e02ea24b38a952ca7daf27bd27edc3f11"
         },
         {
           "id": "engine-atr-5a-1-delayed",
@@ -2558,7 +2558,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "509e7314e784514bcb8a1c28fc26720c9fb704ac5cce7fecab229b068bc08d7b"
+          "screenshot_sequence_sha256": "55cdc46c62a21396dc34e5fa311d5549ce7c592b6f9009b1b0209b6844424cbf"
         },
         {
           "id": "engine-atr-5a-2-immediate",
@@ -2626,7 +2626,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-atr-5a-2-delayed",
@@ -2694,7 +2694,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         }
       ],
       "restart_sessions": [
@@ -2732,7 +2732,7 @@
             143
           ],
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         },
         {
           "id": "engine-restart-atr-a5",
@@ -2768,7 +2768,7 @@
             143
           ],
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d233c895f73f35e75fac7237f23c400c360223b5cead6d34fc199965c5118819"
+          "screenshot_sequence_sha256": "9e96acc0b92a5e7bd4caf97e6a549e353110410b178b2fd9a9501007765baec7"
         }
       ],
       "evidence": {
@@ -2779,8 +2779,8 @@
           "columns": 8,
           "width": 2688,
           "height": 960,
-          "bytes": 20126,
-          "sha256": "0a0e58f17422d4972f6050683b05c2ee30f3d08b25d1524ae5a36fcdf64b8f1b"
+          "bytes": 20142,
+          "sha256": "74c162fb2bacc64ea48271e03667502fcbbd7e2c4ed58956d5e3d10a783f97df"
         },
         "two_cycles_contact": {
           "path": "build/runtime-wall-trace/capital-engines-two-cycles-contact.png",
@@ -2788,8 +2788,8 @@
           "columns": 8,
           "width": 2688,
           "height": 960,
-          "bytes": 31405,
-          "sha256": "e0a46f4b8ff418c810e15ed169ad726d367ddfd4bdb1df4ebacba0a51f3d1f73"
+          "bytes": 31392,
+          "sha256": "aab8df4efa440a242743257c7e2d4943b09da7cb0acfce5c3d4bb5d66f52f542"
         },
         "compact_trace": {
           "path": "build/runtime-wall-trace/capital-engines-first-150.csv",
@@ -2810,20 +2810,20 @@
       "screenshots_per_session": 150,
       "passed": true
     },
-    "measured_wall_cycles_dma_on": 33172,
-    "measured_physical_headroom": 2396,
+    "measured_wall_cycles_dma_on": 33074,
+    "measured_physical_headroom": 2494,
     "deadline_overrun_frames": 0,
     "missed_frames": 0,
     "baseline_9040_deadline_overrun_frames": 0,
     "baseline_9040_missed_frames": 0,
     "targeted_deadline_overrun_frames": 0,
     "targeted_missed_frames": 0,
-    "baseline_9040_active_frames_crossing_host_vbi": 6087,
-    "baseline_9040_host_vbi_boundary_crossings": 6087,
-    "targeted_active_frames_crossing_host_vbi": 598,
-    "targeted_host_vbi_boundary_crossings": 598,
-    "active_frames_crossing_host_vbi": 22239,
-    "host_vbi_boundary_crossings": 22239,
+    "baseline_9040_active_frames_crossing_host_vbi": 5985,
+    "baseline_9040_host_vbi_boundary_crossings": 5985,
+    "targeted_active_frames_crossing_host_vbi": 588,
+    "targeted_host_vbi_boundary_crossings": 588,
+    "active_frames_crossing_host_vbi": 21842,
+    "host_vbi_boundary_crossings": 21842,
     "extra_vbi_boundaries": 0,
     "passed": true
   },
@@ -2860,7 +2860,7 @@
         "policy": "neutral",
         "fire_delay": 0,
         "measured_frames": 760,
-        "maximum_wall_cycles": 31784,
+        "maximum_wall_cycles": 31503,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2872,7 +2872,7 @@
         "policy": "sweep",
         "fire_delay": 0,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32475,
+        "maximum_wall_cycles": 32145,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2884,7 +2884,7 @@
         "policy": "evasive",
         "fire_delay": 1,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32126,
+        "maximum_wall_cycles": 31969,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2896,7 +2896,7 @@
         "policy": "sweep",
         "fire_delay": 2,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32135,
+        "maximum_wall_cycles": 32008,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2908,7 +2908,7 @@
         "policy": "evasive",
         "fire_delay": 3,
         "measured_frames": 920,
-        "maximum_wall_cycles": 31951,
+        "maximum_wall_cycles": 31848,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2920,7 +2920,7 @@
         "policy": "sweep",
         "fire_delay": 4,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32467,
+        "maximum_wall_cycles": 32336,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2932,7 +2932,7 @@
         "policy": "sweep",
         "fire_delay": 5,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32072,
+        "maximum_wall_cycles": 31964,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2944,7 +2944,7 @@
         "policy": "sweep",
         "fire_delay": 6,
         "measured_frames": 920,
-        "maximum_wall_cycles": 30570,
+        "maximum_wall_cycles": 30444,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2956,7 +2956,7 @@
         "policy": "evasive",
         "fire_delay": 7,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32035,
+        "maximum_wall_cycles": 31894,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2968,7 +2968,7 @@
         "policy": "evasive",
         "fire_delay": 3,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32939,
+        "maximum_wall_cycles": 32854,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2980,7 +2980,7 @@
         "policy": "sweep",
         "fire_delay": 4,
         "measured_frames": 920,
-        "maximum_wall_cycles": 32467,
+        "maximum_wall_cycles": 32336,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -2992,7 +2992,7 @@
         "policy": "sweep",
         "fire_delay": 4,
         "measured_frames": 400,
-        "maximum_wall_cycles": 32973,
+        "maximum_wall_cycles": 32899,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3004,7 +3004,7 @@
         "policy": "sweep",
         "fire_delay": 4,
         "measured_frames": 400,
-        "maximum_wall_cycles": 32981,
+        "maximum_wall_cycles": 32918,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3016,7 +3016,7 @@
         "policy": "sweep",
         "fire_delay": 4,
         "measured_frames": 400,
-        "maximum_wall_cycles": 32467,
+        "maximum_wall_cycles": 32336,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3040,7 +3040,7 @@
         "policy": "sweep",
         "fire_delay": 4,
         "measured_frames": 1200,
-        "maximum_wall_cycles": 32467,
+        "maximum_wall_cycles": 32336,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3052,7 +3052,7 @@
         "policy": "hunt",
         "fire_delay": 4,
         "measured_frames": 3200,
-        "maximum_wall_cycles": 33172,
+        "maximum_wall_cycles": 33074,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3064,7 +3064,7 @@
         "policy": "evasive",
         "fire_delay": 4,
         "measured_frames": 3000,
-        "maximum_wall_cycles": 32006,
+        "maximum_wall_cycles": 31918,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3076,7 +3076,7 @@
         "policy": "hunt",
         "fire_delay": 4,
         "measured_frames": 3000,
-        "maximum_wall_cycles": 33172,
+        "maximum_wall_cycles": 33074,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3088,7 +3088,7 @@
         "policy": "evasive",
         "fire_delay": 4,
         "measured_frames": 3000,
-        "maximum_wall_cycles": 32006,
+        "maximum_wall_cycles": 31918,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3100,7 +3100,7 @@
         "policy": "hunt",
         "fire_delay": 4,
         "measured_frames": 3000,
-        "maximum_wall_cycles": 33172,
+        "maximum_wall_cycles": 33074,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3136,7 +3136,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3148,7 +3148,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3208,7 +3208,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3220,7 +3220,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3280,7 +3280,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3292,7 +3292,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3352,7 +3352,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3364,7 +3364,7 @@
         "policy": "neutral",
         "fire_delay": 4000,
         "measured_frames": 150,
-        "maximum_wall_cycles": 20421,
+        "maximum_wall_cycles": 20417,
         "deadline_overrun_frames": 0,
         "missed_frames": 0
       },
@@ -3423,8 +3423,8 @@
       "frame": 515,
       "gameplay_frame": 3,
       "difficulty": 1,
-      "wall_cycles": 32939,
-      "physical_headroom": 2629,
+      "wall_cycles": 32854,
+      "physical_headroom": 2714,
       "start": {
         "clock": 32250388,
         "host_frame": 906,
@@ -3432,13 +3432,13 @@
         "cycle": 16
       },
       "end": {
-        "clock": 32283327,
+        "clock": 32283242,
         "host_frame": 907,
-        "scanline": 203,
-        "cycle": 9
+        "scanline": 202,
+        "cycle": 38
       },
       "next_start": {
-        "clock": 32285961,
+        "clock": 32285955,
         "host_frame": 907
       },
       "host_vbi_boundaries": 1,
@@ -3474,7 +3474,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 8,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           144
@@ -3515,22 +3515,22 @@
       "frame": 337,
       "gameplay_frame": 81,
       "difficulty": 2,
-      "wall_cycles": 32467,
-      "physical_headroom": 3101,
+      "wall_cycles": 32336,
+      "physical_headroom": 3232,
       "start": {
-        "clock": 26488372,
+        "clock": 26488377,
         "host_frame": 744,
         "scanline": 226,
-        "cycle": 16
+        "cycle": 21
       },
       "end": {
-        "clock": 26520839,
+        "clock": 26520713,
         "host_frame": 745,
-        "scanline": 198,
-        "cycle": 107
+        "scanline": 197,
+        "cycle": 95
       },
       "next_start": {
-        "clock": 26523940,
+        "clock": 26523945,
         "host_frame": 745
       },
       "host_vbi_boundaries": 1,
@@ -3566,7 +3566,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 6,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           80
@@ -3603,22 +3603,22 @@
       "frame": 337,
       "gameplay_frame": 81,
       "difficulty": 2,
-      "wall_cycles": 32467,
-      "physical_headroom": 3101,
+      "wall_cycles": 32336,
+      "physical_headroom": 3232,
       "start": {
-        "clock": 26488372,
+        "clock": 26488377,
         "host_frame": 744,
         "scanline": 226,
-        "cycle": 16
+        "cycle": 21
       },
       "end": {
-        "clock": 26520839,
+        "clock": 26520713,
         "host_frame": 745,
-        "scanline": 198,
-        "cycle": 107
+        "scanline": 197,
+        "cycle": 95
       },
       "next_start": {
-        "clock": 26523940,
+        "clock": 26523945,
         "host_frame": 745
       },
       "host_vbi_boundaries": 1,
@@ -3654,7 +3654,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 6,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           80
@@ -3696,22 +3696,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -3747,7 +3747,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -3790,22 +3790,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -3841,7 +3841,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -3884,22 +3884,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -3935,7 +3935,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -3991,22 +3991,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -4042,7 +4042,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -4090,22 +4090,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -4141,7 +4141,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -4184,8 +4184,8 @@
         "frame": 231,
         "gameplay_frame": 231,
         "difficulty": 2,
-        "wall_cycles": 33134,
-        "physical_headroom": 2434,
+        "wall_cycles": 33062,
+        "physical_headroom": 2506,
         "start": {
           "clock": 22718169,
           "host_frame": 638,
@@ -4193,10 +4193,10 @@
           "cycle": 21
         },
         "end": {
-          "clock": 22751303,
+          "clock": 22751231,
           "host_frame": 639,
           "scanline": 204,
-          "cycle": 95
+          "cycle": 23
         },
         "next_start": {
           "clock": 22753739,
@@ -4235,7 +4235,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             64
@@ -4280,8 +4280,8 @@
         "frame": 231,
         "gameplay_frame": 231,
         "difficulty": 2,
-        "wall_cycles": 33134,
-        "physical_headroom": 2434,
+        "wall_cycles": 33062,
+        "physical_headroom": 2506,
         "start": {
           "clock": 22718169,
           "host_frame": 638,
@@ -4289,10 +4289,10 @@
           "cycle": 21
         },
         "end": {
-          "clock": 22751303,
+          "clock": 22751231,
           "host_frame": 639,
           "scanline": 204,
-          "cycle": 95
+          "cycle": 23
         },
         "next_start": {
           "clock": 22753739,
@@ -4331,7 +4331,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             64
@@ -4376,22 +4376,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -4427,7 +4427,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -4470,8 +4470,8 @@
         "frame": 515,
         "gameplay_frame": 3,
         "difficulty": 1,
-        "wall_cycles": 32939,
-        "physical_headroom": 2629,
+        "wall_cycles": 32854,
+        "physical_headroom": 2714,
         "start": {
           "clock": 32250388,
           "host_frame": 906,
@@ -4479,13 +4479,13 @@
           "cycle": 16
         },
         "end": {
-          "clock": 32283327,
+          "clock": 32283242,
           "host_frame": 907,
-          "scanline": 203,
-          "cycle": 9
+          "scanline": 202,
+          "cycle": 38
         },
         "next_start": {
-          "clock": 32285961,
+          "clock": 32285955,
           "host_frame": 907
         },
         "host_vbi_boundaries": 1,
@@ -4521,7 +4521,7 @@
             "drawn_mask": 0
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             144
@@ -4566,22 +4566,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -4617,7 +4617,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -4655,28 +4655,28 @@
       "observed": true,
       "matching_frames": 290,
       "heaviest": {
-        "trace_kind": "baseline-9040",
-        "session": "2-sweep-fire0",
-        "frame": 439,
-        "gameplay_frame": 183,
-        "difficulty": 2,
-        "wall_cycles": 28664,
-        "physical_headroom": 6904,
+        "trace_kind": "parallax-cadence",
+        "session": "cadence-1-sweep-fire4",
+        "frame": 177,
+        "gameplay_frame": 177,
+        "difficulty": 1,
+        "wall_cycles": 28324,
+        "physical_headroom": 7244,
         "start": {
-          "clock": 30116313,
-          "host_frame": 846,
+          "clock": 20228409,
+          "host_frame": 568,
           "scanline": 226,
           "cycle": 21
         },
         "end": {
-          "clock": 30144977,
-          "host_frame": 847,
-          "scanline": 165,
-          "cycle": 71
+          "clock": 20256733,
+          "host_frame": 569,
+          "scanline": 162,
+          "cycle": 73
         },
         "next_start": {
-          "clock": 30151881,
-          "host_frame": 847
+          "clock": 20263977,
+          "host_frame": 569
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -4685,36 +4685,36 @@
         "dma_ctl": 62,
         "nmi_en": 128,
         "state": {
-          "projectiles": 14,
-          "broadside": 0,
-          "far_rendered": 21,
-          "active_muzzles": 0,
+          "projectiles": 15,
+          "broadside": 1,
+          "far_rendered": 22,
+          "active_muzzles": 2,
           "entity_active": 1,
-          "entity_x": 124,
+          "entity_x": 128,
           "entity_y": 24,
           "entity_vx_signed": 0,
           "entity_move_accumulator": 0,
           "entity_vertical_accumulator": 0,
-          "entity_render_id": 110,
+          "entity_render_id": 116,
           "entity_active_mask": 1,
           "weapon_pickup": {
-            "state": 3,
-            "booster_state": 3,
-            "qualified_kill_counter": 0,
-            "x": 105,
-            "y": 195,
-            "timer": 292,
-            "timer_low": 36,
-            "timer_high": 1,
-            "animation_frame": 42,
-            "render_id": 252,
+            "state": 0,
+            "booster_state": 0,
+            "qualified_kill_counter": 2,
+            "x": 0,
+            "y": 0,
+            "timer": 0,
+            "timer_low": 0,
+            "timer_high": 0,
+            "animation_frame": 0,
+            "render_id": 0,
             "drawn_mask": 0
           },
-          "viper_projectiles": 10,
-          "powered_viper_projectiles": 10,
+          "viper_projectiles": 6,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
-            112
+            32
           ],
           "effect_active_mask": 0,
           "effect_active_count": 0,
@@ -4728,7 +4728,7 @@
           "capital_sfx": false,
           "sound_enabled": true,
           "player_lifecycle": 0,
-          "sector_state": 4
+          "sector_state": 2
         },
         "events": [
           "world-copy",
@@ -4755,22 +4755,22 @@
         "frame": 248,
         "gameplay_frame": 248,
         "difficulty": 1,
-        "wall_cycles": 29185,
-        "physical_headroom": 6383,
+        "wall_cycles": 28932,
+        "physical_headroom": 6636,
         "start": {
-          "clock": 22753737,
+          "clock": 22753732,
           "host_frame": 639,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22782922,
+          "clock": 22782664,
           "host_frame": 640,
-          "scanline": 170,
-          "cycle": 22
+          "scanline": 167,
+          "cycle": 106
         },
         "next_start": {
-          "clock": 22789305,
+          "clock": 22789300,
           "host_frame": 640
         },
         "host_vbi_boundaries": 1,
@@ -4806,7 +4806,7 @@
             "drawn_mask": 0
           },
           "viper_projectiles": 7,
-          "powered_viper_projectiles": 7,
+          "rapid_viper_projectiles": 7,
           "score_bcd": [
             0,
             80
@@ -4853,22 +4853,22 @@
         "frame": 248,
         "gameplay_frame": 248,
         "difficulty": 1,
-        "wall_cycles": 29185,
-        "physical_headroom": 6383,
+        "wall_cycles": 28932,
+        "physical_headroom": 6636,
         "start": {
-          "clock": 22753737,
+          "clock": 22753732,
           "host_frame": 639,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22782922,
+          "clock": 22782664,
           "host_frame": 640,
-          "scanline": 170,
-          "cycle": 22
+          "scanline": 167,
+          "cycle": 106
         },
         "next_start": {
-          "clock": 22789305,
+          "clock": 22789300,
           "host_frame": 640
         },
         "host_vbi_boundaries": 1,
@@ -4904,7 +4904,7 @@
             "drawn_mask": 0
           },
           "viper_projectiles": 7,
-          "powered_viper_projectiles": 7,
+          "rapid_viper_projectiles": 7,
           "score_bcd": [
             0,
             80
@@ -4951,8 +4951,8 @@
         "frame": 463,
         "gameplay_frame": 207,
         "difficulty": 2,
-        "wall_cycles": 32475,
-        "physical_headroom": 3093,
+        "wall_cycles": 32145,
+        "physical_headroom": 3423,
         "start": {
           "clock": 30969945,
           "host_frame": 870,
@@ -4960,13 +4960,13 @@
           "cycle": 21
         },
         "end": {
-          "clock": 31002420,
+          "clock": 31002090,
           "host_frame": 871,
-          "scanline": 199,
-          "cycle": 6
+          "scanline": 196,
+          "cycle": 18
         },
         "next_start": {
-          "clock": 31005512,
+          "clock": 31005508,
           "host_frame": 871
         },
         "host_vbi_boundaries": 1,
@@ -5002,7 +5002,7 @@
             "drawn_mask": 0
           },
           "viper_projectiles": 9,
-          "powered_viper_projectiles": 9,
+          "rapid_viper_projectiles": 9,
           "score_bcd": [
             0,
             112
@@ -5046,8 +5046,8 @@
         "frame": 231,
         "gameplay_frame": 231,
         "difficulty": 2,
-        "wall_cycles": 33134,
-        "physical_headroom": 2434,
+        "wall_cycles": 33062,
+        "physical_headroom": 2506,
         "start": {
           "clock": 22718169,
           "host_frame": 638,
@@ -5055,10 +5055,10 @@
           "cycle": 21
         },
         "end": {
-          "clock": 22751303,
+          "clock": 22751231,
           "host_frame": 639,
           "scanline": 204,
-          "cycle": 95
+          "cycle": 23
         },
         "next_start": {
           "clock": 22753739,
@@ -5097,7 +5097,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             64
@@ -5149,8 +5149,8 @@
         "frame": 227,
         "gameplay_frame": 227,
         "difficulty": 2,
-        "wall_cycles": 32761,
-        "physical_headroom": 2807,
+        "wall_cycles": 32650,
+        "physical_headroom": 2918,
         "start": {
           "clock": 22575897,
           "host_frame": 634,
@@ -5158,13 +5158,13 @@
           "cycle": 21
         },
         "end": {
-          "clock": 22608658,
+          "clock": 22608547,
           "host_frame": 635,
-          "scanline": 201,
-          "cycle": 64
+          "scanline": 200,
+          "cycle": 67
         },
         "next_start": {
-          "clock": 22611465,
+          "clock": 22611466,
           "host_frame": 635
         },
         "host_vbi_boundaries": 1,
@@ -5200,7 +5200,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 9,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             64
@@ -5249,8 +5249,8 @@
           "frame": 62,
           "gameplay_frame": 62,
           "difficulty": 2,
-          "wall_cycles": 11394,
-          "physical_headroom": 24174,
+          "wall_cycles": 11285,
+          "physical_headroom": 24283,
           "start": {
             "clock": 16707177,
             "host_frame": 469,
@@ -5258,10 +5258,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 16718571,
+            "clock": 16718462,
             "host_frame": 470,
-            "scanline": 14,
-            "cycle": 15
+            "scanline": 13,
+            "cycle": 20
           },
           "next_start": {
             "clock": 16742745,
@@ -5300,7 +5300,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               16
@@ -5335,8 +5335,8 @@
           "frame": 95,
           "gameplay_frame": 95,
           "difficulty": 2,
-          "wall_cycles": 24346,
-          "physical_headroom": 11222,
+          "wall_cycles": 24182,
+          "physical_headroom": 11386,
           "start": {
             "clock": 17880921,
             "host_frame": 502,
@@ -5344,10 +5344,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 17905267,
+            "clock": 17905103,
             "host_frame": 503,
-            "scanline": 127,
-            "cycle": 85
+            "scanline": 126,
+            "cycle": 35
           },
           "next_start": {
             "clock": 17916489,
@@ -5386,7 +5386,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               32
@@ -5426,8 +5426,8 @@
           "frame": 161,
           "gameplay_frame": 161,
           "difficulty": 2,
-          "wall_cycles": 28214,
-          "physical_headroom": 7354,
+          "wall_cycles": 28039,
+          "physical_headroom": 7529,
           "start": {
             "clock": 20228409,
             "host_frame": 568,
@@ -5435,10 +5435,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 20256623,
+            "clock": 20256448,
             "host_frame": 569,
-            "scanline": 161,
-            "cycle": 77
+            "scanline": 160,
+            "cycle": 16
           },
           "next_start": {
             "clock": 20263977,
@@ -5477,7 +5477,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               48
@@ -5514,8 +5514,8 @@
           "frame": 282,
           "gameplay_frame": 26,
           "difficulty": 2,
-          "wall_cycles": 12838,
-          "physical_headroom": 22730,
+          "wall_cycles": 12712,
+          "physical_headroom": 22856,
           "start": {
             "clock": 24532137,
             "host_frame": 689,
@@ -5523,10 +5523,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 24544975,
+            "clock": 24544849,
             "host_frame": 690,
-            "scanline": 26,
-            "cycle": 91
+            "scanline": 25,
+            "cycle": 79
           },
           "next_start": {
             "clock": 24567705,
@@ -5565,7 +5565,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 5,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               80
@@ -5600,8 +5600,8 @@
           "frame": 325,
           "gameplay_frame": 69,
           "difficulty": 2,
-          "wall_cycles": 25651,
-          "physical_headroom": 9917,
+          "wall_cycles": 25588,
+          "physical_headroom": 9980,
           "start": {
             "clock": 26061561,
             "host_frame": 732,
@@ -5609,10 +5609,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 26087212,
+            "clock": 26087149,
             "host_frame": 733,
-            "scanline": 139,
-            "cycle": 22
+            "scanline": 138,
+            "cycle": 73
           },
           "next_start": {
             "clock": 26097124,
@@ -5651,7 +5651,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 5,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               96
@@ -5688,8 +5688,8 @@
           "frame": 353,
           "gameplay_frame": 97,
           "difficulty": 2,
-          "wall_cycles": 24338,
-          "physical_headroom": 11230,
+          "wall_cycles": 24246,
+          "physical_headroom": 11322,
           "start": {
             "clock": 27057465,
             "host_frame": 760,
@@ -5697,10 +5697,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 27081803,
+            "clock": 27081711,
             "host_frame": 761,
-            "scanline": 127,
-            "cycle": 77
+            "scanline": 126,
+            "cycle": 99
           },
           "next_start": {
             "clock": 27093028,
@@ -5739,7 +5739,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               112
@@ -5777,22 +5777,22 @@
           "frame": 456,
           "gameplay_frame": 200,
           "difficulty": 2,
-          "wall_cycles": 14024,
-          "physical_headroom": 21544,
+          "wall_cycles": 13853,
+          "physical_headroom": 21715,
           "start": {
-            "clock": 30720969,
+            "clock": 30720964,
             "host_frame": 863,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 30734993,
+            "clock": 30734817,
             "host_frame": 864,
-            "scanline": 37,
-            "cycle": 23
+            "scanline": 35,
+            "cycle": 75
           },
           "next_start": {
-            "clock": 30756532,
+            "clock": 30756537,
             "host_frame": 864
           },
           "host_vbi_boundaries": 1,
@@ -5828,7 +5828,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               144
@@ -5863,8 +5863,8 @@
           "frame": 502,
           "gameplay_frame": 246,
           "difficulty": 2,
-          "wall_cycles": 11060,
-          "physical_headroom": 24508,
+          "wall_cycles": 10932,
+          "physical_headroom": 24636,
           "start": {
             "clock": 32357097,
             "host_frame": 909,
@@ -5872,13 +5872,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 32368157,
+            "clock": 32368029,
             "host_frame": 910,
-            "scanline": 11,
-            "cycle": 23
+            "scanline": 10,
+            "cycle": 9
           },
           "next_start": {
-            "clock": 32392660,
+            "clock": 32392665,
             "host_frame": 910
           },
           "host_vbi_boundaries": 1,
@@ -5914,7 +5914,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               0
@@ -5950,19 +5950,19 @@
           "frame": 535,
           "gameplay_frame": 23,
           "difficulty": 2,
-          "wall_cycles": 25076,
-          "physical_headroom": 10492,
+          "wall_cycles": 25008,
+          "physical_headroom": 10560,
           "start": {
-            "clock": 33530836,
+            "clock": 33530841,
             "host_frame": 942,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 33555912,
+            "clock": 33555849,
             "host_frame": 943,
-            "scanline": 134,
-            "cycle": 12
+            "scanline": 133,
+            "cycle": 63
           },
           "next_start": {
             "clock": 33566409,
@@ -6001,7 +6001,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               16
@@ -6041,19 +6041,19 @@
           "frame": 609,
           "gameplay_frame": 97,
           "difficulty": 2,
-          "wall_cycles": 14761,
-          "physical_headroom": 20807,
+          "wall_cycles": 14614,
+          "physical_headroom": 20954,
           "start": {
-            "clock": 36162868,
+            "clock": 36162873,
             "host_frame": 1016,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 36177629,
+            "clock": 36177487,
             "host_frame": 1017,
-            "scanline": 43,
-            "cycle": 71
+            "scanline": 42,
+            "cycle": 43
           },
           "next_start": {
             "clock": 36198441,
@@ -6092,7 +6092,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               32
@@ -6129,8 +6129,8 @@
           "frame": 642,
           "gameplay_frame": 130,
           "difficulty": 2,
-          "wall_cycles": 10598,
-          "physical_headroom": 24970,
+          "wall_cycles": 10510,
+          "physical_headroom": 25058,
           "start": {
             "clock": 37336612,
             "host_frame": 1049,
@@ -6138,10 +6138,10 @@
             "cycle": 16
           },
           "end": {
-            "clock": 37347210,
+            "clock": 37347122,
             "host_frame": 1050,
-            "scanline": 7,
-            "cycle": 12
+            "scanline": 6,
+            "cycle": 38
           },
           "next_start": {
             "clock": 37372180,
@@ -6180,7 +6180,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 10,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               48
@@ -6215,8 +6215,8 @@
           "frame": 676,
           "gameplay_frame": 164,
           "difficulty": 2,
-          "wall_cycles": 13048,
-          "physical_headroom": 22520,
+          "wall_cycles": 12879,
+          "physical_headroom": 22689,
           "start": {
             "clock": 38545929,
             "host_frame": 1083,
@@ -6224,13 +6224,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 38558977,
+            "clock": 38558808,
             "host_frame": 1084,
-            "scanline": 28,
-            "cycle": 73
+            "scanline": 27,
+            "cycle": 18
           },
           "next_start": {
-            "clock": 38581492,
+            "clock": 38581497,
             "host_frame": 1084
           },
           "host_vbi_boundaries": 1,
@@ -6266,7 +6266,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 10,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               64
@@ -6301,22 +6301,22 @@
           "frame": 767,
           "gameplay_frame": 255,
           "difficulty": 2,
-          "wall_cycles": 27530,
-          "physical_headroom": 8038,
+          "wall_cycles": 27391,
+          "physical_headroom": 8177,
           "start": {
-            "clock": 41782617,
+            "clock": 41782612,
             "host_frame": 1174,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 41810147,
+            "clock": 41810003,
             "host_frame": 1175,
-            "scanline": 155,
-            "cycle": 77
+            "scanline": 154,
+            "cycle": 47
           },
           "next_start": {
-            "clock": 41818180,
+            "clock": 41818185,
             "host_frame": 1175
           },
           "host_vbi_boundaries": 1,
@@ -6352,7 +6352,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               96
@@ -6392,19 +6392,19 @@
           "frame": 815,
           "gameplay_frame": 47,
           "difficulty": 2,
-          "wall_cycles": 27473,
-          "physical_headroom": 8095,
+          "wall_cycles": 27395,
+          "physical_headroom": 8173,
           "start": {
-            "clock": 43489881,
+            "clock": 43489876,
             "host_frame": 1222,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 43517354,
+            "clock": 43517271,
             "host_frame": 1223,
-            "scanline": 155,
-            "cycle": 20
+            "scanline": 154,
+            "cycle": 51
           },
           "next_start": {
             "clock": 43525444,
@@ -6443,7 +6443,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               112
@@ -6483,8 +6483,8 @@
           "frame": 890,
           "gameplay_frame": 122,
           "difficulty": 2,
-          "wall_cycles": 15550,
-          "physical_headroom": 20018,
+          "wall_cycles": 15428,
+          "physical_headroom": 20140,
           "start": {
             "clock": 46157481,
             "host_frame": 1297,
@@ -6492,10 +6492,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 46173031,
+            "clock": 46172909,
             "host_frame": 1298,
-            "scanline": 50,
-            "cycle": 67
+            "scanline": 49,
+            "cycle": 59
           },
           "next_start": {
             "clock": 46193049,
@@ -6534,7 +6534,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               128
@@ -6569,8 +6569,8 @@
           "frame": 1014,
           "gameplay_frame": 246,
           "difficulty": 2,
-          "wall_cycles": 10971,
-          "physical_headroom": 24597,
+          "wall_cycles": 10865,
+          "physical_headroom": 24703,
           "start": {
             "clock": 50567908,
             "host_frame": 1421,
@@ -6578,13 +6578,13 @@
             "cycle": 16
           },
           "end": {
-            "clock": 50578879,
+            "clock": 50578773,
             "host_frame": 1422,
-            "scanline": 10,
-            "cycle": 43
+            "scanline": 9,
+            "cycle": 51
           },
           "next_start": {
-            "clock": 50603481,
+            "clock": 50603476,
             "host_frame": 1422
           },
           "host_vbi_boundaries": 1,
@@ -6620,7 +6620,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               2,
               0
@@ -6655,19 +6655,19 @@
           "frame": 1057,
           "gameplay_frame": 33,
           "difficulty": 2,
-          "wall_cycles": 10669,
-          "physical_headroom": 24899,
+          "wall_cycles": 10610,
+          "physical_headroom": 24958,
           "start": {
-            "clock": 52097332,
+            "clock": 52097337,
             "host_frame": 1464,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 52108001,
+            "clock": 52107947,
             "host_frame": 1465,
             "scanline": 7,
-            "cycle": 83
+            "cycle": 29
           },
           "next_start": {
             "clock": 52132905,
@@ -6706,7 +6706,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               2,
               16
@@ -6744,19 +6744,19 @@
           "frame": 1148,
           "gameplay_frame": 124,
           "difficulty": 2,
-          "wall_cycles": 14957,
-          "physical_headroom": 20611,
+          "wall_cycles": 14842,
+          "physical_headroom": 20726,
           "start": {
-            "clock": 55334020,
+            "clock": 55334025,
             "host_frame": 1555,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 55348977,
+            "clock": 55348867,
             "host_frame": 1556,
-            "scanline": 45,
-            "cycle": 39
+            "scanline": 44,
+            "cycle": 43
           },
           "next_start": {
             "clock": 55369593,
@@ -6795,7 +6795,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 5,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               2,
               32
@@ -6830,8 +6830,8 @@
           "frame": 1247,
           "gameplay_frame": 223,
           "difficulty": 2,
-          "wall_cycles": 29522,
-          "physical_headroom": 6046,
+          "wall_cycles": 29410,
+          "physical_headroom": 6158,
           "start": {
             "clock": 58855257,
             "host_frame": 1654,
@@ -6839,10 +6839,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 58884779,
+            "clock": 58884667,
             "host_frame": 1655,
-            "scanline": 173,
-            "cycle": 17
+            "scanline": 172,
+            "cycle": 19
           },
           "next_start": {
             "clock": 58890825,
@@ -6881,7 +6881,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               2,
               64
@@ -6921,22 +6921,22 @@
           "frame": 1272,
           "gameplay_frame": 248,
           "difficulty": 2,
-          "wall_cycles": 10831,
-          "physical_headroom": 24737,
+          "wall_cycles": 10682,
+          "physical_headroom": 24886,
           "start": {
-            "clock": 59744457,
+            "clock": 59744452,
             "host_frame": 1679,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 59755288,
+            "clock": 59755134,
             "host_frame": 1680,
-            "scanline": 9,
-            "cycle": 22
+            "scanline": 7,
+            "cycle": 96
           },
           "next_start": {
-            "clock": 59780025,
+            "clock": 59780020,
             "host_frame": 1680
           },
           "host_vbi_boundaries": 1,
@@ -6972,7 +6972,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               2,
               80
@@ -7008,19 +7008,19 @@
           "frame": 1325,
           "gameplay_frame": 45,
           "difficulty": 2,
-          "wall_cycles": 10508,
-          "physical_headroom": 25060,
+          "wall_cycles": 10458,
+          "physical_headroom": 25110,
           "start": {
-            "clock": 61629556,
+            "clock": 61629561,
             "host_frame": 1732,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 61640064,
+            "clock": 61640019,
             "host_frame": 1733,
-            "scanline": 6,
-            "cycle": 36
+            "scanline": 5,
+            "cycle": 105
           },
           "next_start": {
             "clock": 61665129,
@@ -7059,7 +7059,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 5,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               2,
               96
@@ -7096,8 +7096,8 @@
           "frame": 1445,
           "gameplay_frame": 165,
           "difficulty": 2,
-          "wall_cycles": 13668,
-          "physical_headroom": 21900,
+          "wall_cycles": 13356,
+          "physical_headroom": 22212,
           "start": {
             "clock": 65897721,
             "host_frame": 1852,
@@ -7105,10 +7105,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 65911389,
+            "clock": 65911077,
             "host_frame": 1853,
-            "scanline": 34,
-            "cycle": 9
+            "scanline": 31,
+            "cycle": 39
           },
           "next_start": {
             "clock": 65933289,
@@ -7147,7 +7147,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 8,
+            "rapid_viper_projectiles": 8,
             "score_bcd": [
               2,
               128
@@ -7184,8 +7184,8 @@
           "frame": 1501,
           "gameplay_frame": 221,
           "difficulty": 2,
-          "wall_cycles": 13401,
-          "physical_headroom": 22167,
+          "wall_cycles": 13088,
+          "physical_headroom": 22480,
           "start": {
             "clock": 67889524,
             "host_frame": 1908,
@@ -7193,13 +7193,13 @@
             "cycle": 16
           },
           "end": {
-            "clock": 67902925,
+            "clock": 67902612,
             "host_frame": 1909,
-            "scanline": 31,
-            "cycle": 79
+            "scanline": 28,
+            "cycle": 108
           },
           "next_start": {
-            "clock": 67925097,
+            "clock": 67925092,
             "host_frame": 1909
           },
           "host_vbi_boundaries": 1,
@@ -7235,7 +7235,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 9,
+            "rapid_viper_projectiles": 9,
             "score_bcd": [
               2,
               144
@@ -7272,19 +7272,19 @@
           "frame": 1533,
           "gameplay_frame": 253,
           "difficulty": 2,
-          "wall_cycles": 10226,
-          "physical_headroom": 25342,
+          "wall_cycles": 10054,
+          "physical_headroom": 25514,
           "start": {
-            "clock": 69027705,
+            "clock": 69027700,
             "host_frame": 1940,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 69037931,
+            "clock": 69037754,
             "host_frame": 1941,
-            "scanline": 3,
-            "cycle": 101
+            "scanline": 2,
+            "cycle": 38
           },
           "next_start": {
             "clock": 69063268,
@@ -7323,7 +7323,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 9,
+            "rapid_viper_projectiles": 9,
             "score_bcd": [
               3,
               0
@@ -7360,8 +7360,8 @@
           "frame": 1620,
           "gameplay_frame": 84,
           "difficulty": 2,
-          "wall_cycles": 15444,
-          "physical_headroom": 20124,
+          "wall_cycles": 15200,
+          "physical_headroom": 20368,
           "start": {
             "clock": 72122121,
             "host_frame": 2027,
@@ -7369,13 +7369,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 72137565,
+            "clock": 72137321,
             "host_frame": 2028,
-            "scanline": 49,
-            "cycle": 75
+            "scanline": 47,
+            "cycle": 59
           },
           "next_start": {
-            "clock": 72157689,
+            "clock": 72157684,
             "host_frame": 2028
           },
           "host_vbi_boundaries": 1,
@@ -7411,7 +7411,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 5,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               3,
               32
@@ -7446,19 +7446,19 @@
           "frame": 1665,
           "gameplay_frame": 129,
           "difficulty": 2,
-          "wall_cycles": 10300,
-          "physical_headroom": 25268,
+          "wall_cycles": 10225,
+          "physical_headroom": 25343,
           "start": {
-            "clock": 73722676,
+            "clock": 73722681,
             "host_frame": 2072,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 73732976,
+            "clock": 73732906,
             "host_frame": 2073,
-            "scanline": 4,
-            "cycle": 56
+            "scanline": 3,
+            "cycle": 100
           },
           "next_start": {
             "clock": 73758249,
@@ -7497,7 +7497,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               3,
               48
@@ -7534,19 +7534,19 @@
           "frame": 1720,
           "gameplay_frame": 184,
           "difficulty": 2,
-          "wall_cycles": 15453,
-          "physical_headroom": 20115,
+          "wall_cycles": 15222,
+          "physical_headroom": 20346,
           "start": {
-            "clock": 75678916,
+            "clock": 75678921,
             "host_frame": 2127,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 75694369,
+            "clock": 75694143,
             "host_frame": 2128,
-            "scanline": 49,
-            "cycle": 79
+            "scanline": 47,
+            "cycle": 81
           },
           "next_start": {
             "clock": 75714489,
@@ -7585,7 +7585,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               3,
               64
@@ -7620,8 +7620,8 @@
           "frame": 1825,
           "gameplay_frame": 33,
           "difficulty": 2,
-          "wall_cycles": 10592,
-          "physical_headroom": 24976,
+          "wall_cycles": 10503,
+          "physical_headroom": 25065,
           "start": {
             "clock": 79413561,
             "host_frame": 2232,
@@ -7629,13 +7629,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 79424153,
+            "clock": 79424064,
             "host_frame": 2233,
-            "scanline": 7,
-            "cycle": 11
+            "scanline": 6,
+            "cycle": 36
           },
           "next_start": {
-            "clock": 79449124,
+            "clock": 79449129,
             "host_frame": 2233
           },
           "host_vbi_boundaries": 1,
@@ -7671,7 +7671,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 4,
-            "powered_viper_projectiles": 4,
+            "rapid_viper_projectiles": 4,
             "score_bcd": [
               3,
               96
@@ -7709,19 +7709,19 @@
           "frame": 1855,
           "gameplay_frame": 63,
           "difficulty": 2,
-          "wall_cycles": 22244,
-          "physical_headroom": 13324,
+          "wall_cycles": 21991,
+          "physical_headroom": 13577,
           "start": {
-            "clock": 80480601,
+            "clock": 80480596,
             "host_frame": 2262,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 80502845,
+            "clock": 80502587,
             "host_frame": 2263,
-            "scanline": 109,
-            "cycle": 35
+            "scanline": 107,
+            "cycle": 5
           },
           "next_start": {
             "clock": 80516169,
@@ -7760,7 +7760,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 6,
+            "rapid_viper_projectiles": 6,
             "score_bcd": [
               3,
               112
@@ -7801,8 +7801,8 @@
           "frame": 1908,
           "gameplay_frame": 116,
           "difficulty": 2,
-          "wall_cycles": 15474,
-          "physical_headroom": 20094,
+          "wall_cycles": 15132,
+          "physical_headroom": 20436,
           "start": {
             "clock": 82365705,
             "host_frame": 2315,
@@ -7810,9 +7810,9 @@
             "cycle": 21
           },
           "end": {
-            "clock": 82381179,
+            "clock": 82380837,
             "host_frame": 2316,
-            "scanline": 49,
+            "scanline": 46,
             "cycle": 105
           },
           "next_start": {
@@ -7852,7 +7852,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 8,
+            "rapid_viper_projectiles": 8,
             "score_bcd": [
               3,
               128
@@ -7887,19 +7887,19 @@
           "frame": 1997,
           "gameplay_frame": 205,
           "difficulty": 2,
-          "wall_cycles": 9567,
-          "physical_headroom": 26001,
+          "wall_cycles": 9385,
+          "physical_headroom": 26183,
           "start": {
-            "clock": 85531257,
+            "clock": 85531252,
             "host_frame": 2404,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 85540824,
+            "clock": 85540637,
             "host_frame": 2404,
-            "scanline": 310,
-            "cycle": 12
+            "scanline": 308,
+            "cycle": 53
           },
           "next_start": {
             "clock": 85566820,
@@ -7938,7 +7938,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 9,
+            "rapid_viper_projectiles": 9,
             "score_bcd": [
               4,
               0
@@ -7975,8 +7975,8 @@
           "frame": 2080,
           "gameplay_frame": 32,
           "difficulty": 2,
-          "wall_cycles": 16020,
-          "physical_headroom": 19548,
+          "wall_cycles": 15776,
+          "physical_headroom": 19792,
           "start": {
             "clock": 88483401,
             "host_frame": 2487,
@@ -7984,10 +7984,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 88499421,
+            "clock": 88499177,
             "host_frame": 2488,
-            "scanline": 54,
-            "cycle": 81
+            "scanline": 52,
+            "cycle": 65
           },
           "next_start": {
             "clock": 88518969,
@@ -8026,7 +8026,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 7,
+            "rapid_viper_projectiles": 7,
             "score_bcd": [
               4,
               16
@@ -8061,22 +8061,22 @@
           "frame": 2118,
           "gameplay_frame": 70,
           "difficulty": 2,
-          "wall_cycles": 10072,
-          "physical_headroom": 25496,
+          "wall_cycles": 9892,
+          "physical_headroom": 25676,
           "start": {
-            "clock": 89834985,
+            "clock": 89834980,
             "host_frame": 2525,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 89845057,
+            "clock": 89844872,
             "host_frame": 2526,
-            "scanline": 2,
-            "cycle": 61
+            "scanline": 0,
+            "cycle": 104
           },
           "next_start": {
-            "clock": 89870548,
+            "clock": 89870553,
             "host_frame": 2526
           },
           "host_vbi_boundaries": 1,
@@ -8112,7 +8112,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 9,
+            "rapid_viper_projectiles": 9,
             "score_bcd": [
               4,
               32
@@ -8147,8 +8147,8 @@
           "frame": 2214,
           "gameplay_frame": 166,
           "difficulty": 2,
-          "wall_cycles": 8969,
-          "physical_headroom": 26599,
+          "wall_cycles": 8849,
+          "physical_headroom": 26719,
           "start": {
             "clock": 93249508,
             "host_frame": 2621,
@@ -8156,13 +8156,13 @@
             "cycle": 16
           },
           "end": {
-            "clock": 93258477,
+            "clock": 93258357,
             "host_frame": 2621,
-            "scanline": 304,
-            "cycle": 93
+            "scanline": 303,
+            "cycle": 87
           },
           "next_start": {
-            "clock": 93285081,
+            "clock": 93285076,
             "host_frame": 2622
           },
           "host_vbi_boundaries": 0,
@@ -8198,7 +8198,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 6,
+            "rapid_viper_projectiles": 6,
             "score_bcd": [
               4,
               64
@@ -8234,8 +8234,8 @@
           "frame": 2268,
           "gameplay_frame": 220,
           "difficulty": 2,
-          "wall_cycles": 15134,
-          "physical_headroom": 20434,
+          "wall_cycles": 14812,
+          "physical_headroom": 20756,
           "start": {
             "clock": 95170185,
             "host_frame": 2675,
@@ -8243,13 +8243,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 95185319,
+            "clock": 95184997,
             "host_frame": 2676,
-            "scanline": 46,
-            "cycle": 107
+            "scanline": 44,
+            "cycle": 13
           },
           "next_start": {
-            "clock": 95205748,
+            "clock": 95205753,
             "host_frame": 2676
           },
           "host_vbi_boundaries": 1,
@@ -8285,7 +8285,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 9,
+            "rapid_viper_projectiles": 9,
             "score_bcd": [
               4,
               80
@@ -8320,19 +8320,19 @@
           "frame": 2335,
           "gameplay_frame": 31,
           "difficulty": 2,
-          "wall_cycles": 31983,
-          "physical_headroom": 3585,
+          "wall_cycles": 31824,
+          "physical_headroom": 3744,
           "start": {
-            "clock": 97553236,
+            "clock": 97553241,
             "host_frame": 2742,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 97585219,
+            "clock": 97585065,
             "host_frame": 2743,
-            "scanline": 194,
-            "cycle": 79
+            "scanline": 193,
+            "cycle": 39
           },
           "next_start": {
             "clock": 97588809,
@@ -8371,7 +8371,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               4,
               96
@@ -8411,8 +8411,8 @@
           "frame": 2413,
           "gameplay_frame": 109,
           "difficulty": 2,
-          "wall_cycles": 12767,
-          "physical_headroom": 22801,
+          "wall_cycles": 12656,
+          "physical_headroom": 22912,
           "start": {
             "clock": 100327545,
             "host_frame": 2820,
@@ -8420,13 +8420,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 100340312,
+            "clock": 100340201,
             "host_frame": 2821,
-            "scanline": 26,
-            "cycle": 20
+            "scanline": 25,
+            "cycle": 23
           },
           "next_start": {
-            "clock": 100363113,
+            "clock": 100363108,
             "host_frame": 2821
           },
           "host_vbi_boundaries": 1,
@@ -8462,7 +8462,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               4,
               112
@@ -8499,22 +8499,22 @@
           "frame": 2468,
           "gameplay_frame": 164,
           "difficulty": 2,
-          "wall_cycles": 14244,
-          "physical_headroom": 21324,
+          "wall_cycles": 14174,
+          "physical_headroom": 21394,
           "start": {
-            "clock": 102283780,
+            "clock": 102283785,
             "host_frame": 2875,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 102298024,
+            "clock": 102297959,
             "host_frame": 2876,
-            "scanline": 39,
-            "cycle": 10
+            "scanline": 38,
+            "cycle": 59
           },
           "next_start": {
-            "clock": 102319353,
+            "clock": 102319348,
             "host_frame": 2876
           },
           "host_vbi_boundaries": 1,
@@ -8550,7 +8550,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 5,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               4,
               128
@@ -8585,22 +8585,22 @@
           "frame": 2502,
           "gameplay_frame": 198,
           "difficulty": 2,
-          "wall_cycles": 9041,
-          "physical_headroom": 26527,
+          "wall_cycles": 9000,
+          "physical_headroom": 26568,
           "start": {
-            "clock": 103493097,
+            "clock": 103493092,
             "host_frame": 2909,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 103502138,
+            "clock": 103502092,
             "host_frame": 2909,
             "scanline": 305,
-            "cycle": 56
+            "cycle": 10
           },
           "next_start": {
-            "clock": 103528665,
+            "clock": 103528660,
             "host_frame": 2910
           },
           "host_vbi_boundaries": 0,
@@ -8636,7 +8636,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 5,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               4,
               144
@@ -8671,8 +8671,8 @@
           "frame": 2594,
           "gameplay_frame": 34,
           "difficulty": 2,
-          "wall_cycles": 15730,
-          "physical_headroom": 19838,
+          "wall_cycles": 15432,
+          "physical_headroom": 20136,
           "start": {
             "clock": 106765353,
             "host_frame": 3001,
@@ -8680,13 +8680,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 106781083,
+            "clock": 106780785,
             "host_frame": 3002,
-            "scanline": 52,
-            "cycle": 19
+            "scanline": 49,
+            "cycle": 63
           },
           "next_start": {
-            "clock": 106800916,
+            "clock": 106800921,
             "host_frame": 3002
           },
           "host_vbi_boundaries": 1,
@@ -8722,7 +8722,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 9,
+            "rapid_viper_projectiles": 9,
             "score_bcd": [
               5,
               16
@@ -8757,22 +8757,22 @@
           "frame": 2635,
           "gameplay_frame": 75,
           "difficulty": 2,
-          "wall_cycles": 21369,
-          "physical_headroom": 14199,
+          "wall_cycles": 21181,
+          "physical_headroom": 14387,
           "start": {
-            "clock": 108223636,
+            "clock": 108223641,
             "host_frame": 3042,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 108245005,
+            "clock": 108244822,
             "host_frame": 3043,
-            "scanline": 101,
-            "cycle": 67
+            "scanline": 99,
+            "cycle": 112
           },
           "next_start": {
-            "clock": 108259209,
+            "clock": 108259204,
             "host_frame": 3043
           },
           "host_vbi_boundaries": 1,
@@ -8808,7 +8808,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 5,
-            "powered_viper_projectiles": 5,
+            "rapid_viper_projectiles": 5,
             "score_bcd": [
               5,
               32
@@ -8847,8 +8847,8 @@
           "frame": 2666,
           "gameplay_frame": 106,
           "difficulty": 2,
-          "wall_cycles": 8766,
-          "physical_headroom": 26802,
+          "wall_cycles": 8640,
+          "physical_headroom": 26928,
           "start": {
             "clock": 109326249,
             "host_frame": 3073,
@@ -8856,10 +8856,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 109335015,
+            "clock": 109334889,
             "host_frame": 3073,
-            "scanline": 303,
-            "cycle": 9
+            "scanline": 301,
+            "cycle": 111
           },
           "next_start": {
             "clock": 109361817,
@@ -8898,7 +8898,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 6,
+            "rapid_viper_projectiles": 6,
             "score_bcd": [
               5,
               48
@@ -8934,22 +8934,22 @@
           "frame": 2753,
           "gameplay_frame": 193,
           "difficulty": 2,
-          "wall_cycles": 13307,
-          "physical_headroom": 22261,
+          "wall_cycles": 13192,
+          "physical_headroom": 22376,
           "start": {
-            "clock": 112420660,
+            "clock": 112420665,
             "host_frame": 3160,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 112433967,
+            "clock": 112433857,
             "host_frame": 3161,
-            "scanline": 30,
-            "cycle": 99
+            "scanline": 29,
+            "cycle": 103
           },
           "next_start": {
-            "clock": 112456228,
+            "clock": 112456233,
             "host_frame": 3161
           },
           "host_vbi_boundaries": 1,
@@ -8985,7 +8985,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 2,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               5,
               80
@@ -9023,8 +9023,8 @@
           "frame": 2804,
           "gameplay_frame": 244,
           "difficulty": 2,
-          "wall_cycles": 14654,
-          "physical_headroom": 20914,
+          "wall_cycles": 14568,
+          "physical_headroom": 21000,
           "start": {
             "clock": 114234633,
             "host_frame": 3211,
@@ -9032,10 +9032,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 114249287,
+            "clock": 114249201,
             "host_frame": 3212,
-            "scanline": 42,
-            "cycle": 83
+            "scanline": 41,
+            "cycle": 111
           },
           "next_start": {
             "clock": 114270201,
@@ -9074,7 +9074,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               5,
               96
@@ -9109,22 +9109,22 @@
           "frame": 2834,
           "gameplay_frame": 18,
           "difficulty": 2,
-          "wall_cycles": 10232,
-          "physical_headroom": 25336,
+          "wall_cycles": 10167,
+          "physical_headroom": 25401,
           "start": {
-            "clock": 115301668,
+            "clock": 115301673,
             "host_frame": 3241,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 115311900,
+            "clock": 115311840,
             "host_frame": 3242,
             "scanline": 3,
-            "cycle": 102
+            "cycle": 42
           },
           "next_start": {
-            "clock": 115337236,
+            "clock": 115337241,
             "host_frame": 3242
           },
           "host_vbi_boundaries": 1,
@@ -9160,7 +9160,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               5,
               112
@@ -9196,22 +9196,22 @@
           "frame": 2970,
           "gameplay_frame": 154,
           "difficulty": 2,
-          "wall_cycles": 10612,
-          "physical_headroom": 24956,
+          "wall_cycles": 10537,
+          "physical_headroom": 25031,
           "start": {
-            "clock": 120138916,
+            "clock": 120138921,
             "host_frame": 3377,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 120149528,
+            "clock": 120149458,
             "host_frame": 3378,
-            "scanline": 7,
-            "cycle": 26
+            "scanline": 6,
+            "cycle": 70
           },
           "next_start": {
-            "clock": 120174484,
+            "clock": 120174489,
             "host_frame": 3378
           },
           "host_vbi_boundaries": 1,
@@ -9247,7 +9247,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               5,
               144
@@ -9282,8 +9282,8 @@
           "frame": 2996,
           "gameplay_frame": 180,
           "difficulty": 2,
-          "wall_cycles": 13414,
-          "physical_headroom": 22154,
+          "wall_cycles": 13254,
+          "physical_headroom": 22314,
           "start": {
             "clock": 121063689,
             "host_frame": 3403,
@@ -9291,13 +9291,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 121077103,
+            "clock": 121076943,
             "host_frame": 3404,
-            "scanline": 31,
-            "cycle": 97
+            "scanline": 30,
+            "cycle": 51
           },
           "next_start": {
-            "clock": 121099257,
+            "clock": 121099252,
             "host_frame": 3404
           },
           "host_vbi_boundaries": 1,
@@ -9333,7 +9333,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 10,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               6,
               0
@@ -9369,8 +9369,8 @@
           "frame": 3066,
           "gameplay_frame": 250,
           "difficulty": 2,
-          "wall_cycles": 15880,
-          "physical_headroom": 19688,
+          "wall_cycles": 15794,
+          "physical_headroom": 19774,
           "start": {
             "clock": 123553449,
             "host_frame": 3473,
@@ -9378,10 +9378,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 123569329,
+            "clock": 123569243,
             "host_frame": 3474,
-            "scanline": 53,
-            "cycle": 55
+            "scanline": 52,
+            "cycle": 83
           },
           "next_start": {
             "clock": 123589017,
@@ -9420,7 +9420,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               6,
               16
@@ -9456,19 +9456,19 @@
           "frame": 3167,
           "gameplay_frame": 95,
           "difficulty": 2,
-          "wall_cycles": 25926,
-          "physical_headroom": 9642,
+          "wall_cycles": 25837,
+          "physical_headroom": 9731,
           "start": {
-            "clock": 127145817,
+            "clock": 127145812,
             "host_frame": 3574,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 127171743,
+            "clock": 127171649,
             "host_frame": 3575,
-            "scanline": 141,
-            "cycle": 69
+            "scanline": 140,
+            "cycle": 89
           },
           "next_start": {
             "clock": 127181385,
@@ -9507,7 +9507,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               6,
               48
@@ -9551,19 +9551,19 @@
           "frame": 2335,
           "gameplay_frame": 31,
           "difficulty": 2,
-          "wall_cycles": 31983,
-          "physical_headroom": 3585,
+          "wall_cycles": 31824,
+          "physical_headroom": 3744,
           "start": {
-            "clock": 97553236,
+            "clock": 97553241,
             "host_frame": 2742,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 97585219,
+            "clock": 97585065,
             "host_frame": 2743,
-            "scanline": 194,
-            "cycle": 79
+            "scanline": 193,
+            "cycle": 39
           },
           "next_start": {
             "clock": 97588809,
@@ -9602,7 +9602,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               4,
               96
@@ -9646,22 +9646,22 @@
           "frame": 223,
           "gameplay_frame": 223,
           "difficulty": 2,
-          "wall_cycles": 33172,
-          "physical_headroom": 2396,
+          "wall_cycles": 33074,
+          "physical_headroom": 2494,
           "start": {
-            "clock": 22433625,
+            "clock": 22433620,
             "host_frame": 630,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 22466797,
+            "clock": 22466694,
             "host_frame": 631,
-            "scanline": 205,
-            "cycle": 19
+            "scanline": 204,
+            "cycle": 30
           },
           "next_start": {
-            "clock": 22469193,
+            "clock": 22469194,
             "host_frame": 631
           },
           "host_vbi_boundaries": 1,
@@ -9697,7 +9697,7 @@
               "drawn_mask": 15
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               48
@@ -9738,22 +9738,22 @@
           "frame": 427,
           "gameplay_frame": 171,
           "difficulty": 2,
-          "wall_cycles": 27552,
-          "physical_headroom": 8016,
+          "wall_cycles": 27369,
+          "physical_headroom": 8199,
           "start": {
-            "clock": 29689497,
+            "clock": 29689492,
             "host_frame": 834,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 29717049,
+            "clock": 29716861,
             "host_frame": 835,
-            "scanline": 155,
-            "cycle": 99
+            "scanline": 154,
+            "cycle": 25
           },
           "next_start": {
-            "clock": 29725065,
+            "clock": 29725060,
             "host_frame": 835
           },
           "host_vbi_boundaries": 1,
@@ -9789,7 +9789,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               128
@@ -9830,8 +9830,8 @@
           "frame": 754,
           "gameplay_frame": 242,
           "difficulty": 2,
-          "wall_cycles": 13431,
-          "physical_headroom": 22137,
+          "wall_cycles": 13291,
+          "physical_headroom": 22277,
           "start": {
             "clock": 41320228,
             "host_frame": 1161,
@@ -9839,13 +9839,13 @@
             "cycle": 16
           },
           "end": {
-            "clock": 41333659,
+            "clock": 41333519,
             "host_frame": 1162,
-            "scanline": 31,
-            "cycle": 109
+            "scanline": 30,
+            "cycle": 83
           },
           "next_start": {
-            "clock": 41355801,
+            "clock": 41355796,
             "host_frame": 1162
           },
           "host_vbi_boundaries": 1,
@@ -9881,7 +9881,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               80
@@ -9918,8 +9918,8 @@
           "frame": 1401,
           "gameplay_frame": 121,
           "difficulty": 2,
-          "wall_cycles": 13881,
-          "physical_headroom": 21687,
+          "wall_cycles": 13710,
+          "physical_headroom": 21858,
           "start": {
             "clock": 64332729,
             "host_frame": 1808,
@@ -9927,13 +9927,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 64346610,
+            "clock": 64346439,
             "host_frame": 1809,
-            "scanline": 35,
-            "cycle": 108
+            "scanline": 34,
+            "cycle": 51
           },
           "next_start": {
-            "clock": 64368292,
+            "clock": 64368297,
             "host_frame": 1809
           },
           "host_vbi_boundaries": 1,
@@ -9969,7 +9969,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 8,
             "score_bcd": [
               2,
               112
@@ -10008,8 +10008,8 @@
           "frame": 1608,
           "gameplay_frame": 72,
           "difficulty": 2,
-          "wall_cycles": 12030,
-          "physical_headroom": 23538,
+          "wall_cycles": 11472,
+          "physical_headroom": 24096,
           "start": {
             "clock": 71695305,
             "host_frame": 2015,
@@ -10017,10 +10017,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 71707335,
+            "clock": 71706777,
             "host_frame": 2016,
-            "scanline": 19,
-            "cycle": 81
+            "scanline": 14,
+            "cycle": 93
           },
           "next_start": {
             "clock": 71730873,
@@ -10029,7 +10029,7 @@
           "host_vbi_boundaries": 1,
           "extra_vbi_boundaries": 0,
           "missed_frames": 0,
-          "dli_nmis": 1,
+          "dli_nmis": 0,
           "dma_ctl": 62,
           "nmi_en": 128,
           "state": {
@@ -10059,7 +10059,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 8,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               3,
               16
@@ -10094,8 +10094,8 @@
           "frame": 1786,
           "gameplay_frame": 250,
           "difficulty": 2,
-          "wall_cycles": 9746,
-          "physical_headroom": 25822,
+          "wall_cycles": 9668,
+          "physical_headroom": 25900,
           "start": {
             "clock": 78026404,
             "host_frame": 2193,
@@ -10103,13 +10103,13 @@
             "cycle": 16
           },
           "end": {
-            "clock": 78036150,
+            "clock": 78036072,
             "host_frame": 2193,
-            "scanline": 311,
-            "cycle": 72
+            "scanline": 310,
+            "cycle": 108
           },
           "next_start": {
-            "clock": 78061977,
+            "clock": 78061972,
             "host_frame": 2194
           },
           "host_vbi_boundaries": 0,
@@ -10145,7 +10145,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               3,
               80
@@ -10182,22 +10182,22 @@
           "frame": 2192,
           "gameplay_frame": 144,
           "difficulty": 2,
-          "wall_cycles": 14127,
-          "physical_headroom": 21441,
+          "wall_cycles": 13853,
+          "physical_headroom": 21715,
           "start": {
-            "clock": 92467017,
+            "clock": 92467012,
             "host_frame": 2599,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 92481144,
+            "clock": 92480865,
             "host_frame": 2600,
-            "scanline": 38,
-            "cycle": 12
+            "scanline": 35,
+            "cycle": 75
           },
           "next_start": {
-            "clock": 92502580,
+            "clock": 92502585,
             "host_frame": 2600
           },
           "host_vbi_boundaries": 1,
@@ -10233,7 +10233,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 7,
+            "rapid_viper_projectiles": 7,
             "score_bcd": [
               4,
               48
@@ -10270,19 +10270,19 @@
           "frame": 2573,
           "gameplay_frame": 13,
           "difficulty": 2,
-          "wall_cycles": 7684,
-          "physical_headroom": 27884,
+          "wall_cycles": 7639,
+          "physical_headroom": 27929,
           "start": {
-            "clock": 106018420,
+            "clock": 106018425,
             "host_frame": 2980,
             "scanline": 226,
-            "cycle": 16
+            "cycle": 21
           },
           "end": {
-            "clock": 106026104,
+            "clock": 106026064,
             "host_frame": 2980,
             "scanline": 293,
-            "cycle": 62
+            "cycle": 22
           },
           "next_start": {
             "clock": 106053993,
@@ -10321,7 +10321,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 6,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 6,
             "score_bcd": [
               5,
               0
@@ -10358,8 +10358,8 @@
           "frame": 2739,
           "gameplay_frame": 179,
           "difficulty": 2,
-          "wall_cycles": 22222,
-          "physical_headroom": 13346,
+          "wall_cycles": 21952,
+          "physical_headroom": 13616,
           "start": {
             "clock": 111922713,
             "host_frame": 3146,
@@ -10367,10 +10367,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 111944935,
+            "clock": 111944665,
             "host_frame": 3147,
-            "scanline": 109,
-            "cycle": 13
+            "scanline": 106,
+            "cycle": 85
           },
           "next_start": {
             "clock": 111958281,
@@ -10409,7 +10409,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 8,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               5,
               64
@@ -10452,8 +10452,8 @@
           "frame": 2183,
           "gameplay_frame": 135,
           "difficulty": 2,
-          "wall_cycles": 31349,
-          "physical_headroom": 4219,
+          "wall_cycles": 31174,
+          "physical_headroom": 4394,
           "start": {
             "clock": 92146905,
             "host_frame": 2590,
@@ -10461,13 +10461,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 92178254,
+            "clock": 92178079,
             "host_frame": 2591,
-            "scanline": 189,
-            "cycle": 20
+            "scanline": 187,
+            "cycle": 73
           },
           "next_start": {
-            "clock": 92182473,
+            "clock": 92182468,
             "host_frame": 2591
           },
           "host_vbi_boundaries": 1,
@@ -10503,7 +10503,7 @@
               "drawn_mask": 15
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 7,
+            "rapid_viper_projectiles": 7,
             "score_bcd": [
               4,
               48
@@ -10549,8 +10549,8 @@
           "frame": 385,
           "gameplay_frame": 129,
           "difficulty": 2,
-          "wall_cycles": 22374,
-          "physical_headroom": 13194,
+          "wall_cycles": 22234,
+          "physical_headroom": 13334,
           "start": {
             "clock": 28195641,
             "host_frame": 792,
@@ -10558,10 +10558,10 @@
             "cycle": 21
           },
           "end": {
-            "clock": 28218015,
+            "clock": 28217875,
             "host_frame": 793,
-            "scanline": 110,
-            "cycle": 51
+            "scanline": 109,
+            "cycle": 25
           },
           "next_start": {
             "clock": 28231209,
@@ -10600,7 +10600,7 @@
               "drawn_mask": 15
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               112
@@ -10632,17 +10632,17 @@
         },
         "first_visible_frame": 192
       },
-      "powered_projectiles": {
+      "yellow_projectiles": {
         "observed": true,
-        "matching_frames": 897,
+        "matching_frames": 856,
         "heaviest": {
           "trace_kind": "weapon-pickup-coverage",
           "session": "weapon-pickup-2-hunt-fire4",
           "frame": 2183,
           "gameplay_frame": 135,
           "difficulty": 2,
-          "wall_cycles": 31349,
-          "physical_headroom": 4219,
+          "wall_cycles": 31174,
+          "physical_headroom": 4394,
           "start": {
             "clock": 92146905,
             "host_frame": 2590,
@@ -10650,13 +10650,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 92178254,
+            "clock": 92178079,
             "host_frame": 2591,
-            "scanline": 189,
-            "cycle": 20
+            "scanline": 187,
+            "cycle": 73
           },
           "next_start": {
-            "clock": 92182473,
+            "clock": 92182468,
             "host_frame": 2591
           },
           "host_vbi_boundaries": 1,
@@ -10692,7 +10692,7 @@
               "drawn_mask": 15
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 7,
+            "rapid_viper_projectiles": 7,
             "score_bcd": [
               4,
               48
@@ -10725,15 +10725,18 @@
           ],
           "cpu_dma_off_reference": null
         },
-        "powered_screen_code_frames": 816,
-        "other_code_or_occluded_frames": 81,
-        "powered_screen_code_percent": 90.97,
-        "persisted_after_timer_frames": 46,
-        "powered_screen_code_after_timer_frames": 34,
+        "viper_screen_code_frames": 785,
+        "other_code_or_occluded_frames": 71,
+        "viper_screen_code_percent": 91.71,
+        "screen_code_minimum": 11,
+        "screen_code_maximum": 36,
+        "all_screen_codes_select_colpf2": true,
+        "colour_register": "COLPF2",
+        "colour_value": 30,
         "screenshot": {
           "path": "build/runtime-wall-trace/weapon-pickup-rapid-projectiles-atari800.png",
-          "bytes": 1494,
-          "sha256": "3e3f8c08edcedef50be5ce85ce2fe08138721dbfc852d5b73c0a4581c9bed685",
+          "bytes": 1493,
+          "sha256": "991ac21e4edf98839c2fac690f7f8ed06f0c5084aaaf4c3c83eccfbc996a1eb8",
           "capture_frame": 1420,
           "capture_host_frame": 1827,
           "capture_state": {
@@ -10742,8 +10745,8 @@
             "frame": 1420,
             "gameplay_frame": 140,
             "difficulty": 2,
-            "wall_cycles": 8397,
-            "physical_headroom": 27171,
+            "wall_cycles": 8329,
+            "physical_headroom": 27239,
             "start": {
               "clock": 65008516,
               "host_frame": 1827,
@@ -10751,10 +10754,10 @@
               "cycle": 16
             },
             "end": {
-              "clock": 65016913,
+              "clock": 65016845,
               "host_frame": 1827,
               "scanline": 299,
-              "cycle": 91
+              "cycle": 23
             },
             "next_start": {
               "clock": 65044089,
@@ -10793,7 +10796,7 @@
                 "drawn_mask": 0
               },
               "viper_projectiles": 4,
-              "powered_viper_projectiles": 3,
+              "rapid_viper_projectiles": 4,
               "score_bcd": [
                 2,
                 112
@@ -10846,8 +10849,8 @@
           "frame": 999,
           "gameplay_frame": 231,
           "difficulty": 2,
-          "wall_cycles": 32920,
-          "physical_headroom": 2648,
+          "wall_cycles": 32845,
+          "physical_headroom": 2723,
           "start": {
             "clock": 50034393,
             "host_frame": 1406,
@@ -10855,13 +10858,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 50067313,
+            "clock": 50067238,
             "host_frame": 1407,
             "scanline": 202,
-            "cycle": 109
+            "cycle": 34
           },
           "next_start": {
-            "clock": 50069959,
+            "clock": 50069961,
             "host_frame": 1407
           },
           "host_vbi_boundaries": 1,
@@ -10897,7 +10900,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 10,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               144
@@ -10942,8 +10945,8 @@
           "frame": 999,
           "gameplay_frame": 231,
           "difficulty": 2,
-          "wall_cycles": 32920,
-          "physical_headroom": 2648,
+          "wall_cycles": 32845,
+          "physical_headroom": 2723,
           "start": {
             "clock": 50034393,
             "host_frame": 1406,
@@ -10951,13 +10954,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 50067313,
+            "clock": 50067238,
             "host_frame": 1407,
             "scanline": 202,
-            "cycle": 109
+            "cycle": 34
           },
           "next_start": {
-            "clock": 50069959,
+            "clock": 50069961,
             "host_frame": 1407
           },
           "host_vbi_boundaries": 1,
@@ -10993,7 +10996,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 10,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               1,
               144
@@ -11031,8 +11034,8 @@
       },
       "screenshot": {
         "path": "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png",
-        "bytes": 1495,
-        "sha256": "cc90aa247d6f44563b65076d010edb49cb8bcc709ee9436f4621d79a285b7f5c",
+        "bytes": 2340,
+        "sha256": "b34ba6689e1e0b404dcdcdfe04bd6af3cead14917fbeb44a6a7acf3416baeb1b",
         "capture_frame": 449,
         "capture_host_frame": 857,
         "capture_state": {
@@ -11041,22 +11044,22 @@
           "frame": 449,
           "gameplay_frame": 193,
           "difficulty": 2,
-          "wall_cycles": 26304,
-          "physical_headroom": 9264,
+          "wall_cycles": 26084,
+          "physical_headroom": 9484,
           "start": {
-            "clock": 30471993,
+            "clock": 30471988,
             "host_frame": 856,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 30498297,
+            "clock": 30498072,
             "host_frame": 857,
-            "scanline": 144,
-            "cycle": 105
+            "scanline": 142,
+            "cycle": 108
           },
           "next_start": {
-            "clock": 30507561,
+            "clock": 30507556,
             "host_frame": 857
           },
           "host_vbi_boundaries": 1,
@@ -11092,7 +11095,7 @@
               "drawn_mask": 0
             },
             "viper_projectiles": 9,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               128
@@ -11133,22 +11136,22 @@
           "frame": 223,
           "gameplay_frame": 223,
           "difficulty": 2,
-          "wall_cycles": 33172,
-          "physical_headroom": 2396,
+          "wall_cycles": 33074,
+          "physical_headroom": 2494,
           "start": {
-            "clock": 22433625,
+            "clock": 22433620,
             "host_frame": 630,
             "scanline": 226,
-            "cycle": 21
+            "cycle": 16
           },
           "end": {
-            "clock": 22466797,
+            "clock": 22466694,
             "host_frame": 631,
-            "scanline": 205,
-            "cycle": 19
+            "scanline": 204,
+            "cycle": 30
           },
           "next_start": {
-            "clock": 22469193,
+            "clock": 22469194,
             "host_frame": 631
           },
           "host_vbi_boundaries": 1,
@@ -11184,7 +11187,7 @@
               "drawn_mask": 15
             },
             "viper_projectiles": 8,
-            "powered_viper_projectiles": 0,
+            "rapid_viper_projectiles": 0,
             "score_bcd": [
               0,
               48
@@ -11227,8 +11230,8 @@
           "frame": 2183,
           "gameplay_frame": 135,
           "difficulty": 2,
-          "wall_cycles": 31349,
-          "physical_headroom": 4219,
+          "wall_cycles": 31174,
+          "physical_headroom": 4394,
           "start": {
             "clock": 92146905,
             "host_frame": 2590,
@@ -11236,13 +11239,13 @@
             "cycle": 21
           },
           "end": {
-            "clock": 92178254,
+            "clock": 92178079,
             "host_frame": 2591,
-            "scanline": 189,
-            "cycle": 20
+            "scanline": 187,
+            "cycle": 73
           },
           "next_start": {
-            "clock": 92182473,
+            "clock": 92182468,
             "host_frame": 2591
           },
           "host_vbi_boundaries": 1,
@@ -11278,7 +11281,7 @@
               "drawn_mask": 15
             },
             "viper_projectiles": 7,
-            "powered_viper_projectiles": 7,
+            "rapid_viper_projectiles": 7,
             "score_bcd": [
               4,
               48
@@ -11318,22 +11321,22 @@
         "frame": 223,
         "gameplay_frame": 223,
         "difficulty": 2,
-        "wall_cycles": 33172,
-        "physical_headroom": 2396,
+        "wall_cycles": 33074,
+        "physical_headroom": 2494,
         "start": {
-          "clock": 22433625,
+          "clock": 22433620,
           "host_frame": 630,
           "scanline": 226,
-          "cycle": 21
+          "cycle": 16
         },
         "end": {
-          "clock": 22466797,
+          "clock": 22466694,
           "host_frame": 631,
-          "scanline": 205,
-          "cycle": 19
+          "scanline": 204,
+          "cycle": 30
         },
         "next_start": {
-          "clock": 22469193,
+          "clock": 22469194,
           "host_frame": 631
         },
         "host_vbi_boundaries": 1,
@@ -11369,7 +11372,7 @@
             "drawn_mask": 15
           },
           "viper_projectiles": 8,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -11407,28 +11410,28 @@
       "observed": true,
       "matching_frames": 234,
       "heaviest": {
-        "trace_kind": "weapon-pickup-coverage",
-        "session": "weapon-pickup-2-hunt-fire4",
-        "frame": 2743,
-        "gameplay_frame": 183,
+        "trace_kind": "memory-integrity-120s",
+        "session": "memory-integrity-xex-2-evasive-fire4",
+        "frame": 2463,
+        "gameplay_frame": 159,
         "difficulty": 2,
-        "wall_cycles": 28471,
-        "physical_headroom": 7097,
+        "wall_cycles": 28210,
+        "physical_headroom": 7358,
         "start": {
-          "clock": 112064985,
-          "host_frame": 3150,
+          "clock": 102105945,
+          "host_frame": 2870,
           "scanline": 226,
           "cycle": 21
         },
         "end": {
-          "clock": 112093456,
-          "host_frame": 3151,
-          "scanline": 163,
-          "cycle": 106
+          "clock": 102134155,
+          "host_frame": 2871,
+          "scanline": 161,
+          "cycle": 73
         },
         "next_start": {
-          "clock": 112100553,
-          "host_frame": 3151
+          "clock": 102141508,
+          "host_frame": 2871
         },
         "host_vbi_boundaries": 1,
         "extra_vbi_boundaries": 0,
@@ -11437,46 +11440,46 @@
         "dma_ctl": 62,
         "nmi_en": 128,
         "state": {
-          "projectiles": 9,
+          "projectiles": 12,
           "broadside": 0,
-          "far_rendered": 23,
+          "far_rendered": 24,
           "active_muzzles": 0,
-          "entity_active": 0,
-          "entity_x": 128,
-          "entity_y": 80,
+          "entity_active": 1,
+          "entity_x": 124,
+          "entity_y": 128,
           "entity_vx_signed": 0,
           "entity_move_accumulator": 0,
           "entity_vertical_accumulator": 1,
-          "entity_render_id": 116,
-          "entity_active_mask": 0,
+          "entity_render_id": 112,
+          "entity_active_mask": 2,
           "weapon_pickup": {
-            "state": 4,
+            "state": 2,
             "booster_state": 4,
             "qualified_kill_counter": 0,
-            "x": 112,
-            "y": 164,
-            "timer": 496,
-            "timer_low": 240,
+            "x": 103,
+            "y": 176,
+            "timer": 312,
+            "timer_low": 56,
             "timer_high": 1,
-            "animation_frame": 46,
-            "render_id": 252,
-            "drawn_mask": 0
+            "animation_frame": 12,
+            "render_id": 120,
+            "drawn_mask": 15
           },
-          "viper_projectiles": 10,
-          "powered_viper_projectiles": 7,
+          "viper_projectiles": 9,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             5,
-            64
+            16
           ],
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": true,
-          "fighter_explosion": false,
+          "live_raider": false,
+          "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
           "fire_sfx": true,
-          "hit_sfx": false,
+          "hit_sfx": true,
           "capital_sfx": false,
           "sound_enabled": true,
           "player_lifecycle": 0,
@@ -11495,6 +11498,7 @@
           "far-step",
           "debris-shot",
           "debris-destruction-spawn",
+          "effect-erase",
           "effect-update",
           "effect-render"
         ],
@@ -11510,8 +11514,8 @@
         "frame": 259,
         "gameplay_frame": 3,
         "difficulty": 1,
-        "wall_cycles": 28927,
-        "physical_headroom": 6641,
+        "wall_cycles": 28776,
+        "physical_headroom": 6792,
         "start": {
           "clock": 23144985,
           "host_frame": 650,
@@ -11519,13 +11523,13 @@
           "cycle": 21
         },
         "end": {
-          "clock": 23173912,
+          "clock": 23173761,
           "host_frame": 651,
-          "scanline": 167,
-          "cycle": 106
+          "scanline": 166,
+          "cycle": 69
         },
         "next_start": {
-          "clock": 23180548,
+          "clock": 23180553,
           "host_frame": 651
         },
         "host_vbi_boundaries": 1,
@@ -11561,7 +11565,7 @@
             "drawn_mask": 0
           },
           "viper_projectiles": 7,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             0,
             48
@@ -11602,19 +11606,19 @@
         "frame": 2335,
         "gameplay_frame": 31,
         "difficulty": 2,
-        "wall_cycles": 31983,
-        "physical_headroom": 3585,
+        "wall_cycles": 31824,
+        "physical_headroom": 3744,
         "start": {
-          "clock": 97553236,
+          "clock": 97553241,
           "host_frame": 2742,
           "scanline": 226,
-          "cycle": 16
+          "cycle": 21
         },
         "end": {
-          "clock": 97585219,
+          "clock": 97585065,
           "host_frame": 2743,
-          "scanline": 194,
-          "cycle": 79
+          "scanline": 193,
+          "cycle": 39
         },
         "next_start": {
           "clock": 97588809,
@@ -11653,7 +11657,7 @@
             "drawn_mask": 0
           },
           "viper_projectiles": 7,
-          "powered_viper_projectiles": 0,
+          "rapid_viper_projectiles": 0,
           "score_bcd": [
             4,
             96
@@ -11870,8 +11874,8 @@
       "frame": 515,
       "gameplay_frame": 3,
       "difficulty": 1,
-      "wall_cycles": 32939,
-      "physical_headroom": 2629,
+      "wall_cycles": 32854,
+      "physical_headroom": 2714,
       "start": {
         "clock": 32250388,
         "host_frame": 906,
@@ -11879,13 +11883,13 @@
         "cycle": 16
       },
       "end": {
-        "clock": 32283327,
+        "clock": 32283242,
         "host_frame": 907,
-        "scanline": 203,
-        "cycle": 9
+        "scanline": 202,
+        "cycle": 38
       },
       "next_start": {
-        "clock": 32285961,
+        "clock": 32285955,
         "host_frame": 907
       },
       "host_vbi_boundaries": 1,
@@ -11921,7 +11925,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 8,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           144
@@ -11955,8 +11959,8 @@
         "effect-render"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20562,
-        "active_cycles": 20549,
+        "main_loop_cycles": 20490,
+        "active_cycles": 20477,
         "inclusive_procedure_cycles": {
           "erase_transient_effect_overlays": 245,
           "entity_effects_erase": 269,
@@ -11968,11 +11972,11 @@
           "read_input": 598,
           "update_enemy": 1068,
           "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 82,
+          "entity_viper_projectile_target": 81,
           "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 1679,
+          "update_fighter_projectiles": 1671,
           "update_broadside": 205,
-          "handle_collisions": 1981,
+          "handle_collisions": 1973,
           "update_viper_weapon": 229,
           "update_enemy_weapon": 97,
           "erase_far_star_overlays": 1610,
@@ -11990,7 +11994,7 @@
           "render_shared_fighter_explosions": 41,
           "initialize_projectile_screen_pointer": 104,
           "advance_dst_to_next_physical_row": 67,
-          "render_fighter_projectile_overlays": 4130,
+          "render_fighter_projectile_overlays": 4066,
           "render_transient_effect_overlays": 794,
           "entity_effects_render": 811,
           "update_sound": 58,
@@ -12001,161 +12005,26 @@
     },
     {
       "trace_kind": "baseline-9040",
-      "session": "2-sweep-fire0",
-      "frame": 463,
-      "gameplay_frame": 207,
-      "difficulty": 2,
-      "wall_cycles": 32475,
-      "physical_headroom": 3093,
-      "start": {
-        "clock": 30969945,
-        "host_frame": 870,
-        "scanline": 226,
-        "cycle": 21
-      },
-      "end": {
-        "clock": 31002420,
-        "host_frame": 871,
-        "scanline": 199,
-        "cycle": 6
-      },
-      "next_start": {
-        "clock": 31005512,
-        "host_frame": 871
-      },
-      "host_vbi_boundaries": 1,
-      "extra_vbi_boundaries": 0,
-      "missed_frames": 0,
-      "dli_nmis": 1,
-      "dma_ctl": 62,
-      "nmi_en": 128,
-      "state": {
-        "projectiles": 18,
-        "broadside": 0,
-        "far_rendered": 23,
-        "active_muzzles": 0,
-        "entity_active": 1,
-        "entity_x": 124,
-        "entity_y": 80,
-        "entity_vx_signed": 0,
-        "entity_move_accumulator": 0,
-        "entity_vertical_accumulator": 1,
-        "entity_render_id": 110,
-        "entity_active_mask": 1,
-        "weapon_pickup": {
-          "state": 3,
-          "booster_state": 3,
-          "qualified_kill_counter": 0,
-          "x": 105,
-          "y": 195,
-          "timer": 268,
-          "timer_low": 12,
-          "timer_high": 1,
-          "animation_frame": 18,
-          "render_id": 252,
-          "drawn_mask": 0
-        },
-        "viper_projectiles": 9,
-        "powered_viper_projectiles": 9,
-        "score_bcd": [
-          0,
-          112
-        ],
-        "effect_active_mask": 0,
-        "effect_active_count": 0,
-        "effect_rendered_mask": 0,
-        "live_raider": true,
-        "fighter_explosion": false,
-        "capital_explosion": false,
-        "music_active": true,
-        "fire_sfx": true,
-        "hit_sfx": false,
-        "capital_sfx": false,
-        "sound_enabled": true,
-        "player_lifecycle": 0,
-        "sector_state": 4
-      },
-      "events": [
-        "world-copy",
-        "far-erase",
-        "hull-copy",
-        "broadside-update",
-        "fighter-explosion-render",
-        "capital-explosion-render",
-        "music-tick",
-        "near-copy",
-        "far-step",
-        "debris-shot",
-        "effect-update"
-      ],
-      "cpu_dma_off_reference": {
-        "main_loop_cycles": 20276,
-        "active_cycles": 20263,
-        "inclusive_procedure_cycles": {
-          "erase_interactive_entity_overlays": 81,
-          "entity_effects_erase": 95,
-          "erase_fighter_projectile_overlays": 1408,
-          "tick_shared_fighter_explosions": 37,
-          "tick_capital_explosions": 41,
-          "tick_launch_flashes": 55,
-          "update_player_death": 26,
-          "read_input": 69,
-          "update_enemy": 1112,
-          "entity_viper_projectile_hits_debris": 47,
-          "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 148,
-          "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 2198,
-          "update_broadside": 205,
-          "handle_collisions": 2515,
-          "set_gameplay_row_ptr": 32,
-          "initialize_projectile_screen_pointer": 104,
-          "update_viper_weapon": 337,
-          "update_enemy_weapon": 95,
-          "erase_far_star_overlays": 1610,
-          "rotate_playfield_rows": 1204,
-          "scroll_world_columns": 2372,
-          "advance_far_stars": 709,
-          "scroll_hull_columns": 1596,
-          "update_starfield": 6461,
-          "render_far_star_overlays": 1963,
-          "render_far_star_overlays_if_needed": 1978,
-          "update_transient_effects": 28,
-          "entity_effects_update": 232,
-          "render_capital_explosions": 44,
-          "render_shared_fighter_explosions": 41,
-          "advance_dst_to_next_physical_row": 67,
-          "render_fighter_projectile_overlays": 4339,
-          "render_interactive_entity_overlays": 176,
-          "entity_effects_render": 189,
-          "update_sound": 74,
-          "music_tick_gameplay": 56
-        },
-        "note": "Procedure values are inclusive and may be nested; they must not be summed."
-      }
-    },
-    {
-      "trace_kind": "baseline-9040",
       "session": "2-sweep-fire4",
       "frame": 337,
       "gameplay_frame": 81,
       "difficulty": 2,
-      "wall_cycles": 32467,
-      "physical_headroom": 3101,
+      "wall_cycles": 32336,
+      "physical_headroom": 3232,
       "start": {
-        "clock": 26488372,
+        "clock": 26488377,
         "host_frame": 744,
         "scanline": 226,
-        "cycle": 16
+        "cycle": 21
       },
       "end": {
-        "clock": 26520839,
+        "clock": 26520713,
         "host_frame": 745,
-        "scanline": 198,
-        "cycle": 107
+        "scanline": 197,
+        "cycle": 95
       },
       "next_start": {
-        "clock": 26523940,
+        "clock": 26523945,
         "host_frame": 745
       },
       "host_vbi_boundaries": 1,
@@ -12191,7 +12060,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 6,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           80
@@ -12221,8 +12090,8 @@
         "pickup-qualified-kill"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20251,
-        "active_cycles": 20238,
+        "main_loop_cycles": 20200,
+        "active_cycles": 20187,
         "inclusive_procedure_cycles": {
           "erase_interactive_entity_overlays": 81,
           "entity_effects_erase": 95,
@@ -12236,13 +12105,13 @@
           "update_enemy": 1068,
           "entity_viper_projectile_hits_debris": 29,
           "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 106,
+          "entity_viper_projectile_target": 105,
           "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 1976,
+          "update_fighter_projectiles": 1969,
           "update_broadside": 205,
           "spawn_raider_breakup_effects": 165,
-          "weapon_pickup_record_qualified_kill": 28,
-          "handle_collisions": 3152,
+          "weapon_pickup_record_qualified_kill": 27,
+          "handle_collisions": 3144,
           "update_viper_weapon": 59,
           "update_enemy_weapon": 61,
           "set_gameplay_row_ptr": 32,
@@ -12250,11 +12119,11 @@
           "update_starfield": 7159,
           "render_far_star_overlays_if_needed": 19,
           "update_transient_effects": 28,
-          "entity_effects_update": 163,
+          "entity_effects_update": 162,
           "render_capital_explosions": 884,
           "render_shared_fighter_explosions": 581,
           "initialize_projectile_screen_pointer": 104,
-          "render_fighter_projectile_overlays": 3677,
+          "render_fighter_projectile_overlays": 3635,
           "render_interactive_entity_overlays": 174,
           "entity_effects_render": 187,
           "update_sound": 139,
@@ -12265,26 +12134,161 @@
     },
     {
       "trace_kind": "baseline-9040",
+      "session": "2-sweep-fire0",
+      "frame": 463,
+      "gameplay_frame": 207,
+      "difficulty": 2,
+      "wall_cycles": 32145,
+      "physical_headroom": 3423,
+      "start": {
+        "clock": 30969945,
+        "host_frame": 870,
+        "scanline": 226,
+        "cycle": 21
+      },
+      "end": {
+        "clock": 31002090,
+        "host_frame": 871,
+        "scanline": 196,
+        "cycle": 18
+      },
+      "next_start": {
+        "clock": 31005508,
+        "host_frame": 871
+      },
+      "host_vbi_boundaries": 1,
+      "extra_vbi_boundaries": 0,
+      "missed_frames": 0,
+      "dli_nmis": 1,
+      "dma_ctl": 62,
+      "nmi_en": 128,
+      "state": {
+        "projectiles": 18,
+        "broadside": 0,
+        "far_rendered": 23,
+        "active_muzzles": 0,
+        "entity_active": 1,
+        "entity_x": 124,
+        "entity_y": 80,
+        "entity_vx_signed": 0,
+        "entity_move_accumulator": 0,
+        "entity_vertical_accumulator": 1,
+        "entity_render_id": 110,
+        "entity_active_mask": 1,
+        "weapon_pickup": {
+          "state": 3,
+          "booster_state": 3,
+          "qualified_kill_counter": 0,
+          "x": 105,
+          "y": 195,
+          "timer": 268,
+          "timer_low": 12,
+          "timer_high": 1,
+          "animation_frame": 18,
+          "render_id": 252,
+          "drawn_mask": 0
+        },
+        "viper_projectiles": 9,
+        "rapid_viper_projectiles": 9,
+        "score_bcd": [
+          0,
+          112
+        ],
+        "effect_active_mask": 0,
+        "effect_active_count": 0,
+        "effect_rendered_mask": 0,
+        "live_raider": true,
+        "fighter_explosion": false,
+        "capital_explosion": false,
+        "music_active": true,
+        "fire_sfx": true,
+        "hit_sfx": false,
+        "capital_sfx": false,
+        "sound_enabled": true,
+        "player_lifecycle": 0,
+        "sector_state": 4
+      },
+      "events": [
+        "world-copy",
+        "far-erase",
+        "hull-copy",
+        "broadside-update",
+        "fighter-explosion-render",
+        "capital-explosion-render",
+        "music-tick",
+        "near-copy",
+        "far-step",
+        "debris-shot",
+        "effect-update"
+      ],
+      "cpu_dma_off_reference": {
+        "main_loop_cycles": 20108,
+        "active_cycles": 20095,
+        "inclusive_procedure_cycles": {
+          "erase_interactive_entity_overlays": 81,
+          "entity_effects_erase": 95,
+          "erase_fighter_projectile_overlays": 1408,
+          "tick_shared_fighter_explosions": 37,
+          "tick_capital_explosions": 41,
+          "tick_launch_flashes": 55,
+          "update_player_death": 26,
+          "read_input": 69,
+          "update_enemy": 1112,
+          "entity_viper_projectile_hits_debris": 47,
+          "viper_projectile_hits_enemy": 61,
+          "entity_viper_projectile_target": 148,
+          "raider_projectile_hits_player": 33,
+          "update_fighter_projectiles": 2190,
+          "update_broadside": 205,
+          "handle_collisions": 2507,
+          "set_gameplay_row_ptr": 32,
+          "initialize_projectile_screen_pointer": 104,
+          "update_viper_weapon": 331,
+          "update_enemy_weapon": 95,
+          "erase_far_star_overlays": 1610,
+          "rotate_playfield_rows": 1204,
+          "scroll_world_columns": 2372,
+          "advance_far_stars": 709,
+          "scroll_hull_columns": 1596,
+          "update_starfield": 6461,
+          "render_far_star_overlays": 1963,
+          "render_far_star_overlays_if_needed": 1978,
+          "update_transient_effects": 28,
+          "entity_effects_update": 231,
+          "render_capital_explosions": 44,
+          "render_shared_fighter_explosions": 41,
+          "advance_dst_to_next_physical_row": 67,
+          "render_fighter_projectile_overlays": 4186,
+          "render_interactive_entity_overlays": 176,
+          "entity_effects_render": 189,
+          "update_sound": 74,
+          "music_tick_gameplay": 56
+        },
+        "note": "Procedure values are inclusive and may be nested; they must not be summed."
+      }
+    },
+    {
+      "trace_kind": "baseline-9040",
       "session": "1-evasive-fire3",
       "frame": 524,
       "gameplay_frame": 12,
       "difficulty": 1,
-      "wall_cycles": 32215,
-      "physical_headroom": 3353,
+      "wall_cycles": 32052,
+      "physical_headroom": 3516,
       "start": {
-        "clock": 32570500,
+        "clock": 32570505,
         "host_frame": 915,
         "scanline": 226,
-        "cycle": 16
+        "cycle": 21
       },
       "end": {
-        "clock": 32602715,
+        "clock": 32602557,
         "host_frame": 916,
-        "scanline": 196,
-        "cycle": 83
+        "scanline": 195,
+        "cycle": 39
       },
       "next_start": {
-        "clock": 32606073,
+        "clock": 32606068,
         "host_frame": 916
       },
       "host_vbi_boundaries": 1,
@@ -12320,7 +12324,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 9,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           1,
           0
@@ -12354,8 +12358,8 @@
         "effect-render"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20138,
-        "active_cycles": 20125,
+        "main_loop_cycles": 20058,
+        "active_cycles": 20045,
         "inclusive_procedure_cycles": {
           "erase_transient_effect_overlays": 245,
           "entity_effects_erase": 269,
@@ -12368,11 +12372,11 @@
           "read_input": 598,
           "update_enemy": 26,
           "viper_projectile_hits_enemy": 23,
-          "entity_viper_projectile_target": 44,
+          "entity_viper_projectile_target": 43,
           "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 1594,
+          "update_fighter_projectiles": 1585,
           "update_broadside": 412,
-          "handle_collisions": 2081,
+          "handle_collisions": 2072,
           "update_viper_weapon": 59,
           "update_enemy_weapon": 61,
           "erase_far_star_overlays": 1553,
@@ -12390,7 +12394,7 @@
           "render_capital_explosions": 44,
           "render_shared_fighter_explosions": 581,
           "initialize_projectile_screen_pointer": 104,
-          "render_fighter_projectile_overlays": 3925,
+          "render_fighter_projectile_overlays": 3854,
           "render_transient_effect_overlays": 758,
           "entity_effects_render": 775,
           "update_sound": 109,
@@ -12405,8 +12409,8 @@
       "frame": 183,
       "gameplay_frame": 183,
       "difficulty": 2,
-      "wall_cycles": 32135,
-      "physical_headroom": 3433,
+      "wall_cycles": 32008,
+      "physical_headroom": 3560,
       "start": {
         "clock": 21010905,
         "host_frame": 590,
@@ -12414,13 +12418,13 @@
         "cycle": 21
       },
       "end": {
-        "clock": 21043040,
+        "clock": 21042913,
         "host_frame": 591,
-        "scanline": 196,
-        "cycle": 8
+        "scanline": 194,
+        "cycle": 109
       },
       "next_start": {
-        "clock": 21046473,
+        "clock": 21046468,
         "host_frame": 591
       },
       "host_vbi_boundaries": 1,
@@ -12456,7 +12460,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 8,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           48
@@ -12490,8 +12494,8 @@
         "effect-render"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20098,
-        "active_cycles": 20085,
+        "main_loop_cycles": 20029,
+        "active_cycles": 20016,
         "inclusive_procedure_cycles": {
           "erase_transient_effect_overlays": 282,
           "erase_interactive_entity_overlays": 81,
@@ -12506,14 +12510,14 @@
           "update_enemy": 26,
           "entity_viper_projectile_hits_debris": 29,
           "viper_projectile_hits_enemy": 23,
-          "entity_viper_projectile_target": 68,
+          "entity_viper_projectile_target": 67,
           "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 1540,
+          "update_fighter_projectiles": 1533,
           "update_broadside": 623,
-          "handle_collisions": 2238,
+          "handle_collisions": 2231,
           "set_gameplay_row_ptr": 32,
           "initialize_projectile_screen_pointer": 104,
-          "update_viper_weapon": 429,
+          "update_viper_weapon": 424,
           "update_enemy_weapon": 61,
           "erase_far_star_overlays": 1588,
           "rotate_playfield_rows": 1204,
@@ -12525,10 +12529,10 @@
           "render_far_star_overlays_if_needed": 1962,
           "update_transient_effects": 301,
           "update_weapon_pickup_active": 50,
-          "entity_effects_update": 498,
+          "entity_effects_update": 497,
           "render_capital_explosions": 44,
           "render_shared_fighter_explosions": 581,
-          "render_fighter_projectile_overlays": 3263,
+          "render_fighter_projectile_overlays": 3207,
           "render_interactive_entity_overlays": 174,
           "render_transient_effect_overlays": 945,
           "entity_effects_render": 1135,
@@ -12540,160 +12544,26 @@
     },
     {
       "trace_kind": "baseline-9040",
-      "session": "2-sweep-fire0",
-      "frame": 455,
-      "gameplay_frame": 199,
-      "difficulty": 2,
-      "wall_cycles": 32126,
-      "physical_headroom": 3442,
-      "start": {
-        "clock": 30685396,
-        "host_frame": 862,
-        "scanline": 226,
-        "cycle": 16
-      },
-      "end": {
-        "clock": 30717522,
-        "host_frame": 863,
-        "scanline": 195,
-        "cycle": 108
-      },
-      "next_start": {
-        "clock": 30720969,
-        "host_frame": 863
-      },
-      "host_vbi_boundaries": 1,
-      "extra_vbi_boundaries": 0,
-      "missed_frames": 0,
-      "dli_nmis": 1,
-      "dma_ctl": 62,
-      "nmi_en": 128,
-      "state": {
-        "projectiles": 17,
-        "broadside": 0,
-        "far_rendered": 22,
-        "active_muzzles": 0,
-        "entity_active": 1,
-        "entity_x": 124,
-        "entity_y": 56,
-        "entity_vx_signed": 0,
-        "entity_move_accumulator": 0,
-        "entity_vertical_accumulator": 4,
-        "entity_render_id": 110,
-        "entity_active_mask": 1,
-        "weapon_pickup": {
-          "state": 3,
-          "booster_state": 3,
-          "qualified_kill_counter": 0,
-          "x": 105,
-          "y": 195,
-          "timer": 276,
-          "timer_low": 20,
-          "timer_high": 1,
-          "animation_frame": 26,
-          "render_id": 252,
-          "drawn_mask": 0
-        },
-        "viper_projectiles": 9,
-        "powered_viper_projectiles": 9,
-        "score_bcd": [
-          0,
-          112
-        ],
-        "effect_active_mask": 0,
-        "effect_active_count": 0,
-        "effect_rendered_mask": 0,
-        "live_raider": true,
-        "fighter_explosion": false,
-        "capital_explosion": false,
-        "music_active": true,
-        "fire_sfx": true,
-        "hit_sfx": false,
-        "capital_sfx": false,
-        "sound_enabled": true,
-        "player_lifecycle": 0,
-        "sector_state": 4
-      },
-      "events": [
-        "world-copy",
-        "far-erase",
-        "hull-copy",
-        "broadside-update",
-        "fighter-explosion-render",
-        "capital-explosion-render",
-        "music-tick",
-        "near-copy",
-        "far-step",
-        "effect-update"
-      ],
-      "cpu_dma_off_reference": {
-        "main_loop_cycles": 20070,
-        "active_cycles": 20057,
-        "inclusive_procedure_cycles": {
-          "erase_interactive_entity_overlays": 81,
-          "entity_effects_erase": 95,
-          "erase_fighter_projectile_overlays": 1351,
-          "tick_shared_fighter_explosions": 37,
-          "tick_capital_explosions": 41,
-          "tick_launch_flashes": 55,
-          "update_player_death": 26,
-          "read_input": 85,
-          "update_enemy": 1115,
-          "entity_viper_projectile_hits_debris": 47,
-          "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 124,
-          "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 2013,
-          "update_broadside": 205,
-          "handle_collisions": 2330,
-          "set_gameplay_row_ptr": 32,
-          "initialize_projectile_screen_pointer": 104,
-          "update_viper_weapon": 406,
-          "update_enemy_weapon": 97,
-          "erase_far_star_overlays": 1543,
-          "rotate_playfield_rows": 1204,
-          "scroll_world_columns": 2375,
-          "advance_far_stars": 709,
-          "scroll_hull_columns": 1605,
-          "update_starfield": 6406,
-          "render_far_star_overlays": 1943,
-          "render_far_star_overlays_if_needed": 1958,
-          "update_transient_effects": 28,
-          "entity_effects_update": 208,
-          "render_capital_explosions": 44,
-          "render_shared_fighter_explosions": 41,
-          "advance_dst_to_next_physical_row": 45,
-          "render_fighter_projectile_overlays": 4305,
-          "render_interactive_entity_overlays": 174,
-          "entity_effects_render": 187,
-          "update_sound": 74,
-          "music_tick_gameplay": 56
-        },
-        "note": "Procedure values are inclusive and may be nested; they must not be summed."
-      }
-    },
-    {
-      "trace_kind": "baseline-9040",
       "session": "2-evasive-fire1",
       "frame": 655,
       "gameplay_frame": 143,
       "difficulty": 2,
-      "wall_cycles": 32126,
-      "physical_headroom": 3442,
+      "wall_cycles": 31969,
+      "physical_headroom": 3599,
       "start": {
-        "clock": 37799001,
+        "clock": 37798996,
         "host_frame": 1062,
         "scanline": 226,
-        "cycle": 21
+        "cycle": 16
       },
       "end": {
-        "clock": 37831127,
+        "clock": 37830965,
         "host_frame": 1063,
-        "scanline": 195,
-        "cycle": 113
+        "scanline": 194,
+        "cycle": 65
       },
       "next_start": {
-        "clock": 37834564,
+        "clock": 37834569,
         "host_frame": 1063
       },
       "host_vbi_boundaries": 1,
@@ -12729,7 +12599,7 @@
           "drawn_mask": 15
         },
         "viper_projectiles": 8,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           1,
           48
@@ -12761,8 +12631,8 @@
         "effect-update"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20071,
-        "active_cycles": 20058,
+        "main_loop_cycles": 20009,
+        "active_cycles": 19996,
         "inclusive_procedure_cycles": {
           "erase_interactive_entity_overlays": 33,
           "entity_effects_erase": 47,
@@ -12774,12 +12644,12 @@
           "read_input": 598,
           "update_enemy": 1115,
           "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 82,
+          "entity_viper_projectile_target": 81,
           "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 1942,
-          "update_broadside": 336,
+          "update_fighter_projectiles": 1933,
+          "update_broadside": 337,
           "spawn_raider_breakup_effects": 165,
-          "handle_collisions": 3207,
+          "handle_collisions": 3199,
           "update_viper_weapon": 57,
           "update_enemy_weapon": 61,
           "erase_far_star_overlays": 1557,
@@ -12799,9 +12669,9 @@
           "render_shared_fighter_explosions": 581,
           "initialize_projectile_screen_pointer": 104,
           "advance_dst_to_next_physical_row": 67,
-          "render_fighter_projectile_overlays": 4135,
-          "render_interactive_entity_overlays": 171,
-          "entity_effects_render": 184,
+          "render_fighter_projectile_overlays": 4079,
+          "render_interactive_entity_overlays": 172,
+          "entity_effects_render": 185,
           "update_sound": 116,
           "music_tick_gameplay": 41
         },
@@ -12814,8 +12684,8 @@
       "frame": 263,
       "gameplay_frame": 7,
       "difficulty": 2,
-      "wall_cycles": 32072,
-      "physical_headroom": 3496,
+      "wall_cycles": 31964,
+      "physical_headroom": 3604,
       "start": {
         "clock": 23856345,
         "host_frame": 670,
@@ -12823,10 +12693,10 @@
         "cycle": 21
       },
       "end": {
-        "clock": 23888417,
+        "clock": 23888309,
         "host_frame": 671,
-        "scanline": 195,
-        "cycle": 59
+        "scanline": 194,
+        "cycle": 65
       },
       "next_start": {
         "clock": 23891913,
@@ -12865,7 +12735,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 7,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           64
@@ -12898,8 +12768,8 @@
         "pickup-qualified-kill"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20062,
-        "active_cycles": 20049,
+        "main_loop_cycles": 20004,
+        "active_cycles": 19991,
         "inclusive_procedure_cycles": {
           "entity_effects_erase": 25,
           "erase_fighter_projectile_overlays": 1351,
@@ -12910,13 +12780,13 @@
           "read_input": 69,
           "update_enemy": 1055,
           "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 82,
+          "entity_viper_projectile_target": 81,
           "raider_projectile_hits_player": 46,
-          "update_fighter_projectiles": 1967,
+          "update_fighter_projectiles": 1959,
           "update_broadside": 469,
           "spawn_raider_breakup_effects": 165,
-          "weapon_pickup_record_qualified_kill": 28,
-          "handle_collisions": 3407,
+          "weapon_pickup_record_qualified_kill": 27,
+          "handle_collisions": 3398,
           "update_viper_weapon": 59,
           "update_enemy_weapon": 61,
           "erase_far_star_overlays": 1616,
@@ -12933,7 +12803,7 @@
           "render_capital_explosions": 44,
           "render_shared_fighter_explosions": 581,
           "initialize_projectile_screen_pointer": 104,
-          "render_fighter_projectile_overlays": 3443,
+          "render_fighter_projectile_overlays": 3394,
           "entity_effects_render": 24,
           "update_sound": 139,
           "music_tick_gameplay": 41
@@ -12947,8 +12817,8 @@
       "frame": 423,
       "gameplay_frame": 167,
       "difficulty": 2,
-      "wall_cycles": 32035,
-      "physical_headroom": 3533,
+      "wall_cycles": 31894,
+      "physical_headroom": 3674,
       "start": {
         "clock": 29547220,
         "host_frame": 830,
@@ -12956,10 +12826,10 @@
         "cycle": 16
       },
       "end": {
-        "clock": 29579255,
+        "clock": 29579114,
         "host_frame": 831,
-        "scanline": 195,
-        "cycle": 17
+        "scanline": 193,
+        "cycle": 104
       },
       "next_start": {
         "clock": 29582793,
@@ -12998,7 +12868,7 @@
           "drawn_mask": 15
         },
         "viper_projectiles": 8,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           128
@@ -13032,8 +12902,8 @@
         "raider-breakup-spawn"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20030,
-        "active_cycles": 20017,
+        "main_loop_cycles": 19969,
+        "active_cycles": 19956,
         "inclusive_procedure_cycles": {
           "erase_interactive_entity_overlays": 33,
           "entity_effects_erase": 47,
@@ -13046,11 +12916,11 @@
           "read_input": 598,
           "update_enemy": 26,
           "viper_projectile_hits_enemy": 23,
-          "entity_viper_projectile_target": 44,
+          "entity_viper_projectile_target": 43,
           "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 1458,
-          "update_broadside": 345,
-          "handle_collisions": 1878,
+          "update_fighter_projectiles": 1450,
+          "update_broadside": 346,
+          "handle_collisions": 1871,
           "update_viper_weapon": 59,
           "update_enemy_weapon": 61,
           "erase_far_star_overlays": 1618,
@@ -13071,10 +12941,10 @@
           "render_capital_explosions": 44,
           "render_shared_fighter_explosions": 45,
           "initialize_projectile_screen_pointer": 104,
-          "render_fighter_projectile_overlays": 3793,
-          "render_interactive_entity_overlays": 171,
+          "render_fighter_projectile_overlays": 3737,
+          "render_interactive_entity_overlays": 172,
           "render_transient_effect_overlays": 944,
-          "entity_effects_render": 1131,
+          "entity_effects_render": 1132,
           "update_sound": 138,
           "music_tick_gameplay": 41
         },
@@ -13087,22 +12957,22 @@
       "frame": 191,
       "gameplay_frame": 191,
       "difficulty": 2,
-      "wall_cycles": 32021,
-      "physical_headroom": 3547,
+      "wall_cycles": 31855,
+      "physical_headroom": 3713,
       "start": {
-        "clock": 21295449,
+        "clock": 21295444,
         "host_frame": 598,
         "scanline": 226,
-        "cycle": 21
+        "cycle": 16
       },
       "end": {
-        "clock": 21327470,
+        "clock": 21327299,
         "host_frame": 599,
-        "scanline": 195,
-        "cycle": 8
+        "scanline": 193,
+        "cycle": 65
       },
       "next_start": {
-        "clock": 21331012,
+        "clock": 21331017,
         "host_frame": 599
       },
       "host_vbi_boundaries": 1,
@@ -13138,7 +13008,7 @@
           "drawn_mask": 0
         },
         "viper_projectiles": 8,
-        "powered_viper_projectiles": 0,
+        "rapid_viper_projectiles": 0,
         "score_bcd": [
           0,
           48
@@ -13171,8 +13041,8 @@
         "pickup-qualified-kill"
       ],
       "cpu_dma_off_reference": {
-        "main_loop_cycles": 20016,
-        "active_cycles": 20003,
+        "main_loop_cycles": 19950,
+        "active_cycles": 19937,
         "inclusive_procedure_cycles": {
           "erase_interactive_entity_overlays": 81,
           "entity_effects_erase": 95,
@@ -13185,13 +13055,13 @@
           "update_enemy": 1062,
           "entity_viper_projectile_hits_debris": 29,
           "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 106,
+          "entity_viper_projectile_target": 105,
           "raider_projectile_hits_player": 33,
-          "update_fighter_projectiles": 1963,
+          "update_fighter_projectiles": 1954,
           "update_broadside": 685,
           "spawn_raider_breakup_effects": 165,
           "weapon_pickup_record_qualified_kill": 101,
-          "handle_collisions": 3695,
+          "handle_collisions": 3686,
           "update_viper_weapon": 57,
           "update_enemy_weapon": 61,
           "erase_far_star_overlays": 1659,
@@ -13205,15 +13075,149 @@
           "render_far_star_overlays_if_needed": 1992,
           "update_transient_effects": 28,
           "update_weapon_pickup_active": 50,
-          "entity_effects_update": 206,
+          "entity_effects_update": 205,
           "render_capital_explosions": 44,
           "render_shared_fighter_explosions": 581,
           "initialize_projectile_screen_pointer": 104,
-          "render_fighter_projectile_overlays": 2879,
+          "render_fighter_projectile_overlays": 2823,
           "render_interactive_entity_overlays": 174,
           "entity_effects_render": 187,
           "update_sound": 116,
           "music_tick_gameplay": 41
+        },
+        "note": "Procedure values are inclusive and may be nested; they must not be summed."
+      }
+    },
+    {
+      "trace_kind": "baseline-9040",
+      "session": "2-evasive-fire3",
+      "frame": 343,
+      "gameplay_frame": 87,
+      "difficulty": 2,
+      "wall_cycles": 31848,
+      "physical_headroom": 3720,
+      "start": {
+        "clock": 26701785,
+        "host_frame": 750,
+        "scanline": 226,
+        "cycle": 21
+      },
+      "end": {
+        "clock": 26733633,
+        "host_frame": 751,
+        "scanline": 193,
+        "cycle": 63
+      },
+      "next_start": {
+        "clock": 26737353,
+        "host_frame": 751
+      },
+      "host_vbi_boundaries": 1,
+      "extra_vbi_boundaries": 0,
+      "missed_frames": 0,
+      "dli_nmis": 1,
+      "dma_ctl": 62,
+      "nmi_en": 128,
+      "state": {
+        "projectiles": 13,
+        "broadside": 0,
+        "far_rendered": 21,
+        "active_muzzles": 1,
+        "entity_active": 1,
+        "entity_x": 120,
+        "entity_y": 104,
+        "entity_vx_signed": 0,
+        "entity_move_accumulator": 0,
+        "entity_vertical_accumulator": 4,
+        "entity_render_id": 110,
+        "entity_active_mask": 1,
+        "weapon_pickup": {
+          "state": 0,
+          "booster_state": 0,
+          "qualified_kill_counter": 1,
+          "x": 151,
+          "y": 195,
+          "timer": 0,
+          "timer_low": 0,
+          "timer_high": 0,
+          "animation_frame": 0,
+          "render_id": 120,
+          "drawn_mask": 0
+        },
+        "viper_projectiles": 7,
+        "rapid_viper_projectiles": 0,
+        "score_bcd": [
+          0,
+          96
+        ],
+        "effect_active_mask": 0,
+        "effect_active_count": 0,
+        "effect_rendered_mask": 0,
+        "live_raider": true,
+        "fighter_explosion": false,
+        "capital_explosion": true,
+        "music_active": true,
+        "fire_sfx": true,
+        "hit_sfx": false,
+        "capital_sfx": true,
+        "sound_enabled": true,
+        "player_lifecycle": 0,
+        "sector_state": 2
+      },
+      "events": [
+        "world-copy",
+        "far-erase",
+        "hull-copy",
+        "broadside-update",
+        "fighter-explosion-render",
+        "capital-explosion-render",
+        "music-tick",
+        "near-copy",
+        "far-step",
+        "effect-update"
+      ],
+      "cpu_dma_off_reference": {
+        "main_loop_cycles": 19943,
+        "active_cycles": 19930,
+        "inclusive_procedure_cycles": {
+          "erase_interactive_entity_overlays": 81,
+          "entity_effects_erase": 95,
+          "advance_dst_to_next_physical_row": 54,
+          "erase_fighter_projectile_overlays": 1452,
+          "tick_shared_fighter_explosions": 37,
+          "tick_capital_explosions": 558,
+          "tick_launch_flashes": 55,
+          "update_player_death": 26,
+          "read_input": 613,
+          "update_enemy": 1112,
+          "entity_viper_projectile_hits_debris": 29,
+          "viper_projectile_hits_enemy": 61,
+          "entity_viper_projectile_target": 105,
+          "raider_projectile_hits_player": 46,
+          "update_fighter_projectiles": 1529,
+          "update_broadside": 205,
+          "handle_collisions": 1846,
+          "set_gameplay_row_ptr": 32,
+          "initialize_projectile_screen_pointer": 104,
+          "update_viper_weapon": 370,
+          "update_enemy_weapon": 97,
+          "erase_far_star_overlays": 1492,
+          "rotate_playfield_rows": 1204,
+          "scroll_world_columns": 2258,
+          "advance_far_stars": 978,
+          "scroll_hull_columns": 1177,
+          "update_starfield": 6079,
+          "render_far_star_overlays": 1915,
+          "render_far_star_overlays_if_needed": 1930,
+          "update_transient_effects": 28,
+          "entity_effects_update": 143,
+          "render_capital_explosions": 853,
+          "render_shared_fighter_explosions": 41,
+          "render_fighter_projectile_overlays": 2909,
+          "render_interactive_entity_overlays": 174,
+          "entity_effects_render": 187,
+          "update_sound": 74,
+          "music_tick_gameplay": 56
         },
         "note": "Procedure values are inclusive and may be nested; they must not be summed."
       }
@@ -13224,32 +13228,32 @@
     {
       "session": "weapon-pickup-2-hunt-fire4",
       "frame": 223,
-      "wall_cycles": 33172,
-      "physical_headroom": 2396
+      "wall_cycles": 33074,
+      "physical_headroom": 2494
     },
     {
       "session": "memory-integrity-xex-2-hunt-fire4",
       "frame": 223,
-      "wall_cycles": 33172,
-      "physical_headroom": 2396
+      "wall_cycles": 33074,
+      "physical_headroom": 2494
     },
     {
       "session": "memory-integrity-atr-2-hunt-fire4",
       "frame": 223,
-      "wall_cycles": 33172,
-      "physical_headroom": 2396
+      "wall_cycles": 33074,
+      "physical_headroom": 2494
     },
     {
       "session": "weapon-pickup-2-hunt-fire4",
       "frame": 231,
-      "wall_cycles": 33134,
-      "physical_headroom": 2434
+      "wall_cycles": 33062,
+      "physical_headroom": 2506
     },
     {
       "session": "memory-integrity-xex-2-hunt-fire4",
       "frame": 231,
-      "wall_cycles": 33134,
-      "physical_headroom": 2434
+      "wall_cycles": 33062,
+      "physical_headroom": 2506
     }
   ],
   "limitations": [

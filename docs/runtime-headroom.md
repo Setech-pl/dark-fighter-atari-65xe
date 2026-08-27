@@ -9,21 +9,22 @@ generated from the packed release XEX and checked against the ATR payload.
 | Measure | Current result | Limit |
 | --- | ---: | ---: |
 | Boot payload | 16,384 B / 128 sectors | 16,384 B / 128 sectors |
-| Source-owned payload reserve | 94 B | at least 64 B |
+| Source-owned payload reserve | 120 B | at least 64 B |
 | Formatter padding | 0 B | no hidden reserve claimed |
 | XEX size | 16,396 B | artifact format result |
 | ATR size | 92,176 B | standard 90 KB single-density image |
 | PAL frame | 35,568 cycles | fixed PAL frame |
-| Worst measured wall | 33,172 cycles | at most 33,340 |
-| Physical headroom | 2,396 cycles | at least 2,200 |
+| Worst measured wall | 33,074 cycles | at most 33,340 |
+| Physical headroom | 2,494 cycles | at least 2,200 |
 | Missed synchronization | 0 | 0 |
 | Deadline overruns | 0 | 0 |
 | Additional VBI boundaries | 0 | 0 |
 
 The 32,956-cycle figure in the report is the accepted Rapid Fire measurement
 used as the baseline for the Spread Shot delta. It is not the Spread Shot
-baseline state. Spread Shot measures 33,172 cycles: a +216-cycle delta, 40
-cycles inside its +256 target and 168 cycles inside its +384 hard limit.
+baseline state. The current Spread Shot runtime measures 33,074 cycles: a
++118-cycle delta, 138 cycles inside its +256 target and 266 cycles inside its
++384 hard limit.
 
 ## Artifact and cold-start evidence
 
@@ -69,13 +70,13 @@ instructions and zero cycles to the measured path.
 
 The report keeps three quantities distinct:
 
-- the 20,562-cycle DMA-off CPU comparison from static NMOS 6502 analysis;
-- the 33,172-cycle measured DMA-on wall used for acceptance;
+- the 20,490-cycle DMA-off CPU comparison from static NMOS 6502 analysis;
+- the 33,074-cycle measured DMA-on wall used for acceptance;
 - a conservative additive estimate retained only as a diagnostic comparison.
 
 `ten_heaviest_frames_in_9040_replay` is deliberately scoped to the original
 9,040-frame baseline replay. `five_heaviest_frames` is sorted across all
-measured legal runtime replays, so its first entry is the global 33,172-cycle
+measured legal runtime replays, so its first entry is the global 33,074-cycle
 maximum.
 
 The measurement is exact for the stated Atari800 version, not an electrical
