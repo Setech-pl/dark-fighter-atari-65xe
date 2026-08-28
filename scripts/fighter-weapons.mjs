@@ -84,10 +84,13 @@ export function loadFighterWeaponsDefinition(sourcePath) {
   "Spread Shot must use the eight-salvo normal burst for exactly 500 active PAL frames");
   invariant(definition.viper.spreadShotProjectileCount === 3,
     "Spread Shot must allocate exactly three logical projectiles");
+  invariant(definition.viper.spreadShotCooldownFrames === 10,
+    "Spread Shot cooldown must preserve one reserve slot at maximum legal lifetime");
   invariant(definition.viper.spreadShotInitialOffsetHpos === 4,
     "Spread Shot side projectiles must start one character from the centre shot");
-  invariant(definition.viper.spreadShotLateralStepHpos === 2,
-    "Spread Shot side projectiles must move two HPOS units per active frame");
+  invariant(definition.viper.spreadShotLateralStepHpos === 1 &&
+    definition.viper.spreadShotLateralPeriodFrames === 2,
+  "Spread Shot side projectiles must move one HPOS unit every two active frames");
   invariant(definition.viper.colourRegister === "COLPF2" &&
     definition.viper.colourValue === 0x1e,
   "Viper projectiles must use genuine Atari yellow through COLPF2=$1E");
@@ -206,6 +209,7 @@ export function renderFighterWeaponsCa65Include(asset) {
     `VIPER_NORMAL_BURST_COUNT = ${viper.burstCount}`,
     `VIPER_RAPID_FIRE_BURST_COUNT = ${viper.rapidFireBurstCount}`,
     `VIPER_SPREAD_BURST_COUNT = ${viper.spreadShotBurstCount}`,
+    `VIPER_SPREAD_COOLDOWN = ${viper.spreadShotCooldownFrames}`,
     `VIPER_BURST_INTERVAL = ${viper.burstIntervalFrames}`,
     `VIPER_RAPID_FIRE_INTERVAL = ${viper.rapidFireIntervalFrames}`,
     `VIPER_RAPID_FIRE_DURATION = ${viper.rapidFireDurationFrames}`,
@@ -213,6 +217,7 @@ export function renderFighterWeaponsCa65Include(asset) {
     `VIPER_SPREAD_PROJECTILE_COUNT = ${viper.spreadShotProjectileCount}`,
     `VIPER_SPREAD_INITIAL_OFFSET = ${viper.spreadShotInitialOffsetHpos}`,
     `VIPER_SPREAD_LATERAL_STEP = ${viper.spreadShotLateralStepHpos}`,
+    `VIPER_SPREAD_LATERAL_PERIOD = ${viper.spreadShotLateralPeriodFrames}`,
     `VIPER_POST_BURST_PAUSE = ${viper.postBurstFrames}`,
     `VIPER_PROJECTILE_SPEED = ${viper.speedScanlines}`,
     `VIPER_PROJECTILE_WIDTH_HPOS = ${viper.widthHpos}`,

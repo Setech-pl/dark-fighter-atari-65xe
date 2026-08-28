@@ -185,12 +185,18 @@ test("assembled gameplay display list and DLI switch a dedicated ANTIC 2 HUD", (
       `HUD glyph ${code} must be present in the dedicated charset`,
     );
   }
-  const percentCode = "%".charCodeAt(0) - 0x20;
-  assert.deepEqual(
-    graphics.hudCharset.subarray(percentCode * 8, percentCode * 8 + 8),
-    Uint8Array.from([0xcc, 0xd8, 0x18, 0x30, 0x60, 0x6c, 0xcc, 0xff]),
-    "HUD percent sign must use the native dedicated glyph copied at startup",
-  );
+  for (const [name, expected] of [
+    ["CH_HUD_HULL_FULL", [0, 0, 0, 0x3c, 0x7e, 0xff, 0x7e, 0xff]],
+    ["CH_HUD_HULL_DAMAGED", [0, 0, 0, 0x3c, 0x42, 0x5a, 0x24, 0xff]],
+    ["CH_HUD_BOOSTER_FULL", [0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0xff]],
+  ]) {
+    const code = graphics.constants.get(name);
+    assert.deepEqual(
+      graphics.hudCharset.subarray(code * 8, code * 8 + 8),
+      Uint8Array.from(expected),
+      `${name} must use its shape-distinct dedicated HUD glyph`,
+    );
+  }
 
   const state = readGameplayRuntimeState(source, definition);
   const hudRegisters = new Set(state.registerPixels.subarray(0, 8 * 320));
@@ -238,14 +244,11 @@ test("assembled ANTIC 2 HUD keeps independent live score, life, and hull fields"
     statusAddress,
     labels.get("begin_broadside_impact") - statusAddress,
   );
-  for (const offset of [18, 26, 27]) {
-    assert.notEqual(
-      statusBytes.indexOf(absoluteStore(0x4000 + offset)),
-      -1,
-      `HUD status digit at screen offset ${offset} must remain live`,
-    );
-  }
-  assert.match(source, /hud_ascii:\s*\.byte "SCORE 00000  LIFE 3  HULL 100%"/);
+  assert.notEqual(statusBytes.indexOf(absoluteStore(0x4000 + 18)), -1,
+    "HUD LIFE digit at screen offset 18 must remain live");
+  assert.notEqual(statusBytes.indexOf(Buffer.from([0x9d, 0x19, 0x40])), -1,
+    "HUD HULL plates must update only the indexed 25-28 field");
+  assert.match(source, /hud_ascii:\s*\.byte "SCORE 00000  LIFE 3 HULL "/);
   assert.doesNotMatch(source, /hud_ascii:[\s\S]*?\.byte [^\n]*\b(?:FUEL|ARM)\b/);
   assert.match(source,
     /update_hud_status:[\s\S]+lda PLAYER_LIVES[\s\S]+HUD_LIFE_DIGIT_OFFSET[\s\S]+lda BROAD_PLAYER_HEALTH/);
@@ -580,7 +583,9 @@ test("joystick, FIRE, projectile, enemy, and scoring routines remain connected",
     /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #VIPER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #RAIDER_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
   assert.doesNotMatch(source, /\b(?:bullet_x|bullet_y|bullet_active|refresh_bullet_active)\b/);
   assert.match(source,
-    /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jsr update_top_score[\s\S]+jmp update_score_display/);
+    /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jmp update_score_display/);
+  assert.match(source,
+    /update_player_death:[\s\S]+@game_over:[\s\S]+jsr insert_top_score/);
   assert.match(source,
     /update_enemy:[\s\S]+jsr update_raider_soft_pursuit[\s\S]+update_enemy_animation/);
   assert.match(source,

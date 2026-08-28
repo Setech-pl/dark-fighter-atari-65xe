@@ -652,7 +652,7 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
   const mainLoop = source.slice(source.indexOf("main_loop:"),
     source.indexOf("main_loop_option_poll"));
   assert.match(mainLoop,
-    /jsr update_player_death[\s\S]+bcc @lifecycle_ready[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop[\s\S]+@lifecycle_ready:[\s\S]+jsr entity_effects_update/,
+    /jsr update_player_death[\s\S]+bcc main_loop_lifecycle_ready[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop[\s\S]+main_loop_lifecycle_ready\s*=\s*\*[\s\S]+jsr entity_effects_update/,
     "terminal Game Over must leave gameplay before the entity update");
 
   const emptyDuringDrain = createRuntimeMemory();

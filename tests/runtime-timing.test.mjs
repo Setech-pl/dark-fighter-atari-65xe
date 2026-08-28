@@ -149,11 +149,14 @@ test("logical gameplay row pointers keep a fixed divider plus 22 linear ring row
   assert.match(source,
     /set_gameplay_row_ptr:[\s\S]+beq @divider[\s\S]+lda PLAYFIELD_ROW_LO,x\s+sta dst_ptr[\s\S]+@divider:[\s\S]+lda #<GAMEPLAY_DIVIDER_SCREEN/);
   assert.match(source,
-    /initialize_projectile_screen_pointer:[\s\S]+sbc #GAMEPLAY_TOP\s+lsr\s+lsr\s+lsr\s+jsr set_gameplay_row_ptr/);
+    /initialize_projectile_screen_pointer = \*[\s\S]+lsr\s+lsr\s+lsr\s+tay\s+\.repeat \(GAMEPLAY_TOP\/8\)\s+dey\s+\.endrepeat\s+bne @playfield[\s\S]+@playfield:\s+dey\s+lda PLAYFIELD_ROW_LO,y[\s\S]+lda PLAYFIELD_ROW_HI,y/);
   assert.doesNotMatch(source.slice(
-    source.indexOf("initialize_projectile_screen_pointer:"),
-    source.indexOf("render_fighter_projectile_overlays:"),
+    source.indexOf("initialize_projectile_screen_pointer = *"),
+    source.indexOf("profile_projectile_pointer_end = *"),
   ), /sta row_counter\s+lda row_counter/);
+  assert.match(source,
+    /render_fighter_projectile_overlays:[\s\S]+@code_ready:\s+;[^\n]*\n(?:\s*;[^\n]*\n)*initialize_projectile_screen_pointer = \*/,
+    "projectile mapping must stay inline in the per-slot renderer");
   assert.match(source,
     /init_far_star_population:[\s\S]+sta STAR_FAR_ROW,x[\s\S]+sta STAR_FAR_COLUMN,x/);
   assert.match(source,

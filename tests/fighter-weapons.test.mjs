@@ -365,6 +365,7 @@ test("assembled burst controllers use accepted counts, intervals, speeds and dam
     viperCount: weapons.viper.burstCount,
     viperRapidCount: weapons.viper.rapidFireBurstCount,
     viperSpreadCount: weapons.viper.spreadShotBurstCount,
+    viperSpreadCooldown: weapons.viper.spreadShotCooldownFrames,
     viperInterval: weapons.viper.burstIntervalFrames,
     viperSpeed: weapons.viper.speedScanlines,
     viperPost: weapons.viper.postBurstFrames,
@@ -374,13 +375,13 @@ test("assembled burst controllers use accepted counts, intervals, speeds and dam
     raiderPost: weapons.raider.postBurstFrames,
     raiderDamage: weapons.raider.damage,
   }, {
-    viperCount: 8, viperRapidCount: 10, viperSpreadCount: 8,
+    viperCount: 8, viperRapidCount: 10, viperSpreadCount: 8, viperSpreadCooldown: 10,
     viperInterval: 3, viperSpeed: 6, viperPost: 12,
     raiderCount: 10, raiderInterval: 4, raiderSpeed: 5,
     raiderPost: [60, 50, 40], raiderDamage: 10,
   });
   assert.match(source,
-    /update_viper_weapon:[\s\S]+VIPER_RAPID_FIRE_BURST_COUNT-VIPER_NORMAL_BURST_COUNT[\s\S]+VIPER_BURST_INTERVAL-VIPER_RAPID_FIRE_INTERVAL/);
+    /update_viper_weapon:[\s\S]+VIPER_RAPID_FIRE_BURST_COUNT-VIPER_NORMAL_BURST_COUNT[\s\S]+viper_fire_intervals/);
   assert.match(source, /update_enemy_weapon_runtime:[\s\S]+RAIDER_BURST_COUNT[\s\S]+RAIDER_BURST_INTERVAL/);
   assert.match(source, /update_fighter_projectiles:[\s\S]+raider_projectile_hits_player[\s\S]+ENEMY_PULSE_DAMAGE_UNITS[\s\S]+apply_player_damage/);
 });

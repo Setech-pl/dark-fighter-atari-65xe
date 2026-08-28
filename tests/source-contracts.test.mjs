@@ -23,10 +23,10 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.doesNotMatch(rotate, /sta DLISTL/,
     "visible-frame ring rotation must not publish DLISTL directly");
   assert.match(source,
-    /gameplay_dli:[\s\S]+lda gameplay_dli_phase\s+bne @sync_hud[\s\S]+lda PLAYFIELD_ACTIVE_DLIST_LO\s+clc\s+adc #\$03\s+sta DLISTL\s+@sync_gameplay:/,
+    /gameplay_dli:[\s\S]+lda gameplay_dli_phase\s+bne gameplay_dli_sync_hud[\s\S]+lda PLAYFIELD_ACTIVE_DLIST_LO\s+clc\s+adc #\$03\s+sta DLISTL\s+gameplay_dli_sync_gameplay\s*=\s*\*/,
     "the first gameplay DLI must select byte three of the active A2 list before playfield DMA");
   assert.match(source,
-    /@hud:[\s\S]+sta gameplay_dli_phase[\s\S]+publish_playfield_display_list = @hud\s+pla\s+rti/,
+    /gameplay_dli_hud\s*=\s*\*[\s\S]+sta gameplay_dli_phase[\s\S]+publish_playfield_display_list = gameplay_dli_hud\s+pla[\s\S]+rti/,
     "the final gameplay DLI must leave next-frame publication to the active list JVB");
   assert.match(source, /\.byte \$47,<SCREEN,>SCREEN\s+; ANTIC 7 title/);
   assert.match(source, /\.byte \$02\s+; 40-column ANTIC 2 control hint/);
@@ -57,13 +57,14 @@ test("current documentation keeps implemented, planned and historical state dist
     runtimeHeadroom, read("docs/memory-map.md")].join("\n");
 
   assert.match(gameDesign, /The gameplay HUD contains `SCORE`, `LIFE`, and `HULL`\./);
+  assert.match(gameDesign, /full `BOOST` label/);
   assert.doesNotMatch(gameDesign, /\b(?:ARM|FUEL)\b/);
   assert.match(gameDesign, /Rapid Fire — implemented/);
   assert.match(gameDesign, /Spread Shot — implemented/);
   assert.match(gameDesign, /Shield Booster — planned/);
   assert.doesNotMatch(currentSources, /\$8100-\$99A3/);
   assert.doesNotMatch(currentSources, /\$8100-\$(?:9AA3|9A3D)/);
-  assert.match(architecture, /stages it at `\$8100-\$9A38`/);
+  assert.match(architecture, /stages it at `\$8100-\$9A53`/);
   assert.match(architecture, /packs them to \*\*1,997 bytes\*\*/);
   assert.doesNotMatch(currentSources, /\b2,?027[- ]bytes\b/i);
   assert.doesNotMatch(artDirection, /\bresidual\b/i);

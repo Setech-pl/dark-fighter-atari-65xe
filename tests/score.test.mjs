@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { installRuntimeSegments } from "../scripts/runtime-image.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(directory, "..");
@@ -20,8 +21,9 @@ const addresses = {
   screen: 0x4000,
   scoreLow: labels.get("score_bcd_lo"),
   scoreHigh: labels.get("score_bcd_hi"),
-  topLow: 0x4ed7,
-  topHigh: 0x4ed8,
+  topLow: labels.get("TOP_SCORE_TABLE_LO"),
+  topHigh: labels.get("TOP_SCORE_TABLE_HI"),
+  topEnd: labels.get("TOP_SCORE_TABLE_END"),
   playerLifecycle: 0x4eaa,
   playerLives: 0x4eab,
   playerHealth: 0x4e5d,
@@ -34,7 +36,11 @@ const addresses = {
   applyPlayerDamage: labels.get("apply_player_damage"),
   updatePlayerDeath: labels.get("update_player_death"),
   initState: labels.get("init_state"),
-  drawTop: labels.get("draw_session_top_score"),
+  insertTop: labels.get("insert_top_score"),
+  drawTop: labels.get("draw_top_score_rows"),
+  enterGameOver: labels.get("enter_game_over"),
+  enterMainMenu: labels.get("enter_main_menu"),
+  enterTopScores: labels.get("enter_top_scores"),
 };
 
 function routine(label) {
@@ -55,6 +61,71 @@ function createRuntimeMemory() {
   const memory = new Uint8Array(0x10000);
   installRuntimeSegments(memory, root);
   return memory;
+}
+
+function runAssembledRoutine(memory, startAddress, { hooks = {} } = {}) {
+  const cpu = new Nmos6502(memory, hooks);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = startAddress;
+  let steps = 0;
+  while (cpu.pc !== stop && steps++ < 500_000) cpu.step();
+  assert.equal(cpu.pc, stop, `routine $${startAddress.toString(16)} did not return`);
+  return { cycles: cpu.cycles, steps };
+}
+
+function scoreToBcd(score) {
+  return {
+    high: Math.floor(score / 1000) << 4 | Math.floor(score / 100) % 10,
+    low: Math.floor(score / 10) % 10 << 4 | score % 10,
+  };
+}
+
+function bcdToScore(high, low) {
+  return (high >> 4) * 1000 + (high & 0x0f) * 100 +
+    (low >> 4) * 10 + (low & 0x0f);
+}
+
+function writeTopScores(memory, scores) {
+  for (let index = 0; index < 10; index += 1) {
+    const { high, low } = scoreToBcd(scores[index] ?? 0);
+    memory[addresses.topLow + index] = low;
+    memory[addresses.topHigh + index] = high;
+  }
+}
+
+function readTopScores(memory) {
+  return Array.from({ length: 10 }, (_, index) => bcdToScore(
+    memory[addresses.topHigh + index],
+    memory[addresses.topLow + index],
+  ));
+}
+
+function insertScore(memory, score, hooks = {}) {
+  const { high, low } = scoreToBcd(score);
+  memory[addresses.scoreHigh] = high;
+  memory[addresses.scoreLow] = low;
+  return runAssembledRoutine(memory, addresses.insertTop, { hooks });
+}
+
+function renderedTopScores(memory) {
+  runAssembledRoutine(memory, addresses.drawTop);
+  return Array.from({ length: 10 }, (_, row) => {
+    const digits = memory.subarray(addresses.screen + (5 + row) * 40 + 21,
+      addresses.screen + (5 + row) * 40 + 27);
+    return Number.parseInt([...digits].map((code) => code - 1).join(""), 10);
+  });
+}
+
+function frontendHooks() {
+  let vcountRead = 0;
+  return {
+    read(address) {
+      if (address !== 0xd40b) return undefined;
+      return vcountRead++ === 0 ? 0 : 1;
+    },
+  };
 }
 
 // Focused NMOS 6502 runner for the assembled score and lifecycle paths. It
@@ -274,40 +345,43 @@ function awardOnePoint({ scoreLow, scoreHigh, topLow, topHigh }) {
 test("all score writes use one BCD award path while source ownership stays unchanged", () => {
   assert.ok(Object.values(addresses).every(Number.isInteger));
   assert.match(source,
-    /TOP_SCORE_BCD_LO\s*=\s*STARFIELD_STATE_END[\s\S]+TOP_SCORE_BCD_HI\s*=\s*TOP_SCORE_BCD_LO\+\$01/);
+    /TOP_SCORE_RECORD_COUNT\s*=\s*10[\s\S]+TOP_SCORE_TABLE_LO\s*=\s*TOP_SCORE_TABLE[\s\S]+TOP_SCORE_TABLE_HI\s*=\s*TOP_SCORE_TABLE_LO\+TOP_SCORE_STORAGE_COUNT/);
   assert.match(routine("add_archetype_score"),
-    /adc enemy_scores,x[\s\S]+sta score_bcd_hi[\s\S]+jsr update_top_score[\s\S]+jmp update_score_display/);
+    /adc enemy_scores,x[\s\S]+sta score_bcd_hi[\s\S]+cld\s+jmp update_score_display/);
+  assert.doesNotMatch(routine("add_archetype_score"), /insert_top_score/);
+  assert.match(routine("update_player_death"),
+    /@game_over:[\s\S]+sta PLAYER_LIFECYCLE\s+jsr insert_top_score/);
   assert.match(routine("resolve_enemy_damage"),
     /cmp #\(DAMAGE_CAPITAL_CYLON\+1\)\s+bcs @no_score\s+pha\s+jsr add_archetype_score\s+pla\s+cmp #DAMAGE_PLAYER_PROJECTILE\s+bne @no_score\s+lda ENTITY_STATE\+WEAPON_PICKUP_SLOT\s+bne @no_score\s+jsr weapon_pickup_record_qualified_kill/);
   assert.match(routine("init_state"), /sta score_bcd_lo\s+sta score_bcd_hi/);
-  assert.doesNotMatch(routine("init_state"), /TOP_SCORE/);
+  assert.doesNotMatch(routine("init_state"), /TOP_SCORE_TABLE/);
   assert.match(routine("finish_startup_after_loader"),
-    /sta TOP_SCORE_BCD_LO\s+sta TOP_SCORE_BCD_HI/);
+    /ldx #\(TOP_SCORE_TABLE_BYTES-1\)[\s\S]+sta TOP_SCORE_TABLE,x[\s\S]+bpl @clear_top_scores/);
   assert.equal((source.match(/sta score_bcd_lo/g) ?? []).length, 2);
   assert.equal((source.match(/sta score_bcd_hi/g) ?? []).length, 2);
 });
 
-test("assembled decimal score code carries 9 to 10 and 99 to 100", () => {
+test("assembled decimal score code carries without inserting partial-game scores", () => {
   const cases = [
     {
       name: "0009 + 1",
       input: { scoreLow: 0x09, scoreHigh: 0x00, topLow: 0x08, topHigh: 0x00 },
       score: [0x10, 0x00],
-      top: [0x10, 0x00],
+      top: [0x08, 0x00],
       hud: [16, 16, 16, 17, 16],
     },
     {
       name: "0099 + 1",
       input: { scoreLow: 0x99, scoreHigh: 0x00, topLow: 0x99, topHigh: 0x00 },
       score: [0x00, 0x01],
-      top: [0x00, 0x01],
+      top: [0x99, 0x00],
       hud: [16, 16, 17, 16, 16],
     },
     {
       name: "0199 + 1 exceeds TOP 0199",
       input: { scoreLow: 0x99, scoreHigh: 0x01, topLow: 0x99, topHigh: 0x01 },
       score: [0x00, 0x02],
-      top: [0x00, 0x02],
+      top: [0x99, 0x01],
       hud: [16, 16, 18, 16, 16],
     },
   ];
@@ -324,16 +398,83 @@ test("assembled decimal score code carries 9 to 10 and 99 to 100", () => {
   }
 });
 
-test("assembled TOP=max(TOP,SCORE) never lowers an existing session record", () => {
-  const { memory } = awardOnePoint({
-    scoreLow: 0x99,
-    scoreHigh: 0x00,
-    topLow: 0x00,
-    topHigh: 0x02,
-  });
-  assert.deepEqual([memory[addresses.scoreLow], memory[addresses.scoreHigh]], [0x00, 0x01]);
-  assert.deepEqual([memory[addresses.topLow], memory[addresses.topHigh]], [0x00, 0x02]);
+test("TOP SCORES owns exactly ten two-byte packed-BCD records", () => {
+  assert.equal(labels.get("TOP_SCORE_RECORD_COUNT"), 10);
+  assert.equal(labels.get("TOP_SCORE_RECORD_BYTES"), 2);
+  assert.equal(labels.get("TOP_SCORE_STORAGE_COUNT"), 10);
+  assert.equal(addresses.topHigh, addresses.topLow + 10);
+  assert.equal(addresses.topEnd, addresses.topLow + 20);
+  assert.equal(addresses.topEnd, 0x4efe);
+});
 
+test("assembled ranking covers empty, regression, middle and new-record insertion", () => {
+  const scenarios = [
+    { name: "empty + 890", before: [], score: 890,
+      after: [890, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "890 + 690 regression", before: [890], score: 690,
+      after: [890, 690, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "insert 750 between 890 and 690", before: [890, 690], score: 750,
+      after: [890, 750, 690, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "new record 950", before: [890, 750, 690], score: 950,
+      after: [950, 890, 750, 690, 0, 0, 0, 0, 0, 0] },
+  ];
+  for (const scenario of scenarios) {
+    const memory = createRuntimeMemory();
+    writeTopScores(memory, scenario.before);
+    const { cycles } = insertScore(memory, scenario.score);
+    assert.deepEqual(readTopScores(memory), scenario.after, scenario.name);
+    assert.ok(cycles < 600, `${scenario.name} remains bounded`);
+  }
+});
+
+test("ranking fills every empty slot and remains descending", () => {
+  const memory = createRuntimeMemory();
+  for (const score of [890, 690, 750, 950, 500, 400, 300, 200, 100, 50]) {
+    insertScore(memory, score);
+  }
+  assert.deepEqual(readTopScores(memory), [950, 890, 750, 690, 500, 400, 300, 200, 100, 50]);
+});
+
+test("equal scores insert after existing equals and move both BCD fields together", () => {
+  const memory = createRuntimeMemory();
+  writeTopScores(memory, [890, 750, 750, 690]);
+  const writes = [];
+  insertScore(memory, 750, {
+    write(address, value) {
+      if ((address >= addresses.topLow && address < addresses.topLow + 10) ||
+        (address >= addresses.topHigh && address < addresses.topHigh + 10)) {
+        writes.push([address, value]);
+      }
+    },
+  });
+  assert.deepEqual(readTopScores(memory), [890, 750, 750, 750, 690, 0, 0, 0, 0, 0]);
+  assert.deepEqual(writes.slice(0, 2).map(([address]) => address),
+    [addresses.topLow + 3, addresses.topHigh + 3],
+  "candidate must be stored after both existing equal records");
+  for (let index = 0; index < writes.length; index += 2) {
+    assert.equal(writes[index + 1][0] - writes[index][0], 10,
+      "every shifted low-byte field must be followed by its matching high byte");
+  }
+});
+
+test("zero and a full-table loser do not alter visible records", () => {
+  const full = [950, 890, 750, 690, 500, 400, 300, 200, 100, 50];
+  for (const score of [0, 40]) {
+    const memory = createRuntimeMemory();
+    writeTopScores(memory, full);
+    insertScore(memory, score);
+    assert.deepEqual(readTopScores(memory), full);
+  }
+});
+
+test("a full-table winner displaces the last record", () => {
+  const memory = createRuntimeMemory();
+  writeTopScores(memory, [950, 890, 750, 690, 500, 400, 300, 200, 100, 50]);
+  insertScore(memory, 125);
+  assert.deepEqual(readTopScores(memory), [950, 890, 750, 690, 500, 400, 300, 200, 125, 100]);
+});
+
+test("ordinary awards update only current BCD score until Game Over", () => {
   const actualAward = createRuntimeMemory();
   assert.equal(actualAward[addresses.enemyScores], 0x10,
     "the release Raider keeps its descriptor-owned ten-point award");
@@ -345,8 +486,7 @@ test("assembled TOP=max(TOP,SCORE) never lowers an existing session record", () 
   executeScoreRoutine(actualAward, addresses.addScore);
   assert.deepEqual([actualAward[addresses.scoreLow], actualAward[addresses.scoreHigh]],
     [0x10, 0x00]);
-  assert.deepEqual([actualAward[addresses.topLow], actualAward[addresses.topHigh]],
-    [0x10, 0x00]);
+  assert.deepEqual(readTopScores(actualAward), Array(10).fill(0));
 });
 
 test("assembled death and respawn preserve whole-game SCORE before the next award", () => {
@@ -397,7 +537,7 @@ test("assembled death and respawn preserve whole-game SCORE before the next awar
   assert.equal(memory[addresses.enemyScores], 0x10);
   executeScoreRoutine(memory, addresses.addScore);
   assert.deepEqual([memory[addresses.scoreLow], memory[addresses.scoreHigh]], [0x33, 0x01]);
-  assert.deepEqual([memory[addresses.topLow], memory[addresses.topHigh]], [0x33, 0x01]);
+  assert.deepEqual([memory[addresses.topLow], memory[addresses.topHigh]], [0x23, 0x01]);
 
   const newGameCalls = new Set([
     "init_fighter_projectiles",
@@ -406,43 +546,66 @@ test("assembled death and respawn preserve whole-game SCORE before the next awar
   ].map((label) => labels.get(label)));
   executeScoreRoutine(memory, addresses.initState, { externalCalls: newGameCalls });
   assert.deepEqual([memory[addresses.scoreLow], memory[addresses.scoreHigh]], [0, 0]);
-  assert.deepEqual([memory[addresses.topLow], memory[addresses.topHigh]], [0x33, 0x01]);
+  assert.deepEqual([memory[addresses.topLow], memory[addresses.topHigh]], [0x23, 0x01]);
 
   assert.doesNotMatch(routine("respawn_player"), /score_bcd|TOP_SCORE|init_state/);
-  assert.doesNotMatch(routine("update_player_death"), /score_bcd|TOP_SCORE|init_state/);
+  assert.match(routine("update_player_death"), /jsr insert_top_score/);
   assert.doesNotMatch(routine("main_loop"), /reset_score_after_player_death/);
   assert.match(routine("start_gameplay"), /jsr init_state/);
 });
 
-test("assembled Game Over transition preserves the final SCORE and TOP", () => {
+test("assembled Game Over transition inserts the final score exactly once", () => {
   const memory = createRuntimeMemory();
+  writeTopScores(memory, [200, 100]);
   memory[addresses.playerLifecycle] = 1;
   memory[addresses.playerLives] = 0;
   memory[addresses.deathTimer] = 1;
   memory[addresses.scoreLow] = 0x23;
   memory[addresses.scoreHigh] = 0x01;
-  memory[addresses.topLow] = 0x23;
-  memory[addresses.topHigh] = 0x01;
-  executeScoreRoutine(memory, addresses.updatePlayerDeath, {
-    externalCalls: new Set([labels.get("clear_player_collision_latches")]),
-  });
+  runAssembledRoutine(memory, addresses.updatePlayerDeath);
   assert.equal(memory[addresses.playerLifecycle], 3);
   assert.deepEqual([memory[addresses.scoreLow], memory[addresses.scoreHigh]], [0x23, 0x01]);
-  assert.deepEqual([memory[addresses.topLow], memory[addresses.topHigh]], [0x23, 0x01]);
+  assert.deepEqual(readTopScores(memory), [200, 123, 100, 0, 0, 0, 0, 0, 0, 0]);
+  runAssembledRoutine(memory, addresses.updatePlayerDeath);
+  assert.deepEqual(readTopScores(memory), [200, 123, 100, 0, 0, 0, 0, 0, 0, 0]);
 });
 
-test("assembled TOP formatter writes the current session record on screen entry", () => {
+test("assembled TOP formatter renders every RAM record", () => {
   const memory = createRuntimeMemory();
-  memory[addresses.topLow] = 0x00;
-  memory[addresses.topHigh] = 0x01;
-  memory.fill(1, addresses.screen + 5 * 40 + 21, addresses.screen + 5 * 40 + 27);
-  executeScoreRoutine(memory, addresses.drawTop);
-  assert.deepEqual(
-    [...memory.subarray(addresses.screen + 5 * 40 + 21, addresses.screen + 5 * 40 + 27)],
-    [1, 1, 1, 2, 1, 1],
-    "packed BCD 0100 must render as six frontend screen codes for 000100",
-  );
+  const expected = [950, 890, 750, 690, 500, 400, 300, 200, 100, 50];
+  writeTopScores(memory, expected);
+  assert.deepEqual(renderedTopScores(memory), expected);
   assert.match(routine("render_frontend_state"),
     /cmp #STATE_TOP_SCORES[\s\S]+jmp draw_top_score_rows/);
-  assert.match(routine("draw_top_score_rows"), /jmp draw_session_top_score/);
+  assert.match(routine("draw_top_score_rows"),
+    /TOP_SCORE_TABLE_HI,x[\s\S]+TOP_SCORE_TABLE_LO,x[\s\S]+cpx #10/);
+});
+
+test("three consecutive games survive SCORE resets and render immediately", () => {
+  const memory = createRuntimeMemory();
+  const newGameCalls = new Set([
+    "init_fighter_projectiles", "init_starfield_state", "reset_enemy_fire_cooldown",
+  ].map((label) => labels.get(label)));
+  const expectations = [
+    [890, [890, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+    [690, [890, 690, 0, 0, 0, 0, 0, 0, 0, 0]],
+    [750, [890, 750, 690, 0, 0, 0, 0, 0, 0, 0]],
+  ];
+  for (const [score, expected] of expectations) {
+    const { high, low } = scoreToBcd(score);
+    memory[addresses.scoreHigh] = high;
+    memory[addresses.scoreLow] = low;
+    memory[addresses.playerLifecycle] = 1;
+    memory[addresses.playerLives] = 0;
+    memory[addresses.deathTimer] = 1;
+    runAssembledRoutine(memory, addresses.updatePlayerDeath);
+    assert.deepEqual(readTopScores(memory), expected, `RAM after game ${score}`);
+    runAssembledRoutine(memory, addresses.enterGameOver, { hooks: frontendHooks() });
+    runAssembledRoutine(memory, addresses.enterMainMenu, { hooks: frontendHooks() });
+    runAssembledRoutine(memory, addresses.enterTopScores, { hooks: frontendHooks() });
+    assert.deepEqual(renderedTopScores(memory), expected, `screen after game ${score}`);
+    executeScoreRoutine(memory, addresses.initState, { externalCalls: newGameCalls });
+    assert.deepEqual([memory[addresses.scoreHigh], memory[addresses.scoreLow]], [0, 0]);
+    assert.deepEqual(readTopScores(memory), expected, `table survives New Game after ${score}`);
+  }
 });

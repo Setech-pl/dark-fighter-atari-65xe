@@ -326,7 +326,9 @@ test("broadside stars stay inside the corridor and never touch hull ownership", 
     assert.ok(state.far.every(({ column }) => column >= 9 && column <= 30));
     state = stepStarfieldWorld(asset, state);
   }
-  assert.match(source, /render_far_star_overlays:[\s\S]+RESOLVE_FAR_STAR_PTR[\s\S]+ldy #\$00[\s\S]+lda \(dst_ptr\),y\s+bne render_far_star_next/);
+  assert.match(source, /STAR_FAR_SCREEN_LO\s*=\s*\$8100[\s\S]+STAR_FAR_SCREEN_HI\s*=\s*STAR_FAR_SCREEN_LO\+STAR_FAR_CAPACITY/);
+  assert.match(source, /render_far_star_overlays:[\s\S]+RESOLVE_FAR_STAR_PTR[\s\S]+ldy #\$00[\s\S]+lda \(dst_ptr\),y\s+bne render_far_star_next[\s\S]+sta STAR_FAR_SCREEN_LO,x[\s\S]+sta STAR_FAR_SCREEN_HI,x/);
+  assert.match(source, /erase_far_star_overlays:[\s\S]+lda STAR_FAR_SCREEN_LO,x\s+sta dst_ptr[\s\S]+lda STAR_FAR_SCREEN_HI,x\s+sta dst_ptr\+1[\s\S]+sta \(dst_ptr\),y/);
   assert.doesNotMatch(source.slice(source.indexOf("handle_collisions:"),
     source.indexOf("update_score_display:")), /STAR_FAR|STAR_NEAR|star_glyph/);
 });

@@ -5,6 +5,19 @@ the bootable `dark-fighter.atr`; do not substitute a debug build or a preview
 model. Record emulator/hardware version, medium, joystick, display connection,
 and any failure with a photo or capture and reproduction steps.
 
+Before manual testing, run the evidence phases in order:
+
+- [ ] `npm run build:candidate` produces a `candidate-awaiting-trace` manifest.
+- [ ] `npm run runtime:wall-trace` completes every schema-v2 session, including
+      cold RAM `$A5/$5A` and full debris flights on EASY, MEDIUM, and HARD.
+- [ ] `npm run build` binds the complete report to the same boot BIN, XEX, and
+      ATR hashes.
+- [ ] `npm run verify` accepts the final-bound manifest and report hash.
+- [ ] A second unchanged full trace has replay fingerprint
+      `6eca3e151923803e15fce3ed1438009bea8edc06bfc9c8c301a6880db6173736`,
+      a 33,020-cycle maximum, and 2,548-cycle physical headroom before final
+      packaging.
+
 ## Atari800 PAL test
 
 Configure Atari800 as PAL XL/XE with 64 KB RAM, BASIC disabled, joystick in port
@@ -15,8 +28,8 @@ For both XEX and ATR:
 
 - [ ] Loader appears intact for five seconds, then reaches the main menu.
 - [ ] Menu, options, top scores, music toggle, and exit screen respond normally.
-- [ ] A new game shows `SCORE`, `LIFE`, and `HULL`; values do not corrupt nearby
-      characters.
+- [ ] A new game shows `SCORE`, `LIFE`, and the full `HULL` label followed by
+      four low intact plates; fields do not corrupt nearby characters.
 - [ ] Viper movement and normal fire remain responsive at 50 FPS PAL; a held
       FIRE input emits exactly eight shots at three-frame intervals, then the
       existing 12-frame post-burst pause.
@@ -29,16 +42,26 @@ For both XEX and ATR:
 - [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
       Raider breakup, and debris breakup behave normally.
 - [ ] Rapid Fire capsule moves as one stable 2x2 footprint; collection displays
-      `RF`, emits ten yellow shots at two-frame intervals with the existing
-      12-frame post-burst pause, and expires after ten active seconds.
+      the full `BOOST` label and four tall energy segments, emits ten yellow shots at two-frame
+      intervals with the existing 12-frame post-burst pause, and expires after
+      ten active seconds.
 - [ ] Spread Shot capsule is a stable red 2x2 footprint with a black fan symbol.
-- [ ] Collecting Spread displays `SP` and produces three yellow Viper projectiles:
-      one vertical and two smoothly diverging, symmetric side shots.
+- [ ] Collecting Spread immediately displays the full `BOOST` label and four
+      full energy segments and
+      produces three yellow Viper projectiles: one vertical and two smoothly
+      diverging, symmetric side shots.
 - [ ] One held Spread burst contains exactly eight complete salvos. When fewer
       than three Viper slots are free, the next salvo waits; no one- or two-shot
       partial fan appears.
 - [ ] Rapid and Spread replace each other; collecting the active type refreshes
-      its countdown; neither timer advances during pause.
+      the `BOOST` field and four-segment bar. It steps at the 75%, 50%, and 25% boundaries; below
+      25% the last segment blinks for 8 visible and 8 hidden PAL frames. Neither
+      timer nor the current blink phase advances during pause.
+- [ ] Expiry, life loss, Game Over, and New Game remove `BOOST` and leave all ten
+      booster HUD cells empty; a live sector transition preserves the active field.
+- [ ] At native 320-pixel width, HULL plates remain low and angular while BOOST
+      cells remain tall and narrow; the two indicators are distinguishable
+      without relying on colour. Damaged HULL plates never blink or disappear.
 - [ ] Spread projectiles cross empty space and successive Colonial hull segments
       without vertical lines, blank cells, ghosts, or stale projectile glyphs.
 - [ ] Repeat over the Cylon prow, midship modules, engine section, module
@@ -49,8 +72,12 @@ For both XEX and ATR:
       opposite capital ship.
 - [ ] Losing a life clears life-scoped weapon state and respawns with the
       expected blink; losing the last life reaches Game Over.
+- [ ] Finish consecutive games with 890, 690, then 750 points. After each
+      Game Over, enter TOP SCORES through the menu and verify `890`; then
+      `890, 690`; then `890, 750, 690` without restarting the program.
 - [ ] New Game resets score, lives, hull, boosters, pickup sequence, projectiles,
-      entities, effects, and sector state while preserving the session top score.
+      entities, effects, and sector state while preserving all ten TOP SCORES
+      records.
 - [ ] XEX and ATR show equivalent gameplay behavior for at least 120 seconds
       each.
 

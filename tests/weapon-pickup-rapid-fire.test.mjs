@@ -16,6 +16,8 @@ import {
 import { compileEnemyRoster, loadEnemyRosterDefinition } from "../scripts/enemy-roster.mjs";
 import {
   assertWeaponPickupTraceParity,
+  executeHudPresentationTrace,
+  executeWeaponBoosterHudTrace,
   executeWeaponPickupCauseTrace,
   executeWeaponPickupBackingTrace,
   executeWeaponPickupCollisionTrace,
@@ -263,9 +265,113 @@ test("pickup collection is single-shot and changes neither score, HULL nor LIFE"
   ], [before.scoreHi, before.scoreLo, before.playerHealth, before.playerLives]);
   const changedHudCells = Array.from({ length: 40 }, (_, offset) => offset)
     .filter((offset) => pickup.display[offset] !== before.display[offset]);
-  assert.deepEqual(changedHudCells, [32, 33, 34, 35]);
+  assert.deepEqual(changedHudCells, [30, 31, 32, 33, 34, 36, 37, 38, 39]);
+  assert.equal(pickup.display[35], 0, "BOOST separator must remain a blank cell");
   assert.deepEqual(Array.from(pickup.display.subarray(0, 30)),
-    Array.from(before.display.subarray(0, 30)), "SCORE/LIFE/HULL cells must remain byte-exact");
+    Array.from(before.display.subarray(0, 30)), "SCORE/LIFE/HULL and separator cells must remain byte-exact");
+});
+
+test("weapon boosters use four proportional ANTIC 2 segments with a timer-derived warning blink", () => {
+  const xex = executeWeaponBoosterHudTrace({ root, artifact: "xex" });
+  const atr = executeWeaponBoosterHudTrace({ root, artifact: "atr" });
+  const summary = (trace) => ({
+    hudOffset: trace.hudOffset,
+    hudCells: trace.hudCells,
+    hudSegmentsOffset: trace.hudSegmentsOffset,
+    fullCode: trace.fullCode,
+    fullGlyph: trace.fullGlyph,
+    samples: trace.samples,
+    paused: trace.paused,
+    refreshed: trace.refreshed,
+    expired: trace.expired,
+    backingBeforeRefresh: trace.backingBeforeRefresh,
+    backingAfterRefresh: trace.backingAfterRefresh,
+    changedScreenOffsets: trace.changedScreenOffsets,
+  });
+  assert.deepEqual(summary(xex), summary(atr), "XEX and ATR HUD execution must match");
+  assert.deepEqual([
+    xex.hudOffset, xex.hudCells, xex.hudSegmentsOffset, xex.hudSegments,
+    xex.fullCode, xex.fullGlyph,
+  ], [30, 10, 36, 4, 7, [0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0xff]]);
+  assert.deepEqual(Object.fromEntries(xex.samples.map(({ name, hudCodes }) =>
+    [name, hudCodes])), {
+    "100%": [7, 7, 7, 7],
+    "76%": [7, 7, 7, 7],
+    "75%": [7, 7, 7, 0],
+    "51%": [7, 7, 7, 0],
+    "50%": [7, 7, 0, 0],
+    "26%": [7, 7, 0, 0],
+    "25%": [7, 7, 0, 0],
+    "below-25-visible": [7, 0, 0, 0],
+    "blink-visible": [7, 0, 0, 0],
+    "blink-hidden-boundary": [0, 0, 0, 0],
+    "blink-hidden": [0, 0, 0, 0],
+    "blink-visible-resumed": [7, 0, 0, 0],
+  });
+  assert.deepEqual(xex.paused.map(({ timer, hudCodes }) => [timer, hudCodes]),
+    Array.from({ length: 16 }, () => [112, [0, 0, 0, 0]]),
+    "pause must freeze both the timer and its current hidden blink phase");
+  assert.deepEqual([
+    xex.activation.state, xex.activation.timer, xex.activation.hudCodes,
+    xex.refreshed.state, xex.refreshed.timer, xex.refreshed.hudCodes,
+  ], [3, 500, [7, 7, 7, 7], 4, 500, [7, 7, 7, 7]]);
+  assert.deepEqual([
+    xex.backingBeforeRefresh, xex.backingAfterRefresh,
+    xex.expired.state, xex.expired.timer, xex.expired.hudRegionCodes,
+  ], [xex.originalHud, xex.originalHud, 0, 0, xex.originalHud]);
+  assert.deepEqual(xex.changedScreenOffsets,
+    [30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+    "activation must not write outside the ten-cell BOOST field");
+  assert.equal(xex.samples.every(({ hudRegionCodes }) =>
+    hudRegionCodes.slice(0, 6).join() === "34,47,47,51,52,0"), true,
+  "the full BOOST label and separator must remain stable while active");
+  assert.equal(xex.samples.every(({ hudCodes }) => hudCodes.every((code) =>
+    code === 0 || code === xex.fullCode)), true,
+  "energy cells may contain only blank or the BOOST segment glyph");
+});
+
+test("HULL plates and the ten-cell BOOST field remain distinct at native screen codes", () => {
+  const xex = executeHudPresentationTrace({ root, artifact: "xex" });
+  const atr = executeHudPresentationTrace({ root, artifact: "atr" });
+  const comparable = ({ artifact: _artifact, manifest: _manifest, ...trace }) => trace;
+  assert.deepEqual(comparable(xex), comparable(atr));
+  assert.deepEqual([
+    xex.hullOffset, xex.hullSegments, xex.boosterOffset, xex.boosterCells,
+    xex.boosterSegmentsOffset, xex.boosterSegments,
+  ], [25, 4, 30, 10, 36, 4]);
+  assert.deepEqual([xex.hullOffset - 1, xex.hullOffset + xex.hullSegments,
+    xex.boosterSegmentsOffset - 1], [24, 29, 35],
+  "the three HULL/BOOST separators must each occupy exactly one cell");
+  assert.equal(xex.frames.every(({ display }) =>
+    [24, 29, 35].every((column) => display[column] === 0)), true,
+  "all three separator cells must stay blank in every rendered state");
+  assert.equal(xex.lifecycleDisplays.every(({ display }) =>
+    [24, 29, 35].every((column) => display[column] === 0)), true,
+  "expiration, new game and respawn must preserve all separator cells");
+  assert.equal(xex.frames.every(({ display }) => display.length === 40), true,
+  "HUD snapshots must remain exactly inside $4000-$4027");
+  assert.equal(xex.frames.every(({ display, hullCodes, boosterCodes }) =>
+    display.slice(25, 29).join() === hullCodes.join() &&
+    display.slice(30, 40).join() === boosterCodes.join()), true,
+  "HULL and BOOST writers must stay inside their disjoint fields");
+  assert.deepEqual([
+    xex.hullFullGlyph, xex.hullDamagedGlyph, xex.boosterFullGlyph,
+  ], [
+    [0, 0, 0, 0x3c, 0x7e, 0xff, 0x7e, 0xff],
+    [0, 0, 0, 0x3c, 0x42, 0x5a, 0x24, 0xff],
+    [0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0xff],
+  ]);
+  assert.deepEqual(xex.frames.map(({ name, health, timer, boosterState,
+    hullCodes, boosterCodes }) =>
+    [name, health, timer, boosterState, hullCodes, boosterCodes]), [
+    ["full-hull-no-booster", 10, 0, 0, [5, 5, 5, 5], Array(10).fill(0)],
+    ["full-hull-full-boost", 10, 500, 3, [5, 5, 5, 5],
+      [34, 47, 47, 51, 52, 0, 7, 7, 7, 7]],
+    ["partial-hull-half-boost", 7, 250, 3, [5, 5, 12, 12],
+      [34, 47, 47, 51, 52, 0, 7, 7, 0, 0]],
+    ["critical-hull-blinking-boost", 1, 111, 3, [12, 12, 12, 12],
+      [34, 47, 47, 51, 52, 0, 7, 0, 0, 0]],
+  ]);
 });
 
 test("Rapid Fire lasts 500 active frames and keeps its ten-shot accelerated burst", () => {
@@ -276,18 +382,24 @@ test("Rapid Fire lasts 500 active frames and keeps its ten-shot accelerated burs
   assert.equal(trace.rapidTimerFrames.length, 500);
   assert.deepEqual(trace.rapidTimerFrames.map(({ timer }) => timer),
     Array.from({ length: 500 }, (_, index) => 499 - index));
-  assert.deepEqual(trace.rapidTimerFrames[0].hudCodes, [50, 38, 17, 16]);
-  assert.deepEqual(trace.rapidTimerFrames[48].hudCodes, [50, 38, 17, 16]);
-  assert.deepEqual(trace.rapidTimerFrames[49].hudCodes, [50, 38, 16, 25]);
-  assert.deepEqual(trace.rapidTimerFrames[449].hudCodes, [50, 38, 16, 17]);
+  assert.deepEqual(trace.rapidTimerFrames[0].hudCodes, [7, 7, 7, 7]);
+  assert.deepEqual(trace.rapidTimerFrames[123].hudCodes, [7, 7, 7, 7]);
+  assert.deepEqual(trace.rapidTimerFrames[124].hudCodes, [7, 7, 7, 0]);
+  assert.deepEqual(trace.rapidTimerFrames[249].hudCodes, [7, 7, 0, 0]);
+  assert.deepEqual(trace.rapidTimerFrames[374].hudCodes, [7, 7, 0, 0]);
+  assert.deepEqual(trace.rapidTimerFrames[375].hudCodes, [7, 0, 0, 0]);
+  assert.deepEqual(trace.rapidTimerFrames[380].hudCodes, [0, 0, 0, 0]);
+  assert.deepEqual(trace.rapidTimerFrames[388].hudCodes, [7, 0, 0, 0]);
   assert.deepEqual(trace.rapidTimerFrames[499].hudCodes, [0, 0, 0, 0]);
   const hudChangeFrames = trace.rapidTimerFrames.filter((record, index, frames) =>
     index === 0 || record.hudCodes.join() !== frames[index - 1].hudCodes.join())
     .map(({ frame }) => frame);
-  assert.deepEqual(hudChangeFrames, [0, 49, 99, 149, 199, 249, 299, 349, 399, 449, 499]);
+  assert.deepEqual(hudChangeFrames,
+    [0, 124, 249, 375, 380, 388, 396, 404, 412, 420, 428, 436, 444, 452,
+      460, 468, 476, 484, 492]);
   assert.equal(trace.pauseFrames.length, 10);
   assert.equal(trace.pauseFrames.every(({ timer, hudCodes }) =>
-    timer === trace.frozenTimer && hudCodes.join() === "50,38,17,16"), true);
+    timer === trace.frozenTimer && hudCodes.join() === "7,7,7,7"), true);
   const rapid = trace.records.find(({ phase }) => phase === "RAPID_BURST");
   const paused = trace.records.find(({ phase }) => phase === "PAUSE");
   const expired = trace.records.find(({ phase }) => phase === "EXPIRED");
@@ -315,7 +427,7 @@ test("packed runtime distinguishes 8-shot normal, 10-shot Rapid and 8-salvo Spre
   assert.deepEqual(summary, [
     ["NORMAL", 8, 3, 12, 8, 8, 21, 8],
     ["RAPID", 10, 2, 12, 10, 10, 30, 10],
-    ["SPREAD", 8, 3, 12, 8, 24, 27, 9],
+    ["SPREAD", 8, 10, 12, 8, 24, 24, 9],
   ]);
   const firstBurstFrames = (mode) => mode.records
     .filter(({ allocatedProjectiles }) => allocatedProjectiles > 0)
@@ -324,7 +436,7 @@ test("packed runtime distinguishes 8-shot normal, 10-shot Rapid and 8-salvo Spre
   assert.deepEqual(firstBurstFrames(xex.traces[0]), [0, 3, 6, 9, 12, 15, 18, 21]);
   assert.deepEqual(firstBurstFrames(xex.traces[1]),
     [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
-  assert.deepEqual(firstBurstFrames(xex.traces[2]), [0, 3, 6, 28, 31, 34, 56, 59]);
+  assert.deepEqual(firstBurstFrames(xex.traces[2]), [0, 10, 20, 30, 40, 50, 60, 70]);
 });
 
 test("Normal and Rapid projectiles render through the Viper yellow bank", () => {
@@ -405,7 +517,7 @@ test("new game, life loss and Game Over clear RF while a live sector transition 
     lifecycle.newGame.qualifiedKillCounter,
     lifecycle.sectorRapid.state, lifecycle.sectorRapid.timer,
   ], [0, 3, 500]);
-  assert.deepEqual(lifecycle.sectorRapid.hudCodes, [50, 38, 17, 16]);
+  assert.deepEqual(lifecycle.sectorRapid.hudCodes, [7, 7, 7, 7]);
 });
 
 test("release trace CSV exposes the authoritative counter, state, timing and score", () => {
@@ -413,6 +525,6 @@ test("release trace CSV exposes the authoritative counter, state, timing and sco
   const csv = weaponPickupTraceCsv(trace);
   assert.match(csv, /^artifact,phase,frame,kill,damage_source,projectile_consumed,/);
   assert.match(csv, /xex,KILL_3,0,3,0,1,0,0,0,1,/);
-  assert.match(csv, /xex,PICKUP,0,,,0,0,26,10,3,/);
+  assert.match(csv, /xex,PICKUP,0,,,0,0,0,0,3,/);
   assert.match(csv, /xex,RAPID_TIMER,499,,,0,0,0,0,0,/);
 });

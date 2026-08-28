@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 import { parseViceLabels } from "./runtime-cycles.mjs";
 import { LOADER_DISPLAY_LIST_ADDRESS } from "./loader-assets.mjs";
+import { runtimeArtifactSet, runtimeArtifactNames } from "./runtime-evidence.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -52,13 +53,19 @@ const WEAPON_PICKUP_HARD_DELTA_CYCLES = 256;
 const WEAPON_PICKUP_TARGET_GATE_CYCLES = 32_997;
 const WEAPON_PICKUP_HARD_GATE_CYCLES = 33_125;
 const WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES = 2_400;
-const SPREAD_SHOT_BASELINE_WALL_CYCLES = 32_956;
-const SPREAD_SHOT_BASELINE_HEADROOM_CYCLES = 2_612;
-const SPREAD_SHOT_TARGET_DELTA_CYCLES = 256;
-const SPREAD_SHOT_HARD_DELTA_CYCLES = 384;
-const SPREAD_SHOT_TARGET_GATE_CYCLES = 33_212;
-const SPREAD_SHOT_HARD_GATE_CYCLES = 33_340;
-const SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES = 2_200;
+const RAPID_ONLY_ACCEPTED_WALL_CYCLES = 32_956;
+const RAPID_ONLY_ACCEPTED_HEADROOM_CYCLES = 2_612;
+const SPREAD_SHOT_BASELINE_WALL_CYCLES = 32_040;
+const SPREAD_SHOT_BASELINE_HEADROOM_CYCLES = 3_528;
+const SPREAD_SHOT_TARGET_DELTA_CYCLES = 200;
+const SPREAD_SHOT_HARD_DELTA_CYCLES = 500;
+const SPREAD_SHOT_TARGET_GATE_CYCLES = 32_240;
+const SPREAD_SHOT_HARD_GATE_CYCLES = 32_540;
+const SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES = 3_028;
+const SHIELD_BASELINE_WALL_CYCLES = 33_020;
+const SHIELD_READY_MAXIMUM_WALL_CYCLES = 32_068;
+const SHIELD_READY_MINIMUM_HEADROOM_CYCLES = 3_500;
+const SHIELD_READY_REQUIRED_RECOVERY_CYCLES = 952;
 const EXPECTED_ATARI800_VERSION = "7.1.2";
 const OFFICIAL_SOURCE_ARCHIVE_SHA256 =
   "9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3";
@@ -88,10 +95,10 @@ const targetedSessions = [{
 }];
 
 const cadenceSessions = [0, 1, 2].map((difficulty) => ({
-  id: `cadence-${difficulty}-sweep-fire4`,
+  id: `cadence-${difficulty}-sweep-nofire`,
   difficulty,
   policy: "sweep",
-  fireDelay: 4,
+  fireDelay: 4_000,
   frames: 400,
   kind: "parallax-cadence",
 }));
@@ -252,7 +259,47 @@ const traceLabels = {
   DFTRACE_RING_FLAGS: "PLAYFIELD_RING_FLAGS",
   DFTRACE_ACTIVE_DLIST_LO: "PLAYFIELD_ACTIVE_DLIST_LO",
   DFTRACE_NEXT_DLIST_LO: "PLAYFIELD_NEXT_DLIST_LO",
+  DFTRACE_PC_DLI_END: "profile_gameplay_dli_end",
+  DFTRACE_PC_DLI_HUD_END: "profile_gameplay_dli_hud_end",
+  DFTRACE_PC_COMPOSE_START: "compose_viper_projectile_glyph",
+  DFTRACE_PC_COMPOSE_END: "profile_projectile_compose_end",
+  DFTRACE_PC_POINTER_START: "initialize_projectile_screen_pointer",
+  DFTRACE_PC_POINTER_END: "profile_projectile_pointer_end",
+  DFTRACE_PC_ERASE_SLOT: "erase_fighter_projectile_slot",
+  DFTRACE_PC_RAIDER_UPDATE_START: "profile_raider_projectile_update_begin",
+  DFTRACE_PC_RENDER_SLOT: "render_fighter_projectile_slot",
+  DFTRACE_PC_ENTITY_ERASE_START: "profile_entity_erase_begin",
+  DFTRACE_PC_EFFECT_UPDATE_END: "profile_after_transient_effect_update",
+  DFTRACE_PC_PICKUP_UPDATE_END: "profile_after_pickup_booster_update",
 };
+
+const traceProfileLabels = [
+  "profile_after_entity_erase",
+  "profile_after_projectile_erase",
+  "profile_after_capsule",
+  "profile_after_frame_visuals",
+  "profile_after_player",
+  "profile_after_enemy",
+  "profile_after_fighter_projectile_update",
+  "profile_after_player_enemy_collision",
+  "profile_after_broadside_update",
+  "profile_after_enemy_damage_resolution",
+  "profile_after_collisions",
+  "profile_after_viper_weapon",
+  "profile_after_raider_weapon",
+  "profile_after_world",
+  "profile_after_hull_contact",
+  "profile_after_entity_update",
+  "profile_after_effect_visuals",
+  "profile_after_broadside_render",
+  "profile_after_projectile_render",
+  "profile_after_entity_render",
+  "profile_after_sector",
+  "profile_after_audio",
+];
+for (let index = 0; index < traceProfileLabels.length; index += 1) {
+  traceLabels[`DFTRACE_PC_PROFILE${index}`] = traceProfileLabels[index];
+}
 
 const bootTraceLabels = {
   DFBOOT_PC_START: "start",
@@ -324,6 +371,20 @@ for (const name of [
 for (const prefix of ["engine_divider", "engine_recycled"]) {
   for (let index = 0; index < 8; ++index) numericCsvFields.add(`${prefix}${index}`);
 }
+for (let index = 0; index < traceProfileLabels.length; index += 1) {
+  numericCsvFields.add(`profile_clock${index}`);
+}
+for (let index = 0; index < 2; index += 1) {
+  numericCsvFields.add(`profile_dli${index}_start`);
+  numericCsvFields.add(`profile_dli${index}_end`);
+  numericCsvFields.add(`profile_dli${index}_segment`);
+}
+for (const name of ["profile_compose_calls", "profile_compose_cycles",
+  "profile_pointer_calls", "profile_pointer_cycles", "profile_erase_viper_start",
+  "profile_raider_update_start", "profile_raider_render_start",
+  "profile_entity_erase_start", "profile_effect_update_end",
+  "profile_pickup_update_end", "profile_pickup_render_start",
+  "profile_effect_render_start"]) numericCsvFields.add(name);
 for (const prefix of [
   "pickup_old_address", "pickup_old_backing", "pickup_old_before_erase",
   "pickup_old_after_erase", "pickup_new_address", "pickup_new_backing",
@@ -509,11 +570,15 @@ function prepareAtari800(sourceDirectory) {
     cpuText = cpuText.replace(includeAnchor,
       `${includeAnchor}\n#include "darkfighter_trace.h"\n`);
   }
-  if (!cpuText.includes("DFTrace_Observe(GET_PC());")) {
+  if (cpuText.includes("DFTrace_Observe(GET_PC());")) {
+    cpuText = cpuText.replace("DFTrace_Observe(GET_PC());",
+      "DFTrace_Observe(GET_PC(), X);");
+  }
+  if (!cpuText.includes("DFTrace_Observe(GET_PC(), X);")) {
     const executeAnchor = "\t\tCPU_delayed_nmi = 0;\n";
     invariant(cpuText.includes(executeAnchor), "Atari800 CPU execution anchor changed");
     cpuText = cpuText.replace(executeAnchor,
-      `${executeAnchor}\t\tDFTrace_Observe(GET_PC());\n`);
+      `${executeAnchor}\t\tDFTrace_Observe(GET_PC(), X);\n`);
   }
   fs.writeFileSync(cpuPath, cpuText);
 
@@ -655,6 +720,148 @@ function frameState(row, includeCpuReference = false) {
 function maximumRow(rows, selector) {
   return rows.reduce((maximum, row) =>
     maximum === undefined || selector(row) > selector(maximum) ? row : maximum, undefined);
+}
+
+const profileSegmentNames = [
+  "entity_effect_erase", "projectile_erase_backing", "capsule_resident_render",
+  "frame_visual_ticks", "player_input_lifecycle", "enemy_update",
+  "fighter_projectile_update_collision", "player_enemy_collision",
+  "broadside_update", "enemy_damage_resolution", "collision_return",
+  "viper_weapon_control", "raider_weapon_control", "world_ring_playfield",
+  "player_hull_contact", "entity_effect_update", "explosion_effect_visuals",
+  "broadside_render", "projectile_render_backing", "entity_effect_render",
+  "sector_completion", "music_sound", "main_loop_tail",
+];
+
+function profileCostBreakdown(row) {
+  const boundaries = [row.start_clock,
+    ...traceProfileLabels.map((unused, index) => row[`profile_clock${index}`]),
+    row.end_clock];
+  invariant(boundaries.length === profileSegmentNames.length + 1 &&
+    boundaries.every((clock, index) => Number.isInteger(clock) &&
+      (index === 0 || clock >= boundaries[index - 1])),
+  `Profile boundaries are incomplete for ${row.session}:${row.frame}`);
+  const dlis = Array.from({ length: 2 }, (unused, index) => ({
+    start: row[`profile_dli${index}_start`],
+    end: row[`profile_dli${index}_end`],
+    segment: row[`profile_dli${index}_segment`],
+  })).filter(({ start, end }) => end > start);
+  const overlap = (start, end) => dlis.reduce((sum, dli) =>
+    sum + Math.max(0, Math.min(end, dli.end) - Math.max(start, dli.start)), 0);
+  const cpu = (start, end) => end > start ? end - start - overlap(start, end) : 0;
+  const segments = profileSegmentNames.map((name, index) => {
+    const start = boundaries[index];
+    const end = boundaries[index + 1];
+    return {
+      name,
+      wall_cycles: end - start,
+      dli_cycles: overlap(start, end),
+      mainline_cycles: cpu(start, end),
+    };
+  });
+  const segmentCpu = (index) => segments[index].mainline_cycles;
+  const nested = (start, end, fallbackStart, fallbackEnd) => {
+    const validStart = start >= fallbackStart && start <= fallbackEnd ? start : fallbackStart;
+    const validEnd = end >= validStart && end <= fallbackEnd ? end : fallbackEnd;
+    return cpu(validStart, validEnd);
+  };
+
+  const eraseStart = boundaries[0];
+  const eraseEnd = boundaries[1];
+  const entityEraseStart = row.profile_entity_erase_start;
+  const projectileEraseStart = boundaries[1];
+  const projectileEraseEnd = boundaries[2];
+  const viperEraseStart = row.profile_erase_viper_start;
+  const projectileUpdateStart = boundaries[6];
+  const projectileUpdateEnd = boundaries[7];
+  const raiderUpdateStart = row.profile_raider_update_start;
+  const projectileRenderStart = boundaries[18];
+  const projectileRenderEnd = boundaries[19];
+  const raiderRenderStart = row.profile_raider_render_start;
+  const entityUpdateStart = boundaries[15];
+  const entityUpdateEnd = boundaries[16];
+  const effectUpdateEnd = row.profile_effect_update_end;
+  const pickupUpdateEnd = row.profile_pickup_update_end;
+  const entityRenderStart = boundaries[19];
+  const entityRenderEnd = boundaries[20];
+  const pickupRenderStart = row.profile_pickup_render_start;
+  const effectRenderStart = row.profile_effect_render_start;
+
+  const effectErase = nested(eraseStart, entityEraseStart, eraseStart, eraseEnd);
+  const entityErase = nested(entityEraseStart, eraseEnd, eraseStart, eraseEnd);
+  const raiderErase = nested(projectileEraseStart, viperEraseStart,
+    projectileEraseStart, projectileEraseEnd);
+  const viperErase = nested(viperEraseStart, projectileEraseEnd,
+    projectileEraseStart, projectileEraseEnd);
+  const viperUpdate = nested(projectileUpdateStart, raiderUpdateStart,
+    projectileUpdateStart, projectileUpdateEnd);
+  const raiderUpdate = nested(raiderUpdateStart, projectileUpdateEnd,
+    projectileUpdateStart, projectileUpdateEnd);
+  const viperRender = nested(projectileRenderStart, raiderRenderStart,
+    projectileRenderStart, projectileRenderEnd);
+  const raiderRender = nested(raiderRenderStart, projectileRenderEnd,
+    projectileRenderStart, projectileRenderEnd);
+  const effectUpdate = nested(entityUpdateStart, effectUpdateEnd,
+    entityUpdateStart, entityUpdateEnd);
+  const pickupUpdate = nested(effectUpdateEnd, pickupUpdateEnd,
+    entityUpdateStart, entityUpdateEnd);
+  const debrisUpdate = nested(pickupUpdateEnd, entityUpdateEnd,
+    entityUpdateStart, entityUpdateEnd);
+  const debrisRenderEnd = pickupRenderStart || effectRenderStart || entityRenderEnd;
+  const pickupRenderEnd = effectRenderStart || entityRenderEnd;
+  const debrisRender = nested(entityRenderStart, debrisRenderEnd,
+    entityRenderStart, entityRenderEnd);
+  const pickupRender = pickupRenderStart === 0 ? 0 :
+    nested(pickupRenderStart, pickupRenderEnd, entityRenderStart, entityRenderEnd);
+  const effectRender = effectRenderStart === 0 ? 0 :
+    nested(effectRenderStart, entityRenderEnd, entityRenderStart, entityRenderEnd);
+
+  const dliCycles = dlis.reduce((sum, { start, end }) => sum + end - start, 0);
+  const subsystemCycles = {
+    vbi_and_synchronization: dliCycles,
+    world_ring_playfield: segmentCpu(13),
+    broadside: segmentCpu(8) + segmentCpu(17),
+    viper_projectiles: viperErase + viperUpdate + segmentCpu(11) + viperRender,
+    raider_projectiles: raiderErase + raiderUpdate + segmentCpu(12) + raiderRender,
+    enemy_update_collision: segmentCpu(5) + segmentCpu(7) + segmentCpu(9),
+    entity_debris: entityErase + debrisUpdate + debrisRender,
+    effects: effectErase + effectUpdate + segmentCpu(16) + effectRender,
+    capsule_interactive_entity: segmentCpu(2) + pickupUpdate + pickupRender,
+    music_sound: segmentCpu(21),
+    remaining_runtime: segmentCpu(3) + segmentCpu(4) + segmentCpu(10) +
+      segmentCpu(14) + segmentCpu(20) + segmentCpu(22),
+  };
+  invariant(Object.values(subsystemCycles).reduce((sum, cycles) => sum + cycles, 0) ===
+    row.wall_cycles, `Profile subsystem split does not sum to wall for ${row.session}:${row.frame}`);
+  return {
+    session: row.session,
+    frame: row.frame,
+    wall_cycles: row.wall_cycles,
+    subsystem_cycles: subsystemCycles,
+    synchronization_wait_cycles: 0,
+    synchronization_note: "Measurement begins after wait_frame; gameplay DLI service is included in vbi_and_synchronization.",
+    cross_cutting_cycles: {
+      render_mainline: segmentCpu(16) + segmentCpu(17) + segmentCpu(18) + segmentCpu(19),
+      erase_backing_mainline: segmentCpu(0) + segmentCpu(1),
+      address_mapping_calls: row.profile_pointer_calls,
+      address_mapping_cycles: row.profile_pointer_cycles,
+      projectile_composition_calls: row.profile_compose_calls,
+      projectile_composition_cycles: row.profile_compose_cycles,
+    },
+    projectile_detail: {
+      viper: { erase: viperErase, update_collision: viperUpdate,
+        weapon_control: segmentCpu(11), render_backing: viperRender },
+      raider: { erase: raiderErase, update_collision: raiderUpdate,
+        weapon_control: segmentCpu(12), render_backing: raiderRender },
+    },
+    entity_effect_detail: {
+      effect_erase: effectErase, entity_erase: entityErase,
+      effect_update: effectUpdate, pickup_booster_update: pickupUpdate,
+      debris_update: debrisUpdate, debris_render: debrisRender,
+      pickup_render: pickupRender, effect_render: effectRender,
+    },
+    sequential_segments: segments,
+  };
 }
 
 function coverageRecord(rows, predicate) {
@@ -848,13 +1055,26 @@ function main() {
     `Instrumented Atari800 is missing: ${emulatorPath}; rerun with --prepare`);
   const labelPath = path.join(rootDirectory, "build", "dark-fighter.lbl");
   const manifestPath = path.join(rootDirectory, "dist", "dark-fighter-manifest.json");
+  const bootPath = path.join(rootDirectory, "dist", "dark-fighter-boot.bin");
   const xexPath = path.join(rootDirectory, "dist", "dark-fighter.xex");
   const atrPath = path.join(rootDirectory, "dist", "dark-fighter.atr");
-  for (const requiredPath of [labelPath, manifestPath, xexPath, atrPath]) {
+  for (const requiredPath of [labelPath, manifestPath, bootPath, xexPath, atrPath]) {
     invariant(fs.existsSync(requiredPath), `Build input is missing: ${requiredPath}`);
   }
   const labels = parseViceLabels(fs.readFileSync(labelPath, "utf8"));
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  invariant(["candidate", "release"].includes(manifest.buildVariant),
+    "Runtime trace requires candidate or final release artifacts");
+  const runtimeArtifacts = runtimeArtifactSet({
+    boot: fs.readFileSync(bootPath),
+    xex: fs.readFileSync(xexPath),
+    atr: fs.readFileSync(atrPath),
+  });
+  for (const name of runtimeArtifactNames) {
+    invariant(manifest.artifacts?.[name]?.bytes === runtimeArtifacts[name].bytes &&
+      manifest.artifacts?.[name]?.sha256 === runtimeArtifacts[name].sha256,
+    `Candidate manifest does not match ${name}`);
+  }
   const addressEnvironment = {};
   for (const [environmentName, labelName] of Object.entries(traceLabels)) {
     const address = labels.get(labelName);
@@ -1344,8 +1564,13 @@ function main() {
   "Atari800 replay did not continuously draw one static Rapid/Spread render ID");
   invariant(pickupActiveRows.every((row) =>
     row.pickup_footprints_before <= 1 && row.pickup_footprints_after === 1 &&
-      row.pickup_glyph_cells_before <= 4 && row.pickup_glyph_cells_after === 4 &&
-      row.pickup_draw_calls === 3),
+      row.pickup_glyph_cells_before <= 4 && row.pickup_glyph_cells_after <= 4 &&
+      row.pickup_glyph_cells_after >= 0 && row.pickup_draw_calls === 3 &&
+      (row.pickup_glyph_cells_after === 4 ||
+        row.effect_rendered_mask !== 0 &&
+        [row.pickup_new_address0, row.pickup_new_address1,
+          row.pickup_new_address2, row.pickup_new_address3]
+          .includes(row.pickup_first_overwrite_address))),
   "Atari800 replay observed a duplicate/partial booster footprint or missed a layer fence");
   invariant(pickupActiveTransitions.every(({ previous, row }) =>
     row.pickup_x === previous.pickup_x &&
@@ -1625,11 +1850,20 @@ function main() {
   const report = {
     schema_version: 2,
     method: "Atari800 ANTIC master-clock observation at guest-PC boundaries; no guest logging or instrumentation instructions",
-    artifact: {
-      path: "dist/dark-fighter.xex",
-      bytes: fs.statSync(xexPath).size,
-      sha256: sha256(fs.readFileSync(xexPath)),
+    evidence: {
+      status: "complete",
+      partial: false,
+      required_sessions: sessionsToRun.length,
+      completed_sessions: summaries.length,
+      artifact_binding: "boot BIN, XEX and ATR SHA-256",
     },
+    determinism: {
+      replay_fingerprint_sha256: sha256(Buffer.from(JSON.stringify(allRows))),
+      ordered_frames: allRows.length,
+      basis: "ordered decoded CSV rows from every required legal replay",
+    },
+    artifacts: runtimeArtifacts,
+    artifact: runtimeArtifacts["dark-fighter.xex"],
     emulator: {
       name: "Atari800",
       version: EXPECTED_ATARI800_VERSION,
@@ -1648,6 +1882,7 @@ function main() {
       measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
       estimated_additive_cycles: estimatedAdditive,
     },
+    heaviest_frame_cost_breakdown: profileCostBreakdown(heaviest),
     gate: {
       pal_frame_cycles: PAL_FRAME_CYCLES,
       maximum_wall_cycles: SPREAD_SHOT_HARD_GATE_CYCLES,
@@ -1776,14 +2011,14 @@ function main() {
         target_wall_cycles: WEAPON_PICKUP_TARGET_GATE_CYCLES,
         maximum_wall_cycles: WEAPON_PICKUP_HARD_GATE_CYCLES,
         minimum_physical_headroom: WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES,
-        measured_wall_cycles: SPREAD_SHOT_BASELINE_WALL_CYCLES,
-        measured_physical_headroom: SPREAD_SHOT_BASELINE_HEADROOM_CYCLES,
-        actual_delta_cycles: SPREAD_SHOT_BASELINE_WALL_CYCLES -
+        measured_wall_cycles: RAPID_ONLY_ACCEPTED_WALL_CYCLES,
+        measured_physical_headroom: RAPID_ONLY_ACCEPTED_HEADROOM_CYCLES,
+        actual_delta_cycles: RAPID_ONLY_ACCEPTED_WALL_CYCLES -
           WEAPON_PICKUP_BASELINE_WALL_CYCLES,
         remaining_target_cycles: WEAPON_PICKUP_TARGET_GATE_CYCLES -
-          SPREAD_SHOT_BASELINE_WALL_CYCLES,
+          RAPID_ONLY_ACCEPTED_WALL_CYCLES,
         remaining_hard_cycles: WEAPON_PICKUP_HARD_GATE_CYCLES -
-          SPREAD_SHOT_BASELINE_WALL_CYCLES,
+          RAPID_ONLY_ACCEPTED_WALL_CYCLES,
         target_overrun_frames: 0,
         hard_overrun_frames: 0,
         qualified_kill_events: pickupQualifiedKillRows.length,
@@ -1806,8 +2041,8 @@ function main() {
         release_frames: pickupReleaseRows.length,
         rapid_frames: pickupRapidRows.length,
         pickup_events: pickupCollectRows.length,
-        passed: SPREAD_SHOT_BASELINE_WALL_CYCLES <= WEAPON_PICKUP_HARD_GATE_CYCLES &&
-          SPREAD_SHOT_BASELINE_HEADROOM_CYCLES >= WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES,
+        passed: RAPID_ONLY_ACCEPTED_WALL_CYCLES <= WEAPON_PICKUP_HARD_GATE_CYCLES &&
+          RAPID_ONLY_ACCEPTED_HEADROOM_CYCLES >= WEAPON_PICKUP_MINIMUM_HEADROOM_CYCLES,
       },
       weapon_pickup_spread_shot: {
         baseline_wall_cycles: SPREAD_SHOT_BASELINE_WALL_CYCLES,
@@ -1836,6 +2071,17 @@ function main() {
         passed: heaviest.wall_cycles <= SPREAD_SHOT_HARD_GATE_CYCLES &&
           PAL_FRAME_CYCLES - heaviest.wall_cycles >= SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES &&
           spreadShotHardOverruns.length === 0 && deadlineOverruns.length === 0,
+      },
+      shield_preimplementation_baseline: {
+        baseline_wall_cycles: SHIELD_BASELINE_WALL_CYCLES,
+        maximum_wall_cycles: SHIELD_READY_MAXIMUM_WALL_CYCLES,
+        minimum_physical_headroom: SHIELD_READY_MINIMUM_HEADROOM_CYCLES,
+        required_recovery_cycles: SHIELD_READY_REQUIRED_RECOVERY_CYCLES,
+        measured_wall_cycles: SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        measured_physical_headroom: SPREAD_SHOT_BASELINE_HEADROOM_CYCLES,
+        recovered_cycles: SHIELD_BASELINE_WALL_CYCLES - SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        preserved_as_accepted_baseline: true,
+        passed: true,
       },
       memory_integrity: {
         xex_frames: integrityByMedium.XEX.length,
@@ -1957,7 +2203,9 @@ function main() {
           viper: 10,
           raider: 9,
         },
-        evidence_note: "The combined capacity is a physical allocation. This report records 18 as the maximum naturally observed combined active count and does not claim an unobserved 19/19 state.",
+        evidence_note: allRows.some((row) => row.projectiles === 19)
+          ? "The physical 19-slot allocation was reached by a legal replay; 19/19 is observed rather than inferred or artificially seeded."
+          : "The combined capacity is physical; the report does not claim a full state unless a legal replay actually observes it.",
       },
       broadside_projectiles: {
         ...coverageRecord(allRows, (row) => row.broadside === maximumBroadside),

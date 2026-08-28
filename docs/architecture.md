@@ -13,14 +13,14 @@ port 1, and schedules gameplay at 50 frames per second.
 
 The build emits one exact 16,384-byte boot payload. The XEX wraps that payload
 with standard segment and run-address records; the standard 90 KB single-density
-ATR stores the same payload in 128 boot sectors. Build and
-runtime tests bind both media to the same required payload bytes.
+ATR stores the same payload in 128 boot sectors. Candidate, trace, final-binding,
+and verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
 
 ## Cold startup and loader
 
 The payload enters at `$201E` with a 449-byte raw bootstrap prefix. The remaining
-7,743-byte resident suffix is stored as a 6,457-byte LZ-10/5 stream. Startup
-stages it at `$8100-$9A38` (the manifest records the inclusive end address),
+7,743-byte resident suffix is stored as a 6,515-byte LZ-10/5 stream. Startup
+stages it at `$8100-$9A53` (the manifest records the inclusive end address),
 expands broadside and relocated modules in dependency order, then
 restores the resident image at `$21C1-$3FFF`.
 
@@ -37,10 +37,10 @@ footer palette zones. The loader remains visible for 250 complete PAL frames
 
 Cold staging also copies:
 
-- packed broadside/runtime data to its final `$5E10-$780C` run range;
-- packed starfield/music data through `$7810-$7ED2` to `$552A-$5DB8`;
-- the 226-byte A2 kernel through `$7F10-$7FF1` to `$9000-$90E1`;
-- packed entity/effect code through `$5100-$57E5` to `$9100-$98FE`.
+- packed broadside/runtime data to its final `$5E10-$77B8` run range;
+- packed starfield/music data through `$7810-$7EFA` to `$552A-$5DE1`;
+- the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
+- packed entity/effect code through `$5140-$5852` to `$9100-$9929`.
 
 The BSS is exactly `$8000-$80FF` and is initialized deterministically. The
 runtime does not use `$A000-$BFFF`; compatibility never assumes that BASIC ROM
@@ -59,6 +59,14 @@ New Game performs a bounded state reset. Life loss resets life-scoped combat
 state, while a live sector transition preserves session-scoped score and
 booster state. Pause copies the visible screen to a reclaimed staging buffer
 and freezes gameplay timers before resuming the same state.
+
+TOP SCORES owns ten two-byte packed-BCD records in RAM. The final score is
+inserted exactly once when the player lifecycle enters Game Over; a first-to-last
+scan preserves descending order, places ties after existing equals, and shifts
+both BCD fields together. The renderer reads all ten records rather than
+synthesizing nine zero rows. The worst insertion executes once at Game Over and
+costs 516 NMOS 6502 cycles; it is outside the visible gameplay loop and VBI. No
+disk persistence is performed.
 
 ## Display, scrolling, and frame publication
 
@@ -114,13 +122,16 @@ head, and ring wrap.
 | Interactive entities | 4 | 2 | debris plus one pickup capsule; controller/reserve slots remain non-rendered |
 | Transient effects | 6 | 5 | one core plus four fragments |
 
-Pool scans are bounded by compile-time counts. Spread Shot checks for three free
-Viper slots before writing any of them; a rejected attempt preserves the
-eight-salvo burst counter and is retried. Normal and Spread initialize an
-eight-shot/eight-salvo burst at the normal three-frame interval. Rapid alone
-initializes ten shots and uses its two-frame interval. All modes retain the
-12-frame post-burst pause. The effects pool is not used for pickup capsules or
-persistent projectile state.
+Pool scans are bounded by compile-time counts. Spread Shot admits its centre
+whenever at least one Viper slot is free and admits the two side shots only as
+an atomic pair. Its ten-frame cooldown is the minimum safe value for the
+28-update maximum legal projectile lifetime: nine frames can reach a
+centre-only tenth slot, while ten frames holds the steady state to three full
+salvos and nine projectiles. Normal and Spread initialize an eight-shot/eight-
+salvo burst; Normal uses a three-frame interval, Spread ten, and Rapid alone
+initializes ten shots at two frames. All modes retain the 12-frame post-burst
+pause. The effects pool is not used for pickup capsules or persistent
+projectile state.
 
 ## Enemies, debris, and boosters
 
@@ -141,10 +152,27 @@ Rapid Fire on New Game. Slot 2 holds the non-rendered timed-booster controller
 and next-type selector. Rapid Fire and Spread Shot are mutually exclusive,
 500-active-frame states.
 
+The fixed ANTIC 2 HUD uses cells `$4019-$401C` for four permanent HULL plates.
+Glyph 5 is a low intact plate and glyph 12 a low cracked plate; the stored
+0-10 health value selects solid quarters at thresholds 3, 5, 8, and 10. The
+full `HULL` label stays at cells 20-23 and the plate field never blinks or
+disappears.
+
+Cells `$401E-$4027` are the complete ten-cell booster presentation: `BOOST`, a
+blank separator, and four tall energy glyphs at cells `$4024-$4027`. The
+optional type glyph is not allocated because no twelfth free cell exists.
+Glyph 7 supplies the narrow vertical energy shape. Segment thresholds are
+exact quarters of the same 16-bit 500-frame booster timer. Below 25%, timer bit
+3 supplies the 8+8 blink phase, so pause freezes the indicator naturally. Ten
+writable backing bytes at `$5E06-$5E0F` preserve and restore the complete prior
+field across refresh, replacement, expiry, life loss, and teardown. No PMG,
+bitmap overlay, DLI, palette, or gameplay-charset allocation is involved.
+
 Rapid Fire uses the existing Viper projectile renderer and yellow colour bank.
 Spread Shot uses three logical Viper projectiles: centre, left, and right. All
 three use the yellow Viper colour. Side directions are encoded in the existing
-render/state byte, avoiding another allocation.
+render/state byte, and the parity of the existing lifetime supplies their
+one-HPOS-per-two-updates fixed phase, avoiding another allocation.
 
 ## Character and PMG ownership
 
@@ -152,6 +180,11 @@ The gameplay charset has 128 occupied glyphs. Stars use 1-6, Viper projectile
 phases 11-46, Spread Shot composite scratch 47-56, capital hulls 59-89,
 Raider/projectile phases 90-109, debris 110-117, fragments 118-119, Rapid Fire
 capsule 120-123, and Spread Shot capsule 124-127.
+
+The separate `$5000-$53FF` HUD charset keeps glyph 0 as the blank/separator,
+uses glyphs 5 and 12 for the two low HULL plate states, and glyph 7 for the tall
+BOOST energy cell. Digits and letters retain their existing allocations and
+colours.
 
 PMG base is `$3800`; active DMA pages are `$3B00-$3FFF`. P0 and P3 form the
 Viper, P1 is the Raider, and P2 is its scanner. M1-M3 serve broadside warnings
@@ -165,7 +198,19 @@ randomness starts from fixed initialization and advances only through defined
 gameplay paths. Tests exercise cold RAM fills `$A5` and `$5A`, XEX/ATR payload
 parity, all A2 heads, pool saturation, lifecycle resets, overlay backing, and
 the measured PAL wall. The machine-readable evidence is generated from the
-packed release artifact, not from a separate preview model.
+packed runtime, not from a separate preview model. `build:candidate`
+deliberately publishes a manifest that cannot pass final verification. The
+trace generator must complete every required replay and bind the exact boot
+BIN, XEX, and ATR. A normal build then creates the final binding, including the
+report hash; `verify` rejects a candidate manifest, a partial session set, an
+artifact mismatch, a failed gate, or later report drift. No force flag can
+bypass these phases.
+
+The wall profiler observes exported zero-byte address symbols from the host
+emulator. It adds no guest instructions, writes no release state, and records a
+disjoint subsystem split for the global maximum. Separate legal no-fire cadence
+sessions prove a complete debris lifecycle on EASY, MEDIUM, and HARD while
+combat sessions retain firing coverage.
 
 The rejected ANTIC 2 full-playfield experiment is archived in
 [history/antic2-spike.md](history/antic2-spike.md); it is not part of this

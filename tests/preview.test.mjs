@@ -15,6 +15,8 @@ import {
   createDestructibleDebrisTrace,
   createRaiderBreakupPreview,
   createRaiderBreakupTrace,
+  createHudPresentationNativePreview,
+  createHudPresentationPreview,
   createWeaponPickupRapidFirePreview,
   createWeaponPickupRapidFireTrace,
   createSpreadShotPreview,
@@ -319,9 +321,9 @@ test("Rapid Fire owner preview executes the packed XEX/ATR pickup lifecycle", ()
     const fields = row.split(",");
     return fields[9] === "3" && fields[10] === "0" && fields[11] === "0" &&
       fields[12] === "128" && Number(fields[13]) >= 40 && Number(fields[13]) <= 184 &&
-      fields[14] === "500" && fields[15] === "50" &&
+      fields[14] === "500" && fields[15] === "0" &&
       fields[16] === "120" && fields.slice(17, 21).every((value) => value === "0") &&
-      fields.slice(27, 31).join(",") === "50,38,17,16" && fields[31] === "0";
+      fields.slice(27, 31).join(",") === "7,7,7,7" && fields[31] === "0";
   }));
   assert.ok(rows.some((row) => {
     if (!row.startsWith("xex,RAPID_TIMER,499,")) return false;
@@ -329,6 +331,15 @@ test("Rapid Fire owner preview executes the packed XEX/ATR pickup lifecycle", ()
     return fields[9] === "0" && fields[14] === "0" && fields[16] === "120" &&
       fields.slice(27, 31).every((value) => value === "0");
   }));
+});
+
+test("HUD presentation preview covers four requested states at native and enlarged scale", () => {
+  const review = createHudPresentationPreview(source);
+  const native = createHudPresentationNativePreview(source);
+  assert.deepEqual(createHudPresentationPreview(source), review);
+  assert.deepEqual(createHudPresentationNativePreview(source), native);
+  assert.deepEqual([inspectPng(review).width, inspectPng(review).height], [1350, 300]);
+  assert.deepEqual([inspectPng(native).width, inspectPng(native).height], [320, 32]);
 });
 
 test("projectile colour owner previews use identical packed XEX and ATR runtime frames", () => {
@@ -353,7 +364,7 @@ test("burst-balance owner previews compare identical 80-frame XEX and ATR execut
   const emitted = (mode) => xexRows.slice(1)
     .filter((row) => row.startsWith(`xex,${mode},`))
     .reduce((sum, row) => sum + Number(row.split(",")[10]), 0);
-  assert.deepEqual([emitted("NORMAL"), emitted("RAPID"), emitted("SPREAD")], [21, 30, 27]);
+  assert.deepEqual([emitted("NORMAL"), emitted("RAPID"), emitted("SPREAD")], [21, 30, 24]);
   assert.equal(xexRows.filter((row) => row.startsWith("xex,SPREAD,"))
     .every((row) => [0, 3].includes(Number(row.split(",")[10]))), true);
 });
@@ -376,9 +387,9 @@ test("Spread Shot owner preview is deterministic executed XEX/ATR gameplay", () 
     ["DROP_3", "0", "1", "0", "1", "120"],
   ]);
   assert.ok(rows.includes(
-    "xex,SPREAD_VOLLEY,0,4,1,0,,,,,,3,65,124,182,17,128,182,33,132,182"));
+    "xex,SPREAD_VOLLEY,0,4,1,0,,,,,,3,17,128,182,65,124,182,33,132,182"));
   assert.ok(rows.includes(
-    "atr,SPREAD_VOLLEY,1,4,1,0,,,,,,3,65,122,176,17,128,176,33,134,176"));
+    "atr,SPREAD_VOLLEY,1,4,1,0,,,,,,3,17,128,176,65,123,176,33,133,176"));
   assert.ok(rows.some((row) => row.startsWith("xex,SPREAD_CLEAN,51,") &&
     row.split(",")[11] === "0"));
 });

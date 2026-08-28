@@ -5,16 +5,16 @@
     "xex": {
       "path": "dist/dark-fighter.xex",
       "bytes": 16396,
-      "sha256": "5d44145ee7d0502b3ec622fe5a3b8a6a90155b5761c664ad4f2cc4f12c42ba9e"
+      "sha256": "38a6e33a35e86d594f208b2d972b0977aff3e15eb41509185b0a2057a3f96f20"
     },
     "atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "3d8833b950c2c81657a87f535d531c7483da69bda74b5957ad16f20e1d4fcb70"
+      "sha256": "b9cd010e4c69555fd2aab0929deff99d8201e1f315c0c9aa302eddc002e22087"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "e9e78f24ff9de83da7f5870a8ba78a4316b03d2cfb4a166e92cd8f988723d247"
+      "sha256": "7d397132c4b42395c11a086bc8df0686a21df9b906aa4730020cf2b8e979adfb"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
@@ -41,9 +41,9 @@
       "frame": 25,
       "width": 320,
       "height": 240,
-      "source_sha256": "7d649dd63be372bef999e44dc434e1705336edc2cf6898d1608c9f0980b2d3b8",
-      "sha256": "af87c26778f3f4544752834c75784d2040bfc2fe8da03f5d2b4aeb95d3c9dcfc",
-      "bytes": 1304
+      "source_sha256": "8c9e87166d94f6a087ca86c686bf6b783a1e6fcd317fc1bf6d66fc26f1aa14c1",
+      "sha256": "2d209f26f9e3cfaf4c6ba5bea825b47c085db35be498c65c9dca420620cf9603",
+      "bytes": 1296
     },
     {
       "path": "docs/media/gameplay/03-raider-breakup.png",
@@ -54,9 +54,9 @@
       "frame": 31,
       "width": 320,
       "height": 240,
-      "source_sha256": "2b8f53756a7be5327db1b79ced6f1f4b7e05104a4d215b637b22c875844e665f",
-      "sha256": "3effdcf3d4cc56df8a2fe0a7e115c2fdb05a1132313769800017be99939b4310",
-      "bytes": 1522
+      "source_sha256": "1f561b9a4e91058d66a6f801297c235173f151a6a5ad4953f091c6c94adae630",
+      "sha256": "567a1acebe35cac8f205a5889eb9d784295d2e83c780c7edd8a85bc584004e8d",
+      "bytes": 1506
     },
     {
       "path": "docs/media/gameplay/04-debris-breakup.png",
@@ -67,9 +67,9 @@
       "frame": 113,
       "width": 320,
       "height": 240,
-      "source_sha256": "8106bc3ba368812d6241300ddd73bedd3ff44a74e1a34fa6b5a182682dcc9510",
-      "sha256": "bd1272d583c526308d4ab7f7b5021c9ff4066f88836b5fdb75f69cb022d445ca",
-      "bytes": 1713
+      "source_sha256": "51110dd42bec175a1e6d73da41d68e3657764f0bd04d5868496b18c172e838c4",
+      "sha256": "7994b9dd99e9be6f09adfc95843ea1b460e9e972146f68be723344663b2c3837",
+      "bytes": 1696
     },
     {
       "path": "docs/media/gameplay/05-rapid-fire-pickup.png",
@@ -80,22 +80,22 @@
       "frame": 385,
       "width": 320,
       "height": 240,
-      "source_sha256": "466bf546797affb779cbf1527c48d0c50665175cb089aa894ee5fb4ad0b85ff1",
-      "sha256": "db88e8eb22fd50d4f3644672bbf0c78c2876c49a79ac43926fd865675242d166",
-      "bytes": 1669
+      "source_sha256": "ad4d531617bbf554f639a2f7b588889d90458eb310e01ac7ecc2b555dc8af861",
+      "sha256": "9f93d08dde16a92939008dc8c0b6f8ecb1ceb7bc3e0f7d2ba470aef332670318",
+      "bytes": 1759
     },
     {
       "path": "docs/media/gameplay/06-rapid-fire-active.png",
-      "description": "RF HUD countdown and yellow Rapid Fire projectiles",
+      "description": "Full BOOST HUD label, energy cells, and yellow Rapid Fire projectiles",
       "source": "build/runtime-wall-trace/weapon-pickup-rapid-projectiles-atari800.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
       "frame": 449,
       "width": 320,
       "height": 240,
-      "source_sha256": "6c9b21bc2e7f7572e38f8a18318aa3fb69d96d9455198d8e4030b14400524413",
-      "sha256": "27e7fcb419e8fc34c37a3aa5611766ea975a307ae94f2b9d74ac7f2c5f6a778f",
-      "bytes": 1145
+      "source_sha256": "de9af9fc6bf10752330f260c036c1845f3ea9e8ab2dd1d96581c6da468cc79ef",
+      "sha256": "ed8cd7b05d02b0bed5b051b542a62823dc116647a517ad28aa966522053fe902",
+      "bytes": 1101
     },
     {
       "path": "docs/media/gameplay/07-capital-broadside.png",
@@ -106,9 +106,9 @@
       "frame": 100,
       "width": 320,
       "height": 240,
-      "source_sha256": "f44d4d15416b49bc06e029b0a9704f28e8799f536fa09186fa0e78417867c0ff",
-      "sha256": "e12e579f52a57c81403bbe925ad5bbbfd200bcb40487378f87b3e3a0c8052611",
-      "bytes": 1639
+      "source_sha256": "4276b41fe3d8cff1ab0f3e738cf7460401f323e4d086c3805165d46e821670ae",
+      "sha256": "f1e36842257ba32a5b282a7f11652e369829b29a81d1841abfb4128d0fd72011",
+      "bytes": 1620
     },
     {
       "path": "docs/media/gameplay/08-capital-engines.png",
@@ -119,22 +119,22 @@
       "frame": 96,
       "width": 320,
       "height": 240,
-      "source_sha256": "41e2dd466ea6965a44ac0f8c6744775dbb254e84aa4c960fe08c8b91ac2a0132",
-      "sha256": "47f05eac8a1d09a8a89fd105f1161b8acfceed23caca4038bb26bfaff879ba15",
-      "bytes": 1599
+      "source_sha256": "84fb5a12c2906bb1ecfb71938f50e4e17e08e7088e99f1be3954f4c9c8b5c1d6",
+      "sha256": "9e8492353f7ebfe594ec2217e1a2b0572166bfa7fbe8dbb3538bf98beb0afc8a",
+      "bytes": 1647
     },
     {
       "path": "docs/media/gameplay/09-spread-shot-active.png",
-      "description": "SP HUD countdown and all-yellow three-projectile fan",
+      "description": "Full BOOST HUD label, energy cells, and all-yellow three-projectile fan",
       "source": "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
-      "frame": 449,
+      "frame": 454,
       "width": 320,
       "height": 240,
-      "source_sha256": "38a910bbc5bab5cd24811f780ed252a48e3fe505a941beda83f7673ffc1ba161",
-      "sha256": "c498c84863482a10217373bbea6be42df21841a673e50f76f54bdb067f9e84c1",
-      "bytes": 1713
+      "source_sha256": "48bca00eb15d0600a07260d8c9b8d99b383b8fa001662d10bca04370e6796ed7",
+      "sha256": "ecae6bdd1b1b180a7f2889caf8d59107d28056c93f257d8f34f8ca7a5fab4a21",
+      "bytes": 1820
     }
   ],
   "assetSheets": [

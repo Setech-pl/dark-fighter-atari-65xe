@@ -16,7 +16,18 @@ resumed. Pause freezes active gameplay simulation and booster countdowns.
 
 ### HUD and player lifecycle
 
-The gameplay HUD contains `SCORE`, `LIFE`, and `HULL`.
+The gameplay HUD contains `SCORE`, `LIFE`, and `HULL`. Four low, angular plate
+cells follow the full `HULL` label at all times: intact quarters are solid and
+damaged quarters remain visible as cracked plates. This indicator never blinks
+or disappears.
+
+While Rapid Fire or Spread Shot is active, the ten cells to the right show the
+full `BOOST` label, one blank separator, and four tall, narrow energy cells.
+The bar has four segments above 75% remaining time, three above 50%, two from
+25% through 50%, and one below 25%. Only the last segment blinks in an
+eight-frame visible/eight-frame hidden rhythm. Expiry restores all ten cells
+to their prior blank contents. The optional type glyph is omitted because the
+40-column HUD has exactly ten unclaimed cells and one active booster at a time.
 
 - A new game starts with three playable Vipers and a full 100% hull.
 - The hull has ten health units. Ordinary Raider pulse and debris contact damage
@@ -27,8 +38,10 @@ The gameplay HUD contains `SCORE`, `LIFE`, and `HULL`.
   an 8-frame visible/8-frame hidden rhythm.
 - Losing the final Viper enters Game Over. New Game resets score, lives, hull,
   sector state, active projectiles, entities, effects, and boosters.
-- The session top score persists across New Game and is cleared only by a cold
-  program start.
+- TOP SCORES keeps ten packed-BCD results in RAM, ordered from highest to
+  lowest. A completed non-zero game is inserted once on the Game Over
+  transition; equal scores follow existing equal entries. New Game resets only
+  the current score, while a cold program start clears the table.
 
 ### Combat and scoring
 
@@ -92,6 +105,12 @@ replaces it, so Rapid Fire and Spread Shot are mutually exclusive. Pause freezes
 their timers; life loss, Game Over, and New Game clear them; a live sector
 transition preserves them.
 
+The `BOOST` label and energy bar are driven by the same 500-active-frame timer
+as the booster. Picking up either type immediately shows the full ten-cell
+field with four energy segments; refreshing or replacing an active type also
+returns it to four segments. Pause freezes both the timer and the current blink
+phase.
+
 ### Rapid Fire — implemented
 
 Rapid Fire lasts exactly 500 active PAL frames (10 seconds). It expands the
@@ -102,13 +121,19 @@ yellow/gold. The 2x2 capsule uses a steel/yellow casing with a black `RF` symbol
 ### Spread Shot — implemented
 
 Spread Shot lasts exactly 500 active PAL frames (10 seconds) and retains the
-normal eight-salvo burst, three-frame cadence, and 12-frame post-burst pause; it
-never combines with Rapid Fire. Each salvo is atomic: it either allocates three
-free Viper slots or creates no projectile and waits without consuming the salvo.
+normal eight-salvo burst and 12-frame post-burst pause, but uses a ten-active-
+frame cooldown between salvos; it never combines with Rapid Fire. With three
+free slots a salvo creates centre, left, and right together. Under transitional
+saturation the centre has priority, while the side pair is created together or
+not at all. Continuous FIRE produces 49 salvos and 147 projectiles during the
+500-frame boost, with no rejected full salvo in steady state and at most nine
+simultaneous Spread projectiles in the ten-slot Viper pool.
 
 The volley begins as a compact formation. The centre projectile travels
 vertically; the side projectiles start four horizontal-position units from the
-centre and move symmetrically left or right by two units per active frame. All
+centre and move symmetrically left or right by one unit every two active frames.
+The phase comes from the existing projectile lifetime, so no extra timer or
+projectile-state array is required. All
 three travel upward at the normal Viper speed, use the yellow Viper weapon
 colour, collide with Raider and debris, and obey ordinary score rules. The 2x2
 capsule has a bright red casing and a black three-shot fan symbol.

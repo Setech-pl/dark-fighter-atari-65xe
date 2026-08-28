@@ -95,7 +95,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     .every((byte) => byte === 0), true);
   assert.deepEqual(parsedXex.segments[0].data, boot);
   assert.deepEqual(parsedAtr.body.subarray(0, boot.length), boot);
-  assert.equal(manifest.entityEffects.stagedSourceAddress, 0x5100);
+  assert.equal(manifest.entityEffects.stagedSourceAddress, 0x5140);
   assert.ok(manifest.entityEffects.stagedEndAddress <
     manifest.entityEffects.packedSourceAddress);
 });

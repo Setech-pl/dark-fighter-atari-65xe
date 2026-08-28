@@ -119,7 +119,7 @@ function initialiseRuntime(root, artifact, coldFill = 0) {
   for (const routine of [
     "stage_boot_streams", "unpack_boot_broadside_runtime", "unpack_resident_runtime",
     "unpack_entity_runtime", "init_entity_effects", "stage_a2_kernel",
-    "unpack_starfield_runtime", "copy_charset", "init_fighter_projectiles",
+    "unpack_starfield_runtime", "copy_charset", "copy_hud_charset", "init_fighter_projectiles",
     "install_entity_effects_glyph",
   ]) runRoutine(memory, labels, routine);
   initialiseRows(memory, labels);
@@ -166,9 +166,14 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
   const nextPickupType = memory[requiredLabel(labels, "ENTITY_TYPE") + 2];
   const subsecond = memory[requiredLabel(labels, "ENTITY_OWNER") +
     (boosterState === 0 ? slot : 2)];
-  const hudOffset = labels.get("HUD_RF_OFFSET") ?? 32;
+  const hudOffset = labels.get("HUD_BOOSTER_OFFSET") ?? 30;
+  const hudCells = labels.get("HUD_BOOSTER_CELLS") ?? 10;
+  const hudSegmentsOffset = labels.get("HUD_BOOSTER_SEGMENTS_OFFSET") ?? 36;
+  const hudSegments = labels.get("HUD_BOOSTER_SEGMENTS") ?? 4;
   const screenBase = labels.get("SCREEN") ?? 0x4000;
-  const hudCodes = Array.from(memory.subarray(screenBase + hudOffset, screenBase + hudOffset + 4));
+  const hudCodes = Array.from(memory.subarray(
+    screenBase + hudSegmentsOffset, screenBase + hudSegmentsOffset + hudSegments,
+  ));
   return {
     phase: fields.phase ?? "",
     frame: fields.frame ?? 0,
@@ -177,8 +182,8 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
     projectileConsumed: fields.projectileConsumed ?? false,
     slotValue,
     qualifiedKillCounter: capsuleState === 0 ? pickupSlotValue : 0,
-    rapidSeconds: boosterState === 3 ? boosterSlotValue - 16 : 0,
-    spreadSeconds: boosterState === 4 ? boosterSlotValue - 16 : 0,
+    rapidSeconds: 0,
+    spreadSeconds: 0,
     capsuleState,
     boosterState,
     pickupType,
@@ -194,6 +199,9 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
     subsecond,
     animationFrame: subsecond,
     hudCodes,
+    hudRegionCodes: Array.from(memory.subarray(
+      screenBase + hudOffset, screenBase + hudOffset + hudCells,
+    )),
     renderId: memory[requiredLabel(labels, "ENTITY_RENDER_ID") + slot],
     a2Head: ((memory[requiredLabel(labels, "PLAYFIELD_ROW_LO")] |
       memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - 0x4050) / 40,
@@ -386,6 +394,7 @@ export function executeWeaponPickupTrace({
     frozenTimer,
     activeRapidFrames,
     charset: Uint8Array.from(memory.subarray(0x4400, 0x4800)),
+    hudCharset: Uint8Array.from(memory.subarray(0x5000, 0x5400)),
     manifest,
   };
 }
@@ -420,14 +429,15 @@ export function executeViperBurstBalanceTrace({
     let firstBurstComplete = false;
     let firstBurstProjectiles = 0;
     let firstBurstSalvos = 0;
+    let maximumWeaponPipelineCycles = 0;
     for (let frame = 0; frame < windowFrames; frame += 1) {
-      runRoutine(memory, labels, "erase_fighter_projectile_overlays");
-      runRoutine(memory, labels, "update_fighter_projectiles");
+      const eraseCycles = runRoutine(memory, labels, "erase_fighter_projectile_overlays");
+      const updateCycles = runRoutine(memory, labels, "update_fighter_projectiles");
       const before = Array.from(memory.subarray(active, active + 10));
       const stateBefore = memory[burstState];
       const remainingBefore = memory[burstRemaining];
       const timerBefore = memory[burstTimer];
-      runRoutine(memory, labels, "update_viper_weapon");
+      const controlCycles = runRoutine(memory, labels, "update_viper_weapon");
       const after = Array.from(memory.subarray(active, active + 10));
       const allocatedSlots = after.flatMap((value, slot) =>
         before[slot] === 0 && value !== 0 ? [slot] : []);
@@ -446,7 +456,16 @@ export function executeViperBurstBalanceTrace({
       if (!firstBurstComplete && memory[burstState] === 2) firstBurstComplete = true;
       const activeCount = countActive(memory, active, 10);
       maximumPoolOccupancy = Math.max(maximumPoolOccupancy, activeCount);
-      runRoutine(memory, labels, "render_fighter_projectile_overlays");
+      const renderCycles = runRoutine(memory, labels, "render_fighter_projectile_overlays");
+      let boosterCycles = 0;
+      if (boosterState !== 0) {
+        boosterCycles = runRoutine(memory, labels, "update_weapon_booster_active",
+          { x: boosterState });
+      }
+      const weaponPipelineCycles = eraseCycles + updateCycles + controlCycles +
+        renderCycles + boosterCycles;
+      maximumWeaponPipelineCycles = Math.max(maximumWeaponPipelineCycles,
+        weaponPipelineCycles);
       records.push(viperProjectileSnapshot(memory, labels, {
         mode,
         frame,
@@ -460,18 +479,22 @@ export function executeViperBurstBalanceTrace({
         allocatedSlots,
         allocatedProjectiles,
         activeCount,
+        eraseCycles,
+        updateCycles,
+        controlCycles,
+        renderCycles,
+        boosterCycles,
+        weaponPipelineCycles,
       }));
-      if (boosterState !== 0) {
-        runRoutine(memory, labels, "update_weapon_booster_active", { x: boosterState });
-      }
     }
     memory[0xd010] = 1;
     const expectedBurst = mode === "RAPID" ? manifest.fighterWeapons.viper.rapidFireBurstCount :
       mode === "SPREAD" ? manifest.fighterWeapons.viper.spreadShotBurstCount :
         manifest.fighterWeapons.viper.burstCount;
     const intervalFrames = mode === "RAPID" ?
-      manifest.fighterWeapons.viper.rapidFireIntervalFrames :
-      manifest.fighterWeapons.viper.burstIntervalFrames;
+      manifest.fighterWeapons.viper.rapidFireIntervalFrames : mode === "SPREAD" ?
+        manifest.fighterWeapons.viper.spreadShotCooldownFrames :
+        manifest.fighterWeapons.viper.burstIntervalFrames;
     return {
       mode,
       expectedBurst,
@@ -482,6 +505,7 @@ export function executeViperBurstBalanceTrace({
       maximumPoolOccupancy,
       firstBurstProjectiles,
       firstBurstSalvos,
+      maximumWeaponPipelineCycles,
       records,
       charset: Array.from(memory.subarray(0x4400, 0x4800)),
     };
@@ -620,6 +644,7 @@ export function executeViperProjectileColourTrace({
     screen: logicalScreen(memory, labels),
     display: logicalDisplay(memory, labels),
     charset: Array.from(memory.subarray(0x4400, 0x4800)),
+    hudCharset: Array.from(memory.subarray(0x5000, 0x5400)),
     hudDuringRapid,
     normalColour: manifest.fighterWeapons.viper.colourValue,
     rapidColour: manifest.fighterWeapons.viper.rapidFireColourValue,
@@ -880,7 +905,10 @@ export function executeWeaponPickupLifecycleTrace({ root = defaultRoot, artifact
     memory[requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + controllerSlot] = 1;
     memory[requiredLabel(labels, "ENTITY_OWNER") + controllerSlot] = 50;
     memory[requiredLabel(labels, "PLAYER_LIFECYCLE")] = lifecycle;
-    if (state >= 3) runRoutine(memory, labels, "show_weapon_booster_hud");
+    if (state >= 3) {
+      runRoutine(memory, labels, "backup_weapon_booster_hud");
+      runRoutine(memory, labels, "show_weapon_booster_hud");
+    }
     if (active) {
       memory[requiredLabel(labels, "ENTITY_ACTIVE_MASK")] = 2;
       memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")] = 1;
@@ -902,6 +930,199 @@ export function executeWeaponPickupLifecycleTrace({ root = defaultRoot, artifact
     lifeLossSpread: runCase("LIFE_LOSS_SPREAD", 4, "clear_transient_effects", { lifecycle: 1 }),
     gameOverSpread: runCase("GAME_OVER_SPREAD", 4, "clear_transient_effects", { lifecycle: 1 }),
     sectorSpread: runCase("SECTOR_SPREAD", 4, "entity_begin_sector_complete"),
+  };
+}
+
+export function executeWeaponBoosterHudTrace({ root = defaultRoot, artifact = "xex" } = {}) {
+  const { memory, labels, manifest } = initialiseRuntime(root, artifact);
+  const screen = labels.get("SCREEN") ?? 0x4000;
+  const hudOffset = labels.get("HUD_BOOSTER_OFFSET") ?? 30;
+  const hudCells = requiredLabel(labels, "HUD_BOOSTER_CELLS");
+  const hudSegmentsOffset = requiredLabel(labels, "HUD_BOOSTER_SEGMENTS_OFFSET");
+  const hudSegments = requiredLabel(labels, "HUD_BOOSTER_SEGMENTS");
+  const timerLow = requiredLabel(labels, "ENTITY_TIMER") + 2;
+  const timerHigh = requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2;
+  const boosterState = requiredLabel(labels, "ENTITY_STATE") + 2;
+  const pickupState = requiredLabel(labels, "ENTITY_STATE") + 1;
+  const pickupType = requiredLabel(labels, "ENTITY_TYPE") + 1;
+  const fullCode = requiredLabel(labels, "CH_HUD_BOOSTER_FULL");
+  const originalHud = Array.from({ length: hudCells }, (_, index) => 0x2a + index);
+  memory.set(originalHud, screen + hudOffset);
+  const screenBefore = Uint8Array.from(memory.subarray(screen, screen + 0x400));
+  memory[pickupState] = 2;
+  memory[pickupType] = 0;
+  runRoutine(memory, labels, "weapon_pickup_collect");
+  const screenAfterActivation = Uint8Array.from(memory.subarray(screen, screen + 0x400));
+  const snapshot = (name) => ({
+    name,
+    state: memory[boosterState],
+    timer: memory[timerLow] | memory[timerHigh] << 8,
+    hudCodes: Array.from(memory.subarray(
+      screen + hudSegmentsOffset, screen + hudSegmentsOffset + hudSegments,
+    )),
+    hudRegionCodes: Array.from(memory.subarray(
+      screen + hudOffset, screen + hudOffset + hudCells,
+    )),
+  });
+  const samples = [snapshot("100%")];
+  const wanted = new Map([
+    [380, "76%"], [375, "75%"], [255, "51%"], [250, "50%"],
+    [130, "26%"], [125, "25%"], [124, "below-25-visible"],
+    [120, "blink-visible"], [119, "blink-hidden-boundary"], [112, "blink-hidden"],
+  ]);
+  while ((memory[timerLow] | memory[timerHigh] << 8) > 112) {
+    runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
+    const timer = memory[timerLow] | memory[timerHigh] << 8;
+    if (wanted.has(timer)) samples.push(snapshot(wanted.get(timer)));
+  }
+  const paused = Array.from({ length: 16 }, (_, frame) => ({ frame, ...snapshot("pause") }));
+  runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
+  samples.push(snapshot("blink-visible-resumed"));
+
+  const backingBeforeRefresh = Array.from(memory.subarray(
+    requiredLabel(labels, "hud_booster_backing"),
+    requiredLabel(labels, "hud_booster_backing") + hudCells,
+  ));
+  memory[pickupState] = 2;
+  memory[pickupType] = 1;
+  runRoutine(memory, labels, "weapon_pickup_collect");
+  const refreshed = snapshot("refreshed-as-spread");
+  const backingAfterRefresh = Array.from(memory.subarray(
+    requiredLabel(labels, "hud_booster_backing"),
+    requiredLabel(labels, "hud_booster_backing") + hudCells,
+  ));
+  memory[timerLow] = 1;
+  memory[timerHigh] = 0;
+  runRoutine(memory, labels, "update_weapon_booster_active", { x: 4 });
+  const expired = snapshot("expired");
+  const changedScreenOffsets = Array.from({ length: 0x400 }, (_, offset) => offset)
+    .filter((offset) => screenBefore[offset] !== screenAfterActivation[offset]);
+  return {
+    artifact,
+    manifest,
+    hudOffset,
+    hudCells,
+    hudSegmentsOffset,
+    hudSegments,
+    fullCode,
+    fullGlyph: Array.from(memory.subarray(
+      0x5000 + (fullCode & 0x7f) * 8,
+      0x5000 + (fullCode & 0x7f) * 8 + 8,
+    )),
+    originalHud,
+    activation: samples[0],
+    samples,
+    paused,
+    resumed: samples.at(-1),
+    refreshed,
+    expired,
+    backingBeforeRefresh,
+    backingAfterRefresh,
+    changedScreenOffsets,
+  };
+}
+
+export function executeHudPresentationTrace({ root = defaultRoot, artifact = "xex" } = {}) {
+  const { memory, labels, manifest } = initialiseRuntime(root, artifact);
+  const screen = labels.get("SCREEN") ?? 0x4000;
+  const health = fixedStateAddress(labels, "BROAD_PLAYER_HEALTH");
+  const timerLow = requiredLabel(labels, "ENTITY_TIMER") + 2;
+  const timerHigh = requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2;
+  const boosterState = requiredLabel(labels, "ENTITY_STATE") + 2;
+  const hullOffset = requiredLabel(labels, "HUD_HULL_SEGMENTS_OFFSET");
+  const hullSegments = requiredLabel(labels, "HUD_HULL_SEGMENTS");
+  const boosterOffset = requiredLabel(labels, "HUD_BOOSTER_OFFSET");
+  const boosterCells = requiredLabel(labels, "HUD_BOOSTER_CELLS");
+  const boosterSegmentsOffset = requiredLabel(labels, "HUD_BOOSTER_SEGMENTS_OFFSET");
+  const boosterSegments = requiredLabel(labels, "HUD_BOOSTER_SEGMENTS");
+  const hullFullCode = requiredLabel(labels, "CH_HUD_HULL_FULL");
+  const hullDamagedCode = requiredLabel(labels, "CH_HUD_HULL_DAMAGED");
+  const boosterFullCode = requiredLabel(labels, "CH_HUD_BOOSTER_FULL");
+
+  runRoutine(memory, labels, "init_screen");
+  runRoutine(memory, labels, "update_score_display");
+  runRoutine(memory, labels, "update_hud_status");
+  const snapshot = (name) => ({
+    name,
+    timer: memory[timerLow] | memory[timerHigh] << 8,
+    boosterState: memory[boosterState],
+    health: memory[health],
+    display: Array.from(memory.subarray(screen, screen + 40)),
+    hullCodes: Array.from(memory.subarray(
+      screen + hullOffset, screen + hullOffset + hullSegments,
+    )),
+    boosterCodes: Array.from(memory.subarray(
+      screen + boosterOffset, screen + boosterOffset + boosterCells,
+    )),
+    boosterSegmentCodes: Array.from(memory.subarray(
+      screen + boosterSegmentsOffset, screen + boosterSegmentsOffset + boosterSegments,
+    )),
+  });
+
+  const frames = [snapshot("full-hull-no-booster")];
+  runRoutine(memory, labels, "backup_weapon_booster_hud");
+  memory[boosterState] = 3;
+  memory[timerLow] = 0xf4;
+  memory[timerHigh] = 1;
+  runRoutine(memory, labels, "show_weapon_booster_hud");
+  frames.push(snapshot("full-hull-full-boost"));
+
+  memory[health] = 7;
+  runRoutine(memory, labels, "update_hud_status");
+  while ((memory[timerLow] | memory[timerHigh] << 8) > 250) {
+    runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
+  }
+  frames.push(snapshot("partial-hull-half-boost"));
+
+  memory[health] = 1;
+  runRoutine(memory, labels, "update_hud_status");
+  while ((memory[timerLow] | memory[timerHigh] << 8) > 111) {
+    runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
+  }
+  frames.push(snapshot("critical-hull-blinking-boost"));
+
+  memory[timerLow] = 1;
+  memory[timerHigh] = 0;
+  runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
+  const lifecycleDisplays = [{
+    name: "booster-expired",
+    display: Array.from(memory.subarray(screen, screen + 40)),
+  }];
+  runRoutine(memory, labels, "init_screen");
+  runRoutine(memory, labels, "update_score_display");
+  runRoutine(memory, labels, "update_hud_status");
+  lifecycleDisplays.push({
+    name: "new-game-layout",
+    display: Array.from(memory.subarray(screen, screen + 40)),
+  });
+  memory[health] = 10;
+  runRoutine(memory, labels, "update_hud_status");
+  lifecycleDisplays.push({
+    name: "respawn-full-hull",
+    display: Array.from(memory.subarray(screen, screen + 40)),
+  });
+
+  const glyph = (code) => Array.from(memory.subarray(
+    0x5000 + code * 8, 0x5000 + code * 8 + 8,
+  ));
+  return {
+    artifact,
+    manifest,
+    frames,
+    lifecycleDisplays,
+    hudCharset: Array.from(memory.subarray(0x5000, 0x5400)),
+    hullOffset,
+    hullSegments,
+    boosterOffset,
+    boosterCells,
+    boosterSegmentsOffset,
+    boosterSegments,
+    hullFullCode,
+    hullDamagedCode,
+    boosterFullCode,
+    hullFullGlyph: glyph(hullFullCode),
+    hullDamagedGlyph: glyph(hullDamagedCode),
+    boosterFullGlyph: glyph(boosterFullCode),
   };
 }
 
@@ -1053,6 +1274,7 @@ export function executeSpreadShotTrace({
     projectilesAfterCleanup,
     initialCharset,
     charset: Uint8Array.from(memory.subarray(0x4400, 0x4800)),
+    hudCharset: Uint8Array.from(memory.subarray(0x5000, 0x5400)),
     manifest,
   };
 }
@@ -1079,7 +1301,94 @@ export function executeSpreadShotPoolTrace({ root = defaultRoot, artifact = "xex
     empty: runCase(0),
     sevenOccupied: runCase(7),
     eightOccupied: runCase(8),
+    nineOccupied: runCase(9),
     full: runCase(10),
+  };
+}
+
+export function executeSpreadShotCooldownSafetyTrace({
+  root = defaultRoot, artifact = "xex", frames = 500,
+} = {}) {
+  const runCandidate = (cooldown) => {
+    const { memory, labels } = initialiseRuntime(root, artifact);
+    const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
+    memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
+    memory[requiredLabel(labels, "player_x")] = 124;
+    memory[requiredLabel(labels, "player_y")] = 184;
+    let maximumPoolOccupancy = 0;
+    const allocationSizes = [];
+    for (let frame = 0; frame < frames; frame += 1) {
+      runRoutine(memory, labels, "update_fighter_projectiles");
+      if (frame % cooldown === 0) {
+        const before = countActive(memory, active, 10);
+        runRoutine(memory, labels, "allocate_viper_projectile");
+        const after = countActive(memory, active, 10);
+        allocationSizes.push(after - before);
+      }
+      maximumPoolOccupancy = Math.max(maximumPoolOccupancy,
+        countActive(memory, active, 10));
+    }
+    return {
+      cooldown,
+      allocationSizes,
+      salvos: allocationSizes.length,
+      fullSalvos: allocationSizes.filter((count) => count === 3).length,
+      rejectedFullSalvos: allocationSizes.filter((count) => count !== 3).length,
+      maximumPoolOccupancy,
+    };
+  };
+  return {
+    artifact,
+    frames,
+    unsafe: runCandidate(9),
+    minimumSafe: runCandidate(10),
+  };
+}
+
+export function executeSpreadShotMotionTrace({ root = defaultRoot, artifact = "xex" } = {}) {
+  const { memory, labels } = initialiseRuntime(root, artifact);
+  const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
+  const xAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_X");
+  const yAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_Y");
+  memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
+  memory[requiredLabel(labels, "player_x")] = 124;
+  memory[requiredLabel(labels, "player_y")] = 184;
+  runRoutine(memory, labels, "allocate_viper_projectile");
+  const initial = Array.from(memory.subarray(xAddress, xAddress + 3));
+  for (let frame = 0; frame < 100; frame += 1) {
+    memory.fill(100, yAddress, yAddress + 3);
+    runRoutine(memory, labels, "update_fighter_projectiles");
+  }
+  const after100 = Array.from(memory.subarray(xAddress, xAddress + 3));
+  const activeAfter100 = Array.from(memory.subarray(active, active + 3));
+
+  const boundaryCase = (direction, x) => {
+    const runtime = initialiseRuntime(root, artifact);
+    const projectileActive = requiredLabel(runtime.labels, "FIGHTER_PROJECTILE_ACTIVE");
+    const projectileX = requiredLabel(runtime.labels, "FIGHTER_PROJECTILE_X");
+    const projectileY = requiredLabel(runtime.labels, "FIGHTER_PROJECTILE_Y");
+    const projectilePreviousY = requiredLabel(runtime.labels, "FIGHTER_PROJECTILE_PREV_Y");
+    const projectileLifetime = requiredLabel(runtime.labels, "FIGHTER_PROJECTILE_LIFETIME");
+    runtime.memory[projectileActive] = 1 | direction;
+    runtime.memory[projectileX] = x;
+    runtime.memory[projectileY] = 100;
+    runtime.memory[projectilePreviousY] = 100;
+    runtime.memory[projectileLifetime] = 0xff;
+    runRoutine(runtime.memory, runtime.labels, "update_fighter_projectiles");
+    return {
+      direction,
+      startX: x,
+      active: runtime.memory[projectileActive],
+      x: runtime.memory[projectileX],
+    };
+  };
+  return {
+    artifact,
+    initial,
+    after100,
+    activeAfter100,
+    leftBoundary: boundaryCase(0x40, 48),
+    rightBoundary: boundaryCase(0x20, 207),
   };
 }
 
@@ -1127,8 +1436,8 @@ export function executeSpreadShotCollisionTrace({ root = defaultRoot, artifact =
       if (slot !== selectedSlot) memory[active + slot] = 0;
     }
     const direction = memory[active + selectedSlot] & 0x60;
-    const nextX = memory[projectileX + selectedSlot] + (direction === 0x40 ? -2 :
-      direction === 0x20 ? 2 : 0);
+    const nextX = memory[projectileX + selectedSlot] + (direction === 0x40 ? -1 :
+      direction === 0x20 ? 1 : 0);
     memory[requiredLabel(labels, "ENTITY_ACTIVE_MASK")] = 1;
     memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")] = 1;
     memory[requiredLabel(labels, "ENTITY_STATE")] = 1;
@@ -1499,6 +1808,7 @@ export function assertWeaponPickupTraceParity(left, right) {
       ...record, screen: Array.from(record.screen), display: Array.from(record.display),
     })),
     charset: Array.from(trace.charset),
+    hudCharset: Array.from(trace.hudCharset),
   });
   if (JSON.stringify(normalize(left)) !== JSON.stringify(normalize(right))) {
     throw new Error(`Weapon pickup runtime differs between ${left.artifact} and ${right.artifact}`);

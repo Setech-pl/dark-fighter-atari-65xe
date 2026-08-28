@@ -21,6 +21,8 @@
 #define DFTRACE_ENGINE_ALLIED_CODE 0x53u
 #define DFTRACE_ENGINE_ENEMY_CODE 0xd4u
 #define DFTRACE_CHARSET 0x4400u
+#define DFTRACE_PROFILE_COUNT 22u
+#define DFTRACE_PROFILE_DLI_COUNT 2u
 
 typedef struct {
 	uint64_t start_clock;
@@ -177,6 +179,24 @@ typedef struct {
 	unsigned engine_playfield_select_dlist;
 	unsigned engine_playfield_select_active_lo;
 	unsigned gameplay_generation;
+	uint64_t profile_clock[DFTRACE_PROFILE_COUNT];
+	uint64_t profile_dli_start[DFTRACE_PROFILE_DLI_COUNT];
+	uint64_t profile_dli_end[DFTRACE_PROFILE_DLI_COUNT];
+	unsigned profile_dli_segment[DFTRACE_PROFILE_DLI_COUNT];
+	unsigned profile_next;
+	unsigned profile_dli_count;
+	unsigned profile_compose_calls;
+	unsigned profile_compose_cycles;
+	unsigned profile_pointer_calls;
+	unsigned profile_pointer_cycles;
+	uint64_t profile_erase_viper_start;
+	uint64_t profile_raider_update_start;
+	uint64_t profile_raider_render_start;
+	uint64_t profile_entity_erase_start;
+	uint64_t profile_effect_update_end;
+	uint64_t profile_pickup_update_end;
+	uint64_t profile_pickup_render_start;
+	uint64_t profile_effect_render_start;
 } DFTraceFrame;
 
 enum {
@@ -216,6 +236,21 @@ static DFTraceFrame dftrace_current;
 
 static unsigned dftrace_pc_active;
 static unsigned dftrace_pc_end;
+static unsigned dftrace_pc_profile[DFTRACE_PROFILE_COUNT];
+static unsigned dftrace_pc_dli_end;
+static unsigned dftrace_pc_dli_hud_end;
+static unsigned dftrace_pc_compose_start;
+static unsigned dftrace_pc_compose_end;
+static unsigned dftrace_pc_pointer_start;
+static unsigned dftrace_pc_pointer_end;
+static unsigned dftrace_pc_erase_slot;
+static unsigned dftrace_pc_raider_update_start;
+static unsigned dftrace_pc_render_slot;
+static unsigned dftrace_pc_entity_erase_start;
+static unsigned dftrace_pc_effect_update_end;
+static unsigned dftrace_pc_pickup_update_end;
+static uint64_t dftrace_compose_start_clock;
+static uint64_t dftrace_pointer_start_clock;
 static unsigned dftrace_pc_frontend_poll;
 static unsigned dftrace_pc_dli;
 static unsigned dftrace_pc_world;
@@ -1219,7 +1254,18 @@ static void dftrace_write(void)
 		perror("darkfighter trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,viper_projectiles,pickup_booster_state,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation\n");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,viper_projectiles,pickup_booster_state,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation");
+	for (index = 0; index < DFTRACE_PROFILE_COUNT; ++index)
+		fprintf(file, ",profile_clock%u", index);
+	for (index = 0; index < DFTRACE_PROFILE_DLI_COUNT; ++index)
+		fprintf(file, ",profile_dli%u_start,profile_dli%u_end,profile_dli%u_segment",
+			index, index, index);
+	fprintf(file, ",profile_compose_calls,profile_compose_cycles"
+		",profile_pointer_calls,profile_pointer_cycles"
+		",profile_erase_viper_start,profile_raider_update_start"
+		",profile_raider_render_start,profile_entity_erase_start"
+		",profile_effect_update_end,profile_pickup_update_end"
+		",profile_pickup_render_start,profile_effect_render_start\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -1319,7 +1365,7 @@ static void dftrace_write(void)
 			frame->engine_first_dlist_write_new,
 			frame->engine_first_dlist_write_scanline,
 			frame->engine_first_dlist_write_cycle);
-		fprintf(file, ",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+		fprintf(file, ",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u",
 			frame->engine_first_recycled_write_pc,
 			frame->engine_first_recycled_write_address,
 			frame->engine_first_recycled_write_old,
@@ -1332,6 +1378,24 @@ static void dftrace_write(void)
 			frame->engine_playfield_select_dlist,
 			frame->engine_playfield_select_active_lo,
 			frame->gameplay_generation);
+		for (unsigned profile = 0; profile < DFTRACE_PROFILE_COUNT; ++profile)
+			fprintf(file, ",%llu", (unsigned long long) frame->profile_clock[profile]);
+		for (unsigned dli = 0; dli < DFTRACE_PROFILE_DLI_COUNT; ++dli)
+			fprintf(file, ",%llu,%llu,%u",
+				(unsigned long long) frame->profile_dli_start[dli],
+				(unsigned long long) frame->profile_dli_end[dli],
+				frame->profile_dli_segment[dli]);
+		fprintf(file, ",%u,%u,%u,%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",
+			frame->profile_compose_calls, frame->profile_compose_cycles,
+			frame->profile_pointer_calls, frame->profile_pointer_cycles,
+			(unsigned long long) frame->profile_erase_viper_start,
+			(unsigned long long) frame->profile_raider_update_start,
+			(unsigned long long) frame->profile_raider_render_start,
+			(unsigned long long) frame->profile_entity_erase_start,
+			(unsigned long long) frame->profile_effect_update_end,
+			(unsigned long long) frame->profile_pickup_update_end,
+			(unsigned long long) frame->profile_pickup_render_start,
+			(unsigned long long) frame->profile_effect_render_start);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -1379,6 +1443,27 @@ static void dftrace_init(void)
 #define DFTRACE_ADDRESS(field, env) field = dftrace_env_u(env)
 	DFTRACE_ADDRESS(dftrace_pc_active, "DFTRACE_PC_ACTIVE");
 	DFTRACE_ADDRESS(dftrace_pc_end, "DFTRACE_PC_END");
+	{
+		unsigned profile_index;
+		char profile_environment[32];
+		for (profile_index = 0; profile_index < DFTRACE_PROFILE_COUNT; ++profile_index) {
+			snprintf(profile_environment, sizeof(profile_environment),
+				"DFTRACE_PC_PROFILE%u", profile_index);
+			dftrace_pc_profile[profile_index] = dftrace_env_u(profile_environment);
+		}
+	}
+	DFTRACE_ADDRESS(dftrace_pc_dli_end, "DFTRACE_PC_DLI_END");
+	DFTRACE_ADDRESS(dftrace_pc_dli_hud_end, "DFTRACE_PC_DLI_HUD_END");
+	DFTRACE_ADDRESS(dftrace_pc_compose_start, "DFTRACE_PC_COMPOSE_START");
+	DFTRACE_ADDRESS(dftrace_pc_compose_end, "DFTRACE_PC_COMPOSE_END");
+	DFTRACE_ADDRESS(dftrace_pc_pointer_start, "DFTRACE_PC_POINTER_START");
+	DFTRACE_ADDRESS(dftrace_pc_pointer_end, "DFTRACE_PC_POINTER_END");
+	DFTRACE_ADDRESS(dftrace_pc_erase_slot, "DFTRACE_PC_ERASE_SLOT");
+	DFTRACE_ADDRESS(dftrace_pc_raider_update_start, "DFTRACE_PC_RAIDER_UPDATE_START");
+	DFTRACE_ADDRESS(dftrace_pc_render_slot, "DFTRACE_PC_RENDER_SLOT");
+	DFTRACE_ADDRESS(dftrace_pc_entity_erase_start, "DFTRACE_PC_ENTITY_ERASE_START");
+	DFTRACE_ADDRESS(dftrace_pc_effect_update_end, "DFTRACE_PC_EFFECT_UPDATE_END");
+	DFTRACE_ADDRESS(dftrace_pc_pickup_update_end, "DFTRACE_PC_PICKUP_UPDATE_END");
 	DFTRACE_ADDRESS(dftrace_pc_frontend_poll, "DFTRACE_PC_FRONTEND_POLL");
 	DFTRACE_ADDRESS(dftrace_pc_dli, "DFTRACE_PC_DLI");
 	DFTRACE_ADDRESS(dftrace_pc_world, "DFTRACE_PC_WORLD");
@@ -1480,7 +1565,7 @@ static void dftrace_init(void)
 	dftrace_initialised = 1;
 }
 
-static void DFTrace_Observe(unsigned pc)
+static void DFTrace_Observe(unsigned pc, unsigned x_register)
 {
 	unsigned host_frame = (unsigned) Atari800_nframes;
 	if (getenv("DFBOOT_OUTPUT") != NULL) {
@@ -1668,8 +1753,70 @@ static void DFTrace_Observe(unsigned pc)
 	dftrace_watch_recycled_write(&dftrace_current);
 	dftrace_pickup_watch(&dftrace_current, pc);
 
-	if (pc == dftrace_pc_dli)
+	if (dftrace_current.profile_next < DFTRACE_PROFILE_COUNT &&
+		pc == dftrace_pc_profile[dftrace_current.profile_next]) {
+		dftrace_current.profile_clock[dftrace_current.profile_next] = dftrace_clock();
+		/* Profile 18 is the projectile-render boundary immediately before the
+		 * entity/effect renderer. Discard the earlier resident-capsule call so
+		 * the nested render markers describe only the final layer pass. */
+		if (dftrace_current.profile_next == 18u) {
+			dftrace_current.profile_pickup_render_start = 0u;
+			dftrace_current.profile_effect_render_start = 0u;
+		}
+		++dftrace_current.profile_next;
+	}
+	if (pc == dftrace_pc_compose_start) {
+		dftrace_compose_start_clock = dftrace_clock();
+		++dftrace_current.profile_compose_calls;
+	}
+	else if (pc == dftrace_pc_compose_end) {
+		dftrace_current.profile_compose_cycles +=
+			(unsigned) (dftrace_clock() + 6u - dftrace_compose_start_clock);
+	}
+	if (pc == dftrace_pc_pointer_start) {
+		dftrace_pointer_start_clock = dftrace_clock();
+		++dftrace_current.profile_pointer_calls;
+	}
+	else if (pc == dftrace_pc_pointer_end) {
+		dftrace_current.profile_pointer_cycles +=
+			(unsigned) (dftrace_clock() + 6u - dftrace_pointer_start_clock);
+	}
+	if (pc == dftrace_pc_erase_slot && x_register == 8u &&
+		dftrace_current.profile_erase_viper_start == 0u)
+		dftrace_current.profile_erase_viper_start = dftrace_clock();
+	if (pc == dftrace_pc_raider_update_start)
+		dftrace_current.profile_raider_update_start = dftrace_clock();
+	if (pc == dftrace_pc_render_slot && x_register == 10u &&
+		dftrace_current.profile_raider_render_start == 0u)
+		dftrace_current.profile_raider_render_start = dftrace_clock();
+	if (pc == dftrace_pc_entity_erase_start)
+		dftrace_current.profile_entity_erase_start = dftrace_clock();
+	if (pc == dftrace_pc_effect_update_end)
+		dftrace_current.profile_effect_update_end = dftrace_clock();
+	if (pc == dftrace_pc_pickup_update_end)
+		dftrace_current.profile_pickup_update_end = dftrace_clock();
+	if (pc == dftrace_pc_entity_draw &&
+		dftrace_current.profile_pickup_render_start == 0u)
+		dftrace_current.profile_pickup_render_start = dftrace_clock();
+	if (pc == dftrace_pc_effect_render &&
+		dftrace_current.profile_effect_render_start == 0u)
+		dftrace_current.profile_effect_render_start = dftrace_clock();
+	if (pc == dftrace_pc_dli) {
 		++dftrace_current.dli_nmis;
+		if (dftrace_current.profile_dli_count < DFTRACE_PROFILE_DLI_COUNT) {
+			unsigned dli_index = dftrace_current.profile_dli_count;
+			dftrace_current.profile_dli_start[dli_index] = dftrace_clock();
+			dftrace_current.profile_dli_segment[dli_index] =
+				dftrace_current.profile_next;
+		}
+	}
+	else if ((pc == dftrace_pc_dli_end || pc == dftrace_pc_dli_hud_end) &&
+		dftrace_current.profile_dli_count < DFTRACE_PROFILE_DLI_COUNT) {
+		unsigned dli_index = dftrace_current.profile_dli_count;
+		/* The hook runs before RTI. Include its fixed six NMOS 6502 cycles. */
+		dftrace_current.profile_dli_end[dli_index] = dftrace_clock() + 6u;
+		++dftrace_current.profile_dli_count;
+	}
 	if (dftrace_previous_pc != 0u && MEMORY_mem[dftrace_previous_pc] == 0x8du &&
 		MEMORY_mem[(dftrace_previous_pc + 1u) & 0xffffu] == 0x02u &&
 		MEMORY_mem[(dftrace_previous_pc + 2u) & 0xffffu] == 0xd4u &&

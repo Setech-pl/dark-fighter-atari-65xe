@@ -16,6 +16,8 @@ const generatedFiles = [
   "build/starfield-runtime.bin",
   "build/starfield-runtime-packed.bin",
   "build/previews/gameplay-screen.png",
+  "build/previews/hud-presentation-review.png",
+  "build/previews/hud-presentation-native.png",
   "build/previews/loader-screen.png",
   "build/previews/starfield-pal-sequence.png",
   "build/previews/starfield-pal-trace.csv",

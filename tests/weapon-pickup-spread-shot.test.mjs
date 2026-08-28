@@ -16,7 +16,9 @@ import {
 import { compileEnemyRoster, loadEnemyRosterDefinition } from "../scripts/enemy-roster.mjs";
 import {
   executeSpreadShotCollisionTrace,
+  executeSpreadShotCooldownSafetyTrace,
   executeSpreadShotHullArtifactTrace,
+  executeSpreadShotMotionTrace,
   executeSpreadShotOverlapTrace,
   executeSpreadShotPoolTrace,
   executeSpreadShotTrace,
@@ -151,15 +153,15 @@ test("Spread collection lasts exactly 500 active PAL frames and pause freezes it
   const trace = executeSpreadShotTrace({ root, artifact: "xex" });
   assert.deepEqual([
     trace.spreadPickup.state, trace.spreadPickup.timer, trace.spreadPickup.hudCodes,
-  ], [4, 500, [51, 48, 17, 16]]);
+  ], [4, 500, [7, 7, 7, 7]]);
   assert.equal(trace.spreadTimerFrames.length, 500);
   assert.deepEqual(trace.spreadTimerFrames.map(({ timer }) => timer),
     Array.from({ length: 500 }, (_, index) => 499 - index));
   assert.equal(trace.frozenTimer, 449);
   assert.equal(trace.pauseFrames.length, 10);
   assert.equal(trace.pauseFrames.every(({ timer, hudCodes }) =>
-    timer === 449 && hudCodes.join() === "51,48,16,25"), true);
-  assert.deepEqual(trace.spreadTimerFrames[449].hudCodes, [51, 48, 16, 17]);
+    timer === 449 && hudCodes.join() === "7,7,7,7"), true);
+  assert.deepEqual(trace.spreadTimerFrames[449].hudCodes, [0, 0, 0, 0]);
   assert.deepEqual([
     trace.spreadExpired.state, trace.spreadExpired.timer, trace.spreadExpired.hudCodes,
   ], [0, 0, [0, 0, 0, 0]]);
@@ -169,20 +171,21 @@ test("Rapid and Spread replace or refresh one another without combining cadence"
   const trace = executeWeaponBoosterReplacementTrace({ root, artifact: "xex" });
   assert.deepEqual([
     trace.rapid.state, trace.rapid.timer, trace.rapid.hudCodes,
-  ], [3, 500, [50, 38, 17, 16]]);
+  ], [3, 500, [7, 7, 7, 7]]);
   assert.deepEqual([
     trace.spreadReplacesRapid.state, trace.spreadReplacesRapid.timer,
     trace.spreadReplacesRapid.hudCodes,
-  ], [4, 500, [51, 48, 17, 16]]);
+  ], [4, 500, [7, 7, 7, 7]]);
   assert.deepEqual([
     trace.spreadRefresh.state, trace.spreadRefresh.timer,
     trace.rapidReplacesSpread.state, trace.rapidReplacesSpread.timer,
   ], [4, 500, 3, 500]);
   assert.match(source,
-    /and #\(VIPER_BURST_INTERVAL-VIPER_RAPID_FIRE_INTERVAL\+1\)[\s\S]+eor #VIPER_BURST_INTERVAL/);
+    /viper_fire_intervals:[\s\S]+VIPER_RAPID_FIRE_INTERVAL,VIPER_SPREAD_COOLDOWN/);
   const cadence = source.slice(source.indexOf("update_viper_weapon:"),
     source.indexOf("allocate_viper_projectile:"));
-  assert.doesNotMatch(cadence, /WEAPON_PICKUP_STATE_SPREAD/);
+  assert.match(cadence,
+    /ldy ENTITY_STATE\+WEAPON_BOOSTER_SLOT[\s\S]+lda viper_fire_intervals,y/);
 });
 
 test("one Spread emission is an unambiguous three-projectile fan", () => {
@@ -192,18 +195,19 @@ test("one Spread emission is an unambiguous three-projectile fan", () => {
     weapons.viper.spreadShotProjectileCount,
     weapons.viper.spreadShotInitialOffsetHpos,
     weapons.viper.spreadShotLateralStepHpos,
-    weapons.viper.burstIntervalFrames,
-  ], [500, 3, 4, 2, 3]);
+    weapons.viper.spreadShotLateralPeriodFrames,
+    weapons.viper.spreadShotCooldownFrames,
+  ], [500, 3, 4, 1, 2, 10]);
   const frames = executeSpreadShotTrace({ root, artifact: "xex" }).trajectoryFrames;
   assert.deepEqual(frames[0].slots.slice(0, 3).map(({ active, x, y }) => [active, x, y]), [
-    [0x41, 124, 182], [0x11, 128, 182], [0x21, 132, 182],
+    [0x11, 128, 182], [0x41, 124, 182], [0x21, 132, 182],
   ]);
   for (let frame = 1; frame < frames.length; frame += 1) {
     assert.deepEqual(frames[frame].slots.slice(0, 3).map(({ active, x, y }) =>
       [active, x, y]), [
-      [0x41, 124 - frame * 2, 182 - frame * 6],
       [0x11, 128, 182 - frame * 6],
-      [0x21, 132 + frame * 2, 182 - frame * 6],
+      [0x41, 124 - Math.ceil(frame / 2), 182 - frame * 6],
+      [0x21, 132 + Math.ceil(frame / 2), 182 - frame * 6],
     ]);
     assert.equal([...frames[frame].screen].filter(Boolean).length, 3,
       `frame ${frame} retained an erased projectile cell`);
@@ -304,19 +308,23 @@ test("all three projectiles leave the screen cleanly without HUD or charset corr
   }
 });
 
-test("the ten-slot physical pool admits three atomically and retries a saturated salvo", () => {
+test("Spread keeps a reserve slot in steady state and admits centre before an atomic side pair", () => {
   const trace = executeSpreadShotPoolTrace({ root, artifact: "xex" });
   assert.deepEqual([
     manifest.fighterWeapons.viper.poolSlots,
     trace.empty.activeCount,
     trace.sevenOccupied.activeCount,
   ], [10, 3, 10]);
-  assert.deepEqual(trace.empty.after.slice(0, 3), [0x41, 0x11, 0x21]);
-  assert.deepEqual(trace.sevenOccupied.after.slice(7), [0x41, 0x11, 0x21]);
-  assert.deepEqual(trace.eightOccupied.after, trace.eightOccupied.before,
-    "two free slots must reject the whole volley without partial writes");
+  assert.deepEqual(trace.empty.after.slice(0, 3), [0x11, 0x41, 0x21]);
+  assert.deepEqual(trace.sevenOccupied.after.slice(7), [0x11, 0x41, 0x21]);
+  assert.deepEqual(trace.eightOccupied.after.slice(8), [0x11, 0],
+    "two free slots must admit the centre but never one unpaired side");
+  assert.deepEqual(trace.nineOccupied.after.slice(9), [0x11],
+    "one free slot must remain sufficient for the priority centre");
   assert.deepEqual(trace.full.after, trace.full.before);
-  const controller = executeViperBurstBalanceTrace({ root, artifact: "xex" })
+  const controller = executeViperBurstBalanceTrace({
+    root, artifact: "xex", windowFrames: 500,
+  })
     .traces.find(({ mode }) => mode === "SPREAD");
   assert.equal(controller.firstBurstSalvos, 8);
   assert.equal(controller.firstBurstProjectiles, 24);
@@ -325,21 +333,48 @@ test("the ten-slot physical pool admits three atomically and retries a saturated
   "a Spread controller update must never allocate a partial fan");
   const rejected = controller.records.filter(({ allocationDue, allocatedProjectiles }) =>
     allocationDue && allocatedProjectiles === 0);
-  assert.ok(rejected.length > 0, "the runtime trace must exercise saturation retries");
-  assert.equal(rejected.every(({ remainingBefore, remainingAfter }) =>
-    remainingBefore === remainingAfter), true,
-  "a rejected atomic salvo must not consume the burst counter");
-  assert.equal(Math.max(...executeViperBurstBalanceTrace({ root, artifact: "xex" })
-    .traces.map(({ maximumPoolOccupancy }) => maximumPoolOccupancy)), 10);
+  assert.equal(rejected.length, 0,
+    "500 active PAL frames must not reject a steady-state Spread salvo");
+  assert.equal(controller.maximumPoolOccupancy, 9);
+  assert.equal(controller.emittedSalvos, 49);
+  assert.equal(controller.emittedProjectiles, 147);
   assert.equal(manifest.fighterWeapons.viper.poolSlots, 10);
   assert.equal(manifest.entityEffects.effectActiveLimit, 5);
+});
+
+test("ten active PAL frames is the exact minimum safe Spread cooldown", () => {
+  const trace = executeSpreadShotCooldownSafetyTrace({ root, artifact: "xex" });
+  assert.equal(trace.unsafe.cooldown, 9);
+  assert.ok(trace.unsafe.rejectedFullSalvos > 0,
+    "nine frames must demonstrate transitional centre-only saturation");
+  assert.equal(trace.unsafe.maximumPoolOccupancy, 10);
+  assert.deepEqual(trace.minimumSafe, {
+    cooldown: 10,
+    allocationSizes: Array(50).fill(3),
+    salvos: 50,
+    fullSalvos: 50,
+    rejectedFullSalvos: 0,
+    maximumPoolOccupancy: 9,
+  });
+});
+
+test("Spread fixed phase is symmetric after 100 updates and both side bounds despawn", () => {
+  const trace = executeSpreadShotMotionTrace({ root, artifact: "xex" });
+  assert.deepEqual(trace.initial, [128, 124, 132]);
+  assert.deepEqual(trace.after100, [128, 74, 182]);
+  assert.deepEqual(trace.activeAfter100, [0x11, 0x41, 0x21]);
+  assert.equal(trace.initial[0], trace.after100[0], "centre projectile drifted");
+  assert.equal(trace.initial[1] - trace.after100[1],
+    trace.after100[2] - trace.initial[2]);
+  assert.equal(trace.leftBoundary.active, 0);
+  assert.equal(trace.rightBoundary.active, 0);
 });
 
 test("all three directions collide with debris and Raider scoring resolves only once", () => {
   const trace = executeSpreadShotCollisionTrace({ root, artifact: "xex" });
   assert.deepEqual(trace.debris.map(({ direction, projectileConsumed, debrisHp, score }) =>
     [direction, projectileConsumed, debrisHp, score]), [
-    [0x40, true, 2, 0], [0, true, 2, 0], [0x20, true, 2, 0],
+    [0, true, 2, 0], [0x40, true, 2, 0], [0x20, true, 2, 0],
   ]);
   assert.deepEqual(trace.raider, {
     pendingDamage: 3,
@@ -362,7 +397,7 @@ test("Spread follows Rapid lifecycle semantics for life, New Game, Game Over and
     lifecycle.sectorSpread.state,
     lifecycle.sectorSpread.timer,
     lifecycle.sectorSpread.hudCodes,
-  ], [4, 500, [51, 48, 17, 16]]);
+  ], [4, 500, [7, 7, 7, 7]]);
   assert.equal(lifecycle.newGameSpread.nextPickupType, 0,
     "New Game must restore Rapid as the first drop");
 });

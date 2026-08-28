@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:candidate": "node scripts/build.mjs --candidate",
     "enemy:review": "node scripts/build.mjs --enemy-review",
     "enemy:combat-review": "node scripts/build.mjs --enemy-combat-review",
     "enemy:palette:cylon-oxblood": "node scripts/build.mjs --enemy-palette=cylon-oxblood",

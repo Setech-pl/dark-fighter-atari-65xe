@@ -47,6 +47,7 @@ import {
 import {
   assertSpreadShotTraceParity,
   assertWeaponPickupTraceParity,
+  executeHudPresentationTrace,
   executeSpreadShotHullVolleyTrace,
   executeSpreadShotTrace,
   executeViperBurstBalanceTrace,
@@ -403,6 +404,18 @@ export const DEFAULT_WEAPON_PICKUP_TRACE_PATH = path.join(
   "previews",
   "weapon-pickup-rapid-fire-trace.csv",
 );
+export const DEFAULT_HUD_PRESENTATION_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "hud-presentation-review.png",
+);
+export const DEFAULT_HUD_PRESENTATION_NATIVE_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "hud-presentation-native.png",
+);
 export const DEFAULT_SPREAD_SHOT_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
@@ -529,7 +542,7 @@ function parseConstants(source) {
   for (const rawLine of source.split(/\r?\n/)) {
     const line = stripComment(rawLine).trim();
     const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/.exec(line);
-    if (match) {
+    if (match && match[2].trim() !== "*") {
       pending.push({ name: match[1], expression: match[2] });
     }
   }
@@ -739,7 +752,7 @@ function requireLength(name, bytes, expectedLength) {
   }
 }
 
-function buildGameplayHudCharset(frontendGlyphRows, constants) {
+function buildGameplayHudCharset(frontendGlyphRows, constants, baseCharset) {
   const charset = new Uint8Array(1024);
   const copyGlyph = (sourceIndex, destinationIndex) => {
     charset.set(
@@ -754,13 +767,14 @@ function buildGameplayHudCharset(frontendGlyphRows, constants) {
   for (let letter = 0; letter < 26; letter += 1) {
     copyGlyph(10 + letter, requireValue(constants, "CH_HUD_A") + letter);
   }
-  const percent = requireValue(constants, "CH_PERCENT");
+  const hullFull = requireValue(constants, "CH_HUD_HULL_FULL");
+  const hullDamaged = requireValue(constants, "CH_HUD_HULL_DAMAGED");
   charset.set(
-    [0xcc, 0xd8, 0x18, 0x30, 0x60, 0x6c, 0xcc, 0x00],
-    percent * CHARACTER_HEIGHT,
+    baseCharset.subarray(hullFull * CHARACTER_HEIGHT, (hullDamaged + 1) * CHARACTER_HEIGHT),
+    hullFull * CHARACTER_HEIGHT,
   );
   charset[7] = 0xff;
-  charset[percent * CHARACTER_HEIGHT + 7] = 0xff;
+  charset[requireValue(constants, "CH_HUD_BOOSTER_FULL") * CHARACTER_HEIGHT + 7] = 0xff;
   return charset;
 }
 
@@ -878,7 +892,7 @@ export function readGameGraphicsSource(
     "frontend_glyph_rows_end",
   );
   requireLength("frontend glyph rows", frontendGlyphRows, 42 * 7);
-  const hudCharset = buildGameplayHudCharset(frontendGlyphRows, constants);
+  const hudCharset = buildGameplayHudCharset(frontendGlyphRows, constants, baseCharset);
   charset.set(
     frontendGlyphRows,
     capitalHulls.definition.charsetBaseIndex * CHARACTER_HEIGHT + capitalHulls.glyphBytes.length,
@@ -4128,12 +4142,127 @@ export function createWeaponPickupRapidFireTrace() {
   return `${weaponPickupTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
 }
 
+function comparableHudPresentation(trace) {
+  return {
+    frames: trace.frames,
+    hudCharset: trace.hudCharset,
+    hullOffset: trace.hullOffset,
+    hullSegments: trace.hullSegments,
+    boosterOffset: trace.boosterOffset,
+    boosterCells: trace.boosterCells,
+    boosterSegmentsOffset: trace.boosterSegmentsOffset,
+    boosterSegments: trace.boosterSegments,
+    hullFullCode: trace.hullFullCode,
+    hullDamagedCode: trace.hullDamagedCode,
+    boosterFullCode: trace.boosterFullCode,
+    hullFullGlyph: trace.hullFullGlyph,
+    hullDamagedGlyph: trace.hullDamagedGlyph,
+    boosterFullGlyph: trace.boosterFullGlyph,
+  };
+}
+
+function executedHudPresentation(source) {
+  const xex = executeHudPresentationTrace({ artifact: "xex" });
+  const atr = executeHudPresentationTrace({ artifact: "atr" });
+  if (JSON.stringify(comparableHudPresentation(xex)) !==
+      JSON.stringify(comparableHudPresentation(atr))) {
+    throw new Error("HUD presentation differs between release XEX and ATR");
+  }
+  return { trace: xex, frontend: readFrontendGraphicsSource(source) };
+}
+
+function runtimeHudRowRgb(record, trace, scale = 1) {
+  const registerPixels = new Uint8Array(SOURCE_WIDTH * CHARACTER_HEIGHT);
+  drawAntic2Rows({
+    pixels: registerPixels,
+    pixelHeight: CHARACTER_HEIGHT,
+    screen: Uint8Array.from(record.display),
+    charset: Uint8Array.from(trace.hudCharset),
+    registers: new Map([["COLBK", 0x00], ["COLPF1", 0x0e], ["COLPF2", 0x00]]),
+    firstCharacterRow: 0,
+    characterRows: 1,
+  });
+  return scaleAndConvertToRgb(
+    registerPixels, SOURCE_WIDTH, CHARACTER_HEIGHT, scale,
+  );
+}
+
+export function createHudPresentationNativePreview(source) {
+  const { trace } = executedHudPresentation(source);
+  const rgb = Buffer.alloc(SOURCE_WIDTH * CHARACTER_HEIGHT * trace.frames.length * 3);
+  trace.frames.forEach((record, index) => {
+    copyRgbPanel(
+      rgb, SOURCE_WIDTH, CHARACTER_HEIGHT * trace.frames.length,
+      runtimeHudRowRgb(record, trace, 1), SOURCE_WIDTH, CHARACTER_HEIGHT,
+      0, index * CHARACTER_HEIGHT,
+    );
+  });
+  return encodePng(rgb, SOURCE_WIDTH, CHARACTER_HEIGHT * trace.frames.length);
+}
+
+export function createHudPresentationPreview(source) {
+  const { trace, frontend } = executedHudPresentation(source);
+  const labels = [
+    "1 FULL HULL  NO BOOSTER",
+    "2 FULL HULL  FULL BOOST",
+    "3 PARTIAL HULL  HALF BOOST",
+    "4 CRITICAL HULL  BLINKING BOOST",
+  ];
+  const width = 1350;
+  const height = 300;
+  const rgb = Buffer.alloc(width * height * 3);
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  const yellow = atariPalRegisterToRgb(0x1e);
+  fillRgb(rgb, [3, 5, 9]);
+  drawRgbLabel(rgb, width, "HUD PRESENTATION  EXECUTED RELEASE XEX AND ATR", 24, 14,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "HULL LOW ANGULAR PLATES  BOOST TALL ENERGY CELLS  NO COLOR DEPENDENCY", 24, 32,
+    frontend, yellow);
+  drawRgbLabel(rgb, width, "NATIVE 1 TO 1  320 BY 8 PIXELS PER STATE", 24, 54,
+    frontend, steel);
+  trace.frames.forEach((record, index) => {
+    const x = 10 + index * 335;
+    drawRgbLabel(rgb, width, labels[index], x + 4, 72, frontend, white);
+    copyRgbPanel(rgb, width, height,
+      runtimeHudRowRgb(record, trace, 1), SOURCE_WIDTH, CHARACTER_HEIGHT, x, 92);
+  });
+  drawRgbLabel(rgb, width, "ENLARGED 2X  SAME PACKED GLYPHS AND SCREEN CODES", 24, 126,
+    frontend, steel);
+  trace.frames.forEach((record, index) => {
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    const x = 10 + column * 670;
+    const y = 148 + row * 70;
+    drawRgbLabel(rgb, width, labels[index], x + 4, y, frontend, white);
+    copyRgbPanel(rgb, width, height,
+      runtimeHudRowRgb(record, trace, 2), SOURCE_WIDTH * 2, CHARACTER_HEIGHT * 2,
+      x, y + 20);
+  });
+  return encodePng(rgb, width, height);
+}
+
 function runtimeWeaponPickupFrameRgb(record, trace, registers, scale) {
   const display = record.display ?? record.screen ?? record.during;
   const rows = display.length / SCREEN_COLUMNS;
   const charset = record.charsetDuring ?? trace.charset;
   const registerPixels = drawAnticScreen(registers, display,
     { charset: Uint8Array.from(charset) }, undefined, rows);
+  if (record.display && trace.hudCharset) {
+    const hudRegisters = new Map(registers);
+    hudRegisters.set("COLPF1", 0x0e);
+    hudRegisters.set("COLPF2", 0x00);
+    drawAntic2Rows({
+      pixels: registerPixels,
+      pixelHeight: rows * CHARACTER_HEIGHT,
+      screen: display,
+      charset: Uint8Array.from(trace.hudCharset),
+      registers: hudRegisters,
+      firstCharacterRow: 0,
+      characterRows: 1,
+    });
+  }
   return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, rows * CHARACTER_HEIGHT, scale);
 }
 
@@ -4162,12 +4291,12 @@ export function createWeaponPickupRapidFirePreview(source) {
   const selected = [
     ["1 RF CAPSULE 2X2", select("ACTIVE", 0)],
     ["2 PICKUP", select("PICKUP", 0)],
-    ["3 HUD RF10", trace.rapidTimerFrames[0]],
+    ["3 BOOST FULL", trace.rapidTimerFrames[0]],
     ["4 NORMAL YELLOW", colourRecord(colours.normalDisplay)],
     ["5 RAPID YELLOW", colourRecord(colours.rapidDisplay)],
-    ["6 HUD RF01", trace.rapidTimerFrames[449]],
-    ["7 EXPIRY", trace.rapidTimerFrames[499]],
-    ["8 NEW YELLOW", colourRecord(colours.display)],
+    ["6 BOOST 1 VISIBLE", trace.rapidTimerFrames[443]],
+    ["7 BOOST BLINK HIDDEN", trace.rapidTimerFrames[449]],
+    ["8 EXPIRY", trace.rapidTimerFrames[499]],
   ].map(([label, record]) => ({ label, record }));
   if (selected.some(({ record }) => !record)) throw new Error("Rapid Fire runtime preview frame missing");
 
@@ -4186,7 +4315,7 @@ export function createWeaponPickupRapidFirePreview(source) {
   drawRgbLabel(rgb, width, "WEAPON PICKUP RF  EXECUTED RELEASE XEX AND ATR", 24, 16,
     frontend, white);
   drawRgbLabel(rgb, width,
-    "STATIC STEEL YELLOW 2X2 CAPSULE  BLACK RF  HUD RF10 TO RF01  YELLOW FIRE", 24, 34,
+    "STATIC STEEL YELLOW 2X2 CAPSULE  BLACK RF  FULL BOOST LABEL  YELLOW FIRE", 24, 34,
     frontend, yellow);
   drawRgbLabel(rgb, width, "NATIVE 1 TO 1  ACTUAL RUNTIME FRAMES", 24, 58,
     frontend, steel);
@@ -4314,7 +4443,7 @@ export function createViperBurstBalancePreview(source, artifact = "xex") {
     `VIPER BURST BALANCE  EXECUTED ${artifact.toUpperCase()}  80 PAL FRAMES HELD FIRE`,
     24, 14, frontend, white);
   drawRgbLabel(rgb, width,
-    "NORMAL 8 AT I3    RAPID 10 AT I2    SPREAD 8 FULL SALVOS AT I3    POST 12",
+    "NORMAL 8 AT I3    RAPID 10 AT I2    SPREAD 8 FULL SALVOS AT I10    POST 12",
     24, 34, frontend, yellow);
   trace.traces.forEach((mode, index) => {
     const x = gap + index * (panelWidth + gap);
@@ -4366,7 +4495,7 @@ export function createSpreadShotPreview(source) {
   const selected = [
     ["1 SP CAPSULE F0", trace.spreadCapsuleFrames[0]],
     ["2 SP MOVED F1", trace.spreadCapsuleFrames[1]],
-    ["3 PICKUP HUD SP10", trace.spreadPickup],
+    ["3 PICKUP BOOST FULL", trace.spreadPickup],
     ["4 FAN FRAME 1", trace.trajectoryFrames[1]],
     ["5 FAN FRAME 2", trace.trajectoryFrames[2]],
     ["6 FAN FRAME 3", trace.trajectoryFrames[3]],
@@ -4391,7 +4520,7 @@ export function createSpreadShotPreview(source) {
   drawRgbLabel(rgb, width, "SPREAD SHOT  EXECUTED RELEASE XEX AND ATR", 24, 16,
     frontend, white);
   drawRgbLabel(rgb, width,
-    "RED 2X2 FAN CAPSULE  HUD SP10  THREE YELLOW VIPER SHOTS  50 FPS", 24, 34,
+    "RED 2X2 FAN CAPSULE  FULL BOOST LABEL  THREE YELLOW VIPER SHOTS  50 FPS", 24, 34,
     frontend, red);
   drawRgbLabel(rgb, width, "NATIVE 1 TO 1  ACTUAL CONSECUTIVE RUNTIME FRAMES", 24, 58,
     frontend, steel);
@@ -5981,6 +6110,26 @@ export function generateWeaponPickupRapidFirePreview({
   );
 }
 
+export function generateHudPresentationPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_HUD_PRESENTATION_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createHudPresentationPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
+export function generateHudPresentationNativePreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_HUD_PRESENTATION_NATIVE_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createHudPresentationNativePreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
 export function generateWeaponPickupRapidFireTrace({
   outputPath = DEFAULT_WEAPON_PICKUP_TRACE_PATH,
 } = {}) {
@@ -6539,6 +6688,19 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`Enemy Raider-breakup runtime trace generated successfully`);
     console.log(`  CSV : ${path.relative(rootDirectory, raiderBreakupTrace.outputPath)}`);
     console.log(`  rows: ${raiderBreakupTrace.rows}, ${raiderBreakupTrace.bytes} bytes`);
+
+    const hudPresentationResult = generateHudPresentationPreview();
+    console.log(`HUD presentation review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, hudPresentationResult.outputPath)}`);
+    console.log(
+      `  size: ${hudPresentationResult.width}x${hudPresentationResult.height}, ${hudPresentationResult.bytes} bytes`,
+    );
+    const hudPresentationNativeResult = generateHudPresentationNativePreview();
+    console.log(`HUD native-scale presentation generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, hudPresentationNativeResult.outputPath)}`);
+    console.log(
+      `  size: ${hudPresentationNativeResult.width}x${hudPresentationNativeResult.height}, ${hudPresentationNativeResult.bytes} bytes`,
+    );
 
     const weaponPickupResult = generateWeaponPickupRapidFirePreview();
     console.log(`Rapid Fire weapon-pickup owner review generated successfully`);

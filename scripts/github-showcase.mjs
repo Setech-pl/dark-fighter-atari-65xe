@@ -437,10 +437,10 @@ export function createGameplayGallery() {
     ["03-raider-breakup.png", sources.raider, "XEX", 31, "Raider local breakup after a Viper projectile kill"],
     ["04-debris-breakup.png", sources.debris, "XEX", 113, "Destructible debris with four transient fragments"],
     ["05-rapid-fire-pickup.png", sources.pickup, "XEX", 385, "Static 2x2 Rapid Fire capsule in active gameplay"],
-    ["06-rapid-fire-active.png", sources.rapid, "XEX", 449, "RF HUD countdown and yellow Rapid Fire projectiles"],
+    ["06-rapid-fire-active.png", sources.rapid, "XEX", 449, "Full BOOST HUD label, energy cells, and yellow Rapid Fire projectiles"],
     ["07-capital-broadside.png", sources.broadside, "XEX", 100, "Capital corridor combat and broadside fire"],
     ["08-capital-engines.png", sources.engines, "XEX", 96, "Capital engine bank in its deterministic 8-frame phase"],
-    ["09-spread-shot-active.png", sources.spread, "XEX", spreadCaptureFrame, "SP HUD countdown and all-yellow three-projectile fan"],
+    ["09-spread-shot-active.png", sources.spread, "XEX", spreadCaptureFrame, "Full BOOST HUD label, energy cells, and all-yellow three-projectile fan"],
   ];
   return definitions.map(([fileName, sourcePath, medium, frame, description]) => {
     const { sourceBytes, png, width, height } = cropRuntimeFrame(sourcePath);

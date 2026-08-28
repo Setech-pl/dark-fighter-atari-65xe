@@ -147,7 +147,7 @@ test("respawn, Game Over, new game and sector transitions retain their lifecycle
 
 test("enemy death during broadside uses the same bounded profile without changing capital effects", () => {
   assert.match(routine("handle_collisions", "queue_enemy_damage"),
-    /jsr update_broadside\s+jsr resolve_enemy_damage/);
+    /jsr update_broadside\s+profile_after_broadside_update\s*=\s*\*\s+jsr resolve_enemy_damage/);
   assert.match(routine("update_broadside", "schedule_broadside"),
     /jmp render_weapon_pickup_overlay/);
   assert.doesNotMatch(routine("tick_capital_explosions", "render_capital_explosions"), /COLBK|damage_timer/);

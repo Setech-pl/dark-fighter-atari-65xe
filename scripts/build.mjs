@@ -48,6 +48,11 @@ import {
 } from "./entity-effects.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 import { measureRuntimeCycles } from "./runtime-cycles.mjs";
+import {
+  runtimeArtifactSet,
+  runtimeEvidencePhase,
+  validateRuntimeEvidenceBinding,
+} from "./runtime-evidence.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -56,7 +61,7 @@ const distDirectory = path.join(rootDirectory, "dist");
 const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
 const gameVersion = packageDefinition.version;
 const quiet = process.argv.includes("--quiet");
-const refreshWallTraceCandidate = process.argv.includes("--refresh-wall-trace-candidate");
+const candidateBuild = runtimeEvidencePhase(process.argv) === "candidate";
 const enemyReviewHarness = process.argv.includes("--enemy-review");
 const enemyCombatReviewHarness = process.argv.includes("--enemy-combat-review");
 const enemyPaletteArgument = process.argv.find((argument) => argument.startsWith("--enemy-palette="));
@@ -87,7 +92,7 @@ const minimumWeaponPickupReserveBytes = 512;
 const minimumSpreadShotReserveBytes = 64;
 const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
-const entityPackedStagingAddress = 0x5100;
+const entityPackedStagingAddress = 0x5140;
 const bootA2StagingAddress = 0x7f10;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
@@ -135,10 +140,10 @@ const spreadShotBaselineRuntimeCodeBytes = 14948;
 const spreadShotBaselineEntityFeatureBytes = 1444;
 const spreadShotTargetRuntimeDeltaBytes = 320;
 const spreadShotHardRuntimeDeltaBytes = 448;
-const spreadShotBaselineWallCycles = 32956;
-const spreadShotTargetDeltaCycles = 256;
-const spreadShotHardDeltaCycles = 384;
-const spreadShotMinimumHeadroomCycles = 2200;
+const spreadShotBaselineWallCycles = 32040;
+const spreadShotTargetDeltaCycles = 200;
+const spreadShotHardDeltaCycles = 500;
+const spreadShotMinimumHeadroomCycles = 3028;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -657,6 +662,7 @@ async function build() {
 
   const xex = makeXex(loadAddress, startAddress, rawPayload);
   const atr = makeAtr(rawPayload);
+  const runtimeArtifacts = runtimeArtifactSet({ boot: rawPayload, xex, atr });
   const cpuRuntimeTiming = isReviewVariant ? null : measureRuntimeCycles({
     residentMain,
     loadAddress,
@@ -682,13 +688,14 @@ async function build() {
   });
   const wallTracePath = path.join(rootDirectory, "docs", "runtime-wall-trace.json");
   let wallTrace = null;
-  if (!isReviewVariant && fs.existsSync(wallTracePath)) {
+  if (!isReviewVariant && !candidateBuild) {
+    if (!fs.existsSync(wallTracePath)) {
+      throw new Error("Final build requires a complete runtime wall trace; run the candidate and trace phases first");
+    }
     wallTrace = JSON.parse(fs.readFileSync(wallTracePath, "utf8"));
-    if (wallTrace.artifact?.sha256 !== sha256(xex)) {
-      if (!refreshWallTraceCandidate) {
-        throw new Error("Runtime wall trace belongs to a different XEX artifact");
-      }
-      wallTrace = null;
+    validateRuntimeEvidenceBinding(wallTrace, runtimeArtifacts);
+    if (wallTrace.gate?.passed !== true) {
+      throw new Error("Final build requires runtime evidence that passes every current gate");
     }
   }
   const runtimeTiming = cpuRuntimeTiming === null ? null : {
@@ -738,7 +745,9 @@ async function build() {
         ? "enemy-combat-review"
         : paletteCandidate
           ? `enemy-palette-${enemyPaletteSlug}`
-          : "release",
+          : candidateBuild
+            ? "candidate"
+            : "release",
     loadAddress,
     startAddress,
     bootInitAddress,
@@ -1309,6 +1318,12 @@ async function build() {
       menuRows: ["RESUME", "GAME MUSIC: ON/OFF", "QUIT TO MENU"],
       quitConfirmationDefault: "NO",
     },
+    runtimeEvidence: isReviewVariant ? null : {
+      status: candidateBuild ? "candidate-awaiting-trace" : "final-bound",
+      artifacts: runtimeArtifacts,
+      reportPath: candidateBuild ? null : "docs/runtime-wall-trace.json",
+      reportSha256: candidateBuild ? null : sha256(fs.readFileSync(wallTracePath)),
+    },
     artifacts: {
       "dark-fighter-boot.bin": { bytes: rawPayload.length, sha256: sha256(rawPayload) },
       "dark-fighter.xex": { bytes: xex.length, sha256: sha256(xex) },
@@ -1346,7 +1361,9 @@ async function build() {
   if (!isReviewVariant) validateBuildDirectory(rootDirectory);
 
   if (!quiet) {
-    console.log(`Dark Fighter ${gameVersion} built successfully`);
+    console.log(candidateBuild
+      ? `Dark Fighter ${gameVersion} candidate artifacts built; runtime evidence pending`
+      : `Dark Fighter ${gameVersion} built successfully`);
     console.log(`  payload : ${rawPayload.length} bytes / ${bootSectors} sectors @ $${loadAddress.toString(16)}`);
     console.log(`  entry   : $${startAddress.toString(16)}`);
     console.log(`  XEX     : ${xex.length} bytes`);

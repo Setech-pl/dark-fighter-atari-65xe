@@ -265,8 +265,12 @@ test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve e
     assert.doesNotMatch(text, /MISSILES|HPOSM0|SIZEM/,
       "fighter burst rendering must not consume or mutate M0");
   }
-  assert.match(routine("allocate_viper_projectile", "update_enemy_weapon_runtime"),
-    /FIGHTER_PROJECTILE_VIPER[\s\S]+initialize_projectile_screen_pointer/);
+  assert.doesNotMatch(routine("allocate_viper_projectile", "update_enemy_weapon_runtime"),
+    /initialize_projectile_screen_pointer/,
+    "unrendered allocations must defer their redundant screen-pointer calculation");
+  assert.match(routine("render_fighter_projectile_overlays", "build_raider_projectile_glyphs"),
+    /initialize_projectile_screen_pointer/,
+    "the real overlay renderer remains the authoritative pointer owner");
   assert.match(routine("init_broadside", "update_broadside"),
     /lda SIZEM[\s\S]+and #\$03[\s\S]+ora #BROADSIDE_DOUBLE_SIZES/);
 });

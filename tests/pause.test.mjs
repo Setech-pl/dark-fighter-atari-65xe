@@ -43,7 +43,7 @@ test("physical OPTION enters PAUSED before any gameplay frame mutation", () => {
   assert.match(source, /STATE_PAUSED\s*=\s*8/);
   const loop = routine("main_loop", "enter_pause");
   assert.match(loop,
-    /jsr wait_frame\s+lda #CONSOL_OPTION_MASK\s+bit CONSOL\s+beq @option_pressed/);
+    /jsr wait_frame\s+lda #CONSOL_OPTION_MASK\s+bit CONSOL\s+beq main_loop_option_pressed/);
   assert.ok(loop.indexOf("bit CONSOL") < loop.indexOf("inc frame_counter"));
   assert.match(loop, /inc pause_option_latched\s+jmp enter_pause/);
 });
@@ -179,8 +179,8 @@ test("pause overlay reuses the frontend renderer and released staging RAM", () =
 
 test("quit preserves TOP and a new game remains the sole SCORE reset path", () => {
   const quit = routine("quit_gameplay_to_menu", "backup_gameplay_screen");
-  assert.doesNotMatch(quit, /TOP_SCORE_BCD_LO|TOP_SCORE_BCD_HI|score_bcd_lo|score_bcd_hi/);
+  assert.doesNotMatch(quit, /TOP_SCORE_TABLE|insert_top_score|score_bcd_lo|score_bcd_hi/);
   const init = routine("init_state", "clear_pmg");
   assert.match(init, /sta score_bcd_lo\s+sta score_bcd_hi/);
-  assert.doesNotMatch(init, /TOP_SCORE_BCD_LO|TOP_SCORE_BCD_HI/);
+  assert.doesNotMatch(init, /TOP_SCORE_TABLE|insert_top_score/);
 });

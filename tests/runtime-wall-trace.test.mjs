@@ -29,7 +29,17 @@ test("wall trace keeps CPU comparison, measured wall time and additive estimate 
 });
 
 test("wall trace is artifact-bound and adds no guest timing work", () => {
-  assert.equal(report.artifact.sha256, manifest.artifacts["dark-fighter.xex"].sha256);
+  assert.equal(report.evidence.status, "complete");
+  assert.equal(report.evidence.partial, false);
+  assert.equal(report.evidence.required_sessions, report.evidence.completed_sessions);
+  for (const name of ["dark-fighter-boot.bin", "dark-fighter.xex", "dark-fighter.atr"]) {
+    assert.deepEqual(report.artifacts[name], {
+      path: `dist/${name}`,
+      bytes: manifest.artifacts[name].bytes,
+      sha256: manifest.artifacts[name].sha256,
+    });
+  }
+  assert.equal(report.artifact.sha256, report.artifacts["dark-fighter.xex"].sha256);
   assert.equal(report.instrumentation.start_label, "main_loop_option_poll");
   assert.equal(report.instrumentation.end_label, "main_loop");
   assert.equal(report.instrumentation.guest_instructions_added, 0);
@@ -257,14 +267,14 @@ test("Spread Shot passes PAL wall budget with a legal capsule and projectile-hea
     feature.target_wall_cycles,
     feature.maximum_wall_cycles,
     feature.minimum_physical_headroom,
-  ], [32_956, 2_612, 256, 384, 33_212, 33_340, 2_200]);
+  ], [32_040, 3_528, 200, 500, 32_240, 32_540, 3_028]);
   assert.deepEqual([
     feature.measured_wall_cycles,
     feature.measured_physical_headroom,
     feature.actual_delta_cycles,
     feature.remaining_target_cycles,
     feature.remaining_hard_cycles,
-  ], [33_074, 2_494, 118, 138, 266]);
+  ], [32_072, 3_496, 32, 168, 468]);
   assert.deepEqual(feature.created_capsule_render_ids.slice(0, 7),
     [120, 252, 120, 252, 120, 252, 120]);
   assert.ok(feature.spread_frames > 0);
@@ -288,15 +298,15 @@ test("Spread Shot passes PAL wall budget with a legal capsule and projectile-hea
   assert.equal(report.coverage.weapon_pickup_spread_shot
     .active_capsule_during_booster.observed, true);
   assert.deepEqual(manifest.entityEffects.runtimeBudget.weaponPickupSpreadShot, {
-    baselineWallCycles: 32_956,
-    baselinePhysicalHeadroomCycles: 2_612,
-    targetDeltaCycles: 256,
-    hardDeltaCycles: 384,
-    targetWallLimitCycles: 33_212,
-    hardWallLimitCycles: 33_340,
-    minimumPhysicalHeadroomCycles: 2_200,
-    measuredWallCycles: 33_074,
-    actualDeltaCycles: 118,
+    baselineWallCycles: 32_040,
+    baselinePhysicalHeadroomCycles: 3_528,
+    targetDeltaCycles: 200,
+    hardDeltaCycles: 500,
+    targetWallLimitCycles: 32_240,
+    hardWallLimitCycles: 32_540,
+    minimumPhysicalHeadroomCycles: 3_028,
+    measuredWallCycles: 32_072,
+    actualDeltaCycles: 32,
     missedSynchronization: 0,
     deadlineOverruns: 0,
   });
@@ -314,16 +324,15 @@ test("wall trace records the required legal runtime coverage without incoherent 
   ]) {
     assert.equal(report.coverage[name].observed, true, `${name} was not observed`);
   }
-  assert.deepEqual(report.coverage.maximum_projectile_pool, {
-    scope: "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays",
-    combined_physical_capacity: 19,
-    maximum_combined_active_observed: 18,
-    full_combined_capacity_observed: false,
-    full_combined_capacity_matching_frames: 0,
-    heaviest_at_full_combined_capacity: null,
-    component_physical_capacities: { viper: 10, raider: 9 },
-    evidence_note: "The combined capacity is a physical allocation. This report records 18 as the maximum naturally observed combined active count and does not claim an unobserved 19/19 state.",
-  });
+  const pool = report.coverage.maximum_projectile_pool;
+  assert.equal(pool.scope,
+    "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays");
+  assert.deepEqual([pool.combined_physical_capacity, pool.maximum_combined_active_observed,
+    pool.full_combined_capacity_observed], [19, 19, true]);
+  assert.ok(pool.full_combined_capacity_matching_frames > 0);
+  assert.equal(pool.heaviest_at_full_combined_capacity.state.projectiles, 19);
+  assert.deepEqual(pool.component_physical_capacities, { viper: 10, raider: 9 });
+  assert.match(pool.evidence_note, /19\/19 is observed/);
   assert.equal(report.coverage.broadside_projectiles.pool_capacity, 3);
   assert.equal(report.coverage.broadside_projectiles.release_source_turrets, 2);
   assert.match(report.coverage.broadside_projectiles.classification,
@@ -379,10 +388,10 @@ test("wall trace records the required legal runtime coverage without incoherent 
     session: "2-neutral-fire0",
     open_gameplay_frame: 0,
     drain_frame: 496,
-    complete_frame: 542,
-    next_open_frame: 628,
-    post_capital_spawn_frame: 658,
-    post_capital_spawn_active_frame: 663,
+    complete_frame: 562,
+    next_open_frame: 648,
+    post_capital_spawn_frame: 678,
+    post_capital_spawn_active_frame: 723,
     configured_spawn_delay_scheduler_ticks: 32,
     observable_open_to_spawn_frame_delta: 30,
   });
@@ -609,4 +618,56 @@ test("ten heaviest frames retain exact clock positions, VBI IDs and state", () =
     assert.equal(frame.state.sound_enabled, true);
     assert.ok(frame.cpu_dma_off_reference?.main_loop_cycles > 0);
   }
+});
+
+test("current maximum, subsystem profile and accepted PAL-recovery baseline are exact", () => {
+  const maximum = report.five_heaviest_frames[0];
+  assert.deepEqual([maximum.wall_cycles, maximum.physical_headroom], [32_072, 3_496]);
+  assert.equal(maximum.wall_cycles, report.semantics.measured_wall_cycles_dma_on);
+  assert.ok(report.five_heaviest_frames.every((frame, index, frames) =>
+    index === 0 || frames[index - 1].wall_cycles >= frame.wall_cycles));
+
+  const profile = report.heaviest_frame_cost_breakdown;
+  assert.deepEqual([profile.session, profile.frame, profile.wall_cycles],
+    [maximum.session, maximum.frame, maximum.wall_cycles]);
+  assert.equal(Object.values(profile.subsystem_cycles)
+    .reduce((sum, cycles) => sum + cycles, 0), profile.wall_cycles);
+  for (const name of ["vbi_and_synchronization", "world_ring_playfield", "broadside",
+    "viper_projectiles", "raider_projectiles", "enemy_update_collision",
+    "entity_debris", "effects", "capsule_interactive_entity", "music_sound",
+    "remaining_runtime"]) assert.ok(Number.isInteger(profile.subsystem_cycles[name]));
+  assert.equal(profile.synchronization_wait_cycles, 0);
+  assert.equal(profile.sequential_segments.reduce((sum, segment) =>
+    sum + segment.wall_cycles, 0), profile.wall_cycles);
+
+  const gate = report.gate.shield_preimplementation_baseline;
+  assert.deepEqual([gate.baseline_wall_cycles, gate.maximum_wall_cycles,
+    gate.minimum_physical_headroom, gate.required_recovery_cycles,
+    gate.measured_wall_cycles, gate.measured_physical_headroom,
+    gate.recovered_cycles, gate.preserved_as_accepted_baseline, gate.passed],
+  [33_020, 32_068, 3_500, 952, 32_040, 3_528, 980, true, true]);
+});
+
+test("every difficulty contains a complete legal debris flight", () => {
+  const cadence = report.coverage.parallax_cadence;
+  assert.deepEqual(cadence.map(({ difficulty, full_debris_flight_frames }) =>
+    [difficulty, full_debris_flight_frames]), [
+    [0, [91, 91]], [1, [82, 82]], [2, [74, 74]],
+  ]);
+  const sessions = report.replay.sessions.filter(({ kind }) => kind === "parallax-cadence");
+  assert.deepEqual(sessions.map(({ id, fire_delay }) => [id, fire_delay]), [
+    ["cadence-0-sweep-nofire", 4_000],
+    ["cadence-1-sweep-nofire", 4_000],
+    ["cadence-2-sweep-nofire", 4_000],
+  ]);
+});
+
+test("XEX and ATR legal hunt traces have identical maxima and a reproducible fingerprint", () => {
+  const sessions = report.replay.sessions.filter(({ kind, policy }) =>
+    kind === "memory-integrity-120s" && policy === "hunt");
+  assert.deepEqual(sessions.map(({ medium, maximum_wall_cycles }) =>
+    [medium, maximum_wall_cycles]), [["XEX", 30_720], ["ATR", 30_720]]);
+  assert.equal(report.determinism.replay_fingerprint_sha256,
+    "10901df8d98274572d9c576d422d87ead3ea77a7af87d5d6d625fcba1ee5f5f0");
+  assert.ok(report.determinism.ordered_frames > 0);
 });
