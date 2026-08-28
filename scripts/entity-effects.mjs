@@ -249,6 +249,24 @@ export function loadEntityEffectsDefinition(sourcePath) {
     symbolRegister: "COLBK", symbolValue: 0x00,
   }), "Spread Shot must use the existing static steel/red/black palette");
 
+  const shieldPickup = definition.weaponPickupShield;
+  invariant(Array.isArray(shieldPickup?.glyphs) && shieldPickup.glyphs.length === 4 &&
+    shieldPickup.glyphs.every((rows) => Array.isArray(rows) && rows.length === 8),
+  "Shield must use exactly four eight-row glyphs for its two-by-two footprint");
+  shieldPickup.glyphs.flat().forEach((row, index) =>
+    integer(row, `weaponPickupShield.glyphs[${index}]`, 0, 255));
+  const shieldSelectors = shieldPickup.glyphs.flatMap((rows) => rows.flatMap((row) =>
+    [6, 4, 2, 0].map((shift) => row >> shift & 3)));
+  invariant(shieldSelectors.filter(Boolean).length >= 75 &&
+    shieldSelectors.includes(0) && shieldSelectors.includes(1) &&
+    shieldSelectors.includes(2) && !shieldSelectors.includes(3),
+  "Shield glyphs must use black cut-outs, white fill and steel outline only");
+  invariant(JSON.stringify(shieldPickup.palette) === JSON.stringify({
+    outlineRegister: "COLPF1", outlineValue: 0x84,
+    fillRegister: "COLPF0", fillValue: 0x0e,
+    symbolRegister: "COLBK", symbolValue: 0x00,
+  }), "Shield must use the static steel/white/black palette");
+
   invariant(Array.isArray(definition.archetypes) && definition.archetypes.length === 1,
     "First slice must contain exactly one archetype");
   const archetype = definition.archetypes[0];
@@ -312,6 +330,7 @@ export function compileEntityEffects(definition) {
     definition.debrisMotion.trajectories.find((trajectory) => trajectory.id === id).vxSignedHpos));
   const pickupGlyphs = Uint8Array.from(definition.weaponPickupRapidFire.glyphs.flat());
   const spreadPickupGlyphs = Uint8Array.from(definition.weaponPickupSpreadShot.glyphs.flat());
+  const shieldPickupGlyphs = Uint8Array.from(definition.weaponPickupShield.glyphs.flat());
   return Object.freeze({
     ...definition,
     descriptor,
@@ -319,6 +338,7 @@ export function compileEntityEffects(definition) {
     effectGlyphs,
     pickupGlyphs,
     spreadPickupGlyphs,
+    shieldPickupGlyphs,
     trajectoryVx,
   });
 }
@@ -366,7 +386,9 @@ export function renderEntityEffectsCa65Include(asset) {
     `WEAPON_PICKUP_GLYPH_BYTES = ${asset.pickupGlyphs.length}`,
     `WEAPON_PICKUP_SPREAD_GLYPH_COUNT = ${asset.spreadPickupGlyphs.length / 8}`,
     `WEAPON_PICKUP_SPREAD_GLYPH_BYTES = ${asset.spreadPickupGlyphs.length}`,
-    `ENTITY_EFFECT_TOTAL_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length + asset.pickupGlyphs.length + asset.spreadPickupGlyphs.length}`,
+    `WEAPON_PICKUP_SHIELD_GLYPH_COUNT = ${asset.shieldPickupGlyphs.length / 8}`,
+    `WEAPON_PICKUP_SHIELD_GLYPH_BYTES = ${asset.shieldPickupGlyphs.length}`,
+    `ENTITY_EFFECT_TOTAL_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length + asset.pickupGlyphs.length + asset.spreadPickupGlyphs.length + asset.shieldPickupGlyphs.length}`,
     "ENTITY_ARCHETYPE_DESCRIPTOR_BYTES = 16",
     "ENTITY_DESC_INITIAL_STATE = 0",
     "ENTITY_DESC_FLAGS = 1",
@@ -392,8 +414,11 @@ export function renderEntityEffectsCa65Include(asset) {
     "WEAPON_PICKUP_STATE_ACTIVE = 2",
     "WEAPON_PICKUP_STATE_RAPID = 3",
     "WEAPON_PICKUP_STATE_SPREAD = 4",
+    "WEAPON_PICKUP_STATE_SHIELD = 5",
     "WEAPON_PICKUP_TYPE_RAPID = 0",
     "WEAPON_PICKUP_TYPE_SPREAD = 1",
+    "WEAPON_PICKUP_TYPE_SHIELD = 2",
+    "WEAPON_PICKUP_TYPE_COUNT = 3",
     "ENTITY_FLAG_WORLD_ATTACHED = $01",
     "ENTITY_FLAG_MULTICELL = $02",
     "ENTITY_FLAG_COLLIDE_PLAYER = $04",
@@ -465,6 +490,9 @@ export function renderEntityEffectsCa65Include(asset) {
     ".endmacro",
     ".macro EMIT_WEAPON_PICKUP_SPREAD_GLYPHS",
     `    .byte ${[...asset.spreadPickupGlyphs].map(byte).join(",")}`,
+    ".endmacro",
+    ".macro EMIT_WEAPON_PICKUP_SHIELD_GLYPHS",
+    `    .byte ${[...asset.shieldPickupGlyphs].map(byte).join(",")}`,
     ".endmacro",
     ".macro EMIT_ENTITY_TRAJECTORY_VX",
     `    .byte ${[...asset.trajectoryVx].map(byte).join(",")}`,

@@ -79,13 +79,13 @@ test("Spread Shot owns four final glyphs and a static red 2x2 fan capsule", () =
     source.indexOf("; Effects render after")), /animation|phase/i);
 });
 
-test("release XEX and ATR execute the deterministic Rapid Spread Rapid drop cycle", () => {
+test("release XEX and ATR execute the deterministic Rapid Spread Shield drop cycle", () => {
   const xex = executeSpreadShotTrace({ root, artifact: "xex" });
   const atr = executeSpreadShotTrace({ root, artifact: "atr" });
   const cycle = (trace) => trace.drops.map((drop) => [
     drop.pickupType, drop.nextPickupType, drop.renderId, drop.state,
   ]);
-  assert.deepEqual(cycle(xex), [[0, 1, 120, 1], [1, 0, 252, 1], [0, 1, 120, 1]]);
+  assert.deepEqual(cycle(xex), [[0, 1, 120, 1], [1, 2, 252, 1], [2, 0, 124, 1]]);
   assert.deepEqual(cycle(atr), cycle(xex));
   assert.equal(xex.drops[1].boosterState, 3,
     "Spread capsule must be earned naturally while Rapid Fire is still active");
@@ -298,7 +298,15 @@ test("all three projectiles leave the screen cleanly without HUD or charset corr
     active === 0 && rendered === 0), true);
   assert.equal([...trace.projectilesAfterCleanup.screen].every((code) => code === 0), true,
     "reverse erase must remove every final projectile cell");
-  assert.deepEqual(trace.charset, trace.initialCharset);
+  const dynamicStart = 124 * 8;
+  const dynamicEnd = 128 * 8;
+  assert.deepEqual(trace.charset.subarray(0, dynamicStart),
+    trace.initialCharset.subarray(0, dynamicStart));
+  assert.deepEqual(trace.charset.subarray(dynamicEnd),
+    trace.initialCharset.subarray(dynamicEnd));
+  assert.deepEqual(Array.from(trace.charset.subarray(dynamicStart, dynamicEnd)),
+    Array.from(assets().entities.shieldPickupGlyphs),
+  "the only charset mutation must be the erased capsule's shared dynamic bank");
   const hudBefore = trace.spreadPickup.display.subarray(0, 40);
   for (const frame of trace.spreadTimerFrames.slice(0, 51)) {
     const changed = Array.from({ length: 40 }, (_, offset) => offset)
@@ -413,6 +421,8 @@ test("Spread stays inside the fixed BSS, payload, glyph and runtime-code budgets
   ], [0x8000, 0x100, 4, 2, 6, 5]);
   assert.ok(manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
   assert.ok(manifest.entityEffects.codeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
+  assert.ok(manifest.runtimeCodeBudget.weaponPickupShield.actualDeltaBytes <= 512);
+  assert.ok(manifest.entityEffects.codeBudget.weaponPickupShield.actualDeltaBytes <= 512);
   assert.ok(manifest.payloadBudget.weaponPickupSpreadShot.remainingReserveBytes >= 64);
   assert.equal(manifest.payloadBytes, manifest.transportCapacity.totalTransportBytes);
   assert.equal(manifest.bootSectors, manifest.transportCapacity.initialBootSectors);

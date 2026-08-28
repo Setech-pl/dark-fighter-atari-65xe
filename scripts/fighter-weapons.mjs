@@ -82,6 +82,8 @@ export function loadFighterWeaponsDefinition(sourcePath) {
   invariant(definition.viper.spreadShotBurstCount === definition.viper.burstCount &&
     definition.viper.spreadShotDurationFrames === 500,
   "Spread Shot must use the eight-salvo normal burst for exactly 500 active PAL frames");
+  invariant(definition.viper.shieldDurationFrames === 250,
+    "Shield must last exactly 250 active PAL frames");
   invariant(definition.viper.spreadShotProjectileCount === 3,
     "Spread Shot must allocate exactly three logical projectiles");
   invariant(definition.viper.spreadShotCooldownFrames === 10,
@@ -214,6 +216,7 @@ export function renderFighterWeaponsCa65Include(asset) {
     `VIPER_RAPID_FIRE_INTERVAL = ${viper.rapidFireIntervalFrames}`,
     `VIPER_RAPID_FIRE_DURATION = ${viper.rapidFireDurationFrames}`,
     `VIPER_SPREAD_SHOT_DURATION = ${viper.spreadShotDurationFrames}`,
+    `VIPER_SHIELD_DURATION = ${viper.shieldDurationFrames}`,
     `VIPER_SPREAD_PROJECTILE_COUNT = ${viper.spreadShotProjectileCount}`,
     `VIPER_SPREAD_INITIAL_OFFSET = ${viper.spreadShotInitialOffsetHpos}`,
     `VIPER_SPREAD_LATERAL_STEP = ${viper.spreadShotLateralStepHpos}`,

@@ -48,10 +48,12 @@ import {
   assertSpreadShotTraceParity,
   assertWeaponPickupTraceParity,
   executeHudPresentationTrace,
+  executeShieldBoosterTrace,
   executeSpreadShotHullVolleyTrace,
   executeSpreadShotTrace,
   executeViperBurstBalanceTrace,
   executeWeaponPickupTrace,
+  executeWeaponPickupBackingTrace,
   executeViperProjectileColourTrace,
   executeViperProjectileColourLifecycleTrace,
   spreadShotTraceCsv,
@@ -427,6 +429,12 @@ export const DEFAULT_SPREAD_SHOT_TRACE_PATH = path.join(
   "build",
   "previews",
   "weapon-pickup-spread-shot-trace.csv",
+);
+export const DEFAULT_SHIELD_BOOSTER_PREVIEW_PATH = path.join(
+  rootDirectory,
+  "build",
+  "previews",
+  "weapon-pickup-shield-review.png",
 );
 export const DEFAULT_PROJECTILE_COLOUR_XEX_PREVIEW_PATH = path.join(
   rootDirectory, "build", "previews", "weapon-projectile-colour-regression-xex.png",
@@ -893,6 +901,12 @@ export function readGameGraphicsSource(
   );
   requireLength("frontend glyph rows", frontendGlyphRows, 42 * 7);
   const hudCharset = buildGameplayHudCharset(frontendGlyphRows, constants, baseCharset);
+  const shieldHudGlyph = extractLabeledData(
+    source, "hud_shield_booster_glyph", constants, "hud_shield_booster_glyph_end",
+  );
+  requireLength("Shield HUD glyph", shieldHudGlyph, CHARACTER_HEIGHT);
+  hudCharset.set(shieldHudGlyph,
+    requireValue(constants, "CH_HUD_BOOSTER_SHIELD") * CHARACTER_HEIGHT);
   charset.set(
     frontendGlyphRows,
     capitalHulls.definition.charsetBaseIndex * CHARACTER_HEIGHT + capitalHulls.glyphBytes.length,
@@ -4243,6 +4257,62 @@ export function createHudPresentationPreview(source) {
   return encodePng(rgb, width, height);
 }
 
+export function createShieldBoosterPreview(source) {
+  const graphics = readGameGraphicsSource(source);
+  const frontend = readFrontendGraphicsSource(source);
+  const shield = executeShieldBoosterTrace({ artifact: "xex", coldFill: 0xa5 });
+  const atrShield = executeShieldBoosterTrace({ artifact: "atr", coldFill: 0xa5 });
+  const capsule = executeWeaponPickupBackingTrace({ artifact: "xex", pickupType: "shield" });
+  const atrCapsule = executeWeaponPickupBackingTrace({ artifact: "atr", pickupType: "shield" });
+  if (JSON.stringify(shield.activation) !== JSON.stringify(atrShield.activation) ||
+      JSON.stringify(capsule.rendered.display) !== JSON.stringify(atrCapsule.rendered.display)) {
+    throw new Error("Shield visual state differs between packed XEX and ATR");
+  }
+
+  const hudTrace = executeHudPresentationTrace({ artifact: "xex" });
+  const display = Uint8Array.from(hudTrace.frames[1].display);
+  display.set(shield.activation.hudRegion, 30);
+  const registers = new Map(graphics.hardwareState);
+  registers.set("COLPM0", shield.activation.colpm0);
+  registers.set("COLPM3", shield.activation.colpm3);
+  const gameplayFrame = (hpos) => {
+    const pixels = drawGameplayMixedScreen(registers, display, {
+      ...graphics,
+      hudCharset: Uint8Array.from(hudTrace.hudCharset),
+    });
+    drawPlayer(pixels, graphics.playerShape, hpos, 184, 1,
+      shield.activation.colpm0, PMG_SCREEN_TOP, 24, 200);
+    drawPlayer(pixels, graphics.playerEngineShape, hpos, 184, 1,
+      shield.activation.colpm3, PMG_SCREEN_TOP, 24, 200);
+    return scaleAndConvertToRgb(pixels, SOURCE_WIDTH, SOURCE_HEIGHT, 1);
+  };
+  const capsuleRegisters = new Map(graphics.hardwareState);
+  const capsuleFrame = runtimeWeaponPickupFrameRgb(capsule.rendered, {
+    charset: capsule.charset,
+    hudCharset: capsule.hudCharset,
+  }, capsuleRegisters, 1);
+  const panels = [capsuleFrame, gameplayFrame(48), gameplayFrame(124), gameplayFrame(200)];
+  const labels = ["SHIELD CAPSULE", "VIPER LEFT", "VIPER CENTRE", "VIPER RIGHT"];
+  const gap = 12;
+  const width = panels.length * SOURCE_WIDTH + (panels.length + 1) * gap;
+  const height = SOURCE_HEIGHT + 76;
+  const rgb = Buffer.alloc(width * height * 3);
+  fillRgb(rgb, [3, 5, 9]);
+  const white = atariPalRegisterToRgb(0x0e);
+  const steel = atariPalRegisterToRgb(0x84);
+  drawRgbLabel(rgb, width, "SHIELD BOOSTER  EXECUTED XEX ATR VISUAL STATE", 16, 10,
+    frontend, white);
+  drawRgbLabel(rgb, width,
+    "STEEL WHITE CAPSULE  DISTINCT CONTINUOUS HUD BAR  SOLID VIPER PULSE", 16, 28,
+    frontend, steel);
+  panels.forEach((panel, index) => {
+    const x = gap + index * (SOURCE_WIDTH + gap);
+    drawRgbLabel(rgb, width, labels[index], x + 4, 48, frontend, white);
+    copyRgbPanel(rgb, width, height, panel, SOURCE_WIDTH, SOURCE_HEIGHT, x, 68);
+  });
+  return encodePng(rgb, width, height);
+}
+
 function runtimeWeaponPickupFrameRgb(record, trace, registers, scale) {
   const display = record.display ?? record.screen ?? record.during;
   const rows = display.length / SCREEN_COLUMNS;
@@ -6149,6 +6219,16 @@ export function generateSpreadShotPreview({
   );
 }
 
+export function generateShieldBoosterPreview({
+  sourcePath = path.join(rootDirectory, "src", "main.s"),
+  outputPath = DEFAULT_SHIELD_BOOSTER_PREVIEW_PATH,
+} = {}) {
+  return writeEnemyReviewPreview(
+    outputPath,
+    createShieldBoosterPreview(fs.readFileSync(sourcePath, "utf8")),
+  );
+}
+
 export function generateSpreadShotTrace({
   outputPath = DEFAULT_SPREAD_SHOT_TRACE_PATH,
 } = {}) {
@@ -6718,6 +6798,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`  PNG : ${path.relative(rootDirectory, spreadShotResult.outputPath)}`);
     console.log(
       `  size: ${spreadShotResult.width}x${spreadShotResult.height}, ${spreadShotResult.bytes} bytes`,
+    );
+    const shieldBoosterResult = generateShieldBoosterPreview();
+    console.log(`Shield Booster owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, shieldBoosterResult.outputPath)}`);
+    console.log(
+      `  size: ${shieldBoosterResult.width}x${shieldBoosterResult.height}, ${shieldBoosterResult.bytes} bytes`,
     );
     const spreadShotTrace = generateSpreadShotTrace();
     console.log(`Spread Shot XEX/ATR runtime trace generated successfully`);

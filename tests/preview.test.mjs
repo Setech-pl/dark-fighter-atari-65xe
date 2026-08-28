@@ -20,6 +20,7 @@ import {
   createWeaponPickupRapidFirePreview,
   createWeaponPickupRapidFireTrace,
   createSpreadShotPreview,
+  createShieldBoosterPreview,
   createSpreadShotTrace,
   createViperProjectileColourPreview,
   createViperBurstBalancePreview,
@@ -354,11 +355,11 @@ test("burst-balance owner previews compare identical 80-frame XEX and ATR execut
   const atr = createViperBurstBalancePreview(source, "atr");
   assert.deepEqual(xex, createViperBurstBalancePreview(source, "xex"));
   assert.deepEqual(atr, createViperBurstBalancePreview(source, "atr"));
-  assert.deepEqual([inspectPng(xex).width, inspectPng(xex).height], [1968, 620]);
-  assert.deepEqual([inspectPng(atr).width, inspectPng(atr).height], [1968, 620]);
+  assert.deepEqual([inspectPng(xex).width, inspectPng(xex).height], [2620, 620]);
+  assert.deepEqual([inspectPng(atr).width, inspectPng(atr).height], [2620, 620]);
   const xexRows = createViperBurstBalanceTrace("xex").trimEnd().split("\n");
   const atrRows = createViperBurstBalanceTrace("atr").trimEnd().split("\n");
-  assert.equal(xexRows.length, 241);
+  assert.equal(xexRows.length, 321);
   assert.deepEqual(atrRows.slice(1).map((row) => row.replace(/^atr,/, "xex,")),
     xexRows.slice(1));
   const emitted = (mode) => xexRows.slice(1)
@@ -383,8 +384,8 @@ test("Spread Shot owner preview is deterministic executed XEX/ATR gameplay", () 
   assert.deepEqual(rows.filter((row) => row.startsWith("xex,DROP_"))
     .map((row) => row.split(",").slice(1, 7)), [
     ["DROP_1", "0", "1", "0", "1", "120"],
-    ["DROP_2", "0", "1", "1", "0", "252"],
-    ["DROP_3", "0", "1", "0", "1", "120"],
+    ["DROP_2", "0", "1", "1", "2", "252"],
+    ["DROP_3", "0", "1", "2", "0", "124"],
   ]);
   assert.ok(rows.includes(
     "xex,SPREAD_VOLLEY,0,4,1,0,,,,,,3,17,128,182,65,124,182,33,132,182"));
@@ -392,6 +393,12 @@ test("Spread Shot owner preview is deterministic executed XEX/ATR gameplay", () 
     "atr,SPREAD_VOLLEY,1,4,1,0,,,,,,3,17,128,176,65,123,176,33,133,176"));
   assert.ok(rows.some((row) => row.startsWith("xex,SPREAD_CLEAN,51,") &&
     row.split(",")[11] === "0"));
+});
+
+test("Shield Booster preview is deterministic and covers capsule plus three Viper positions", () => {
+  const first = createShieldBoosterPreview(source);
+  assert.deepEqual(createShieldBoosterPreview(source), first);
+  assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [1340, 268]);
 });
 
 test("Spread Shot hull owner sequences execute identical XEX and ATR backing paths", () => {

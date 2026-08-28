@@ -28,6 +28,9 @@ const MINIMUM_WEAPON_PICKUP_RESERVE_BYTES = 512;
 const SPREAD_SHOT_RUNTIME_BASELINE_BYTES = 14948;
 const SPREAD_SHOT_RUNTIME_HARD_DELTA_BYTES = 448;
 const SPREAD_SHOT_ENTITY_BASELINE_BYTES = 1444;
+const SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES = 15346;
+const SHIELD_BOOSTER_ENTITY_BASELINE_BYTES = 1869;
+const SHIELD_BOOSTER_RUNTIME_HARD_DELTA_BYTES = 512;
 const MINIMUM_SPREAD_SHOT_RESERVE_BYTES = 64;
 const BOOT_PAYLOAD_TRAILER = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
 
@@ -183,6 +186,8 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(transport.remainingAtrSectors === ATR_SECTOR_COUNT - transport.totalTransportSectors &&
     transport.remainingAtrTransportBytes === transport.remainingAtrSectors * ATR_SECTOR_SIZE &&
     transport.maximumNewSimultaneousResidencyBytes === 6841 &&
+    transport.remainingSafeResidencyBytes ===
+      6841 - manifest.runtimeCodeBudget.weaponPickupShield.actualDeltaBytes &&
     transport.loaderResidentBytes === 0,
   "Transport and runtime residency capacities are conflated or inconsistent");
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
@@ -225,8 +230,12 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.codeBudget.weaponPickupSpreadShot.baselineBytes ===
       SPREAD_SHOT_ENTITY_BASELINE_BYTES &&
     manifest.entityEffects.codeBudget.weaponPickupSpreadShot.actualDeltaBytes <=
-      SPREAD_SHOT_RUNTIME_HARD_DELTA_BYTES,
-  "Spread Shot exceeds its +448 B ENTITY_CODE/runtime budget");
+      SPREAD_SHOT_RUNTIME_HARD_DELTA_BYTES &&
+    manifest.entityEffects.codeBudget.weaponPickupShield.baselineBytes ===
+      SHIELD_BOOSTER_ENTITY_BASELINE_BYTES &&
+    manifest.entityEffects.codeBudget.weaponPickupShield.actualDeltaBytes <=
+      SHIELD_BOOSTER_RUNTIME_HARD_DELTA_BYTES,
+  "Shield exceeds its ENTITY_CODE/runtime budget");
   invariant(manifest.entityEffects.debrisGlyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
     manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 8 &&
     manifest.entityEffects.effectGlyphCount === 2 &&
@@ -234,8 +243,11 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.weaponPickupGlyphIndex === 120 &&
     manifest.entityEffects.spreadPickupGlyphCount === 4 &&
     manifest.entityEffects.spreadPickupGlyphIndex === 124 &&
+    manifest.entityEffects.shieldPickupGlyphCount === 4 &&
+    manifest.entityEffects.shieldPickupGlyphIndex === 124 &&
+    manifest.entityEffects.dynamicPickupGlyphBankShared === true &&
     manifest.entityEffects.newGlyphsFromFoundation === DEBRIS_VISUAL_POLISH_NEW_GLYPHS,
-  "Weapon pickups must retain debris/effects and use exactly glyphs 120-127");
+  "Weapon pickups must retain debris/effects and safely share glyphs 124-127");
   invariant(manifest.payloadBudget?.destructibleDebris?.limitBytes ===
     DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
     manifest.runtimeCodeBudget?.baselineBytes ===
@@ -268,6 +280,11 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes <=
       SPREAD_SHOT_RUNTIME_HARD_DELTA_BYTES,
   "Spread Shot exceeds its linked runtime hard budget");
+  invariant(manifest.runtimeCodeBudget?.weaponPickupShield?.baselineBytes ===
+    SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES &&
+    manifest.runtimeCodeBudget.weaponPickupShield.actualDeltaBytes <=
+      SHIELD_BOOSTER_RUNTIME_HARD_DELTA_BYTES,
+  "Shield exceeds its linked runtime hard budget");
   invariant(manifest.residentRuntime?.loadAddress === 0x2000 &&
     manifest.residentRuntime.runAddress === 0x2000 &&
     manifest.residentRuntime.rawBytes === 0x2000 &&

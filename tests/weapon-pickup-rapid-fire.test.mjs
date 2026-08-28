@@ -428,6 +428,7 @@ test("packed runtime distinguishes 8-shot normal, 10-shot Rapid and 8-salvo Spre
     ["NORMAL", 8, 3, 12, 8, 8, 21, 8],
     ["RAPID", 10, 2, 12, 10, 10, 30, 10],
     ["SPREAD", 8, 10, 12, 8, 24, 24, 9],
+    ["SHIELD", 8, 3, 12, 8, 8, 21, 8],
   ]);
   const firstBurstFrames = (mode) => mode.records
     .filter(({ allocatedProjectiles }) => allocatedProjectiles > 0)

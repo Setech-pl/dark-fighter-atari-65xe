@@ -21,7 +21,7 @@ cells follow the full `HULL` label at all times: intact quarters are solid and
 damaged quarters remain visible as cracked plates. This indicator never blinks
 or disappears.
 
-While Rapid Fire or Spread Shot is active, the ten cells to the right show the
+While Rapid Fire, Spread Shot, or Shield is active, the ten cells to the right show the
 full `BOOST` label, one blank separator, and four tall, narrow energy cells.
 The bar has four segments above 75% remaining time, three above 50%, two from
 25% through 50%, and one below 25%. Only the last segment blinks in an
@@ -93,20 +93,22 @@ collision, debris destruction, and lifecycle cleanup do not advance the drop
 counter.
 
 The current implementation creates a pickup after every third qualifying kill.
-The sequence is `Rapid Fire -> Spread Shot -> Rapid Fire -> Spread Shot`; a new
+The sequence is `Rapid Fire -> Spread Shot -> Shield -> Rapid Fire`; a new
 game always starts the sequence with Rapid Fire. A successful kill starts a
 30-frame hidden delay before the capsule becomes collectible. The current
 three-kill cadence describes shipped behavior, not accepted final balance; a
 separate owner-playtest tuning task is recorded in the roadmap.
 
 Capsules are static, non-flickering 2x2-character objects that move with the
-world. Picking up the same active type refreshes it. Picking up the other type
-replaces it, so Rapid Fire and Spread Shot are mutually exclusive. Pause freezes
+world. Picking up the same active type refreshes it. Picking up another type
+replaces it, so Rapid Fire, Spread Shot, and Shield are mutually exclusive.
+Pause freezes
 their timers; life loss, Game Over, and New Game clear them; a live sector
 transition preserves them.
 
-The `BOOST` label and energy bar are driven by the same 500-active-frame timer
-as the booster. Picking up either type immediately shows the full ten-cell
+The `BOOST` label and energy bar are driven by the active booster's own timer:
+500 frames for Rapid/Spread or 250 for Shield. Picking up any type immediately
+shows the full ten-cell
 field with four energy segments; refreshing or replacing an active type also
 returns it to four segments. Pause freezes both the timer and the current blink
 phase.
@@ -138,13 +140,18 @@ three travel upward at the normal Viper speed, use the yellow Viper weapon
 colour, collide with Raider and debris, and obey ordinary score rules. The 2x2
 capsule has a bright red casing and a black three-shot fan symbol.
 
+### Shield Booster — implemented
+
+Shield lasts exactly 250 active PAL frames (5 seconds), keeps the normal weapon,
+and uses a separate damage gate rather than extending hit or respawn
+invulnerability. It absorbs at most one valid damage event per frame without
+changing HULL, LIFE, SCORE, the ordinary damage cooldown, hit flash, or HULL-hit
+SFX. The steel-blue/white capsule has a black shield symbol. Its continuous HUD
+bar uses a dense cross-core pattern and exact thresholds 188, 126, and 63; the
+last segment uses the shared timer's 8+8 blink phase. A solid steel/white Viper
+colour pulse is derived from the same timer and never makes the craft disappear.
+
 ## Planned
-
-### Shield Booster — planned
-
-Shield Booster is the intended third pickup type. Its duration, replacement
-rules, visual language, memory cost, and balance must be specified and measured
-before implementation. It is not present in the current runtime.
 
 ### Nova Missile — planned
 

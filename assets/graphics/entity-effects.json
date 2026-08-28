@@ -131,6 +131,22 @@
       "symbolValue": 0
     }
   },
+  "weaponPickupShield": {
+    "glyphs": [
+      [42, 149, 144, 146, 146, 146, 146, 146],
+      [168, 86, 6, 134, 134, 134, 134, 134],
+      [146, 146, 144, 148, 148, 37, 9, 2],
+      [134, 134, 6, 22, 22, 88, 96, 128]
+    ],
+    "palette": {
+      "outlineRegister": "COLPF1",
+      "outlineValue": 132,
+      "fillRegister": "COLPF0",
+      "fillValue": 14,
+      "symbolRegister": "COLBK",
+      "symbolValue": 0
+    }
+  },
   "archetypes": [
     {
       "id": "neutral-debris",

@@ -392,6 +392,7 @@ export function executeViperBurstBalanceTrace({
     ["NORMAL", 0],
     ["RAPID", 3],
     ["SPREAD", 4],
+    ["SHIELD", 5],
   ];
   const traces = modes.map(([mode, boosterState]) => {
     const { memory, labels, manifest } = initialiseRuntime(root, artifact, coldFill);
@@ -787,12 +788,18 @@ export function executeWeaponPickupBackingTrace({
   const { memory, labels, manifest } = initialiseRuntime(root, artifact);
   initialiseRows(memory, labels, head);
   const slot = 1;
-  if (pickupType !== "rapid" && pickupType !== "spread") {
+  if (!new Set(["rapid", "spread", "shield"]).has(pickupType)) {
     throw new Error(`Unknown weapon pickup type ${pickupType}`);
+  }
+  if (pickupType === "spread") {
+    runRoutine(memory, labels, "install_weapon_pickup_spread_glyph");
+  } else if (pickupType === "shield") {
+    runRoutine(memory, labels, "install_weapon_pickup_shield_glyph");
   }
   const renderId = pickupType === "rapid" ?
     manifest.entityEffects.weaponPickupGlyphIndex :
-    manifest.entityEffects.spreadPickupGlyphIndex | 0x80;
+    manifest.entityEffects.spreadPickupGlyphIndex |
+      (pickupType === "spread" ? 0x80 : 0);
   memory[requiredLabel(labels, "ENTITY_STATE") + slot] = 2;
   memory[requiredLabel(labels, "ENTITY_ACTIVE_MASK")] = 2;
   memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")] = 1;
@@ -828,6 +835,8 @@ export function executeWeaponPickupBackingTrace({
     drawnMaskAfterErase: memory[requiredLabel(labels, "ENTITY_DRAWN_MASK") + slot],
     renderedMaskAfterErase: memory[requiredLabel(labels, "ENTITY_RENDERED_MASK")],
     topLatchAfterErase: memory[requiredLabel(labels, "ENTITY_SCREEN_HI") + slot],
+    charset: Array.from(memory.subarray(0x4400, 0x4800)),
+    hudCharset: Array.from(memory.subarray(0x5000, 0x5400)),
   };
 }
 
@@ -887,8 +896,8 @@ export function executeWeaponPickupLifecycleTrace({ root = defaultRoot, artifact
     const controllerSlot = state >= 3 ? 2 : 1;
     memory[requiredLabel(labels, "ENTITY_STATE") + controllerSlot] = state;
     memory[requiredLabel(labels, "ENTITY_HP") + controllerSlot] = state >= 3 ? 26 : counter;
-    memory[requiredLabel(labels, "ENTITY_TIMER") + controllerSlot] = 0xf4;
-    memory[requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + controllerSlot] = 1;
+    memory[requiredLabel(labels, "ENTITY_TIMER") + controllerSlot] = state === 5 ? 0xfa : 0xf4;
+    memory[requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + controllerSlot] = state === 5 ? 0 : 1;
     memory[requiredLabel(labels, "ENTITY_OWNER") + controllerSlot] = 50;
     memory[requiredLabel(labels, "PLAYER_LIFECYCLE")] = lifecycle;
     if (state >= 3) {
@@ -916,6 +925,10 @@ export function executeWeaponPickupLifecycleTrace({ root = defaultRoot, artifact
     lifeLossSpread: runCase("LIFE_LOSS_SPREAD", 4, "clear_transient_effects", { lifecycle: 1 }),
     gameOverSpread: runCase("GAME_OVER_SPREAD", 4, "clear_transient_effects", { lifecycle: 1 }),
     sectorSpread: runCase("SECTOR_SPREAD", 4, "entity_begin_sector_complete"),
+    newGameShield: runCase("NEW_GAME_SHIELD", 5, ["clear_screen", "init_entity_effects"]),
+    lifeLossShield: runCase("LIFE_LOSS_SHIELD", 5, "clear_transient_effects", { lifecycle: 1 }),
+    gameOverShield: runCase("GAME_OVER_SHIELD", 5, "clear_transient_effects", { lifecycle: 1 }),
+    sectorShield: runCase("SECTOR_SHIELD", 5, "entity_begin_sector_complete"),
   };
 }
 
@@ -1708,6 +1721,259 @@ export function executeWeaponBoosterReplacementTrace({
   memory[state] = 4;
   const rapidReplacesSpread = collect(0, "RAPID_REPLACES_SPREAD");
   return { artifact, rapid, spreadReplacesRapid, spreadRefresh, rapidReplacesSpread };
+}
+
+export function executeShieldBoosterTrace({
+  root = defaultRoot, artifact = "xex", coldFill = 0,
+} = {}) {
+  const runtime = initialiseRuntime(root, artifact, coldFill);
+  const { memory, labels, manifest } = runtime;
+  const stateBase = requiredLabel(labels, "ENTITY_STATE");
+  const typeBase = requiredLabel(labels, "ENTITY_TYPE");
+  const timerLow = requiredLabel(labels, "ENTITY_TIMER") + 2;
+  const timerHigh = requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2;
+  const boosterState = stateBase + 2;
+  const pickupState = stateBase + 1;
+  const pickupType = typeBase + 1;
+  const damageApplied = requiredLabel(labels, "BROAD_DAMAGE_APPLIED");
+  const damageCooldown = requiredLabel(labels, "BROAD_DAMAGE_COOLDOWN");
+  const health = fixedStateAddress(labels, "BROAD_PLAYER_HEALTH");
+  const lives = fixedStateAddress(labels, "PLAYER_LIVES");
+  const scoreLo = requiredLabel(labels, "score_bcd_lo");
+  const scoreHi = requiredLabel(labels, "score_bcd_hi");
+  const screen = labels.get("SCREEN") ?? 0x4000;
+  const hudOffset = requiredLabel(labels, "HUD_BOOSTER_OFFSET");
+  const hudCells = requiredLabel(labels, "HUD_BOOSTER_CELLS");
+  const hudSegmentsOffset = requiredLabel(labels, "HUD_BOOSTER_SEGMENTS_OFFSET");
+  const hudSegments = requiredLabel(labels, "HUD_BOOSTER_SEGMENTS");
+  const backing = Array.from({ length: hudCells }, (_value, index) => 0x31 + index);
+  memory.set(backing, screen + hudOffset);
+  const snapshot = (name, extra = {}) => ({
+    name,
+    state: memory[boosterState],
+    timer: memory[timerLow] | memory[timerHigh] << 8,
+    health: memory[health],
+    lives: memory[lives],
+    score: memory[scoreLo] | memory[scoreHi] << 8,
+    damageApplied: memory[damageApplied],
+    damageCooldown: memory[damageCooldown],
+    colpm0: memory[0xd012],
+    colpm3: memory[0xd015],
+    hudRegion: Array.from(memory.subarray(screen + hudOffset, screen + hudOffset + hudCells)),
+    hudSegments: Array.from(memory.subarray(
+      screen + hudSegmentsOffset, screen + hudSegmentsOffset + hudSegments)),
+    ...extra,
+  });
+  let lastCollectCycles = 0;
+  const collect = (type, name) => {
+    memory[pickupState] = 2;
+    memory[pickupType] = type;
+    lastCollectCycles = runRoutine(memory, labels, "weapon_pickup_collect");
+    return snapshot(name);
+  };
+
+  memory[health] = 10;
+  memory[lives] = 3;
+  memory[scoreLo] = 0x45;
+  memory[scoreHi] = 0x01;
+  memory[damageApplied] = 0;
+  memory[damageCooldown] = 0;
+  memory[0xd012] = 0x0e;
+  memory[0xd015] = 0x28;
+  const activation = collect(2, "activation");
+  const paused = Array.from({ length: 16 }, (_value, frame) => snapshot("pause", { frame }));
+  runRoutine(memory, labels, "entity_begin_sector_complete");
+  const sector = snapshot("sector");
+  const boundaries = [];
+  const activeUpdateCycles = [];
+  const wanted = new Set([249, 188, 187, 126, 125, 63, 62, 56, 55, 48, 47, 40, 39, 1, 0]);
+  for (let tick = 1; tick <= 250; tick += 1) {
+    const cycles = runRoutine(memory, labels, "update_weapon_booster_active", { x: 5 });
+    activeUpdateCycles.push(cycles);
+    const timer = memory[timerLow] | memory[timerHigh] << 8;
+    if (wanted.has(timer)) boundaries.push(snapshot(`timer-${timer}`, { tick, cycles }));
+  }
+  const expiry = snapshot("expiry");
+
+  const damageCase = (name, setup = () => {}, damage = 1) => {
+    const current = initialiseRuntime(root, artifact, coldFill);
+    const m = current.memory;
+    const l = current.labels;
+    m[requiredLabel(l, "ENTITY_STATE") + 2] = 5;
+    m[requiredLabel(l, "ENTITY_TIMER") + 2] = 250;
+    m[fixedStateAddress(l, "BROAD_PLAYER_HEALTH")] = 10;
+    m[fixedStateAddress(l, "PLAYER_LIVES")] = 3;
+    m[requiredLabel(l, "score_bcd_lo")] = 0x45;
+    m[requiredLabel(l, "score_bcd_hi")] = 0x01;
+    m[requiredLabel(l, "BROAD_DAMAGE_APPLIED")] = 0;
+    m[requiredLabel(l, "BROAD_DAMAGE_COOLDOWN")] = 0;
+    m[requiredLabel(l, "damage_timer")] = 0;
+    setup(m, l);
+    const cycles = runRoutine(m, l, "apply_player_damage", { a: damage });
+    return {
+      name,
+      cycles,
+      health: m[fixedStateAddress(l, "BROAD_PLAYER_HEALTH")],
+      lives: m[fixedStateAddress(l, "PLAYER_LIVES")],
+      score: m[requiredLabel(l, "score_bcd_lo")] |
+        m[requiredLabel(l, "score_bcd_hi")] << 8,
+      applied: m[requiredLabel(l, "BROAD_DAMAGE_APPLIED")],
+      cooldown: m[requiredLabel(l, "BROAD_DAMAGE_COOLDOWN")],
+      damageTimer: m[requiredLabel(l, "damage_timer")],
+    };
+  };
+  const damage = {
+    ordinary: damageCase("ordinary"),
+    heavy: damageCase("heavy", () => {}, 2),
+    duringCooldown: damageCase("during-cooldown", (m, l) => {
+      m[requiredLabel(l, "BROAD_DAMAGE_COOLDOWN")] = 17;
+    }),
+    secondEvent: damageCase("second-event", (m, l) => {
+      m[requiredLabel(l, "BROAD_DAMAGE_APPLIED")] = 1;
+    }),
+    respawn: damageCase("respawn", (m, l) => {
+      m[requiredLabel(l, "PLAYER_LIFECYCLE")] = 2;
+    }),
+  };
+
+  const raiderProjectile = initialiseRuntime(root, artifact, coldFill);
+  let raiderProjectileCycles = 0;
+  {
+    const m = raiderProjectile.memory;
+    const l = raiderProjectile.labels;
+    const slot = 10;
+    m[requiredLabel(l, "ENTITY_STATE") + 2] = 5;
+    m[requiredLabel(l, "BROAD_DAMAGE_APPLIED")] = 0;
+    m[requiredLabel(l, "BROAD_DAMAGE_COOLDOWN")] = 0;
+    m[fixedStateAddress(l, "BROAD_PLAYER_HEALTH")] = 10;
+    m[requiredLabel(l, "player_x")] = 124;
+    m[requiredLabel(l, "player_y")] = 184;
+    m[requiredLabel(l, "FIGHTER_PROJECTILE_ACTIVE") + slot] = 2;
+    m[requiredLabel(l, "FIGHTER_PROJECTILE_X") + slot] = 124;
+    m[requiredLabel(l, "FIGHTER_PROJECTILE_Y") + slot] = 178;
+    m[requiredLabel(l, "FIGHTER_PROJECTILE_PREV_Y") + slot] = 178;
+    m[requiredLabel(l, "FIGHTER_PROJECTILE_LIFETIME") + slot] = 10;
+    raiderProjectileCycles = runRoutine(m, l, "update_fighter_projectiles");
+  }
+  damage.raiderProjectile = {
+    active: raiderProjectile.memory[requiredLabel(raiderProjectile.labels,
+      "FIGHTER_PROJECTILE_ACTIVE") + 10],
+    health: raiderProjectile.memory[fixedStateAddress(raiderProjectile.labels,
+      "BROAD_PLAYER_HEALTH")],
+    applied: raiderProjectile.memory[requiredLabel(raiderProjectile.labels,
+      "BROAD_DAMAGE_APPLIED")],
+  };
+
+  const broadsideImpact = initialiseRuntime(root, artifact, coldFill);
+  let broadsideImpactCycles = 0;
+  {
+    const m = broadsideImpact.memory;
+    const l = broadsideImpact.labels;
+    m[requiredLabel(l, "ENTITY_STATE") + 2] = 5;
+    m[requiredLabel(l, "BROAD_DAMAGE_APPLIED")] = 0;
+    m[requiredLabel(l, "BROAD_DAMAGE_COOLDOWN")] = 0;
+    m[fixedStateAddress(l, "BROAD_PLAYER_HEALTH")] = 10;
+    broadsideImpactCycles += runRoutine(m, l, "begin_broadside_impact", { x: 0 });
+    broadsideImpactCycles += runRoutine(m, l, "apply_broadside_player_damage", { x: 0 });
+  }
+  damage.broadsideImpact = {
+    state: broadsideImpact.memory[requiredLabel(broadsideImpact.labels, "BROAD_STATE")],
+    health: broadsideImpact.memory[fixedStateAddress(broadsideImpact.labels,
+      "BROAD_PLAYER_HEALTH")],
+    applied: broadsideImpact.memory[requiredLabel(broadsideImpact.labels,
+      "BROAD_DAMAGE_APPLIED")],
+  };
+
+  const debrisSameFrame = initialiseRuntime(root, artifact, coldFill);
+  let debrisSameFrameCycles = 0;
+  {
+    const m = debrisSameFrame.memory;
+    const l = debrisSameFrame.labels;
+    m[requiredLabel(l, "player_x")] = 124;
+    m[requiredLabel(l, "player_y")] = 104;
+    m[fixedStateAddress(l, "BROAD_PLAYER_HEALTH")] = 10;
+    m[requiredLabel(l, "BROAD_DAMAGE_APPLIED")] = 0;
+    m[requiredLabel(l, "BROAD_DAMAGE_COOLDOWN")] = 0;
+    m[requiredLabel(l, "ENTITY_X")] = 124;
+    m[requiredLabel(l, "ENTITY_Y")] = 104;
+    m[requiredLabel(l, "ENTITY_STATE")] = 1;
+    m[requiredLabel(l, "ENTITY_FLAGS")] = 0x3f;
+    m[requiredLabel(l, "ENTITY_STATE") + 1] = 2;
+    m[requiredLabel(l, "ENTITY_TYPE") + 1] = 2;
+    m[requiredLabel(l, "ENTITY_X") + 1] = 124;
+    m[requiredLabel(l, "ENTITY_Y") + 1] = 104;
+    m[requiredLabel(l, "ENTITY_ACTIVE_MASK")] = 3;
+    m[requiredLabel(l, "ENTITY_ACTIVE_COUNT")] = 2;
+    debrisSameFrameCycles = runRoutine(m, l, "entity_effects_update");
+  }
+  const sameFrame = {
+    state: debrisSameFrame.memory[requiredLabel(debrisSameFrame.labels, "ENTITY_STATE") + 2],
+    timer: debrisSameFrame.memory[requiredLabel(debrisSameFrame.labels, "ENTITY_TIMER") + 2],
+    health: debrisSameFrame.memory[fixedStateAddress(debrisSameFrame.labels,
+      "BROAD_PLAYER_HEALTH")],
+    debrisActive: debrisSameFrame.memory[requiredLabel(debrisSameFrame.labels,
+      "ENTITY_ACTIVE_MASK")] & 1,
+    damageApplied: debrisSameFrame.memory[requiredLabel(debrisSameFrame.labels,
+      "BROAD_DAMAGE_APPLIED")],
+  };
+
+  const replacement = initialiseRuntime(root, artifact, coldFill);
+  replacement.memory[0xd012] = 0x0e;
+  replacement.memory[0xd015] = 0x28;
+  const replace = (type, name) => {
+    const m = replacement.memory;
+    const l = replacement.labels;
+    m[requiredLabel(l, "ENTITY_STATE") + 1] = 2;
+    m[requiredLabel(l, "ENTITY_TYPE") + 1] = type;
+    const cycles = runRoutine(m, l, "weapon_pickup_collect");
+    return {
+      name,
+      state: m[requiredLabel(l, "ENTITY_STATE") + 2],
+      timer: m[requiredLabel(l, "ENTITY_TIMER") + 2] |
+        m[requiredLabel(l, "ENTITY_MOVE_ACCUMULATOR") + 2] << 8,
+      colpm0: m[0xd012], colpm3: m[0xd015],
+      cycles,
+    };
+  };
+  const replacements = [
+    replace(0, "rapid"), replace(2, "shield-replaces-rapid"),
+    replace(2, "shield-refresh"), replace(1, "spread-replaces-shield"),
+    replace(2, "shield-replaces-spread"), replace(0, "rapid-replaces-shield"),
+  ];
+
+  const inactive = initialiseRuntime(root, artifact, coldFill);
+  runRoutine(inactive.memory, inactive.labels, "init_entity_effects");
+  const inactiveCycles = runRoutine(inactive.memory, inactive.labels, "entity_effects_update");
+
+  return {
+    artifact,
+    coldFill,
+    manifest,
+    backing,
+    activation,
+    paused,
+    sector,
+    boundaries,
+    expiry,
+    damage,
+    sameFrame,
+    replacements,
+    costs: {
+      inactiveEntityUpdate: inactiveCycles,
+      activation: lastCollectCycles,
+      activeNoContactMin: Math.min(...activeUpdateCycles.slice(0, -1)),
+      activeNoContactMax: Math.max(...activeUpdateCycles.slice(0, -1)),
+      expiry: activeUpdateCycles.at(-1),
+      directAbsorption: damage.ordinary.cycles,
+      raiderProjectileAbsorption: raiderProjectileCycles,
+      broadsideImpactAbsorption: broadsideImpactCycles,
+      pickupThenDebrisAbsorption: debrisSameFrameCycles,
+      replacements: replacements.map(({ name, cycles }) => ({ name, cycles })),
+    },
+    shieldGlyph: Array.from(memory.subarray(
+      0x5000 + requiredLabel(labels, "CH_HUD_BOOSTER_SHIELD") * 8,
+      0x5000 + requiredLabel(labels, "CH_HUD_BOOSTER_SHIELD") * 8 + 8)),
+  };
 }
 
 export function assertSpreadShotTraceParity(left, right) {

@@ -19,6 +19,7 @@
     "rapidFireIntervalFrames": 2,
     "rapidFireDurationFrames": 500,
     "spreadShotDurationFrames": 500,
+    "shieldDurationFrames": 250,
     "spreadShotBurstCount": 8,
     "spreadShotCooldownFrames": 10,
     "spreadShotProjectileCount": 3,

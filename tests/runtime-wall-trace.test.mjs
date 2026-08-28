@@ -276,7 +276,7 @@ test("Spread Shot passes PAL wall budget with a legal capsule and projectile-hea
     feature.remaining_hard_cycles,
   ], [32_072, 3_496, 32, 168, 468]);
   assert.deepEqual(feature.created_capsule_render_ids.slice(0, 7),
-    [120, 252, 120, 252, 120, 252, 120]);
+    [120, 252, 124, 120, 252, 124, 120]);
   assert.ok(feature.spread_frames > 0);
   assert.ok(feature.spread_volley_frames > 0);
   assert.ok(feature.active_capsule_three_projectile_frames > 0);
@@ -620,9 +620,9 @@ test("ten heaviest frames retain exact clock positions, VBI IDs and state", () =
   }
 });
 
-test("current maximum, subsystem profile and accepted PAL-recovery baseline are exact", () => {
+test("current Shield maximum, subsystem profile and accepted PAL-recovery baseline are exact", () => {
   const maximum = report.five_heaviest_frames[0];
-  assert.deepEqual([maximum.wall_cycles, maximum.physical_headroom], [32_072, 3_496]);
+  assert.deepEqual([maximum.wall_cycles, maximum.physical_headroom], [32_108, 3_460]);
   assert.equal(maximum.wall_cycles, report.semantics.measured_wall_cycles_dma_on);
   assert.ok(report.five_heaviest_frames.every((frame, index, frames) =>
     index === 0 || frames[index - 1].wall_cycles >= frame.wall_cycles));
@@ -646,6 +646,13 @@ test("current maximum, subsystem profile and accepted PAL-recovery baseline are 
     gate.measured_wall_cycles, gate.measured_physical_headroom,
     gate.recovered_cycles, gate.preserved_as_accepted_baseline, gate.passed],
   [33_020, 32_068, 3_500, 952, 32_040, 3_528, 980, true, true]);
+
+  const shield = report.gate.weapon_pickup_shield;
+  assert.deepEqual([shield.baseline_wall_cycles, shield.measured_wall_cycles,
+    shield.actual_delta_cycles, shield.measured_physical_headroom,
+    shield.remaining_target_cycles, shield.remaining_hard_cycles,
+    shield.shield_frames, shield.passed],
+  [32_072, 32_108, 36, 3_460, 314, 460, 373, true]);
 });
 
 test("every difficulty contains a complete legal debris flight", () => {
@@ -666,8 +673,8 @@ test("XEX and ATR legal hunt traces have identical maxima and a reproducible fin
   const sessions = report.replay.sessions.filter(({ kind, policy }) =>
     kind === "memory-integrity-120s" && policy === "hunt");
   assert.deepEqual(sessions.map(({ medium, maximum_wall_cycles }) =>
-    [medium, maximum_wall_cycles]), [["XEX", 30_720], ["ATR", 30_720]]);
+    [medium, maximum_wall_cycles]), [["XEX", 30_681], ["ATR", 30_681]]);
   assert.equal(report.determinism.replay_fingerprint_sha256,
-    "b6971387bc03dc9b41c5bee1cf3c802a3fbef9aeb72a76ce1fca49307fc0448c");
+    "30ad02974b3cee0c5543248cb61fc2de060b0d9355022f610c8f9374f4e3c016");
   assert.ok(report.determinism.ordered_frames > 0);
 });

@@ -14,8 +14,8 @@ Before manual testing, run the evidence phases in order:
       ATR hashes.
 - [ ] `npm run verify` accepts the final-bound manifest and report hash.
 - [ ] A second unchanged full trace has replay fingerprint
-      `b6971387bc03dc9b41c5bee1cf3c802a3fbef9aeb72a76ce1fca49307fc0448c`,
-      a 32,072-cycle maximum, and 3,496-cycle physical headroom.
+      `30ad02974b3cee0c5543248cb61fc2de060b0d9355022f610c8f9374f4e3c016`,
+      a 32,108-cycle maximum, and 3,460-cycle physical headroom.
 
 ## Atari800 PAL test
 
@@ -58,6 +58,15 @@ For both XEX and ATR:
       timer nor the current blink phase advances during pause.
 - [ ] Expiry, life loss, Game Over, and New Game remove `BOOST` and leave all ten
       booster HUD cells empty; a live sector transition preserves the active field.
+- [ ] Shield is a steel-blue/white 2x2 capsule with a black shield symbol. Its
+      250-frame timer survives sector transitions, freezes during pause, and is
+      cleared by life loss, Game Over, and New Game.
+- [ ] Shield absorbs Raider shots, broadside impacts, debris, Raider contact,
+      and hull contact without changing HULL, LIFE, SCORE, hit cooldown, flash,
+      or HULL-hit SFX; at most one absorption is accepted per frame.
+- [ ] The dense continuous Shield HUD bar uses boundaries 188/126/63 and the
+      Viper remains solid while COLPM0/COLPM3 pulse steel/white at the left,
+      centre, and right side of the corridor.
 - [ ] At native 320-pixel width, HULL plates remain low and angular while BOOST
       cells remain tall and narrow; the two indicators are distinguishable
       without relying on colour. Damaged HULL plates never blink or disappear.
@@ -86,8 +95,8 @@ Use a stock PAL Atari 65XE with 64 KB and boot the ATR through SIO2SD. Also run
 the XEX through the owner's normal real-hardware loader path when available.
 
 - [ ] Cold boot succeeds repeatedly after power-off, not only after warm reset.
-- [ ] The 94-sector OS boot read is followed by standard-speed SIOV reads of
-      sectors 95-138; no SIO turbo support is required.
+- [ ] The 95-sector OS boot read is followed by standard-speed SIOV reads of
+      sectors 96-140; no SIO turbo support is required.
 - [ ] A deliberately truncated or CRC-corrupted test ATR stops on the fixed red
       loader error screen and never enters partially loaded code.
 - [ ] Loader duration, menu transitions, audio, controls, pause, Game Over, and
@@ -98,8 +107,8 @@ the XEX through the owner's normal real-hardware loader path when available.
       vertical lines, or intermittent engine cells.
 - [ ] Dim/bright engine animation is stable and does not alter non-engine hull
       pixels.
-- [ ] Rapid Fire and Spread Shot can each be collected, refreshed, replaced, and
-      allowed to expire; pause freezes both timers.
+- [ ] Rapid Fire, Spread Shot, and Shield can each be collected, refreshed,
+      replaced in the fixed rotation, and allowed to expire; pause freezes all timers.
 - [ ] All three Spread Shot projectiles are yellow and form a clear symmetric
       fan without flicker or sudden horizontal jumps.
 - [ ] Normal, Rapid Fire, and Spread Shot Viper projectiles all remain yellow;

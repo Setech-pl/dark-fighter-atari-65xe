@@ -19,7 +19,7 @@ verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
 
 ## Cold startup and loader
 
-The 94-sector initial block enters at `$201E` with a 449-byte raw bootstrap
+The 95-sector initial block enters at `$201E` with a 449-byte raw bootstrap
 prefix. A 1,185-byte stage-2 overlay runs at `$21C1-$2661`; after it validates
 the complete manifest, it reads extension sectors through standard OS SIOV
 while OS IRQ/NMI and disk services are still available. Each chunk is fully
@@ -27,18 +27,18 @@ read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
 controlled destination. Any failure blanks DMA, selects a fixed red error
 background, and halts before partially loaded code can execute.
 
-The first production migration moves the 5,585-byte packed BROADSIDE stream to
-sectors 95-138. ATR stages its 5,632-byte sector image at `$8100-$96FF`, checks
-CRC `$60A0`, and expands 6,569 bytes to `$5E10-$77B8`. The last BROADSIDE source
+The first production migration moves the 5,655-byte packed BROADSIDE stream to
+sectors 96-140. ATR stages its 5,760-byte sector image at `$8100-$977F`, checks
+CRC `$8536`, and expands 6,643 bytes to `$5E10-$7802`. The last BROADSIDE source
 read makes `$8100` reusable; only then does startup copy the packed resident
-suffix and stages it at `$8100-$9A53`. The 7,743-byte suffix is stored as a 6,484-byte LZ-10/5 stream
+suffix and stages it at `$8100-$9A5D`. The 7,743-byte suffix is stored as a 6,494-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. No loader byte remains resident or enters gameplay.
 
 The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
-accepts RAW or LZ records. The current 94-sector initial block plus one 44-sector
-extension use 138 sectors. Seven additional 50-sector chunks provide 44,800 B
-of format/loader growth without padding; the ATR itself has 74,496 B free.
+accepts RAW or LZ records. The current 95-sector initial block plus one 45-sector
+extension use 140 sectors. Seven additional 50-sector chunks provide 44,800 B
+of format/loader growth without padding; the ATR itself has 74,240 B free.
 
 ### DFMC v1 byte format
 
@@ -58,7 +58,7 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production record 0 is `{95,44,5585,6569,$5E10,$60A0,1,1,$8100}`.
+Production record 0 is `{96,45,5655,6643,$5E10,$8536,1,1,$8100}`.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
 mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to
@@ -73,10 +73,10 @@ footer palette zones. The loader remains visible for 250 complete PAL frames
 
 Cold staging also copies:
 
-- validated external broadside/runtime data to `$5E10-$77B8` before takeover;
+- validated external broadside/runtime data to `$5E10-$7802` before takeover;
 - packed starfield/music data through `$7810-$7EFA` to `$552A-$5DE1`;
 - the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
-- packed entity/effect code through `$5140-$5852` to `$9100-$9929`.
+- packed entity/effect code through `$5140-$58F0` to `$9100-$99F4`.
 
 The BSS is exactly `$8000-$80FF` and is initialized deterministically. The
 runtime does not use `$A000-$BFFF`; compatibility never assumes that BASIC ROM
@@ -182,11 +182,11 @@ and no score award. Its destruction and Raider breakup materialize into the
 five-slot active effects envelope and are erased before lower layers move.
 
 Slot 1 owns the sole 2x2 pickup capsule. A qualifying Viper-projectile Raider
-kill advances the three-kill drop counter. The next-type bit alternates
-successful capsule creation between Rapid Fire and Spread Shot, starting with
-Rapid Fire on New Game. Slot 2 holds the non-rendered timed-booster controller
-and next-type selector. Rapid Fire and Spread Shot are mutually exclusive,
-500-active-frame states.
+kill advances the three-kill drop counter. The next-type selector rotates
+successful capsule creation through Rapid Fire, Spread Shot, and Shield,
+starting with Rapid Fire on New Game. Slot 2 holds the non-rendered timed-
+booster controller and next-type selector. All three states are mutually
+exclusive. Rapid Fire and Spread Shot last 500 active frames; Shield lasts 250.
 
 The fixed ANTIC 2 HUD uses cells `$4019-$401C` for four permanent HULL plates.
 Glyph 5 is a low intact plate and glyph 12 a low cracked plate; the stored
@@ -197,9 +197,10 @@ disappears.
 Cells `$401E-$4027` are the complete ten-cell booster presentation: `BOOST`, a
 blank separator, and four tall energy glyphs at cells `$4024-$4027`. The
 optional type glyph is not allocated because no twelfth free cell exists.
-Glyph 7 supplies the narrow vertical energy shape. Segment thresholds are
-exact quarters of the same 16-bit 500-frame booster timer. Below 25%, timer bit
-3 supplies the 8+8 blink phase, so pause freezes the indicator naturally. Ten
+Glyph 7 supplies the narrow vertical weapon-energy shape; Shield uses the
+formally reserved dense cross-core glyph 8. Segment thresholds are exact
+quarters of the active type's 16-bit timer (500 or 250 frames). Below 25%,
+timer bit 3 supplies the 8+8 blink phase, so pause freezes the indicator naturally. Ten
 writable backing bytes at `$5E06-$5E0F` preserve and restore the complete prior
 field across refresh, replacement, expiry, life loss, and teardown. No PMG,
 bitmap overlay, DLI, palette, or gameplay-charset allocation is involved.
@@ -210,17 +211,26 @@ three use the yellow Viper colour. Side directions are encoded in the existing
 render/state byte, and the parity of the existing lifetime supplies their
 one-HPOS-per-two-updates fixed phase, avoiding another allocation.
 
+Shield leaves the normal weapon cadence active. Its separate state is checked
+after `PLAYER_ALIVE` and before the ordinary 25-frame damage cooldown. A valid
+absorption consumes the frame's one damage event without changing HULL, LIFE,
+SCORE, hit flash, cooldown, or HULL-hit SFX. Raider shots disappear, broadside
+shots enter their established impact state, debris is consumed, and Raider or
+hull-contact side effects retain their prior behavior. The Shield timer also
+drives a solid COLPM0/COLPM3 steel/white pulse; it never hides the Viper and is
+therefore distinct from respawn invulnerability.
+
 ## Character and PMG ownership
 
 The gameplay charset has 128 occupied glyphs. Stars use 1-6, Viper projectile
 phases 11-46, Spread Shot composite scratch 47-56, capital hulls 59-89,
 Raider/projectile phases 90-109, debris 110-117, fragments 118-119, Rapid Fire
-capsule 120-123, and Spread Shot capsule 124-127.
+capsule 120-123, and a single-owner dynamic Spread/Shield capsule bank 124-127.
 
 The separate `$5000-$53FF` HUD charset keeps glyph 0 as the blank/separator,
-uses glyphs 5 and 12 for the two low HULL plate states, and glyph 7 for the tall
-BOOST energy cell. Digits and letters retain their existing allocations and
-colours.
+uses glyphs 5 and 12 for the two low HULL plate states, glyph 7 for weapon
+energy, and glyph 8 for the distinct continuous Shield bar. Digits and letters
+retain their existing allocations and colours.
 
 PMG base is `$3800`; active DMA pages are `$3B00-$3FFF`. P0 and P3 form the
 Viper, P1 is the Raider, and P2 is its scanner. M1-M3 serve broadside warnings

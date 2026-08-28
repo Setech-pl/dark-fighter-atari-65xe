@@ -57,6 +57,9 @@ between old and new positions.
 - **Rapid Fire:** steel/yellow casing with a black `RF` symbol. It must remain
   readable against space and either capital hull.
 - **Spread Shot:** bright red casing with a black fan/three-projectile symbol.
+- **Shield:** steel-blue `$84` outline, bright `$0E` fill, and a black shield
+  symbol. Its dense cross-core BOOST bar and solid steel/white Viper pulse must
+  remain distinguishable from both weapon boosters and respawn blinking.
   The dark symbol is formed by the capsule interior, not white text.
 - **Shield:** planned only. Its final casing, symbol, and palette ownership need
   owner review before implementation.

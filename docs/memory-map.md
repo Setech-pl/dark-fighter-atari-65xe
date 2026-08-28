@@ -12,23 +12,23 @@ lifetime phases and are not additive free memory.
 | `$0080-$009F` | 32 B | zero-page runtime variables |
 | `$0100-$01FF` | 256 B | 6502 stack |
 | `$0200-$03FF` | 512 B | OS workspace and vectors |
-| `$2000-$3097` | 4,248 B | resident `CODE` |
-| `$3098-$3F67` | 3,792 B | resident `RODATA` |
+| `$2000-$3098` | 4,249 B | resident `CODE` |
+| `$3099-$3F70` | 3,800 B | resident `RODATA` |
 | `$5400-$54C9` | 202 B | `PROJECTILES`: 19 fighter slots, burst controllers, and two shared fighter explosions |
 | `$552A-$5DE1` | 2,232 B | relocated `STARFIELD` runtime; 2,278 B reserved through `$5E0F` |
-| `$5E10-$77B8` | 6,569 B | relocated `BROADSIDE`/frontend/enemy/weapon runtime; 6,656 B reserved through `$780F` |
+| `$5E10-$7802` | 6,643 B | relocated `BROADSIDE`/frontend/enemy/weapon runtime; 6,656 B reserved through `$780F` |
 | `$8000-$80FF` | 256 B | `ENTITY_STATE` BSS |
 | `$9000-$90CE` | 207 B | relocated A2 kernel; 256 B reserved through `$90FF` |
-| `$9100-$9929` | 2,090 B | relocated `ENTITY_CODE`; 3,840 B reserved through `$9FFF` |
+| `$9100-$99F4` | 2,293 B | relocated `ENTITY_CODE`; 3,840 B reserved through `$9FFF` |
 | `$21C1-$2661` | 1,185 B | boot-only `BOOT_STAGE2` overlay; replaced by the resident suffix before runtime |
 
 The linked runtime/code/data budget is `CODE + STARFIELD + BROADSIDE +
-A2_KERNEL + ENTITY_CODE = 15,346 B`.
+A2_KERNEL + ENTITY_CODE = 15,624 B`.
 
 ## Boot transport layout
 
-The production transport is 17,664 bytes in 138 occupied sectors. BRCNT is
-dynamic and loads only the 12,032-byte/94-sector initial block at `$2000-$4EFF`;
+The production transport is 17,920 bytes in 140 occupied sectors. BRCNT is
+dynamic and loads only the 12,160-byte/95-sector initial block at `$2000-$4F7F`;
 the entry point remains `$201E`. The last-sector envelope is 121 bytes of
 source-owned metadata/fill required by sector alignment, not reserved capacity.
 
@@ -36,26 +36,26 @@ source-owned metadata/fill required by sector alignment, not reserved capacity.
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
 | `$21C1-$2661` | 1,185 B | stage-2 SIO/CRC/manifest overlay; later restored resident bytes replace it |
-| `$2662-$3FB5` | 6,484 B | packed 7,743-byte resident suffix; staged at `$8100-$9A53`, restored to `$21C1-$3FFF` |
-| `$3FB6-$46A0` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
-| `$46A1-$476F` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
-| `$4770-$4E82` | 1,811 B | packed 2,090-byte entity/effect code; staged at `$5140-$5852`, expands to `$9100-$9929` |
-| `$4E83-$4E86` | 4 B | source-owned `DFB1` trailer |
-| `$4E87-$4EFF` | 121 B | dynamic `DFI2` initial-sector envelope |
-| ATR sectors 95-138 | 5,632 B | external BROADSIDE chunk: 5,585 B LZ plus `DFC2` footer/fill; stage `$8100-$96FF`, final `$5E10-$77B8` |
+| `$2662-$3FBF` | 6,494 B | packed 7,743-byte resident suffix; staged at `$8100-$9A5D`, restored to `$21C1-$3FFF` |
+| `$3FC0-$46AA` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
+| `$46AB-$4779` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
+| `$477A-$4F2A` | 1,969 B | packed 2,293-byte entity/effect code; staged at `$5140-$58F0`, expands to `$9100-$99F4` |
+| `$4F2B-$4F2E` | 4 B | source-owned `DFB1` trailer |
+| `$4F2F-$4F7F` | 81 B | dynamic `DFI2` initial-sector envelope |
+| ATR sectors 96-140 | 5,760 B | external BROADSIDE chunk: 5,655 B LZ plus `DFC2` footer/fill; stage `$8100-$977F`, final `$5E10-$7802` |
 
 The `DFMC` v1 manifest is 30 B for the current one record and reserves 142 B
-inside stage-2 for at most eight records. The ATR has 582 free sectors
-(74,496 B). With the current eight-record/50-sector-per-chunk loader limits,
+inside stage-2 for at most eight records. The ATR has 580 free sectors
+(74,240 B). With the current eight-record/50-sector-per-chunk loader limits,
 seven further chunks provide 44,800 B additional transport capacity. Runtime
-residency remains a separate 6,841-byte fragmented limit.
+residency has a 6,841-byte architectural ceiling and 6,563 B currently remain.
 
 ## Loader-time ownership
 
 | Range | Size | Loader role |
 | --- | ---: | --- |
-| `$3334-$3356` | 35 B | packed 202-byte loader display-list source |
-| `$379B-$3F67` | 1,997 B | packed loader-bitmap source |
+| `$333D-$335F` | 35 B | packed 202-byte loader display-list source |
+| `$37A4-$3F70` | 1,997 B | packed loader-bitmap source |
 | `$3800-$38C9` | 202 B | expanded loader display list after its overlapping source has been consumed |
 | `$4010-$4FFF` | 4,080 B | bitmap lines 0-101 |
 | `$5000-$5E0F` | 3,600 B | bitmap lines 102-191 via second LMS at `$5000` |
@@ -85,7 +85,7 @@ this lifetime.
 | `$54CA-$5529` | 96 B | 24 far-star records |
 | `$5DE2-$5E05` | 36 B | free tail of the starfield reservation |
 | `$5E06-$5E0F` | 10 B | exact prior-content backing for HUD cells `$401E-$4027` while BOOST is active |
-| `$77B9-$780F` | 87 B | free tail of the broadside reservation |
+| `$7803-$780F` | 13 B | free tail of the broadside reservation |
 | `$7810-$7BCF` | 960 B | pause-screen backup after cold staging is consumed |
 | `$7BD0-$7F0F` | 832 B | unassigned remainder of the cold starfield staging reservation |
 | `$7F10-$7F5A` | 75 B | A2 display list A |
@@ -107,8 +107,8 @@ this lifetime.
 | `$8130-$8FFF` | 3,792 B | unowned after cold startup; retained reservation, not current gameplay state |
 | `$9000-$90CE` | 207 B | A2 kernel |
 | `$90CF-$90FF` | 49 B | free A2 reservation tail |
-| `$9100-$9929` | 2,090 B | entity/effect/booster/projectile-composite runtime |
-| `$992A-$9FFF` | 1,750 B | free entity-code reservation tail after cold staging |
+| `$9100-$99F4` | 2,293 B | entity/effect/booster/projectile-composite runtime |
+| `$99F5-$9FFF` | 1,547 B | free entity-code reservation tail after cold staging |
 | `$A000-$BFFF` | 8,192 B | deliberately unused BASIC-ROM window |
 | `$C000-$FFFF` | 16,384 B | OS ROM and I/O; not gameplay RAM |
 
@@ -146,7 +146,7 @@ All 128 glyphs are allocated.
 | 110-117 | debris |
 | 118-119 | transient fragments |
 | 120-123 | Rapid Fire capsule |
-| 124-127 | Spread Shot capsule |
+| 124-127 | dynamic Spread Shot or Shield capsule; erase precedes glyph ownership transfer |
 
 Build-time range assertions, linker overlap checks, payload parity tests, and
 cold-RAM tests are the enforcement mechanism for this snapshot.

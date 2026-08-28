@@ -61,10 +61,10 @@ test("current documentation keeps implemented, planned and historical state dist
   assert.doesNotMatch(gameDesign, /\b(?:ARM|FUEL)\b/);
   assert.match(gameDesign, /Rapid Fire — implemented/);
   assert.match(gameDesign, /Spread Shot — implemented/);
-  assert.match(gameDesign, /Shield Booster — planned/);
+  assert.match(gameDesign, /Shield Booster — implemented/);
   assert.doesNotMatch(currentSources, /\$8100-\$99A3/);
   assert.doesNotMatch(currentSources, /\$8100-\$(?:9AA3|9A3D)/);
-  assert.match(architecture, /stages it at `\$8100-\$9A53`/);
+  assert.match(architecture, /stages it at `\$8100-\$9A5D`/);
   assert.match(architecture, /packs them to \*\*1,997 bytes\*\*/);
   assert.doesNotMatch(currentSources, /\b2,?027[- ]bytes\b/i);
   assert.doesNotMatch(artDirection, /\bresidual\b/i);

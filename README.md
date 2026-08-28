@@ -10,9 +10,9 @@
 
 Pilot a Colonial Viper through open space and the narrow crossfire corridor
 between opposing capital ships. Fight Cylon Raiders, dodge or destroy drifting
-debris, survive heavy broadside fire, and collect the Rapid Fire weapon capsule.
-Successful capsules now alternate between Rapid Fire and the red-cased Spread
-Shot booster. The current release is fully playable in an emulator and on an Atari through
+debris, survive heavy broadside fire, and collect Rapid Fire, Spread Shot, and
+Shield capsules. Successful capsules rotate deterministically through all three
+boosters. The current release is fully playable in an emulator and on an Atari through
 SIO2SD.
 
 The current documentation map and source-of-truth hierarchy begin at
@@ -78,11 +78,13 @@ owner; commit and push happen only after owner acceptance.
   trajectories, local hit feedback, a breakup core, and four non-colliding
   fragments.
 - Local Raider breakup effects that reuse the fixed transient-effects system.
-- Alternating 2×2 Rapid Fire and Spread Shot capsules earned after every third
-  qualifying Raider projectile kill. Each booster lasts exactly 500 active PAL
-  frames and replaces or refreshes the other: Rapid uses ten-shot bursts with
+- Rotating 2×2 Rapid Fire, Spread Shot, and Shield capsules earned after every
+  third qualifying Raider projectile kill. Weapon boosters last 500 active PAL
+  frames and Shield lasts 250; every pickup replaces or refreshes the current
+  booster. Rapid uses ten-shot bursts with
   two-frame spacing, while Spread uses eight salvos with a ten-frame cooldown
-  and emits an all-yellow centre plus an atomic symmetric side pair. Every Viper projectile stays
+  and emits an all-yellow centre plus an atomic symmetric side pair. Shield
+  absorbs damage while retaining the normal weapon cadence. Every Viper projectile stays
   yellow. The full `BOOST` label precedes a shared four-segment HUD energy bar
   that tracks the exact remaining fraction; only its final segment blinks in
   an 8+8 PAL-frame rhythm. Four permanent low HULL plates use a separate shape.
@@ -101,16 +103,16 @@ and tested by the repository.
 | CPU and machine | Atari 65XE, NMOS 6502C, 64 KB RAM |
 | Video target | PAL, 50 FPS, ANTIC 2/4/6/7/F and PMG |
 | Toolchain | ca65/ld65 through the pinned WebAssembly package |
-| Distribution | 18,617-byte XEX and 92,176-byte bootable ATR |
-| Boot transport | 94-sector dynamic initial block plus a 44-sector manifest chunk; entry `$201E` |
+| Distribution | 18,819-byte XEX and 92,176-byte bootable ATR |
+| Boot transport | 95-sector dynamic initial block plus a 45-sector manifest chunk; entry `$201E` |
 | Payload reserve | 73 source-owned bytes; zero formatter padding |
 | Runtime BSS | `$8000–$80FF`, exactly 256 bytes |
 | Entity engine | Four physical interactive slots, up to two active |
 | Effects engine | Six physical transient slots, up to five active |
-| Entity code | `$9100–$9929`, 2,090 of 3,840 bytes before packing |
+| Entity code | `$9100–$99F4`, 2,293 of 3,840 bytes before packing |
 | Gameplay layers | base/ring → broadside → projectile → entity → effect; reverse erase |
-| Charset budget | All 128 gameplay glyphs used; Spread scratch uses 47–56 and its capsule uses 124–127 |
-| Measured PAL wall | 32,072 cycles worst case; 3,496 cycles physical headroom |
+| Charset budget | All 128 gameplay glyphs used; Spread scratch uses 47–56 and Spread/Shield dynamically share 124–127 |
+| Measured PAL wall | 32,108 cycles worst case; 3,460 cycles physical headroom |
 | Synchronization | Zero missed frames, deadline overruns, or extra VBI boundaries in the full trace |
 
 Visible-frame work is deterministic and bounded. Pools have fixed capacity;
@@ -120,7 +122,7 @@ trace runs instrumented Atari800 at guest-PC boundaries against the actual XEX
 and ATR payload, including the heaviest combination of projectiles, debris,
 pickups, broadside fire, and five transient effects.
 
-The current repository validates more than 300 contracts covering formats,
+The current repository validates 388 contracts covering formats,
 memory ownership, rendering, backing and reverse erase, RNG and cadence,
 gameplay lifecycle, real-artifact boot smoke, and runtime wall timing. Exact
 measurements are kept in
@@ -277,8 +279,8 @@ The current build is a complete playable release with a bounded gameplay loop,
 front end, difficulty settings, combat, hazards, sector transitions, weapon
 pickup, scoring, life cycle, audio, XEX distribution, and bootable ATR.
 
-Development can continue without changing that status. The next planned pickup
-is Shield Booster; pickup drop frequency also has a separate owner-playtest
+Development can continue without changing that status. Pickup drop frequency
+also has a separate owner-playtest
 tuning task. Additional enemy roles, bosses, more levels, and a broader
 Gauntlet Loop remain future directions, not claims about features already
 present in the downloadable build.

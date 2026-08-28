@@ -148,6 +148,13 @@ const spreadShotBaselineWallCycles = 32040;
 const spreadShotTargetDeltaCycles = 200;
 const spreadShotHardDeltaCycles = 500;
 const spreadShotMinimumHeadroomCycles = 3028;
+const shieldBoosterBaselineRuntimeCodeBytes = 15346;
+const shieldBoosterBaselineEntityFeatureBytes = 1869;
+const shieldBoosterHardRuntimeDeltaBytes = 512;
+const shieldBoosterBaselineWallCycles = 32072;
+const shieldBoosterTargetDeltaCycles = 350;
+const shieldBoosterHardDeltaCycles = 496;
+const shieldBoosterMinimumHeadroomCycles = 3000;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -499,9 +506,9 @@ async function build() {
     throw new Error("Relocated pixel-exact hull scroll does not lie wholly in ENTITY_CODE");
   }
   if (!isReviewVariant && entityFeatureCodeBytes >
-    spreadShotBaselineEntityFeatureBytes + spreadShotHardRuntimeDeltaBytes) {
-    throw new Error(`Spread Shot ENTITY_CODE feature body is ${entityFeatureCodeBytes} B; ` +
-      `limit is ${spreadShotBaselineEntityFeatureBytes + spreadShotHardRuntimeDeltaBytes} B`);
+    shieldBoosterBaselineEntityFeatureBytes + shieldBoosterHardRuntimeDeltaBytes) {
+    throw new Error(`Shield ENTITY_CODE feature body is ${entityFeatureCodeBytes} B; ` +
+      `limit is ${shieldBoosterBaselineEntityFeatureBytes + shieldBoosterHardRuntimeDeltaBytes} B`);
   }
   if (entityStateRunAddress !== 0x8000 || entityStateBytes !== 0x0100) {
     throw new Error("Entity/effects BSS must occupy exactly $8000-$80FF");
@@ -753,9 +760,9 @@ async function build() {
   const destructibleDebrisRuntimeCodeBytes = codeBytes + starfieldRuntimeBytes +
     broadsideRuntimeBytes + a2KernelBytes + entityCodeBytes;
   if (!isReviewVariant && destructibleDebrisRuntimeCodeBytes >
-    spreadShotBaselineRuntimeCodeBytes + spreadShotHardRuntimeDeltaBytes) {
-    throw new Error(`Spread Shot linked runtime is ${destructibleDebrisRuntimeCodeBytes} B; ` +
-      `limit is ${spreadShotBaselineRuntimeCodeBytes + spreadShotHardRuntimeDeltaBytes} B`);
+    shieldBoosterBaselineRuntimeCodeBytes + shieldBoosterHardRuntimeDeltaBytes) {
+    throw new Error(`Shield linked runtime is ${destructibleDebrisRuntimeCodeBytes} B; ` +
+      `limit is ${shieldBoosterBaselineRuntimeCodeBytes + shieldBoosterHardRuntimeDeltaBytes} B`);
   }
   // The historical debris/Raider code budgets describe their accepted commits.
   // New weapon code consumes only the explicit post-compaction payload reserve;
@@ -874,7 +881,8 @@ async function build() {
       maximumExtensionChunkBytes: 50 * chunkLoaderConstants.atrSectorBytes,
       maximumChunkCount: chunkLoaderConstants.maxChunks,
       maximumNewSimultaneousResidencyBytes: 6841,
-      remainingSafeResidencyBytes: 6841,
+      remainingSafeResidencyBytes:
+        6841 - (destructibleDebrisRuntimeCodeBytes - shieldBoosterBaselineRuntimeCodeBytes),
       bootOnlyStaging: { address: packedResidentStagingAddress, bytes: 0x1954 },
       loaderResidentBytes: 0,
       stage2: {
@@ -987,9 +995,15 @@ async function build() {
         },
         weaponPickupSpreadShot: {
           baselineBytes: spreadShotBaselineEntityFeatureBytes,
-          actualBytes: entityFeatureCodeBytes,
-          actualDeltaBytes: entityFeatureCodeBytes - spreadShotBaselineEntityFeatureBytes,
+          actualBytes: shieldBoosterBaselineEntityFeatureBytes,
+          actualDeltaBytes: shieldBoosterBaselineEntityFeatureBytes - spreadShotBaselineEntityFeatureBytes,
           hardDeltaBytes: spreadShotHardRuntimeDeltaBytes,
+        },
+        weaponPickupShield: {
+          baselineBytes: shieldBoosterBaselineEntityFeatureBytes,
+          actualBytes: entityFeatureCodeBytes,
+          actualDeltaBytes: entityFeatureCodeBytes - shieldBoosterBaselineEntityFeatureBytes,
+          hardDeltaBytes: shieldBoosterHardRuntimeDeltaBytes,
         },
       },
       packedBytes: packedEntityCodeRuntime.length,
@@ -1009,6 +1023,7 @@ async function build() {
       effectGlyphBytes: entityEffectsAsset.effectGlyphs.length,
       weaponPickupGlyphBytes: entityEffectsAsset.pickupGlyphs.length,
       spreadPickupGlyphBytes: entityEffectsAsset.spreadPickupGlyphs.length,
+      shieldPickupGlyphBytes: entityEffectsAsset.shieldPickupGlyphs.length,
       glyphIndex: labels.get("ENTITY_DEBRIS_GLYPH_BASE"),
       glyphCount: (entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length +
         entityEffectsAsset.pickupGlyphs.length + entityEffectsAsset.spreadPickupGlyphs.length) / 8,
@@ -1018,6 +1033,9 @@ async function build() {
       weaponPickupGlyphIndex: labels.get("WEAPON_PICKUP_GLYPH_BASE"),
       spreadPickupGlyphCount: entityEffectsAsset.spreadPickupGlyphs.length / 8,
       spreadPickupGlyphIndex: labels.get("WEAPON_PICKUP_SPREAD_GLYPH_BASE"),
+      shieldPickupGlyphCount: entityEffectsAsset.shieldPickupGlyphs.length / 8,
+      shieldPickupGlyphIndex: labels.get("WEAPON_PICKUP_SHIELD_GLYPH_BASE"),
+      dynamicPickupGlyphBankShared: true,
       newGlyphsFromFoundation: entityEffectsAsset.glyphs.length / 8 - 1,
       runtimeBudget: {
         historicalGateWallCycles: runtimeHeadroomHistoricalWallGate,
@@ -1143,6 +1161,22 @@ async function build() {
           missedSynchronization: wallTrace?.gate.missed_frames ?? null,
           deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
         },
+        weaponPickupShield: {
+          baselineWallCycles: shieldBoosterBaselineWallCycles,
+          baselinePhysicalHeadroomCycles: 35568 - shieldBoosterBaselineWallCycles,
+          targetDeltaCycles: shieldBoosterTargetDeltaCycles,
+          hardDeltaCycles: shieldBoosterHardDeltaCycles,
+          targetWallLimitCycles: shieldBoosterBaselineWallCycles + shieldBoosterTargetDeltaCycles,
+          hardWallLimitCycles: shieldBoosterBaselineWallCycles + shieldBoosterHardDeltaCycles,
+          minimumPhysicalHeadroomCycles: shieldBoosterMinimumHeadroomCycles,
+          measuredWallCycles:
+            wallTrace?.gate.weapon_pickup_shield?.measured_wall_cycles ?? null,
+          actualDeltaCycles:
+            wallTrace?.gate.weapon_pickup_shield?.actual_delta_cycles ?? null,
+          missedSynchronization: wallTrace?.gate.missed_frames ?? null,
+          deadlineOverruns: wallTrace?.gate.deadline_overrun_frames ?? null,
+          extraVbiBoundaries: wallTrace?.gate.extra_vbi_boundaries ?? null,
+        },
       },
     },
     runtimeCodeBudget: {
@@ -1179,10 +1213,16 @@ async function build() {
       },
       weaponPickupSpreadShot: {
         baselineBytes: spreadShotBaselineRuntimeCodeBytes,
-        actualBytes: destructibleDebrisRuntimeCodeBytes,
-        actualDeltaBytes: destructibleDebrisRuntimeCodeBytes - spreadShotBaselineRuntimeCodeBytes,
+        actualBytes: shieldBoosterBaselineRuntimeCodeBytes,
+        actualDeltaBytes: shieldBoosterBaselineRuntimeCodeBytes - spreadShotBaselineRuntimeCodeBytes,
         targetDeltaBytes: spreadShotTargetRuntimeDeltaBytes,
         hardDeltaBytes: spreadShotHardRuntimeDeltaBytes,
+      },
+      weaponPickupShield: {
+        baselineBytes: shieldBoosterBaselineRuntimeCodeBytes,
+        actualBytes: destructibleDebrisRuntimeCodeBytes,
+        actualDeltaBytes: destructibleDebrisRuntimeCodeBytes - shieldBoosterBaselineRuntimeCodeBytes,
+        hardDeltaBytes: shieldBoosterHardRuntimeDeltaBytes,
       },
     },
     loaderScreen: {

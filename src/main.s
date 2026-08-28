@@ -243,7 +243,8 @@ SESSION_SCORE_STATE_END      = TOP_SCORE_TABLE_END
 ; Build/debug tooling reads these symbols from the linker label file. Exporting
 ; constants has no runtime footprint and avoids duplicating the resident-state
 ; layout in a host-side wall-clock tracer.
-.export BROAD_STATE, DIFFICULTY_SETTING, CAPITAL_SECTOR_STATE, PLAYER_LIFECYCLE
+.export BROAD_STATE, BROAD_DAMAGE_COOLDOWN, BROAD_DAMAGE_APPLIED
+.export DIFFICULTY_SETTING, CAPITAL_SECTOR_STATE, PLAYER_LIFECYCLE
 .export CAPITAL_EXPLOSION_TIMER, CAPITAL_EXPLOSION_SOUND_TIMER, ENEMY_ACTIVE
 .export ENEMY_ARCHETYPE, ENEMY_HP, ENEMY_PENDING_DAMAGE, ENEMY_PENDING_SOURCE
 .export STAR_FAR_ACTIVE, MUSIC_ACTIVE
@@ -363,6 +364,7 @@ CH_PANEL_TRUSS = 4
 CH_HUD_HULL_FULL = 5
 CH_PANEL_FRAME = 6
 CH_PANEL_STRIPE = 7
+CH_HUD_BOOSTER_SHIELD = 8
 CH_SEPARATOR = 9
 CH_STAR     = 10
 CH_DASH     = 13
@@ -385,6 +387,10 @@ GAMEPLAY_BACKGROUND_COLOR = $00
 HUD_COLPF1 = $0E
 HUD_COLPF2 = $00
 PLAYER_DAMAGE_FLASH_COLOR = $42
+PLAYER_NORMAL_HULL_COLOR = $0E
+PLAYER_NORMAL_ENGINE_COLOR = $28
+PLAYER_SHIELD_HULL_COLOR = $84
+PLAYER_SHIELD_ENGINE_COLOR = $0E
 FLASH_YELLOW_BRIGHT = $1E
 FLASH_YELLOW_MID = $1C
 FLASH_RED_BRIGHT = $3C
@@ -414,6 +420,9 @@ HUD_BOOSTER_BLINK_HALF_PERIOD = 8
 HUD_BOOSTER_QUARTER = VIPER_RAPID_FIRE_DURATION/4
 HUD_BOOSTER_THREE_SEGMENT_MIN = HUD_BOOSTER_QUARTER*2+1
 HUD_BOOSTER_FOUR_SEGMENT_MIN = HUD_BOOSTER_QUARTER*3+1
+HUD_SHIELD_TWO_SEGMENT_MIN = 63
+HUD_SHIELD_THREE_SEGMENT_MIN = 126
+HUD_SHIELD_FOUR_SEGMENT_MIN = 188
 .assert VIPER_RAPID_FIRE_DURATION = VIPER_SPREAD_SHOT_DURATION, error, "weapon boosters must share one HUD duration"
 .assert VIPER_SPREAD_COOLDOWN = 10, error, "Spread cooldown must retain one reserve projectile slot"
 .assert VIPER_SPREAD_LATERAL_STEP = 1, error, "Spread side step must be one HPOS unit"
@@ -427,10 +436,14 @@ HUD_BOOSTER_FOUR_SEGMENT_MIN = HUD_BOOSTER_QUARTER*3+1
 .assert HUD_BOOSTER_SEGMENTS_OFFSET+HUD_BOOSTER_SEGMENTS = GAMEPLAY_SCREEN_COLUMNS, error, "BOOST energy segments must end at HUD column 39"
 .assert HUD_BOOSTER_BACKING+HUD_BOOSTER_CELLS = __BROADSIDE_RUN__, error, "BOOST HUD backing must occupy the final ten STARFIELD-reservation bytes"
 .assert HUD_BOOSTER_BLINK_HALF_PERIOD = 8, error, "weapon-booster warning must use an 8+8 PAL-frame phase"
+.assert VIPER_SHIELD_DURATION = 250, error, "Shield must last exactly 250 active PAL frames"
+.assert HUD_SHIELD_FOUR_SEGMENT_MIN = VIPER_SHIELD_DURATION-HUD_SHIELD_TWO_SEGMENT_MIN+1, error, "Shield four-segment threshold changed"
+.assert CH_HUD_BOOSTER_SHIELD = CH_HUD_BOOSTER_FULL+1, error, "Shield HUD glyph must own the formally reserved code 8"
+.assert CH_HUD_BOOSTER_SHIELD+1 = CH_SEPARATOR, error, "Shield HUD glyph must not overlap structural screen codes"
 .export HUD_HULL_LABEL_OFFSET, HUD_HULL_LABEL_GAP_OFFSET, HUD_HULL_SEGMENTS_OFFSET
 .export HUD_HULL_SEGMENTS, HUD_HULL_BOOST_GAP_OFFSET, CH_HUD_HULL_FULL, CH_HUD_HULL_DAMAGED
 .export HUD_BOOSTER_OFFSET, HUD_BOOSTER_CELLS, HUD_BOOSTER_SEGMENTS_OFFSET
-.export HUD_BOOSTER_LABEL_GAP_OFFSET, HUD_BOOSTER_SEGMENTS, CH_HUD_BOOSTER_FULL
+.export HUD_BOOSTER_LABEL_GAP_OFFSET, HUD_BOOSTER_SEGMENTS, CH_HUD_BOOSTER_FULL, CH_HUD_BOOSTER_SHIELD
 .export hud_booster_backing
 
 .include "capital-hulls.inc"
@@ -574,6 +587,7 @@ ENTITY_DEBRIS_GLYPH_BASE = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_
 EFFECT_FRAGMENT_GLYPH_BASE = ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT
 WEAPON_PICKUP_GLYPH_BASE = EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT
 WEAPON_PICKUP_SPREAD_GLYPH_BASE = WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_GLYPH_COUNT
+WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE
 VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
@@ -614,6 +628,8 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_GLYPH_COUNT = 124, error, "Rapid Fire must use only glyphs 120-123"
 .assert WEAPON_PICKUP_SPREAD_GLYPH_BASE = 124, error, "Spread Shot glyph indices must begin at 124"
 .assert WEAPON_PICKUP_SPREAD_GLYPH_BASE+WEAPON_PICKUP_SPREAD_GLYPH_COUNT = 128, error, "Spread Shot must end at the gameplay charset boundary"
+.assert WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE, error, "Shield must share the erased capsule's dynamic glyph bank"
+.assert WEAPON_PICKUP_SHIELD_GLYPH_BYTES = WEAPON_PICKUP_SPREAD_GLYPH_BYTES, error, "Shared pickup glyph banks must have identical footprints"
 .assert VIPER_COMPOSITE_GLYPH_BASE+VIPER_PROJECTILE_SLOT_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "slot-owned Viper composite glyphs overlap capital hulls"
 .assert ENTITY_ACTIVE_LIMIT = 2, error, "debris and the fixed weapon-pickup slot must coexist"
 .assert EFFECT_ACTIVE_LIMIT = 5, error, "debris destruction requires one core and four fragments"
@@ -2782,6 +2798,11 @@ copy_hud_charset:
     sta HUD_CHARSET+CH_SPACE*8+7
     sta HUD_CHARSET+CH_HUD_BOOSTER_FULL*8+7
 
+    ; Screen code 8 is reserved exclusively for the Shield BOOST bar. Two
+    ; solid edge rails and repeated cross-braces keep it continuous while
+    ; remaining shape-distinct from the narrow energy cell at code 7.
+    jsr install_shield_hud_glyph
+
     rts
 
 copy_hud_glyphs:
@@ -3461,7 +3482,7 @@ update_viper_weapon:
 
 viper_fire_intervals:
     .byte VIPER_BURST_INTERVAL,VIPER_BURST_INTERVAL,VIPER_BURST_INTERVAL
-    .byte VIPER_RAPID_FIRE_INTERVAL,VIPER_SPREAD_COOLDOWN
+    .byte VIPER_RAPID_FIRE_INTERVAL,VIPER_SPREAD_COOLDOWN,VIPER_BURST_INTERVAL
 
 allocate_viper_projectile:
     ldy ENTITY_STATE+WEAPON_BOOSTER_SLOT
@@ -6220,6 +6241,10 @@ hud_ascii:
     .byte "SCORE 00000  LIFE 3 HULL "
     .byte $00
 
+hud_shield_booster_glyph:
+    .byte $C3,$DB,$FF,$DB,$DB,$FF,$C3,$FF
+hud_shield_booster_glyph_end:
+
 frontend_screen_data:
     .word main_menu_screen_data, options_screen_data, top_scores_screen_data
     .word exit_screen_data, ended_screen_data
@@ -7352,6 +7377,18 @@ apply_player_damage:
     lda PLAYER_LIFECYCLE
     cmp #PLAYER_ALIVE
     bne @done
+    ; Shield is a booster-owned gate, not the post-hit cooldown or respawn
+    ; lifecycle. The first later collision in this frame is consumed by the
+    ; existing one-event latch without changing HULL, LIFE, SCORE or hit SFX.
+    lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
+    cmp #WEAPON_PICKUP_STATE_SHIELD
+    bne @ordinary_damage
+    lda BROAD_DAMAGE_APPLIED
+    bne @done
+    lda #$01
+    sta BROAD_DAMAGE_APPLIED
+    rts
+@ordinary_damage:
     lda BROAD_DAMAGE_COOLDOWN
     bne @done
     lda BROAD_DAMAGE_APPLIED
@@ -7419,6 +7456,11 @@ update_hud_status:
 ; 500-frame gameplay timer remains authoritative. Most frames take the short
 ; no-change path; only the energy cells change after activation.
 update_weapon_booster_hud:
+    lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
+    cmp #WEAPON_PICKUP_STATE_SHIELD
+    bne :+
+    jmp update_shield_booster_hud
+:
     lda ENTITY_MOVE_ACCUMULATOR+WEAPON_BOOSTER_SLOT
     beq @low_byte
     lda ENTITY_TIMER+WEAPON_BOOSTER_SLOT
@@ -7461,7 +7503,14 @@ show_weapon_booster_hud:
     sta SCREEN+HUD_BOOSTER_OFFSET,x
     dex
     bpl @label
+    lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
+    cmp #WEAPON_PICKUP_STATE_SHIELD
+    beq :+
     lda #CH_HUD_BOOSTER_FULL
+    bne @fill_segments
+:
+    lda #CH_HUD_BOOSTER_SHIELD
+@fill_segments:
     ldx #(HUD_BOOSTER_SEGMENTS-1)
 @segment:
     sta SCREEN+HUD_BOOSTER_SEGMENTS_OFFSET,x
@@ -8576,7 +8625,9 @@ update_weapon_pickup_active:
     sta ENTITY_Y+WEAPON_PICKUP_SLOT
 @after_motion:
     cpx #WEAPON_PICKUP_STATE_PENDING
-    beq weapon_pickup_pending_tick
+    bne :+
+    jmp weapon_pickup_pending_tick
+:
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
     cmp #(ENTITY_GAMEPLAY_BOTTOM-(WEAPON_PICKUP_HEIGHT_SCANLINES-8))
     bcc weapon_pickup_collide_player
@@ -8603,10 +8654,25 @@ weapon_pickup_collect:
     bne @hud_backed_up
     jsr backup_weapon_booster_hud
 @hud_backed_up:
+    lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
+    cmp #WEAPON_PICKUP_STATE_SHIELD
+    bne :+
+    jsr restore_viper_normal_colors
+:
+    lda ENTITY_TYPE+WEAPON_PICKUP_SLOT
+    cmp #WEAPON_PICKUP_TYPE_SHIELD
+    beq @shield_duration
     lda #<VIPER_SPREAD_SHOT_DURATION
     sta ENTITY_TIMER+WEAPON_BOOSTER_SLOT
     lda #>VIPER_SPREAD_SHOT_DURATION
     sta ENTITY_MOVE_ACCUMULATOR+WEAPON_BOOSTER_SLOT
+    bne @activate
+@shield_duration:
+    lda #<VIPER_SHIELD_DURATION
+    sta ENTITY_TIMER+WEAPON_BOOSTER_SLOT
+    lda #>VIPER_SHIELD_DURATION
+    sta ENTITY_MOVE_ACCUMULATOR+WEAPON_BOOSTER_SLOT
+@activate:
     lda ENTITY_TYPE+WEAPON_PICKUP_SLOT
     clc
     adc #WEAPON_PICKUP_STATE_RAPID
@@ -8614,6 +8680,11 @@ weapon_pickup_collect:
     lda #$00
     sta ENTITY_STATE+WEAPON_PICKUP_SLOT
     sta ENTITY_HP+WEAPON_PICKUP_SLOT
+    lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
+    cmp #WEAPON_PICKUP_STATE_SHIELD
+    bne :+
+    jsr update_shield_viper_colors
+:
     jmp show_weapon_booster_hud
 weapon_pickup_collision_done:
     rts
@@ -8621,6 +8692,8 @@ update_weapon_booster_active:
     cpx #WEAPON_PICKUP_STATE_RAPID
     beq weapon_pickup_rapid_tick
     cpx #WEAPON_PICKUP_STATE_SPREAD
+    beq weapon_pickup_rapid_tick
+    cpx #WEAPON_PICKUP_STATE_SHIELD
     bne weapon_pickup_collision_done
 weapon_pickup_rapid_tick:
     lda ENTITY_TIMER+WEAPON_BOOSTER_SLOT
@@ -8630,9 +8703,13 @@ weapon_pickup_rapid_tick:
     dec ENTITY_TIMER+WEAPON_BOOSTER_SLOT
     lda ENTITY_TIMER+WEAPON_BOOSTER_SLOT
     ora ENTITY_MOVE_ACCUMULATOR+WEAPON_BOOSTER_SLOT
-    beq :+
+    beq @expired
+    cpx #WEAPON_PICKUP_STATE_SHIELD
+    bne @hud
+    jsr update_shield_viper_colors
+@hud:
     jmp update_weapon_booster_hud
-:
+@expired:
     jmp weapon_booster_release
 
 weapon_pickup_pending_tick:
@@ -8680,16 +8757,30 @@ weapon_pickup_record_qualified_kill:
     sta ENTITY_HP+WEAPON_PICKUP_SLOT
     lda ENTITY_TYPE+WEAPON_PICKUP_NEXT_TYPE_SLOT
     sta ENTITY_TYPE+WEAPON_PICKUP_SLOT
-    beq :+
+    beq @rapid_render
+    cmp #WEAPON_PICKUP_TYPE_SPREAD
+    beq @spread_render
+    ; The prior capsule is already absent: qualification is gated on idle
+    ; slot one, and release restores its backing before state zero. Install
+    ; the shared 124-127 bank before publishing the pending Shield capsule.
+    jsr install_weapon_pickup_shield_glyph
+    lda #WEAPON_PICKUP_SHIELD_GLYPH_BASE
+    bne @store_render_id
+@spread_render:
+    jsr install_weapon_pickup_spread_glyph
     lda #(WEAPON_PICKUP_SPREAD_GLYPH_BASE|$80)
     bne @store_render_id
-:
+@rapid_render:
     lda #WEAPON_PICKUP_GLYPH_BASE
 @store_render_id:
     sta ENTITY_RENDER_ID+WEAPON_PICKUP_SLOT
+    inc ENTITY_TYPE+WEAPON_PICKUP_NEXT_TYPE_SLOT
     lda ENTITY_TYPE+WEAPON_PICKUP_NEXT_TYPE_SLOT
-    eor #WEAPON_PICKUP_TYPE_SPREAD
+    cmp #WEAPON_PICKUP_TYPE_COUNT
+    bcc :+
+    lda #WEAPON_PICKUP_TYPE_RAPID
     sta ENTITY_TYPE+WEAPON_PICKUP_NEXT_TYPE_SLOT
+:
     lda #WEAPON_PICKUP_PENDING_TIMER_LOAD
     sta ENTITY_TIMER+WEAPON_PICKUP_SLOT
     lda #WEAPON_PICKUP_STATE_PENDING
@@ -8742,6 +8833,11 @@ weapon_pickup_release:
     rts
 
 weapon_booster_release:
+    lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
+    cmp #WEAPON_PICKUP_STATE_SHIELD
+    bne :+
+    jsr restore_viper_normal_colors
+:
     lda #$00
     sta ENTITY_STATE+WEAPON_BOOSTER_SLOT
     sta ENTITY_TIMER+WEAPON_BOOSTER_SLOT
@@ -9465,6 +9561,88 @@ install_entity_effects_glyph:
     bpl @copy_glyph
     rts
 
+; Glyphs 124-127 are a single-owner dynamic capsule bank. These installers are
+; called only while slot one is idle, after reverse erase has removed every
+; screen code using the previous definition and before pending state is set.
+install_weapon_pickup_spread_glyph:
+    ldx #(WEAPON_PICKUP_SPREAD_GLYPH_BYTES-1)
+@copy:
+    lda weapon_pickup_spread_glyph,x
+    sta CHARSET+WEAPON_PICKUP_SPREAD_GLYPH_BASE*8,x
+    dex
+    bpl @copy
+    rts
+
+install_weapon_pickup_shield_glyph:
+    ldx #(WEAPON_PICKUP_SHIELD_GLYPH_BYTES-1)
+@copy:
+    lda weapon_pickup_shield_glyph,x
+    sta CHARSET+WEAPON_PICKUP_SHIELD_GLYPH_BASE*8,x
+    dex
+    bpl @copy
+    rts
+
+install_shield_hud_glyph:
+    ldx #$07
+@copy:
+    lda hud_shield_booster_glyph,x
+    sta HUD_CHARSET+CH_HUD_BOOSTER_SHIELD*8,x
+    dex
+    bpl @copy
+    rts
+
+update_shield_booster_hud:
+    lda ENTITY_TIMER+WEAPON_BOOSTER_SLOT
+    cmp #(HUD_SHIELD_FOUR_SEGMENT_MIN-1)
+    beq @three_segments
+    cmp #(HUD_SHIELD_THREE_SEGMENT_MIN-1)
+    beq @two_segments
+    cmp #(HUD_SHIELD_TWO_SEGMENT_MIN-1)
+    beq @one_segment
+    bcs @finished
+    and #(HUD_BOOSTER_BLINK_HALF_PERIOD-1)
+    cmp #(HUD_BOOSTER_BLINK_HALF_PERIOD-1)
+    bne @finished
+    lda ENTITY_TIMER+WEAPON_BOOSTER_SLOT
+    and #HUD_BOOSTER_BLINK_HALF_PERIOD
+    beq @store_blink
+    lda #CH_HUD_BOOSTER_SHIELD
+@store_blink:
+    sta SCREEN+HUD_BOOSTER_SEGMENTS_OFFSET
+@finished:
+    rts
+@three_segments:
+    lda #CH_SPACE
+    sta SCREEN+HUD_BOOSTER_SEGMENTS_OFFSET+3
+    rts
+@two_segments:
+    lda #CH_SPACE
+    sta SCREEN+HUD_BOOSTER_SEGMENTS_OFFSET+2
+    rts
+@one_segment:
+    lda #CH_SPACE
+    sta SCREEN+HUD_BOOSTER_SEGMENTS_OFFSET+1
+    rts
+
+restore_viper_normal_colors:
+    lda #PLAYER_NORMAL_HULL_COLOR
+    sta COLPM0
+    lda #PLAYER_NORMAL_ENGINE_COLOR
+    sta COLPM3
+    rts
+
+; The authoritative Shield timer doubles as the 8+8 PAL-frame pulse phase.
+; No phase advances while pause bypasses the active gameplay update.
+update_shield_viper_colors:
+    lda ENTITY_TIMER+WEAPON_BOOSTER_SLOT
+    and #HUD_BOOSTER_BLINK_HALF_PERIOD
+    beq restore_viper_normal_colors
+    lda #PLAYER_SHIELD_HULL_COLOR
+    sta COLPM0
+    lda #PLAYER_SHIELD_ENGINE_COLOR
+    sta COLPM3
+    rts
+
 entity_archetype_descriptors:
     EMIT_ENTITY_ARCHETYPE_DESCRIPTORS
 entity_archetype_descriptors_end:
@@ -9646,6 +9824,9 @@ profile_projectile_compose_end = *
 weapon_pickup_spread_glyph:
     EMIT_WEAPON_PICKUP_SPREAD_GLYPHS
 weapon_pickup_spread_glyph_end:
+weapon_pickup_shield_glyph:
+    EMIT_WEAPON_PICKUP_SHIELD_GLYPHS
+weapon_pickup_shield_glyph_end:
 
 .segment "CODE"
 entity_slot_bit_masks:
@@ -9658,11 +9839,13 @@ entity_trajectory_vx:
 .assert effect_fragment_glyph_end-effect_fragment_glyph = EFFECT_FRAGMENT_GLYPH_BYTES, error, "fragment glyph bank size changed"
 .assert weapon_pickup_glyph_end-weapon_pickup_glyph = WEAPON_PICKUP_GLYPH_BYTES, error, "Rapid Fire glyph bank size changed"
 .assert weapon_pickup_spread_glyph_end-weapon_pickup_spread_glyph = WEAPON_PICKUP_SPREAD_GLYPH_BYTES, error, "Spread Shot glyph bank size changed"
+.assert weapon_pickup_shield_glyph_end-weapon_pickup_shield_glyph = WEAPON_PICKUP_SHIELD_GLYPH_BYTES, error, "Shield glyph bank size changed"
 .assert *-__ENTITY_CODE_RUN__ <= ENTITY_CODE_RESERVED_BYTES, error, "ENTITY_CODE exceeds its unconditional RAM reservation"
 
 .export init_entity_effects, install_entity_effects_glyph
+.export install_weapon_pickup_spread_glyph, install_weapon_pickup_shield_glyph
 .export ENTITY_DEBRIS_GLYPH_BASE
-.export WEAPON_PICKUP_GLYPH_BASE, WEAPON_PICKUP_SPREAD_GLYPH_BASE, weapon_pickup_glyph
+.export WEAPON_PICKUP_GLYPH_BASE, WEAPON_PICKUP_SPREAD_GLYPH_BASE, WEAPON_PICKUP_SHIELD_GLYPH_BASE, weapon_pickup_glyph
 .export entity_effects_erase, entity_effects_update, entity_effects_render
 .export entity_spawn_debris, entity_damage_applied, entity_despawn_debris
 .export entity_begin_sector_complete, entity_complete_scroll_tick
@@ -10116,8 +10299,8 @@ stage2_validate_record_broad:
     STAGE2_FAIL_NE
     lda stage2_final_end_hi
     cmp #>$7810
-    STAGE2_FAIL_CS
-    bne stage2_validate_record_staging
+    bcc stage2_validate_record_staging
+    STAGE2_FAIL_NE
     lda stage2_final_end_lo
     cmp #<$7811
     STAGE2_FAIL_CS

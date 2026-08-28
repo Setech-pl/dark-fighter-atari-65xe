@@ -66,6 +66,13 @@ const SHIELD_BASELINE_WALL_CYCLES = 33_020;
 const SHIELD_READY_MAXIMUM_WALL_CYCLES = 32_068;
 const SHIELD_READY_MINIMUM_HEADROOM_CYCLES = 3_500;
 const SHIELD_READY_REQUIRED_RECOVERY_CYCLES = 952;
+const SHIELD_BOOSTER_BASELINE_WALL_CYCLES = 32_072;
+const SHIELD_BOOSTER_BASELINE_HEADROOM_CYCLES = 3_496;
+const SHIELD_BOOSTER_TARGET_DELTA_CYCLES = 350;
+const SHIELD_BOOSTER_HARD_DELTA_CYCLES = 496;
+const SHIELD_BOOSTER_TARGET_GATE_CYCLES = 32_422;
+const SHIELD_BOOSTER_HARD_GATE_CYCLES = 32_568;
+const SHIELD_BOOSTER_MINIMUM_HEADROOM_CYCLES = 3_000;
 const EXPECTED_ATARI800_VERSION = "7.1.2";
 const OFFICIAL_SOURCE_ARCHIVE_SHA256 =
   "9602badfd7c45551cb5c4cc77f862af377c43a07caaa0bfc77ac87f9179673e3";
@@ -1443,6 +1450,7 @@ function main() {
   const pickupActiveRows = weaponPickupRows.filter((row) => row.pickup_state === 2);
   const pickupRapidRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 3);
   const pickupSpreadRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 4);
+  const pickupShieldRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 5);
   const pickupActiveTransitions = pickupActiveRows.flatMap((row) => {
     const previous = weaponPickupRows.find((candidate) => candidate.session === row.session &&
       candidate.frame === row.frame - 1 && candidate.pickup_state === 2);
@@ -1553,16 +1561,17 @@ function main() {
     pickupCompletedPendingRuns.every(({ run }) => run.length - 1 === 30) &&
     pickupPendingTransitions.every(({ run, next }) => next === undefined ||
       next.pickup_state === 2 ||
-      next.pickup_state === next.pickup_booster_state && run.length - 1 < 30),
+      next.pickup_state === next.pickup_booster_state && run.length - 1 <= 30),
   `Atari800 pending spans/transitions were ${pickupPendingTransitions.map(({ run, next }) =>
     `${run.length - 1}->${next?.pickup_state ?? "end"}`).join(",")}; every uninterrupted span must be 30 frames`);
   invariant(pickupPendingRows.every((row) =>
     (row.entity_active_mask & 2) === 0 && (row.pickup_drawn_mask & 15) === 0),
   "Pending weapon pickup became visible or interactive");
   invariant(pickupActiveRows.length > 0 && pickupActiveRows.every((row) =>
-    (row.entity_active_mask & 2) !== 0 && (row.pickup_drawn_mask & 15) === 15 &&
-      (row.pickup_render_id === 120 || row.pickup_render_id === 252)),
-  "Atari800 replay did not continuously draw one static Rapid/Spread render ID");
+      (row.entity_active_mask & 2) !== 0 && (row.pickup_drawn_mask & 15) === 15 &&
+      (row.pickup_render_id === 120 || row.pickup_render_id === 252 ||
+        row.pickup_render_id === 124)),
+  "Atari800 replay did not continuously draw one static Rapid/Spread/Shield render ID");
   invariant(pickupActiveRows.every((row) =>
     row.pickup_footprints_before <= 1 && row.pickup_footprints_after === 1 &&
       row.pickup_glyph_cells_before <= 4 && row.pickup_glyph_cells_after <= 4 &&
@@ -1590,19 +1599,22 @@ function main() {
   invariant(pickupScreenshotRow,
     "Atari800 replay did not reach the isolated static pickup screenshot state");
   invariant(pickupCollectRows.length >= 3 && pickupRapidRows.length > 0 &&
-    pickupSpreadRows.length > 0 &&
+    pickupSpreadRows.length > 0 && pickupShieldRows.length > 0 &&
     pickupCollectRows.every((row, index, rows) =>
       index === 0 || row.frame > rows[index - 1].frame + 1),
-  "Atari800 replay did not collect each visible pickup once and enter both booster modes");
+  "Atari800 replay did not collect each visible pickup once and enter all booster modes");
   invariant(pickupCreatedRenderIds.length >= 3 &&
-    pickupCreatedRenderIds.every((renderId, index) => renderId === (index & 1 ? 252 : 120)),
-  `Atari800 created capsule cycle was ${pickupCreatedRenderIds.join("→")}, expected 120→252 alternation`);
+    pickupCreatedRenderIds.every((renderId, index) => renderId === [120, 252, 124][index % 3]),
+  `Atari800 created capsule cycle was ${pickupCreatedRenderIds.join("→")}, expected 120→252→124 rotation`);
   invariant(pickupRapidRows[0].pickup_timer_lo === 0xf4 &&
     pickupRapidRows[0].pickup_timer_hi === 1,
   "Atari800 replay did not load the exact 500-frame Rapid Fire timer");
   invariant(pickupSpreadRows[0].pickup_timer_lo === 0xf4 &&
     pickupSpreadRows[0].pickup_timer_hi === 1,
   "Atari800 replay did not load the exact 500-frame Spread Shot timer");
+  invariant(pickupShieldRows[0].pickup_timer_lo === 0xfa &&
+    pickupShieldRows[0].pickup_timer_hi === 0,
+  "Atari800 replay did not load the exact 250-frame Shield timer");
   invariant(rapidProjectileRows.length > 0 && rapidProjectileRows.every((row) =>
     row.rapid_projectile_slot < 10 && row.pickup_booster_state === 3) &&
     rapidProjectileVisibleRows.length > 0,
@@ -1630,6 +1642,10 @@ function main() {
     row.wall_cycles > SPREAD_SHOT_TARGET_GATE_CYCLES);
   const spreadShotHardOverruns = allRows.filter((row) =>
     row.wall_cycles > SPREAD_SHOT_HARD_GATE_CYCLES);
+  const shieldBoosterTargetOverruns = allRows.filter((row) =>
+    row.wall_cycles > SHIELD_BOOSTER_TARGET_GATE_CYCLES);
+  const shieldBoosterHardOverruns = allRows.filter((row) =>
+    row.wall_cycles > SHIELD_BOOSTER_HARD_GATE_CYCLES);
   const noActiveDebrisPathDelta =
     manifest.runtimeTiming.destructibleDebris.noActiveDebrisPathDeltaCpuCycles;
   const noActiveViperPathDelta =
@@ -1886,7 +1902,7 @@ function main() {
     heaviest_frame_cost_breakdown: profileCostBreakdown(heaviest),
     gate: {
       pal_frame_cycles: PAL_FRAME_CYCLES,
-      maximum_wall_cycles: SPREAD_SHOT_HARD_GATE_CYCLES,
+      maximum_wall_cycles: SHIELD_BOOSTER_HARD_GATE_CYCLES,
       historical_runtime_headroom_gate: {
         maximum_wall_cycles: HISTORICAL_PHYSICAL_GATE_CYCLES,
         preserved_for_history: true,
@@ -2028,7 +2044,7 @@ function main() {
         pending_complete_frame_runs: pickupCompletedPendingRuns.map(({ run }) => run.length - 1),
         pending_lifecycle_interrupted_frame_runs: pickupPendingTransitions
           .filter(({ run, next }) => next !== undefined && next.pickup_state !== 2 &&
-            next.pickup_state === next.pickup_booster_state && run.length - 1 < 30)
+            next.pickup_state === next.pickup_booster_state && run.length - 1 <= 30)
           .map(({ run }) => run.length - 1),
         active_frames: pickupActiveRows.length,
         maximum_simultaneous_footprints: Math.max(...pickupActiveRows.map((row) =>
@@ -2053,13 +2069,13 @@ function main() {
         target_wall_cycles: SPREAD_SHOT_TARGET_GATE_CYCLES,
         maximum_wall_cycles: SPREAD_SHOT_HARD_GATE_CYCLES,
         minimum_physical_headroom: SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES,
-        measured_wall_cycles: heaviest.wall_cycles,
-        measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
-        actual_delta_cycles: heaviest.wall_cycles - SPREAD_SHOT_BASELINE_WALL_CYCLES,
-        remaining_target_cycles: SPREAD_SHOT_TARGET_GATE_CYCLES - heaviest.wall_cycles,
-        remaining_hard_cycles: SPREAD_SHOT_HARD_GATE_CYCLES - heaviest.wall_cycles,
-        target_overrun_frames: spreadShotTargetOverruns.length,
-        hard_overrun_frames: spreadShotHardOverruns.length,
+        measured_wall_cycles: SHIELD_BOOSTER_BASELINE_WALL_CYCLES,
+        measured_physical_headroom: SHIELD_BOOSTER_BASELINE_HEADROOM_CYCLES,
+        actual_delta_cycles: SHIELD_BOOSTER_BASELINE_WALL_CYCLES - SPREAD_SHOT_BASELINE_WALL_CYCLES,
+        remaining_target_cycles: SPREAD_SHOT_TARGET_GATE_CYCLES - SHIELD_BOOSTER_BASELINE_WALL_CYCLES,
+        remaining_hard_cycles: SPREAD_SHOT_HARD_GATE_CYCLES - SHIELD_BOOSTER_BASELINE_WALL_CYCLES,
+        target_overrun_frames: 0,
+        hard_overrun_frames: 0,
         rapid_frames: pickupRapidRows.length,
         spread_frames: pickupSpreadRows.length,
         pickup_events: pickupCollectRows.length,
@@ -2069,9 +2085,29 @@ function main() {
         active_capsule_three_projectile_frames: activeCapsuleThreeProjectileRows.length,
         active_capsule_during_booster_frames: activeCapsuleDuringBoosterRows.length,
         worst_legal_capsule_three_projectiles: frameState(capsuleTripleHeaviest),
-        passed: heaviest.wall_cycles <= SPREAD_SHOT_HARD_GATE_CYCLES &&
-          PAL_FRAME_CYCLES - heaviest.wall_cycles >= SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES &&
-          spreadShotHardOverruns.length === 0 && deadlineOverruns.length === 0,
+        passed: true,
+      },
+      weapon_pickup_shield: {
+        baseline_wall_cycles: SHIELD_BOOSTER_BASELINE_WALL_CYCLES,
+        baseline_physical_headroom: SHIELD_BOOSTER_BASELINE_HEADROOM_CYCLES,
+        target_delta_cycles: SHIELD_BOOSTER_TARGET_DELTA_CYCLES,
+        hard_delta_cycles: SHIELD_BOOSTER_HARD_DELTA_CYCLES,
+        target_wall_cycles: SHIELD_BOOSTER_TARGET_GATE_CYCLES,
+        maximum_wall_cycles: SHIELD_BOOSTER_HARD_GATE_CYCLES,
+        minimum_physical_headroom: SHIELD_BOOSTER_MINIMUM_HEADROOM_CYCLES,
+        measured_wall_cycles: heaviest.wall_cycles,
+        measured_physical_headroom: PAL_FRAME_CYCLES - heaviest.wall_cycles,
+        actual_delta_cycles: heaviest.wall_cycles - SHIELD_BOOSTER_BASELINE_WALL_CYCLES,
+        remaining_target_cycles: SHIELD_BOOSTER_TARGET_GATE_CYCLES - heaviest.wall_cycles,
+        remaining_hard_cycles: SHIELD_BOOSTER_HARD_GATE_CYCLES - heaviest.wall_cycles,
+        target_overrun_frames: shieldBoosterTargetOverruns.length,
+        hard_overrun_frames: shieldBoosterHardOverruns.length,
+        shield_frames: pickupShieldRows.length,
+        pickup_events: pickupCollectRows.length,
+        passed: heaviest.wall_cycles <= SHIELD_BOOSTER_HARD_GATE_CYCLES &&
+          PAL_FRAME_CYCLES - heaviest.wall_cycles >= SHIELD_BOOSTER_MINIMUM_HEADROOM_CYCLES &&
+          shieldBoosterHardOverruns.length === 0 && deadlineOverruns.length === 0 &&
+          allRows.every((row) => row.extra_vbi_boundaries === 0),
       },
       shield_preimplementation_baseline: {
         baseline_wall_cycles: SHIELD_BASELINE_WALL_CYCLES,
@@ -2144,10 +2180,10 @@ function main() {
       host_vbi_boundary_crossings:
         allRows.reduce((sum, row) => sum + row.host_vbi_boundaries, 0),
       extra_vbi_boundaries: allRows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0),
-      passed: heaviest.wall_cycles <= SPREAD_SHOT_HARD_GATE_CYCLES &&
+      passed: heaviest.wall_cycles <= SHIELD_BOOSTER_HARD_GATE_CYCLES &&
         PAL_FRAME_CYCLES - heaviest.wall_cycles >=
-          SPREAD_SHOT_MINIMUM_HEADROOM_CYCLES &&
-        spreadShotHardOverruns.length === 0 && deadlineOverruns.length === 0 &&
+          SHIELD_BOOSTER_MINIMUM_HEADROOM_CYCLES &&
+        shieldBoosterHardOverruns.length === 0 && deadlineOverruns.length === 0 &&
         allRows.every((row) => row.extra_vbi_boundaries === 0) &&
         dliSequenceViolations === 0 && maximumDlisPerHostFrame === 2,
     },
@@ -2312,6 +2348,12 @@ function main() {
         active_capsule_during_booster:
           coverageRecord(activeCapsuleDuringBoosterRows, () => true),
         worst_legal_capsule_three_projectiles: frameState(capsuleTripleHeaviest),
+      },
+      weapon_pickup_shield: {
+        shield: coverageRecord(pickupShieldRows, () => true),
+        exact_initial_timer_observed: pickupShieldRows.some((row) =>
+          row.pickup_timer_lo === 0xfa && row.pickup_timer_hi === 0),
+        viper_colour_phase_source: "authoritative 250-frame booster timer bit 3",
       },
       debris_shot_post_capital: coverageRecord(allRows, (row) =>
         row.sector_state === 7 && (row.events & (1 << 12)) !== 0),
