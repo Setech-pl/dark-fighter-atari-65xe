@@ -901,6 +901,7 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
   }
   const expected = {
     start: labels.get("start"),
+    xex_entry: labels.get("boot_stage2_xex_entry"),
     loader_dlist: LOADER_DISPLAY_LIST_ADDRESS,
     main_menu_dlist: labels.get("main_menu_display_list"),
     playfield_dlist_a: labels.get("PLAYFIELD_DLIST_A"),
@@ -977,8 +978,8 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
       milestones.gameplay_init <= milestones.main_loop && milestones.main_loop < 750,
     `${definition.id} did not execute the complete loader-to-gameplay handoff`);
     if (definition.id.startsWith("xex")) {
-      invariant(menu.runad === expected.start,
-        `${definition.id} XEX RUNAD does not point at the game entry`);
+      invariant(menu.runad === expected.xex_entry,
+        `${definition.id} XEX RUNAD does not point at the stage-2 parity entry`);
     } else {
       invariant(menu.dosvec === expected.start,
         `${definition.id} ATR DOSVEC does not point at the game entry`);

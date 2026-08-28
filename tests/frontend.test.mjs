@@ -12,6 +12,7 @@ import {
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
+const residentSource = source.slice(0, source.indexOf('.segment "BOOT_STAGE2"'));
 const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
 const labels = new Map(
   fs
@@ -227,7 +228,7 @@ test("TOP SCORES renders all ten RAM records and returns only on FIRE", () => {
     /TOP_SCORE_RECORD_COUNT\s*=\s*10[\s\S]+draw_top_score_bcd_byte:[\s\S]+CH_FRONT_ZERO/);
   assert.match(routine("handle_top_scores_input"), /jmp handle_game_over_input/);
   assert.match(routine("handle_game_over_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
-  assert.doesNotMatch(source, /jsr SIOV|initials_entry|save_high_scores/i);
+  assert.doesNotMatch(residentSource, /jsr SIOV|initials_entry|save_high_scores/i);
 });
 
 test("ANTIC 6 attributes route the selected marker and full label to $D8", () => {
@@ -332,7 +333,7 @@ test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => 
   assert.match(source, /\.byte "DARK FIGHTER ENDED",0/);
   assert.match(source, /\.byte "PRESS RESET TO RESTART",0/);
   assert.doesNotMatch(exited, /DOSVEC|SIOV/);
-  assert.doesNotMatch(source, /jmp \(DOSVEC\)|jsr SIOV/);
+  assert.doesNotMatch(residentSource, /jmp \(DOSVEC\)|jsr SIOV/);
 });
 
 test("frontend charset and transient loader tail stay in their bounded ranges", () => {

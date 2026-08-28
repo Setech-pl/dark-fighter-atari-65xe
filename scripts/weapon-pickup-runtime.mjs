@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseAtr, parseXex } from "./formats.mjs";
 import { Nmos6502 } from "./nmos6502.mjs";
+import { installBootArtifact } from "./runtime-image.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..");
@@ -65,20 +65,6 @@ function drawRuntimeHullScene(memory, labels, { head, topPhase }) {
   }
 }
 
-function loadPayload(root, artifact, manifest) {
-  if (artifact === "xex") {
-    return parseXex(fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"))).segments[0];
-  }
-  if (artifact === "atr") {
-    return {
-      start: manifest.loadAddress,
-      data: parseAtr(fs.readFileSync(path.join(root, "dist", "dark-fighter.atr")))
-        .body.subarray(0, manifest.payloadBytes),
-    };
-  }
-  throw new Error(`Unknown weapon-pickup trace artifact ${artifact}`);
-}
-
 function initialiseRows(memory, labels, head = 0) {
   const lo = requiredLabel(labels, "PLAYFIELD_ROW_LO");
   const hi = requiredLabel(labels, "PLAYFIELD_ROW_HI");
@@ -114,10 +100,10 @@ function initialiseRuntime(root, artifact, coldFill = 0) {
   const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
   const memory = new Uint8Array(0x10000);
   memory.fill(coldFill);
-  const payload = loadPayload(root, artifact, manifest);
-  memory.set(payload.data, payload.start);
+  const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
+  if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   for (const routine of [
-    "stage_boot_streams", "unpack_boot_broadside_runtime", "unpack_resident_runtime",
+    "stage_boot_streams", "unpack_resident_runtime",
     "unpack_entity_runtime", "init_entity_effects", "stage_a2_kernel",
     "unpack_starfield_runtime", "copy_charset", "copy_hud_charset", "init_fighter_projectiles",
     "install_entity_effects_glyph",

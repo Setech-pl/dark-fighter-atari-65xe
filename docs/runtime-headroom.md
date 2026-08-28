@@ -12,10 +12,13 @@ the packed boot BIN, XEX, and ATR.
 
 | Measure | Current result | Current gate |
 | --- | ---: | ---: |
-| Boot payload | 16,384 B / 128 sectors | 16,384 B / 128 sectors |
-| Source-owned payload reserve | 73 B | at least 64 B for this stage |
-| Formatter padding | 0 B | no hidden reserve claimed |
-| XEX size | 16,396 B | artifact format result |
+| Initial boot block | 12,032 B / 94 sectors | dynamic BRCNT 1..255 |
+| Extension chunks | 5,632 B / 44 sectors | dynamic, manifest-owned |
+| Total occupied transport | 17,664 B / 138 sectors | no preallocated empty sectors |
+| Additional loader capacity | 44,800 B | at least 8 KiB |
+| Free ATR transport | 74,496 B / 582 sectors | reported separately from residency |
+| Remaining safe residency | 6,841 B fragmented | no new runtime range consumed |
+| XEX size | 18,617 B | artifact format result |
 | ATR size | 92,176 B | standard 90 KB single-density image |
 | PAL frame | 35,568 cycles | fixed PAL frame |
 | Worst measured wall | 32,072 cycles | preferred at most 32,240; hard 32,540 |
@@ -61,9 +64,9 @@ must not be added to the wall total.
 
 ## Artifact and cold-start evidence
 
-- Boot BIN: `23d9548db1d0f47509a1bf39217b07809ee6902959a94fc667109ce2a031d614`.
-- XEX: `38a6e33a35e86d594f208b2d972b0977aff3e15eb41509185b0a2057a3f96f20`.
-- ATR: `b9cd010e4c69555fd2aab0929deff99d8201e1f315c0c9aa302eddc002e22087`.
+- Boot BIN: `be84dcaa5478524f976d813cfedb786bdee9f83a06eddd95bdbc0f5139e90af5`.
+- XEX: `1044538bca3ccb0df9792891aac301bd88bdced394b8243b1ea9d28f88502e5b`.
+- ATR: `f68034584284cae4db500cbc34bd352a4bfb5255bb143f066dc6b704f333163c`.
 - XEX and ATR cold boots pass with `$A5` and `$5A` fills across
   `$8000-$9FFF`.
 - XEX and ATR each run two 3,000-frame integrity sessions, for 6,000 frames

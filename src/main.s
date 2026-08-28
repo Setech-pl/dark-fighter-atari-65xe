@@ -17,6 +17,7 @@
 .include "loader-display-list.inc"
 
 .import __A2_KERNEL_RUN__, __A2_KERNEL_SIZE__
+.import __BOOT_STAGE2_LOAD__, __BOOT_STAGE2_RUN__, __BOOT_STAGE2_SIZE__
 
 ; -----------------------------------------------------------------------------
 ; OS workspace and vectors
@@ -25,6 +26,18 @@ DOSVEC      = $000A
 APPMHI      = $0014
 VDSLST      = $0200
 MEMLO       = $02E7
+SIOV        = $E459
+DDEVIC      = $0300
+DUNIT       = $0301
+DCOMND      = $0302
+DSTATS      = $0303
+DBUFLO      = $0304
+DBUFHI      = $0305
+DTIMLO      = $0306
+DBYTLO      = $0308
+DBYTHI      = $0309
+DAUX1       = $030A
+DAUX2       = $030B
 
 ; -----------------------------------------------------------------------------
 ; GTIA (write/read aliases share addresses)
@@ -810,6 +823,8 @@ boot_header:
 
 ; The OS enters at BOOTAD+6 after loading the consecutive boot sectors.
 boot_entry:
+    jsr boot_stage2_atr_entry
+    nop                         ; preserve the reviewed $201E runtime entry
     lda #<$3B00
     sta MEMLO
     sta APPMHI
@@ -819,8 +834,6 @@ boot_entry:
 
     lda #<start
     sta DOSVEC
-    lda #>start
-    sta DOSVEC+1
 
     clc
 boot_return:
@@ -840,7 +853,11 @@ start:
     ; every source that later expansion can overwrite, expand BROADSIDE, then
     ; restore the byte-exact resident suffix at its linked address.
     jsr stage_boot_streams
-    jsr unpack_boot_broadside_runtime
+    lda boot_chunk_ready
+    cmp #$02
+    beq :+
+    jmp boot_stage2_error
+:
     jsr unpack_resident_runtime
     jsr unpack_entity_runtime
     jsr init_entity_effects
@@ -1090,6 +1107,8 @@ hud_booster_label:
     .byte CH_HUD_A+18,CH_HUD_A+19,CH_SPACE
 hud_hull_segment_thresholds:
     .byte 3,5,8,10
+boot_chunk_ready:
+    .byte $00
 
 .assert *-start <= $01A3, error, "resident bootstrap prefix exceeds its fixed boundary"
 .res $01A3-(*-start)
@@ -9663,3 +9682,527 @@ entity_trajectory_vx:
 .export render_interactive_entity_overlays
 .export entity_archetype_descriptors, entity_debris_glyph, effect_fragment_glyph
 .export entity_raider_fragment_render_ids, entity_trajectory_vx
+
+; -----------------------------------------------------------------------------
+; Transient second-stage disk loader. The linker gives this segment the run
+; address $21C1, where the resident suffix replaces it after all extension
+; sectors have been validated and published. It executes only while the Atari
+; OS and SIO remain live; no byte survives into the gameplay hot path.
+
+.segment "BOOT_STAGE2"
+
+CHUNK_MANIFEST_BYTES = 30
+CHUNK_MANIFEST_MAX_BYTES = 12+CHUNK_MAX_COUNT*16+2
+CHUNK_RECORD          = 12
+CHUNK_MAX_COUNT       = 8
+CHUNK_TYPE_LZ         = 1
+CHUNK_STAGING_BROAD   = 1
+CHUNK_STAGING_ADDRESS = $8100
+CHUNK_FINAL_ADDRESS   = $5E10
+CHUNK_STAGING_SECTORS_MAX = 50
+
+.macro STAGE2_FAIL_NE
+    .local ok
+    beq ok
+    jmp boot_stage2_error
+ok:
+.endmacro
+.macro STAGE2_FAIL_EQ
+    .local ok
+    bne ok
+    jmp boot_stage2_error
+ok:
+.endmacro
+.macro STAGE2_FAIL_CS
+    .local ok
+    bcc ok
+    jmp boot_stage2_error
+ok:
+.endmacro
+.macro STAGE2_FAIL_CC
+    .local ok
+    bcs ok
+    jmp boot_stage2_error
+ok:
+.endmacro
+.macro STAGE2_FAIL_MI
+    .local ok
+    bpl ok
+    jmp boot_stage2_error
+ok:
+.endmacro
+
+boot_stage2_atr_entry:
+    jsr boot_stage2_validate_manifest
+    lda #<(boot_chunk_manifest+CHUNK_RECORD)
+    sta frontend_data_ptr
+    lda #>(boot_chunk_manifest+CHUNK_RECORD)
+    sta frontend_data_ptr+1
+    lda boot_chunk_manifest+6
+    sta stage2_chunk_remaining
+stage2_load_chunk:
+    lda #$31
+    sta DDEVIC
+    lda #$01
+    sta DUNIT
+    lda #$52
+    sta DCOMND
+    lda #$40
+    sta DSTATS
+    lda #$0F
+    sta DTIMLO
+    lda #$80
+    sta DBYTLO
+    lda #$00
+    sta DBYTHI
+    lda #<CHUNK_STAGING_ADDRESS
+    sta DBUFLO
+    lda #>CHUNK_STAGING_ADDRESS
+    sta DBUFHI
+    ldy #$00
+    lda (frontend_data_ptr),y
+    sta DAUX1
+    iny
+    lda (frontend_data_ptr),y
+    sta DAUX2
+    iny
+    lda (frontend_data_ptr),y
+    sta stage2_sector_remaining
+stage2_read_sector:
+    jsr SIOV
+    tya
+    STAGE2_FAIL_MI
+    clc
+    lda DBUFLO
+    adc #$80
+    sta DBUFLO
+    bcc :+
+    inc DBUFHI
+:
+    inc DAUX1
+    bne :+
+    inc DAUX2
+:
+    dec stage2_sector_remaining
+    bne stage2_read_sector
+
+    lda #<CHUNK_STAGING_ADDRESS
+    sta src_ptr
+    lda #>CHUNK_STAGING_ADDRESS
+    sta src_ptr+1
+    ldy #$02
+    lda (frontend_data_ptr),y
+    lsr
+    sta stage2_crc_length_hi
+    lda #$00
+    ror
+    sta stage2_crc_length_lo
+    jsr boot_stage2_crc16
+    lda stage2_crc_lo
+    ldy #$0A
+    cmp (frontend_data_ptr),y
+    STAGE2_FAIL_NE
+    lda stage2_crc_hi
+    iny
+    cmp (frontend_data_ptr),y
+    STAGE2_FAIL_NE
+
+    lda #<CHUNK_STAGING_ADDRESS
+    sta broadside_read_source+1
+    lda #>CHUNK_STAGING_ADDRESS
+    sta broadside_read_source+2
+    ldy #$08
+    lda (frontend_data_ptr),y
+    sta broadside_destination+1
+    iny
+    lda (frontend_data_ptr),y
+    sta broadside_destination+2
+    ldy #$0C
+    lda (frontend_data_ptr),y
+    beq stage2_publish_raw
+    ; A valid LZ stream must finish exactly at finalDestination+rawLength.
+    ; The shared decoder advances this self-modified store operand after every
+    ; output byte, so the postcondition costs no runtime-resident state.
+    lda stage2_final_end_lo
+    sta stage2_expected_output_lo
+    lda stage2_final_end_hi
+    sta stage2_expected_output_hi
+    jsr broadside_unpack_command
+    lda broadside_destination+1
+    cmp stage2_expected_output_lo
+    STAGE2_FAIL_NE
+    lda broadside_destination+2
+    cmp stage2_expected_output_hi
+    STAGE2_FAIL_NE
+    jmp stage2_chunk_published
+stage2_publish_raw:
+    lda #<CHUNK_STAGING_ADDRESS
+    sta src_ptr
+    lda #>CHUNK_STAGING_ADDRESS
+    sta src_ptr+1
+    lda broadside_destination+1
+    sta dst_ptr
+    lda broadside_destination+2
+    sta dst_ptr+1
+    ldy #$06
+    lda (frontend_data_ptr),y
+    sta loader_repeat_value
+    iny
+    lda (frontend_data_ptr),y
+    sta row_counter
+    jsr copy_boot_stream
+stage2_chunk_published:
+    clc
+    lda frontend_data_ptr
+    adc #$10
+    sta frontend_data_ptr
+    bcc :+
+    inc frontend_data_ptr+1
+:
+    dec stage2_chunk_remaining
+    beq :+
+    jmp stage2_load_chunk
+:
+    lda #$02
+    sta boot_chunk_ready
+    lda #>start
+    sta DOSVEC+1
+    rts
+
+boot_stage2_xex_entry:
+    lda #$02
+    sta boot_chunk_ready
+    jmp start
+
+boot_stage2_validate_manifest:
+    lda boot_chunk_manifest
+    cmp #'D'
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+1
+    cmp #'F'
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+2
+    cmp #'M'
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+3
+    cmp #'C'
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+4
+    cmp #$01
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+5
+    cmp #$0C
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+6
+    STAGE2_FAIL_EQ
+    cmp #(CHUNK_MAX_COUNT+1)
+    STAGE2_FAIL_CS
+    lda boot_chunk_manifest+7
+    cmp #$10
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+6
+    asl
+    asl
+    asl
+    asl
+    clc
+    adc #(CHUNK_RECORD+2)
+    sta stage2_manifest_bytes
+    lda boot_chunk_manifest+10
+    cmp stage2_manifest_bytes
+    STAGE2_FAIL_NE
+    lda boot_chunk_manifest+11
+    cmp #>CHUNK_MANIFEST_BYTES
+    STAGE2_FAIL_NE
+
+    lda #<boot_chunk_manifest
+    sta src_ptr
+    lda #>boot_chunk_manifest
+    sta src_ptr+1
+    lda stage2_manifest_bytes
+    sec
+    sbc #$02
+    sta stage2_crc_length_lo
+    lda #$00
+    sta stage2_crc_length_hi
+    jsr boot_stage2_crc16
+    lda stage2_crc_lo
+    ldy stage2_manifest_bytes
+    dey
+    dey
+    cmp boot_chunk_manifest,y
+    STAGE2_FAIL_NE
+    lda stage2_crc_hi
+    iny
+    cmp boot_chunk_manifest,y
+    STAGE2_FAIL_NE
+
+    ; Validate every record before the first SIO read or destination write.
+    lda #<(boot_chunk_manifest+CHUNK_RECORD)
+    sta frontend_data_ptr
+    lda #>(boot_chunk_manifest+CHUNK_RECORD)
+    sta frontend_data_ptr+1
+    lda boot_chunk_manifest+6
+    sta stage2_chunk_remaining
+    lda boot_header+1
+    clc
+    adc #$01
+    sta stage2_expected_sector_lo
+    lda #$00
+    adc #$00
+    sta stage2_expected_sector_hi
+@record:
+    jsr boot_stage2_validate_record
+    clc
+    lda frontend_data_ptr
+    adc #$10
+    sta frontend_data_ptr
+    bcc :+
+    inc frontend_data_ptr+1
+:
+    dec stage2_chunk_remaining
+    bne @record
+    sec
+    lda stage2_expected_sector_lo
+    sbc #$01
+    cmp boot_chunk_manifest+8
+    STAGE2_FAIL_NE
+    lda stage2_expected_sector_hi
+    sbc #$00
+    cmp boot_chunk_manifest+9
+    STAGE2_FAIL_NE
+    cmp #$03
+    STAGE2_FAIL_CS
+    cmp #$02
+    bne :+
+    lda boot_chunk_manifest+8
+    cmp #$D1
+    STAGE2_FAIL_CS
+:
+
+    rts
+
+boot_stage2_validate_record:
+    ldy #$00
+    lda (frontend_data_ptr),y
+    cmp stage2_expected_sector_lo
+    STAGE2_FAIL_NE
+    iny
+    lda (frontend_data_ptr),y
+    cmp stage2_expected_sector_hi
+    STAGE2_FAIL_NE
+    ldy #$03
+    lda (frontend_data_ptr),y
+    STAGE2_FAIL_NE
+    dey
+    lda (frontend_data_ptr),y
+    STAGE2_FAIL_EQ
+    cmp #(CHUNK_STAGING_SECTORS_MAX+1)
+    STAGE2_FAIL_CS
+    clc
+    adc stage2_expected_sector_lo
+    sta stage2_expected_sector_lo
+    bcc :+
+    inc stage2_expected_sector_hi
+:
+    ldy #$02
+    lda (frontend_data_ptr),y
+    lsr
+    sta stage2_capacity_hi
+    lda #$00
+    ror
+    sta stage2_capacity_lo
+    clc
+    adc #<CHUNK_STAGING_ADDRESS
+    sta stage2_staging_end_lo
+    lda stage2_capacity_hi
+    adc #>CHUNK_STAGING_ADDRESS
+    sta stage2_staging_end_hi
+    ldy #$05
+    lda (frontend_data_ptr),y
+    sta stage2_crc_length_hi
+    dey
+    lda (frontend_data_ptr),y
+    ora stage2_crc_length_hi
+    STAGE2_FAIL_EQ
+    lda stage2_capacity_lo
+    cmp (frontend_data_ptr),y
+    iny
+    lda stage2_capacity_hi
+    sbc (frontend_data_ptr),y
+    STAGE2_FAIL_CC
+    iny
+    lda (frontend_data_ptr),y
+    iny
+    ora (frontend_data_ptr),y
+    STAGE2_FAIL_EQ
+    ldy #$08
+    lda (frontend_data_ptr),y
+    sta stage2_capacity_lo
+    iny
+    lda (frontend_data_ptr),y
+    sta stage2_capacity_hi
+    ldy #$06
+    clc
+    lda (frontend_data_ptr),y
+    adc stage2_capacity_lo
+    sta stage2_final_end_lo
+    iny
+    lda (frontend_data_ptr),y
+    adc stage2_capacity_hi
+    STAGE2_FAIL_CS
+    sta stage2_final_end_hi
+    cmp #$A1
+    STAGE2_FAIL_CS
+    cmp #$A0
+    bne :+
+    lda stage2_final_end_lo
+    STAGE2_FAIL_NE
+:
+    ldy #$0C
+    lda (frontend_data_ptr),y
+    cmp #$02
+    STAGE2_FAIL_CS
+    bne :+
+    ; RAW publication is a direct copy: packed and raw lengths must match.
+    ldy #$04
+    lda (frontend_data_ptr),y
+    ldy #$06
+    cmp (frontend_data_ptr),y
+    STAGE2_FAIL_NE
+    ldy #$05
+    lda (frontend_data_ptr),y
+    ldy #$07
+    cmp (frontend_data_ptr),y
+    STAGE2_FAIL_NE
+:
+    ldy #$0D
+    lda (frontend_data_ptr),y
+    cmp #CHUNK_STAGING_BROAD
+    beq stage2_validate_record_broad
+    cmp #$02
+    STAGE2_FAIL_NE
+    ldy #$09
+    lda (frontend_data_ptr),y
+    cmp #$4E
+    STAGE2_FAIL_CC
+    cmp #$A0
+    STAGE2_FAIL_CS
+    ldy #$09
+    lda (frontend_data_ptr),y
+    cmp #>CHUNK_STAGING_ADDRESS
+    bcc stage2_validate_record_staging
+    cmp stage2_staging_end_hi
+    bcc stage2_validate_record_overlap
+    bne stage2_validate_record_staging
+    dey
+    lda (frontend_data_ptr),y
+    cmp stage2_staging_end_lo
+    bcs stage2_validate_record_staging
+stage2_validate_record_overlap:
+    jmp boot_stage2_error
+stage2_validate_record_broad:
+    ldy #$08
+    lda (frontend_data_ptr),y
+    cmp #<CHUNK_FINAL_ADDRESS
+    STAGE2_FAIL_NE
+    iny
+    lda (frontend_data_ptr),y
+    cmp #>CHUNK_FINAL_ADDRESS
+    STAGE2_FAIL_NE
+    ldy #$0C
+    lda (frontend_data_ptr),y
+    cmp #CHUNK_TYPE_LZ
+    STAGE2_FAIL_NE
+    lda stage2_final_end_hi
+    cmp #>$7810
+    STAGE2_FAIL_CS
+    bne stage2_validate_record_staging
+    lda stage2_final_end_lo
+    cmp #<$7811
+    STAGE2_FAIL_CS
+stage2_validate_record_staging:
+    ldy #$0E
+    lda (frontend_data_ptr),y
+    cmp #<CHUNK_STAGING_ADDRESS
+    STAGE2_FAIL_NE
+    iny
+    lda (frontend_data_ptr),y
+    cmp #>CHUNK_STAGING_ADDRESS
+    STAGE2_FAIL_NE
+    rts
+
+boot_stage2_crc16:
+    lda #$FF
+    sta stage2_crc_lo
+    sta stage2_crc_hi
+@byte:
+    ldy #$00
+    lda (src_ptr),y
+    eor stage2_crc_hi
+    sta stage2_crc_hi
+    ldx #$08
+@bit:
+    asl stage2_crc_lo
+    rol stage2_crc_hi
+    bcc :+
+    lda stage2_crc_lo
+    eor #$21
+    sta stage2_crc_lo
+    lda stage2_crc_hi
+    eor #$10
+    sta stage2_crc_hi
+:
+    dex
+    bne @bit
+    inc src_ptr
+    bne :+
+    inc src_ptr+1
+:
+    lda stage2_crc_length_lo
+    bne :+
+    dec stage2_crc_length_hi
+:
+    dec stage2_crc_length_lo
+    lda stage2_crc_length_lo
+    ora stage2_crc_length_hi
+    bne @byte
+    rts
+
+boot_stage2_error:
+    sei
+    lda #$00
+    sta NMIEN
+    sta DMACTL
+    lda #$34
+    sta COLBK
+@halt:
+    jmp @halt
+
+stage2_sector_remaining: .byte $00
+stage2_crc_length_lo:    .byte $00
+stage2_crc_length_hi:    .byte $00
+stage2_crc_lo:           .byte $00
+stage2_crc_hi:           .byte $00
+stage2_capacity_lo:      .byte $00
+stage2_capacity_hi:      .byte $00
+stage2_chunk_remaining:  .byte $00
+stage2_manifest_bytes:   .byte $00
+stage2_expected_sector_lo:.byte $00
+stage2_expected_sector_hi:.byte $00
+stage2_final_end_lo:      .byte $00
+stage2_final_end_hi:      .byte $00
+stage2_staging_end_lo:    .byte $00
+stage2_staging_end_hi:    .byte $00
+stage2_expected_output_lo:.byte $00
+stage2_expected_output_hi:.byte $00
+
+boot_chunk_manifest:
+    .res CHUNK_MANIFEST_MAX_BYTES,$FF
+boot_chunk_manifest_end:
+
+.assert boot_chunk_manifest_end-boot_chunk_manifest = CHUNK_MANIFEST_MAX_BYTES, error, "stage-2 manifest capacity changed"
+.assert *-__BOOT_STAGE2_RUN__ <= $0800, error, "stage-2 loader exceeds transient overlay"
+
+.export boot_stage2_atr_entry, boot_stage2_xex_entry, boot_stage2_error
+.export boot_chunk_manifest, boot_chunk_manifest_end

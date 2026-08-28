@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseAtr, parseXex } from "./formats.mjs";
 import { Nmos6502 } from "./nmos6502.mjs";
+import { installBootArtifact } from "./runtime-image.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..");
@@ -31,20 +31,6 @@ function runRoutine(memory, labels, name) {
   for (let steps = 0; steps < 300_000 && cpu.pc !== stop; steps += 1) cpu.step();
   if (cpu.pc !== stop) throw new Error(`${name} did not return`);
   return cpu.cycles;
-}
-
-function loadPayload(root, artifact, manifest) {
-  if (artifact === "xex") {
-    return parseXex(fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"))).segments[0];
-  }
-  if (artifact === "atr") {
-    return {
-      start: manifest.loadAddress,
-      data: parseAtr(fs.readFileSync(path.join(root, "dist", "dark-fighter.atr")))
-        .body.subarray(0, manifest.payloadBytes),
-    };
-  }
-  throw new Error(`Unknown debris trace artifact ${artifact}`);
 }
 
 function logicalScreen(memory, labels) {
@@ -145,11 +131,9 @@ export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "dark-fighter-manifest.json")));
   const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
   const memory = new Uint8Array(0x10000);
-  const payload = loadPayload(root, artifact, manifest);
-  memory.set(payload.data, payload.start);
-
+  const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
+  if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "stage_boot_streams");
-  runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "unpack_resident_runtime");
   runRoutine(memory, labels, "unpack_entity_runtime");
   runRoutine(memory, labels, "init_entity_effects");
@@ -221,11 +205,9 @@ export function executeRaiderBreakupTrace({ root = defaultRoot, artifact = "xex"
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "dark-fighter-manifest.json")));
   const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
   const memory = new Uint8Array(0x10000);
-  const payload = loadPayload(root, artifact, manifest);
-  memory.set(payload.data, payload.start);
-
+  const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
+  if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "stage_boot_streams");
-  runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "unpack_resident_runtime");
   runRoutine(memory, labels, "unpack_entity_runtime");
   runRoutine(memory, labels, "init_entity_effects");

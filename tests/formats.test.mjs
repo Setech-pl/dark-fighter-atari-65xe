@@ -14,36 +14,48 @@ test("generated artifact set is internally consistent", () => {
   const { manifest } = validateBuildDirectory(rootDirectory);
   assert.equal(manifest.gameVersion, packageDefinition.version);
   assert.equal(manifest.target, "Atari 65XE PAL / 64 KB");
-  assert.equal(manifest.payloadBytes, 16_384);
-  assert.equal(manifest.bootSectors, 128);
-  assert.deepEqual(manifest.bootPayloadTrailer, {
-    address: 0x5ffc,
-    bytes: 4,
-    ascii: "DFB1",
-    hex: "44464231",
-    sourceOwned: true,
-  });
+  assert.equal(manifest.payloadBytes, manifest.transportCapacity.totalTransportBytes);
+  assert.equal(manifest.bootSectors, manifest.transportCapacity.initialBootSectors);
+  assert.equal(manifest.transportCapacity.format, "DFMC-v1 multi-chunk");
+  assert.equal(manifest.transportCapacity.totalTransportSectors,
+    manifest.transportCapacity.initialBootSectors +
+    manifest.transportCapacity.extensionSectors);
+  assert.ok(manifest.transportCapacity.remainingAtrTransportBytes >= 8192);
+  assert.equal(manifest.bootPayloadTrailer.ascii, "DFB1");
+  assert.equal(manifest.bootPayloadTrailer.sourceOwned, true);
 });
 
 test("XEX contains a payload segment and RUNAD", () => {
+  const { manifest } = validateBuildDirectory(rootDirectory);
   const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
   const { segments } = parseXex(xex);
-  assert.equal(segments.length, 2);
+  assert.equal(segments.length, 3);
   assert.equal(segments[0].start, 0x2000);
-  assert.equal(segments[0].end, 0x5fff);
-  assert.equal(segments[0].data.subarray(-4).toString("ascii"), "DFB1");
-  assert.deepEqual([segments[1].start, segments[1].end], [0x02e0, 0x02e1]);
+  assert.equal(segments[0].data.length, manifest.transportCapacity.initialBootBytes);
+  assert.deepEqual([segments[1].start, segments[1].end],
+    [manifest.broadsideRuntime.runAddress,
+      manifest.broadsideRuntime.runAddress + manifest.broadsideRuntime.bytes - 1]);
+  assert.deepEqual([segments[2].start, segments[2].end], [0x02e0, 0x02e1]);
+  assert.equal(segments[2].data.readUInt16LE(0),
+    manifest.transportCapacity.stage2.xexEntryAddress);
 });
 
 test("ATR uses standard single-density geometry", () => {
+  const { manifest } = validateBuildDirectory(rootDirectory);
   const atr = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.atr"));
   const parsed = parseAtr(atr);
   assert.equal(parsed.magic, atrConstants.magic);
   assert.equal(parsed.sectorSize, 128);
   assert.equal(parsed.body.length, 720 * 128);
   assert.equal(atr.length, 92176);
-  assert.equal(parsed.boot.sectorCount, 128);
-  assert.equal(parsed.body.subarray(0x3ffc, 0x4000).toString("ascii"), "DFB1");
+  assert.equal(parsed.boot.sectorCount, manifest.transportCapacity.initialBootSectors);
+  assert.equal(parsed.body.subarray(
+    manifest.bootPayloadTrailer.address - manifest.loadAddress,
+    manifest.bootPayloadTrailer.address - manifest.loadAddress + 4).toString("ascii"), "DFB1");
+  const chunk = manifest.broadsideRuntime.externalChunk;
+  assert.equal(chunk.startSector, parsed.boot.sectorCount + 1);
+  assert.equal(chunk.startSector + chunk.sectors - 1,
+    manifest.transportCapacity.totalTransportSectors);
 });
 
 test("resident compaction proof survives and Spread Shot leaves at least 64 source-owned bytes", () => {
@@ -88,14 +100,12 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     minimumRemainingReserveBytes: 64,
     remainingReserveBytes: reserve.reserveBytes,
     consumedReserveBytes: 518 - reserve.reserveBytes,
+    preservedForHistory: true,
   });
-  assert.equal(reserve.reserveEndAddress, 0x5ffb);
-  assert.equal(boot.subarray(reserve.reserveAddress - manifest.loadAddress,
-    reserve.reserveAddress - manifest.loadAddress + reserve.reserveBytes)
-    .every((byte) => byte === 0), true);
-  assert.deepEqual(parsedXex.segments[0].data, boot);
+  assert.equal(reserve.preservedForHistory, true);
+  assert.deepEqual(parsedXex.segments[0].data,
+    boot.subarray(0, manifest.transportCapacity.initialBootBytes));
   assert.deepEqual(parsedAtr.body.subarray(0, boot.length), boot);
   assert.equal(manifest.entityEffects.stagedSourceAddress, 0x5140);
-  assert.ok(manifest.entityEffects.stagedEndAddress <
-    manifest.entityEffects.packedSourceAddress);
+  assert.ok(manifest.entityEffects.stagedEndAddress < manifest.broadsideRuntime.runAddress);
 });

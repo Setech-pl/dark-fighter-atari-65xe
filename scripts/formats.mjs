@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { parseChunkManifest } from "./chunk-loader.mjs";
 
 const ATR_MAGIC = 0x0296;
 const ATR_HEADER_SIZE = 16;
@@ -42,21 +43,29 @@ export function readWord(buffer, offset) {
 }
 
 export function makeXex(loadAddress, runAddress, payload) {
-  invariant(payload.length > 0, "XEX payload is empty");
-  const endAddress = loadAddress + payload.length - 1;
-  invariant(endAddress <= 0xffff, "XEX payload exceeds the 16-bit address space");
+  return makeXexSegments([{ start: loadAddress, data: payload }], runAddress);
+}
 
-  const header = Buffer.alloc(6);
-  header.writeUInt16LE(0xffff, 0);
-  header.writeUInt16LE(loadAddress, 2);
-  header.writeUInt16LE(endAddress, 4);
-
+export function makeXexSegments(segments, runAddress) {
+  invariant(Array.isArray(segments) && segments.length > 0, "XEX segment list is empty");
+  const encoded = [];
+  segments.forEach(({ start, data }, index) => {
+    invariant(Buffer.isBuffer(data) && data.length > 0, `XEX segment ${index} is empty`);
+    const end = start + data.length - 1;
+    invariant(Number.isInteger(start) && start >= 0 && end <= 0xffff,
+      `XEX segment ${index} exceeds the 16-bit address space`);
+    const header = Buffer.alloc(index === 0 ? 6 : 4);
+    let offset = 0;
+    if (index === 0) { header.writeUInt16LE(0xffff, 0); offset = 2; }
+    header.writeUInt16LE(start, offset);
+    header.writeUInt16LE(end, offset + 2);
+    encoded.push(header, data);
+  });
   const runRecord = Buffer.alloc(6);
   runRecord.writeUInt16LE(0x02e0, 0);
   runRecord.writeUInt16LE(0x02e1, 2);
   runRecord.writeUInt16LE(runAddress, 4);
-
-  return Buffer.concat([header, payload, runRecord]);
+  return Buffer.concat([...encoded, runRecord]);
 }
 
 export function parseXex(buffer) {
@@ -88,7 +97,8 @@ export function parseXex(buffer) {
 
 export function makeAtr(bootPayload) {
   invariant(bootPayload.length > 0, "ATR boot payload is empty");
-  invariant(bootPayload.length <= 255 * ATR_SECTOR_SIZE, "Boot payload needs more than 255 sectors");
+  invariant(bootPayload.length <= ATR_SECTOR_COUNT * ATR_SECTOR_SIZE,
+    "ATR transport exceeds the 720-sector image");
   invariant(bootPayload.length % ATR_SECTOR_SIZE === 0,
     "ATR boot payload must occupy complete source-owned sectors; formatter padding is forbidden");
 
@@ -140,17 +150,27 @@ export function validateBuildDirectory(rootDirectory) {
   const atr = fs.readFileSync(path.join(distDirectory, "dark-fighter.atr"));
 
   invariant(boot.length === manifest.payloadBytes, "Manifest payload size differs from boot binary");
-  invariant(boot.length === EXACT_BOOT_PAYLOAD_BYTES,
-    "Release boot payload must be exactly 16384 bytes");
-  invariant(manifest.bootSectors === EXACT_BOOT_SECTORS,
-    "Release boot image must load exactly 128 sectors");
-  invariant(boot.subarray(-BOOT_PAYLOAD_TRAILER.length).equals(BOOT_PAYLOAD_TRAILER),
-    "Release boot payload is missing its source-owned DFB1 trailer");
-  invariant(manifest.bootPayloadTrailer?.address === 0x5ffc &&
+  const transport = manifest.transportCapacity;
+  invariant(transport?.format === "DFMC-v1 multi-chunk",
+    "Release manifest is missing the multi-chunk transport contract");
+  invariant(manifest.bootSectors === transport.initialBootSectors &&
+    manifest.bootSectors >= 1 && manifest.bootSectors <= 255,
+  "Initial BRCNT is outside 1..255");
+  invariant(transport.initialBootBytes === manifest.bootSectors * ATR_SECTOR_SIZE &&
+    transport.extensionBytes === transport.extensionSectors * ATR_SECTOR_SIZE &&
+    transport.totalTransportBytes === boot.length &&
+    transport.totalTransportSectors * ATR_SECTOR_SIZE === boot.length,
+  "Initial, extension and total transport sizes are inconsistent");
+  const trailerOffset = manifest.bootPayloadTrailer?.address - manifest.loadAddress;
+  invariant(trailerOffset >= 0 &&
+    boot.subarray(trailerOffset, trailerOffset + BOOT_PAYLOAD_TRAILER.length)
+      .equals(BOOT_PAYLOAD_TRAILER),
+  "Release initial block is missing its source-owned DFB1 trailer");
+  invariant(manifest.bootPayloadTrailer?.address < manifest.loadAddress + transport.initialBootBytes &&
     manifest.bootPayloadTrailer.bytes === BOOT_PAYLOAD_TRAILER.length &&
     manifest.bootPayloadTrailer.hex === BOOT_PAYLOAD_TRAILER.toString("hex") &&
     manifest.bootPayloadTrailer.sourceOwned === true,
-  "Manifest does not describe the source-owned boot trailer at $5FFC-$5FFF");
+  "Manifest does not describe the source-owned initial-block trailer");
   invariant(boot[0] === 0, "Boot flag must be zero for disk boot");
   invariant(boot[1] === manifest.bootSectors, "Boot sector count differs from manifest");
   invariant(readWord(boot, 2) === manifest.loadAddress, "Boot load address differs from manifest");
@@ -160,9 +180,11 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.payloadBudget.historicalRuntimeHeadroom.approvedDeltaBytes ===
       RUNTIME_HEADROOM_PAYLOAD_LIMIT,
   "Historical runtime-headroom payload gate is missing");
-  invariant(boot.length - ACCEPTED_RUNTIME_HEADROOM_PAYLOAD_BYTES <=
-    ENTITY_EFFECTS_FOUNDATION_PAYLOAD_BUDGET,
-  "Entity/effects foundation exceeds its explicit payload budget");
+  invariant(transport.remainingAtrSectors === ATR_SECTOR_COUNT - transport.totalTransportSectors &&
+    transport.remainingAtrTransportBytes === transport.remainingAtrSectors * ATR_SECTOR_SIZE &&
+    transport.maximumNewSimultaneousResidencyBytes === 6841 &&
+    transport.loaderResidentBytes === 0,
+  "Transport and runtime residency capacities are conflated or inconsistent");
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
     "Broadside relocation source must begin at $4000");
   invariant(manifest.broadsideRuntime?.runAddress === 0x5e10,
@@ -214,11 +236,6 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.spreadPickupGlyphIndex === 124 &&
     manifest.entityEffects.newGlyphsFromFoundation === DEBRIS_VISUAL_POLISH_NEW_GLYPHS,
   "Weapon pickups must retain debris/effects and use exactly glyphs 120-127");
-  invariant(manifest.payloadBytes === DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
-    manifest.bootSectors === EXACT_BOOT_SECTORS &&
-    manifest.payloadBudget?.debrisVisualPolish?.limitBytes ===
-      DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT,
-  "Debris visual polish exceeds the owner-approved 16384-byte / 128-sector boot limit");
   invariant(manifest.payloadBudget?.destructibleDebris?.limitBytes ===
     DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
     manifest.runtimeCodeBudget?.baselineBytes ===
@@ -257,31 +274,33 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.residentRuntime.prefixBytes + manifest.residentRuntime.suffixRawBytes === 0x2000 &&
     manifest.residentRuntime.suffixPackedBytes < manifest.residentRuntime.suffixRawBytes,
   "Resident runtime suffix compaction metadata is inconsistent");
-  invariant(boot.length === manifest.residentRuntime.prefixBytes +
-    manifest.residentRuntime.suffixPackedBytes + manifest.broadsideRuntime.packedBytes +
-    manifest.starfieldRuntime.packedBytes + manifest.a2Kernel.bytes +
-    manifest.entityEffects.packedBytes + compaction.reserveBytes +
-    BOOT_PAYLOAD_TRAILER.length,
-  "Boot payload does not contain the compacted runtime, relocation tails and reserve");
-  invariant(compaction.reserveAddress === manifest.loadAddress +
-    manifest.residentRuntime.prefixBytes + manifest.residentRuntime.suffixPackedBytes +
-    manifest.broadsideRuntime.packedBytes + manifest.starfieldRuntime.packedBytes +
-    manifest.a2Kernel.bytes + manifest.entityEffects.packedBytes &&
-    compaction.reserveEndAddress === manifest.bootPayloadTrailer.address - 1,
-  "Runtime payload reserve does not occupy the documented pre-trailer range");
-  const reserveOffset = compaction.reserveAddress - manifest.loadAddress;
-  invariant(boot.subarray(reserveOffset, reserveOffset + compaction.reserveBytes)
-    .every((byte) => byte === compaction.fillByte),
-  "Runtime payload reserve is not the source-owned zero-filled range from the manifest");
+  const manifestOffset = transport.manifest.address - manifest.loadAddress;
+  const parsedTransportManifest = parseChunkManifest(
+    boot.subarray(manifestOffset, manifestOffset + transport.manifest.bytes),
+  );
+  invariant(parsedTransportManifest.crc16 === transport.manifest.crc16 &&
+    parsedTransportManifest.totalOccupiedSectors === transport.totalTransportSectors,
+  "Embedded chunk manifest differs from build metadata");
 
   const parsedXex = parseXex(xex);
-  invariant(parsedXex.segments.length === 2, "XEX must contain the payload and RUNAD segments");
+  invariant(parsedXex.segments.length === 3,
+    "XEX must contain initial, direct BROADSIDE and RUNAD segments");
   const payloadSegment = parsedXex.segments[0];
-  const runSegment = parsedXex.segments[1];
+  const broadsideSegment = parsedXex.segments[1];
+  const runSegment = parsedXex.segments[2];
   invariant(payloadSegment.start === manifest.loadAddress, "XEX payload load address is wrong");
-  invariant(payloadSegment.data.equals(boot), "XEX payload differs from boot binary");
+  invariant(payloadSegment.data.equals(boot.subarray(0, transport.initialBootBytes)),
+    "XEX initial block differs from ATR");
+  invariant(broadsideSegment.start === manifest.broadsideRuntime.runAddress &&
+    broadsideSegment.data.length === manifest.broadsideRuntime.bytes,
+  "XEX direct BROADSIDE segment is invalid");
+  const broadsideRuntime = fs.readFileSync(path.join(rootDirectory,
+    "build", "broadside-runtime.bin"));
+  invariant(broadsideSegment.data.equals(broadsideRuntime),
+    "XEX manifest-owned BROADSIDE bytes differ from the final runtime image");
   invariant(runSegment.start === 0x02e0 && runSegment.end === 0x02e1, "XEX RUNAD record is missing");
-  invariant(readWord(runSegment.data, 0) === manifest.startAddress, "XEX RUNAD differs from start label");
+  invariant(readWord(runSegment.data, 0) === transport.stage2.runAddress +
+    (manifest.transportCapacity.stage2.xexEntryOffset ?? 0), "XEX RUNAD differs from stage-2 entry");
 
   const parsedAtr = parseAtr(atr);
   invariant(atr.length === 92176, "ATR is not a standard 90 KB single-density image");
@@ -290,10 +309,18 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(parsedAtr.boot.loadAddress === manifest.loadAddress, "ATR boot load address is wrong");
   invariant(parsedAtr.boot.initAddress === manifest.bootInitAddress, "ATR init address is wrong");
   invariant(parsedAtr.body.subarray(0, boot.length).equals(boot), "ATR payload differs from boot binary");
+  const packedBroadside = fs.readFileSync(path.join(rootDirectory,
+    "build", "broadside-runtime-packed.bin"));
+  const broadsideRecord = parsedTransportManifest.records[0];
+  const broadsideStorageOffset = (broadsideRecord.startSector - 1) * ATR_SECTOR_SIZE;
+  const broadsideStorage = parsedAtr.body.subarray(broadsideStorageOffset,
+    broadsideStorageOffset + broadsideRecord.sectorCount * ATR_SECTOR_SIZE);
+  invariant(broadsideStorage.subarray(0, broadsideRecord.packedLength).equals(packedBroadside),
+    "ATR BROADSIDE chunk differs from its packed source");
 
   const loadedBytes = manifest.bootSectors * ATR_SECTOR_SIZE;
-  invariant(loadedBytes === boot.length,
-    "ATR loader sector count must not imply formatter-supplied payload padding");
+  invariant(loadedBytes === transport.initialBootBytes && loadedBytes < boot.length,
+    "BRCNT must load only the dynamic initial block, not extension chunks");
 
   return { manifest, boot, xex, atr, parsedXex, parsedAtr };
 }

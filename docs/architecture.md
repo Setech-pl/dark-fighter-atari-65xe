@@ -11,18 +11,54 @@ Dark Fighter targets a stock 64 KB Atari 65XE in PAL mode with documented NMOS
 6502 instructions. The runtime owns the machine after startup, uses joystick
 port 1, and schedules gameplay at 50 frames per second.
 
-The build emits one exact 16,384-byte boot payload. The XEX wraps that payload
-with standard segment and run-address records; the standard 90 KB single-density
-ATR stores the same payload in 128 boot sectors. Candidate, trace, final-binding,
-and verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
+The build emits a dynamic initial boot block plus a versioned `DFMC` extension
+manifest. The standard 90 KB single-density ATR stores only the sectors actually
+used; the XEX emits the same initial block, direct final-address extension
+segments, and a separate XEX entry record. Candidate, trace, final-binding, and
+verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
 
 ## Cold startup and loader
 
-The payload enters at `$201E` with a 449-byte raw bootstrap prefix. The remaining
-7,743-byte resident suffix is stored as a 6,515-byte LZ-10/5 stream. Startup
-stages it at `$8100-$9A53` (the manifest records the inclusive end address),
-expands broadside and relocated modules in dependency order, then
-restores the resident image at `$21C1-$3FFF`.
+The 94-sector initial block enters at `$201E` with a 449-byte raw bootstrap
+prefix. A 1,185-byte stage-2 overlay runs at `$21C1-$2661`; after it validates
+the complete manifest, it reads extension sectors through standard OS SIOV
+while OS IRQ/NMI and disk services are still available. Each chunk is fully
+read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
+controlled destination. Any failure blanks DMA, selects a fixed red error
+background, and halts before partially loaded code can execute.
+
+The first production migration moves the 5,585-byte packed BROADSIDE stream to
+sectors 95-138. ATR stages its 5,632-byte sector image at `$8100-$96FF`, checks
+CRC `$60A0`, and expands 6,569 bytes to `$5E10-$77B8`. The last BROADSIDE source
+read makes `$8100` reusable; only then does startup copy the packed resident
+suffix and stages it at `$8100-$9A53`. The 7,743-byte suffix is stored as a 6,484-byte LZ-10/5 stream
+and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
+eight-record manifest. No loader byte remains resident or enters gameplay.
+
+The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
+accepts RAW or LZ records. The current 94-sector initial block plus one 44-sector
+extension use 138 sectors. Seven additional 50-sector chunks provide 44,800 B
+of format/loader growth without padding; the ATR itself has 74,496 B free.
+
+### DFMC v1 byte format
+
+| Offset | Bytes | Meaning |
+| ---: | ---: | --- |
+| 0 | 4 | ASCII `DFMC` |
+| 4 | 1 | format version, currently 1 |
+| 5 | 1 | header size, 12 |
+| 6 | 1 | chunk count, 1..8 |
+| 7 | 1 | record size, 16 |
+| 8 | 2 | total occupied ATR sectors, little-endian |
+| 10 | 2 | actual manifest length, little-endian |
+| 12 | 16 × count | sequential chunk records |
+| final 2 | 2 | CRC16-CCITT of every preceding manifest byte, little-endian |
+
+Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
+16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
+the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
+staging identifier, and a 16-bit staging address. All words are little-endian.
+Production record 0 is `{95,44,5585,6569,$5E10,$60A0,1,1,$8100}`.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
 mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to
@@ -37,7 +73,7 @@ footer palette zones. The loader remains visible for 250 complete PAL frames
 
 Cold staging also copies:
 
-- packed broadside/runtime data to its final `$5E10-$77B8` run range;
+- validated external broadside/runtime data to `$5E10-$77B8` before takeover;
 - packed starfield/music data through `$7810-$7EFA` to `$552A-$5DE1`;
 - the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
 - packed entity/effect code through `$5140-$5852` to `$9100-$9929`.

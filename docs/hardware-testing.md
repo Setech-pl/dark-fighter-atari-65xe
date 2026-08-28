@@ -14,9 +14,8 @@ Before manual testing, run the evidence phases in order:
       ATR hashes.
 - [ ] `npm run verify` accepts the final-bound manifest and report hash.
 - [ ] A second unchanged full trace has replay fingerprint
-      `6eca3e151923803e15fce3ed1438009bea8edc06bfc9c8c301a6880db6173736`,
-      a 33,020-cycle maximum, and 2,548-cycle physical headroom before final
-      packaging.
+      `b6971387bc03dc9b41c5bee1cf3c802a3fbef9aeb72a76ce1fca49307fc0448c`,
+      a 32,072-cycle maximum, and 3,496-cycle physical headroom.
 
 ## Atari800 PAL test
 
@@ -87,6 +86,10 @@ Use a stock PAL Atari 65XE with 64 KB and boot the ATR through SIO2SD. Also run
 the XEX through the owner's normal real-hardware loader path when available.
 
 - [ ] Cold boot succeeds repeatedly after power-off, not only after warm reset.
+- [ ] The 94-sector OS boot read is followed by standard-speed SIOV reads of
+      sectors 95-138; no SIO turbo support is required.
+- [ ] A deliberately truncated or CRC-corrupted test ATR stops on the fixed red
+      loader error screen and never enters partially loaded code.
 - [ ] Loader duration, menu transitions, audio, controls, pause, Game Over, and
       New Game match the Atari800 reference.
 - [ ] The fixed HUD is stable on the connected PAL display and remains readable

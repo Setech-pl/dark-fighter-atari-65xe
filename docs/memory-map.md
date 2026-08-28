@@ -20,28 +20,35 @@ lifetime phases and are not additive free memory.
 | `$8000-$80FF` | 256 B | `ENTITY_STATE` BSS |
 | `$9000-$90CE` | 207 B | relocated A2 kernel; 256 B reserved through `$90FF` |
 | `$9100-$9929` | 2,090 B | relocated `ENTITY_CODE`; 3,840 B reserved through `$9FFF` |
+| `$21C1-$2661` | 1,185 B | boot-only `BOOT_STAGE2` overlay; replaced by the resident suffix before runtime |
 
 The linked runtime/code/data budget is `CODE + STARFIELD + BROADSIDE +
 A2_KERNEL + ENTITY_CODE = 15,346 B`.
 
-## Boot payload layout
+## Boot transport layout
 
-The boot payload is exactly 16,384 bytes loaded at `$2000-$5FFF` in 128 sectors.
-Its entry point is `$201E`.
+The production transport is 17,664 bytes in 138 occupied sectors. BRCNT is
+dynamic and loads only the 12,032-byte/94-sector initial block at `$2000-$4EFF`;
+the entry point remains `$201E`. The last-sector envelope is 121 bytes of
+source-owned metadata/fill required by sector alignment, not reserved capacity.
 
-| Payload range on entry | Size | Stored form and startup destination |
+| Initial address / ATR sectors | Size | Stored form and startup destination |
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
-| `$21C1-$3B14` | 6,484 B | packed 7,743-byte resident suffix; staged at `$8100-$9A53`, restored to `$21C1-$3FFF` |
-| `$3B15-$50E5` | 5,585 B | packed 6,569-byte broadside runtime; expands to `$5E10-$77B8` |
-| `$50E6-$57D0` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
-| `$57D1-$589F` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
-| `$58A0-$5FB2` | 1,811 B | packed 2,090-byte entity/effect code; staged at `$5140-$5852` after overlapping sources are consumed, expands to `$9100-$9929` |
-| `$5FB3-$5FFB` | 73 B | source-owned zero-filled reserve |
-| `$5FFC-$5FFF` | 4 B | source-owned `DFB1` trailer |
+| `$21C1-$2661` | 1,185 B | stage-2 SIO/CRC/manifest overlay; later restored resident bytes replace it |
+| `$2662-$3FB5` | 6,484 B | packed 7,743-byte resident suffix; staged at `$8100-$9A53`, restored to `$21C1-$3FFF` |
+| `$3FB6-$46A0` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
+| `$46A1-$476F` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
+| `$4770-$4E82` | 1,811 B | packed 2,090-byte entity/effect code; staged at `$5140-$5852`, expands to `$9100-$9929` |
+| `$4E83-$4E86` | 4 B | source-owned `DFB1` trailer |
+| `$4E87-$4EFF` | 121 B | dynamic `DFI2` initial-sector envelope |
+| ATR sectors 95-138 | 5,632 B | external BROADSIDE chunk: 5,585 B LZ plus `DFC2` footer/fill; stage `$8100-$96FF`, final `$5E10-$77B8` |
 
-The 73-byte range is real payload reserve, not formatter padding. Formatter
-padding is zero.
+The `DFMC` v1 manifest is 30 B for the current one record and reserves 142 B
+inside stage-2 for at most eight records. The ATR has 582 free sectors
+(74,496 B). With the current eight-record/50-sector-per-chunk loader limits,
+seven further chunks provide 44,800 B additional transport capacity. Runtime
+residency remains a separate 6,841-byte fragmented limit.
 
 ## Loader-time ownership
 

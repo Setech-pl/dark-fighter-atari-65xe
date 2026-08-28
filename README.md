@@ -101,8 +101,8 @@ and tested by the repository.
 | CPU and machine | Atari 65XE, NMOS 6502C, 64 KB RAM |
 | Video target | PAL, 50 FPS, ANTIC 2/4/6/7/F and PMG |
 | Toolchain | ca65/ld65 through the pinned WebAssembly package |
-| Distribution | 16,396-byte XEX and 92,176-byte bootable ATR |
-| Boot payload | Exactly 16,384 bytes in 128 sectors, loaded at `$2000`, entry `$201E` |
+| Distribution | 18,617-byte XEX and 92,176-byte bootable ATR |
+| Boot transport | 94-sector dynamic initial block plus a 44-sector manifest chunk; entry `$201E` |
 | Payload reserve | 73 source-owned bytes; zero formatter padding |
 | Runtime BSS | `$8000–$80FF`, exactly 256 bytes |
 | Entity engine | Four physical interactive slots, up to two active |

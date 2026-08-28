@@ -406,6 +406,7 @@ typedef struct {
 	unsigned dosvec;
 	unsigned screen_checksum;
 	unsigned frontend_dlist_checksum;
+	unsigned loader_dli_count;
 } DFBootSnapshot;
 
 static int dfboot_initialised;
@@ -431,6 +432,7 @@ static unsigned dfboot_game_state;
 static unsigned dfboot_main_menu_dlist;
 static unsigned dfboot_frontend_dlist_end;
 static unsigned dfboot_snapshots_count;
+static unsigned dfboot_loader_dli_count;
 static DFBootSnapshot dfboot_snapshots[5];
 
 static unsigned dfboot_env_u(const char *name)
@@ -498,6 +500,7 @@ static void dfboot_capture(unsigned frame, unsigned pc)
 	snapshot->screen_checksum = dfboot_checksum(0x4000u, 0x0400u);
 	snapshot->frontend_dlist_checksum = dfboot_checksum(dfboot_main_menu_dlist,
 		dfboot_frontend_dlist_end - dfboot_main_menu_dlist);
+	snapshot->loader_dli_count = dfboot_loader_dli_count;
 	if (dfboot_screenshot_prefix != NULL && *dfboot_screenshot_prefix != '\0') {
 		snprintf(screenshot, sizeof(screenshot), "%s-frame%03u.png",
 			dfboot_screenshot_prefix, frame);
@@ -522,13 +525,13 @@ static void dfboot_write(void)
 			"\"charset_address\":%u,\"pm_base\":%u,\"dma_ctl\":%u,"
 			"\"nmi_en\":%u,\"vdslst\":%u,\"runad\":%u,\"initad\":%u,"
 			"\"dosvec\":%u,\"screen_checksum\":%u,"
-			"\"frontend_dlist_checksum\":%u}%s\n",
+			"\"frontend_dlist_checksum\":%u,\"loader_dli_count\":%u}%s\n",
 			snapshot->frame, snapshot->pc, snapshot->scanline, snapshot->cycle,
 			snapshot->loader_timer, snapshot->game_state, snapshot->dlist,
 			snapshot->charset_address, snapshot->pm_base, snapshot->dma_ctl,
 			snapshot->nmi_en, snapshot->vdslst, snapshot->runad, snapshot->initad,
 			snapshot->dosvec, snapshot->screen_checksum,
-			snapshot->frontend_dlist_checksum,
+			snapshot->frontend_dlist_checksum, snapshot->loader_dli_count,
 			index + 1u == dfboot_snapshots_count ? "" : ",");
 	}
 	fprintf(dfboot_file,
@@ -582,13 +585,16 @@ static void dfboot_observe(unsigned pc)
 	if (!dfboot_initialised)
 		dfboot_init();
 	frame = (unsigned) Atari800_nframes;
+	if (MEMORY_mem[dfboot_game_state] == 0u && pc == dfboot_word(0x0200u))
+		++dfboot_loader_dli_count;
 	if (pc == dfboot_pc_start && dfboot_seen_start == 0xffffffffu)
 		dfboot_seen_start = frame;
 	if (pc == dfboot_pc_loader && dfboot_seen_loader == 0xffffffffu)
 		dfboot_seen_loader = frame;
 	if (pc == dfboot_pc_menu && dfboot_seen_menu == 0xffffffffu)
 		dfboot_seen_menu = frame;
-	if (pc == dfboot_pc_frontend && dfboot_seen_frontend == 0xffffffffu)
+	if (pc == dfboot_pc_frontend && dfboot_seen_frontend == 0xffffffffu &&
+		MEMORY_mem[dfboot_game_state] == 1u)
 		dfboot_seen_frontend = frame;
 	if (pc == dfboot_pc_gameplay && dfboot_seen_gameplay == 0xffffffffu)
 		dfboot_seen_gameplay = frame;
@@ -1597,7 +1603,11 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		dftrace_dli_integrity_count = 0u;
 	}
 
-	if (!dftrace_active && pc == dftrace_pc_frontend_poll) {
+	/* BOOT_STAGE2 deliberately overlays the later resident suffix, so its
+	 * transient PC can alias frontend_input_poll before start has restored the
+	 * runtime image.  Only arm frontend input once the menu state is published. */
+	if (!dftrace_active && pc == dftrace_pc_frontend_poll &&
+		MEMORY_mem[dftrace_game_state] == 1u) {
 		dftrace_set_frontend_input();
 	}
 

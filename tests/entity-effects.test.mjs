@@ -9,9 +9,8 @@ import {
   loadEntityEffectsDefinition,
   renderEntityEffectsCa65Include,
 } from "../scripts/entity-effects.mjs";
-import { parseAtr, parseXex } from "../scripts/formats.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
-import { installRuntimeSegments } from "../scripts/runtime-image.mjs";
+import { installBootArtifact, installRuntimeSegments } from "../scripts/runtime-image.mjs";
 import {
   assertDebrisDestructionTraceParity,
   assertRaiderBreakupTraceParity,
@@ -27,8 +26,6 @@ const starfieldDefinition = JSON.parse(fs.readFileSync(
   path.join(root, "assets", "graphics", "starfield.json"), "utf8"));
 const source = fs.readFileSync(path.join(root, "src", "main.s"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
-const xex = fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"));
-const atr = fs.readFileSync(path.join(root, "dist", "dark-fighter.atr"));
 const broadsideRuntime = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
 const residentRuntime = fs.readFileSync(path.join(root, "build", "resident-runtime.bin"));
 const starfieldRuntime = fs.readFileSync(path.join(root, "build", "starfield-runtime.bin"));
@@ -280,17 +277,13 @@ test("entity memory and code reservations are exact and do not use BASIC ROM", (
 });
 
 test("$A5 and $5A cold RAM are fully and identically initialised for XEX and ATR", () => {
-  const payloads = [
-    parseXex(xex).segments[0],
-    { start: manifest.loadAddress, data: parseAtr(atr).body.subarray(0, manifest.payloadBytes) },
-  ];
   for (const fill of [0xa5, 0x5a]) {
     const results = [];
-    for (const payload of payloads) {
+    for (const artifact of ["xex", "atr"]) {
       const memory = new Uint8Array(0x10000).fill(fill);
-      memory.set(payload.data, payload.start);
+      const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
+      if (requiresBroadsideUnpack) runRoutine(memory, "unpack_boot_broadside_runtime");
       runRoutine(memory, "stage_boot_streams");
-      runRoutine(memory, "unpack_boot_broadside_runtime");
       runRoutine(memory, "unpack_resident_runtime");
       const residentSuffixOffset = manifest.residentRuntime.suffixAddress -
         manifest.residentRuntime.runAddress;

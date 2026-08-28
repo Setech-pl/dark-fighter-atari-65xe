@@ -7,10 +7,10 @@
   "loadAddress": 8192,
   "startAddress": 8222,
   "bootInitAddress": 8221,
-  "bootSectors": 128,
-  "payloadBytes": 16384,
+  "bootSectors": 94,
+  "payloadBytes": 17664,
   "bootPayloadTrailer": {
-    "address": 24572,
+    "address": 20099,
     "bytes": 4,
     "ascii": "DFB1",
     "hex": "44464231",
@@ -60,7 +60,8 @@
       "reserveAddress": 24499,
       "reserveEndAddress": 24571,
       "sourceOwned": true,
-      "fillByte": 0
+      "fillByte": 0,
+      "preservedForHistory": true
     },
     "weaponPickupRapidFire": {
       "baselineReserveBytes": 1097,
@@ -72,7 +73,63 @@
       "baselineReserveBytes": 518,
       "minimumRemainingReserveBytes": 64,
       "remainingReserveBytes": 73,
-      "consumedReserveBytes": 445
+      "consumedReserveBytes": 445,
+      "preservedForHistory": true
+    }
+  },
+  "transportCapacity": {
+    "format": "DFMC-v1 multi-chunk",
+    "initialBootBytes": 12032,
+    "initialBootContentBytes": 11911,
+    "initialBootEnvelopeBytes": 121,
+    "initialBootSectors": 94,
+    "extensionBytes": 5632,
+    "extensionSectors": 44,
+    "totalTransportBytes": 17664,
+    "totalTransportSectors": 138,
+    "remainingAtrSectors": 582,
+    "remainingAtrTransportBytes": 74496,
+    "architecturalAdditionalCapacityBytes": 44800,
+    "maximumExtensionChunkBytes": 6400,
+    "maximumChunkCount": 8,
+    "maximumNewSimultaneousResidencyBytes": 6841,
+    "remainingSafeResidencyBytes": 6841,
+    "bootOnlyStaging": {
+      "address": 33024,
+      "bytes": 6484
+    },
+    "loaderResidentBytes": 0,
+    "stage2": {
+      "runAddress": 8641,
+      "loadAddress": 31232,
+      "bytes": 1185,
+      "xexEntryAddress": 8936,
+      "xexEntryOffset": 295,
+      "overwrittenByResidentSuffix": true
+    },
+    "manifest": {
+      "address": 9684,
+      "bytes": 30,
+      "crc16": 24513,
+      "parsed": {
+        "version": 1,
+        "totalOccupiedSectors": 138,
+        "manifestBytes": 30,
+        "crc16": 24513,
+        "records": [
+          {
+            "startSector": 95,
+            "sectorCount": 44,
+            "packedLength": 5585,
+            "rawLength": 6569,
+            "finalDestination": 24080,
+            "crc16": 24736,
+            "type": 1,
+            "stagingId": 1,
+            "destination": 33024
+          }
+        ]
+      }
     }
   },
   "residentRuntime": {
@@ -84,7 +141,7 @@
     "suffixAddress": 8641,
     "suffixRawBytes": 7743,
     "suffixPackedBytes": 6484,
-    "packedSourceAddress": 8641,
+    "packedSourceAddress": 9826,
     "stagingAddress": 33024,
     "stagedEndAddress": 39507,
     "compression": "LZ-10/5"
@@ -95,8 +152,19 @@
     "bytes": 6569,
     "reservedBytes": 6656,
     "packedBytes": 5585,
-    "packedSourceAddress": 15125,
-    "compression": "LZ-10/5"
+    "packedSourceAddress": 33024,
+    "compression": "LZ-10/5",
+    "externalChunk": {
+      "startSector": 95,
+      "sectors": 44,
+      "transportBytes": 5632,
+      "packedBytes": 5585,
+      "rawBytes": 6569,
+      "crc16": 24736,
+      "stagingAddress": 33024,
+      "stagingEndAddress": 38655,
+      "finalAddress": 24080
+    }
   },
   "starfieldRuntime": {
     "loadAddress": 23040,
@@ -104,7 +172,7 @@
     "bytes": 2232,
     "reservedBytes": 2278,
     "packedBytes": 1771,
-    "packedSourceAddress": 20710,
+    "packedSourceAddress": 16310,
     "stagingAddress": 30736,
     "stagingBytes": 1792,
     "compression": "LZ-10/5"
@@ -112,7 +180,7 @@
   "a2Kernel": {
     "loadAddress": 27136,
     "runAddress": 36864,
-    "sourceAddress": 22481,
+    "sourceAddress": 18081,
     "stagingAddress": 32528,
     "bytes": 207,
     "reservedBytes": 256,
@@ -161,7 +229,7 @@
       }
     },
     "packedBytes": 1811,
-    "packedSourceAddress": 22688,
+    "packedSourceAddress": 18288,
     "stagedSourceAddress": 20800,
     "stagedEndAddress": 22610,
     "compression": "LZ-10/5",
@@ -24912,11 +24980,11 @@
     "estimated_additive_cycles": 32955,
     "wallTrace": {
       "reportPath": "docs/runtime-wall-trace.json",
-      "reportSha256": "7d397132c4b42395c11a086bc8df0686a21df9b906aa4730020cf2b8e979adfb",
+      "reportSha256": "af33c90bbe2070a5631c36d6f762eaf5a10c42c203c35ea24dc568150bc3e5d5",
       "artifact": {
         "path": "dist/dark-fighter.xex",
-        "bytes": 16396,
-        "sha256": "38a6e33a35e86d594f208b2d972b0977aff3e15eb41509185b0a2057a3f96f20"
+        "bytes": 18617,
+        "sha256": "1044538bca3ccb0df9792891aac301bd88bdced394b8243b1ea9d28f88502e5b"
       },
       "emulator": {
         "name": "Atari800",
@@ -25033,20 +25101,20 @@
             "wall_cycles": 31014,
             "physical_headroom": 4554,
             "start": {
-              "clock": 26559513,
-              "host_frame": 746,
+              "clock": 26097129,
+              "host_frame": 733,
               "scanline": 226,
               "cycle": 21
             },
             "end": {
-              "clock": 26590527,
-              "host_frame": 747,
+              "clock": 26128143,
+              "host_frame": 734,
               "scanline": 186,
               "cycle": 27
             },
             "next_start": {
-              "clock": 26595081,
-              "host_frame": 747
+              "clock": 26132697,
+              "host_frame": 734
             },
             "host_vbi_boundaries": 1,
             "extra_vbi_boundaries": 0,
@@ -25250,20 +25318,20 @@
             "wall_cycles": 30720,
             "physical_headroom": 4848,
             "start": {
-              "clock": 22718169,
-              "host_frame": 638,
+              "clock": 22255785,
+              "host_frame": 625,
               "scanline": 226,
               "cycle": 21
             },
             "end": {
-              "clock": 22748889,
-              "host_frame": 639,
+              "clock": 22286505,
+              "host_frame": 626,
               "scanline": 183,
               "cycle": 75
             },
             "next_start": {
-              "clock": 22753737,
-              "host_frame": 639
+              "clock": 22291353,
+              "host_frame": 626
             },
             "host_vbi_boundaries": 1,
             "extra_vbi_boundaries": 0,
@@ -27183,35 +27251,35 @@
     "artifacts": {
       "dark-fighter-boot.bin": {
         "path": "dist/dark-fighter-boot.bin",
-        "bytes": 16384,
-        "sha256": "23d9548db1d0f47509a1bf39217b07809ee6902959a94fc667109ce2a031d614"
+        "bytes": 17664,
+        "sha256": "be84dcaa5478524f976d813cfedb786bdee9f83a06eddd95bdbc0f5139e90af5"
       },
       "dark-fighter.xex": {
         "path": "dist/dark-fighter.xex",
-        "bytes": 16396,
-        "sha256": "38a6e33a35e86d594f208b2d972b0977aff3e15eb41509185b0a2057a3f96f20"
+        "bytes": 18617,
+        "sha256": "1044538bca3ccb0df9792891aac301bd88bdced394b8243b1ea9d28f88502e5b"
       },
       "dark-fighter.atr": {
         "path": "dist/dark-fighter.atr",
         "bytes": 92176,
-        "sha256": "b9cd010e4c69555fd2aab0929deff99d8201e1f315c0c9aa302eddc002e22087"
+        "sha256": "f68034584284cae4db500cbc34bd352a4bfb5255bb143f066dc6b704f333163c"
       }
     },
     "reportPath": "docs/runtime-wall-trace.json",
-    "reportSha256": "7d397132c4b42395c11a086bc8df0686a21df9b906aa4730020cf2b8e979adfb"
+    "reportSha256": "af33c90bbe2070a5631c36d6f762eaf5a10c42c203c35ea24dc568150bc3e5d5"
   },
   "artifacts": {
     "dark-fighter-boot.bin": {
-      "bytes": 16384,
-      "sha256": "23d9548db1d0f47509a1bf39217b07809ee6902959a94fc667109ce2a031d614"
+      "bytes": 17664,
+      "sha256": "be84dcaa5478524f976d813cfedb786bdee9f83a06eddd95bdbc0f5139e90af5"
     },
     "dark-fighter.xex": {
-      "bytes": 16396,
-      "sha256": "38a6e33a35e86d594f208b2d972b0977aff3e15eb41509185b0a2057a3f96f20"
+      "bytes": 18617,
+      "sha256": "1044538bca3ccb0df9792891aac301bd88bdced394b8243b1ea9d28f88502e5b"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "b9cd010e4c69555fd2aab0929deff99d8201e1f315c0c9aa302eddc002e22087"
+      "sha256": "f68034584284cae4db500cbc34bd352a4bfb5255bb143f066dc6b704f333163c"
     }
   }
 }

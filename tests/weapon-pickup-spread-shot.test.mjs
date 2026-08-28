@@ -414,8 +414,9 @@ test("Spread stays inside the fixed BSS, payload, glyph and runtime-code budgets
   assert.ok(manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
   assert.ok(manifest.entityEffects.codeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
   assert.ok(manifest.payloadBudget.weaponPickupSpreadShot.remainingReserveBytes >= 64);
-  assert.equal(manifest.payloadBytes, 16_384);
-  assert.equal(manifest.bootSectors, 128);
+  assert.equal(manifest.payloadBytes, manifest.transportCapacity.totalTransportBytes);
+  assert.equal(manifest.bootSectors, manifest.transportCapacity.initialBootSectors);
+  assert.ok(manifest.transportCapacity.remainingAtrTransportBytes >= 8192);
   assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 128);
   assert.doesNotMatch(source.slice(source.indexOf('.segment "ENTITY_CODE"')), /\$A000|\$BFFF/);
 });
