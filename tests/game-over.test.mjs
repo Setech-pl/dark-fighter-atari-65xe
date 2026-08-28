@@ -144,14 +144,14 @@ test("GAME OVER leaves the gameplay loop before control, combat, spawn, and scor
 
 test("GAME OVER renders final SCORE and TOP from packed BCD without changing them", () => {
   assert.match(source,
-    /game_over_screen_data:[\s\S]+"GAME OVER",0[\s\S]+"SCORE 000000",0[\s\S]+"TOP SCORE 000000",0[\s\S]+"FIRE TO CONTINUE",0/);
+    /game_over_screen_data:[\s\S]+"GAME OVER",0[\s\S]+"COMBAT RECORD",0[\s\S]+"SCORE",0[\s\S]+"TOP SCORE",0[\s\S]+"FIRE TO CONTINUE",0/);
   assert.match(block("render_frontend_state", "draw_main_menu_scene"),
     /cmp #STATE_GAME_OVER[\s\S]+jmp draw_game_over_scores/);
 
   const memory = createRuntimeMemory();
   const screen = 0x4000;
-  const scoreDigits = screen + 9 * 40 + 20;
-  const topDigits = screen + 12 * 40 + 22;
+  const scoreDigits = screen + 80 + 12;
+  const topDigits = screen + 100 + 12;
   const frontendZero = 1;
   const scoreLow = labels.get("score_bcd_lo");
   const scoreHigh = labels.get("score_bcd_hi");
@@ -166,11 +166,11 @@ test("GAME OVER renders final SCORE and TOP from packed BCD without changing the
   memory[topLow] = 0x78;
 
   const instructions = executeGameOverFormatter(memory);
-  assert.deepEqual([...memory.subarray(scoreDigits, scoreDigits + 6)], [1, 1, 2, 3, 4, 5]);
-  assert.deepEqual([...memory.subarray(topDigits, topDigits + 6)], [1, 1, 6, 7, 8, 9]);
+  assert.deepEqual([...memory.subarray(scoreDigits, scoreDigits + 6)], [65, 65, 66, 67, 68, 69]);
+  assert.deepEqual([...memory.subarray(topDigits, topDigits + 6)], [65, 65, 70, 71, 72, 73]);
   assert.deepEqual([memory[scoreHigh], memory[scoreLow]], [0x12, 0x34]);
   assert.deepEqual([memory[topHigh], memory[topLow]], [0x56, 0x78]);
-  assert.ok(instructions < 96);
+  assert.ok(instructions < 256);
   assert.doesNotMatch(block("draw_game_over_scores", "player_contacts_enemy"),
     /sta (?:score_bcd|TOP_SCORE)/);
 });

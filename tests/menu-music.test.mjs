@@ -158,7 +158,7 @@ test("assembly starts only in the main menu and stops before gameplay initialize
   assert.match(source,
     /jsr show_loader[\s\S]+jsr unpack_starfield_runtime[\s\S]+jmp finish_startup_after_loader[\s\S]+finish_startup_after_loader:[\s\S]+sta sound_enabled[\s\S]+jsr music_init[\s\S]+jsr enter_main_menu/);
   assert.match(routine("frontend_loop", "dispatch_frontend_input"),
-    /cmp #STATE_MAIN_MENU\s+bne[\s\S]+jsr music_tick[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
+    /cmp #STATE_MAIN_MENU\s+beq @restore_palette[\s\S]+@restore_palette:[\s\S]+jsr music_tick[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
   assert.match(routine("enter_frontend_state", "enter_exited_state"),
     /cmp #STATE_MAIN_MENU[\s\S]+jsr music_stop[\s\S]+jsr music_start_menu/);
   const gameplay = routine("start_gameplay", "main_loop");

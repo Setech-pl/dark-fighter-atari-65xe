@@ -21,6 +21,13 @@ three engine groups, title, and studio footer. It uses mixed ANTIC F/E with two
 palette-zone DLIs. Gameplay does not add another DLI or PMG multiplexing merely
 for a local colour effect.
 
+The production frontend follows the accepted H3.1 Showcase Tactical Lite
+system. `DARK FIGHTER`, section headings, and score values use amber `$1E`;
+ordinary data uses white `$0E`; structural accents use steel `$84`; active
+actions use green `$D8`; and the Game Over alert replaces steel with `$46`.
+No screen uses a fifth foreground colour. The custom angular font and 3x2 menu
+Viper share one `$4800` charset and remain readable at native Atari scale.
+
 ## Gameplay palette ownership
 
 The fixed HUD remains legible and visually separate from the ANTIC 4 gameplay
@@ -61,9 +68,6 @@ between old and new positions.
   symbol. Its dense cross-core BOOST bar and solid steel/white Viper pulse must
   remain distinguishable from both weapon boosters and respawn blinking.
   The dark symbol is formed by the capsule interior, not white text.
-- **Shield:** planned only. Its final casing, symbol, and palette ownership need
-  owner review before implementation.
-
 Pickup and projectile erase must restore the current lower layer. Visual review
 therefore covers empty space, both hulls, module boundaries, prow, engine banks,
 and display-list wrap.

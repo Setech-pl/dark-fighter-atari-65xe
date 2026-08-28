@@ -28,8 +28,8 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.match(source,
     /gameplay_dli_hud\s*=\s*\*[\s\S]+sta gameplay_dli_phase[\s\S]+publish_playfield_display_list = gameplay_dli_hud\s+pla[\s\S]+rti/,
     "the final gameplay DLI must leave next-frame publication to the active list JVB");
-  assert.match(source, /\.byte \$47,<SCREEN,>SCREEN\s+; ANTIC 7 title/);
-  assert.match(source, /\.byte \$02\s+; 40-column ANTIC 2 control hint/);
+  assert.match(source, /main_menu_display_list:[\s\S]+\.byte \$70,\$70,\$70,\$47,<SCREEN,>SCREEN/);
+  assert.match(source, /\.byte \$42,<\(SCREEN\+300\),>\(SCREEN\+300\)/);
   assert.match(source, /lda #\$3E\s+; normal playfield, single-line PMG DMA/);
   assert.match(source, /lda #\$70\s*\n@wait_for_line:/);
 });

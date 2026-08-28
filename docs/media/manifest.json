@@ -4,17 +4,17 @@
   "runtimeEvidence": {
     "xex": {
       "path": "dist/dark-fighter.xex",
-      "bytes": 18819,
-      "sha256": "b157a4cab2e01b60c63b95406203e3a8e31975c60f7e79f9ac5a5e2282adea77"
+      "bytes": 19344,
+      "sha256": "1eb52ad63db7d45fadb6157b1eb0e7e7ab066ef6d6dca221e7a35384751cc530"
     },
     "atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "be16f3cd40c5f03c43960ee937b2ceb8eaa8778ce65e58324feb08aea4f0cf95"
+      "sha256": "a6cf6c076f142ef3f077f31ec8180f24edac7ce21c1954e836c672a40b526360"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "2c7f423a4c18ff17b70861f9f7a69f53209c99513b68f23b9239bbe0b58eded4"
+      "sha256": "8e66a57de0495b5a9518b2e2a12bb8eb32c633c1e6542656b4a0917bcc7f9588"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
@@ -140,8 +140,8 @@
   "assetSheets": [
     {
       "path": "docs/media/assets/fighter-and-enemies.png",
-      "bytes": 4250,
-      "sha256": "a49384aa84d36f55039babcb54a8d414fbdf37fb41bdd06068c23f024ae402ea",
+      "bytes": 4315,
+      "sha256": "c73ff3feabc6c708bda2f69488da721d6325af84f9574ad1670cd75ca19c229d",
       "width": 960,
       "height": 400,
       "sources": [
@@ -151,8 +151,8 @@
     },
     {
       "path": "docs/media/assets/weapons-and-effects.png",
-      "bytes": 6690,
-      "sha256": "9fc695d4312bb992797131205760ce58a19da484bdce1f9dd16bab062f051d6a",
+      "bytes": 6774,
+      "sha256": "fb420f93e83f0283369874720546fd88f986640f31dfa85e72c5e846d347fe0c",
       "width": 960,
       "height": 520,
       "sources": [
@@ -163,8 +163,8 @@
     },
     {
       "path": "docs/media/assets/debris-and-pickups.png",
-      "bytes": 5681,
-      "sha256": "72cfab0991611103997f43a4f4778e3d3c807db8880d1c92f030d77c5993845a",
+      "bytes": 5767,
+      "sha256": "986fbdf4c646ea888c34c1786e31a60467f817a39417dc006221008d22414fd8",
       "width": 960,
       "height": 560,
       "sources": [
@@ -174,8 +174,8 @@
     },
     {
       "path": "docs/media/assets/capital-ship-modules.png",
-      "bytes": 11088,
-      "sha256": "d675c052dc1626997d546decd9d2297d66a9747d0f0b5b85770765c34af2a86e",
+      "bytes": 11331,
+      "sha256": "8508f777644ea8a2a10294200a76cb63c1dc042075d439094cece497b961937c",
       "width": 960,
       "height": 680,
       "sources": [

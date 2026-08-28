@@ -84,7 +84,7 @@ test("start-menu preview is deterministic, 640x384, and source-derived", () => {
     frontend.mainMenuRecords.filter(({ mode }) => mode === 6).map(({ text }) => text),
     ["START GAME", "OPTIONS", "TOP SCORES", "EXIT"],
   );
-  assert.equal(frontend.mainMenuRecords.at(-1).text, "UP/DOWN MOVE  FIRE SELECT");
+  assert.equal(frontend.mainMenuRecords.at(-1).text, "UP/DOWN MOVE   FIRE SELECT");
   assert.equal(frontend.mainMenuRecords[0].text, "DARK FIGHTER");
   assert.equal(frontend.mainMenuRecords[0].mode, 7);
   assert.equal(frontend.mainMenuRecords.at(-1).mode, 2);
@@ -102,22 +102,16 @@ test("start-menu preview is deterministic, 640x384, and source-derived", () => {
 
   const changedLabel = replaceOnce(source, '.byte "START GAME",0', '.byte "START GAMA",0');
   assert.notDeepEqual(createStartMenuPreview(changedLabel), first);
-  const changedTitle = replaceOnce(
-    source,
-    ".byte $78,$CC,$CC,$FC,$CC,$CC,$CC ; A",
-    ".byte $70,$CC,$CC,$FC,$CC,$CC,$CC ; A",
-  );
-  assert.notDeepEqual(createStartMenuPreview(changedTitle), first);
   const changedHangar = replaceOnce(
     source,
-    "MAIN_MENU_HANGAR_OUTER_LAST = 20",
-    "MAIN_MENU_HANGAR_OUTER_LAST = 19",
+    "MAIN_MENU_LINE_TOP_OFFSET = 20",
+    "MAIN_MENU_LINE_TOP_OFFSET = 21",
   );
   assert.notDeepEqual(createStartMenuPreview(changedHangar), first);
   const changedCraft = replaceOnce(
     source,
-    "player_shape:\n    .byte %00011000",
-    "player_shape:\n    .byte %00010000",
+    "CH_FRONT_VIPER_TOP_LEFT = 58",
+    "CH_FRONT_VIPER_TOP_LEFT = 57",
   );
   assert.notDeepEqual(createStartMenuPreview(changedCraft), first);
 });

@@ -33,6 +33,10 @@ import {
   stepStarfieldWorld,
 } from "./starfield.mjs";
 import {
+  compileFrontendH31,
+  loadFrontendH31Definition,
+} from "./frontend-h31-assets.mjs";
+import {
   compileEntityEffects,
   loadEntityEffectsDefinition,
 } from "./entity-effects.mjs";
@@ -96,6 +100,9 @@ import {
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
+const frontendH31Asset = compileFrontendH31(loadFrontendH31Definition(
+  path.join(rootDirectory, "assets", "graphics", "frontend-h31.json"),
+));
 
 const SCREEN_COLUMNS = 40;
 const SCREEN_ROWS = 24;
@@ -893,13 +900,8 @@ export function readGameGraphicsSource(
     capitalHulls.glyphBytes,
     capitalHulls.definition.charsetBaseIndex * CHARACTER_HEIGHT,
   );
-  const frontendGlyphRows = extractLabeledData(
-    source,
-    "frontend_glyph_rows",
-    constants,
-    "frontend_glyph_rows_end",
-  );
-  requireLength("frontend glyph rows", frontendGlyphRows, 42 * 7);
+  const frontendGlyphRows = frontendH31Asset.fontRows;
+  requireLength("frontend glyph rows", frontendGlyphRows, 43 * 7);
   const hudCharset = buildGameplayHudCharset(frontendGlyphRows, constants, baseCharset);
   const shieldHudGlyph = extractLabeledData(
     source, "hud_shield_booster_glyph", constants, "hud_shield_booster_glyph_end",
@@ -941,7 +943,7 @@ export function readGameGraphicsSource(
 
   const mainMenuHardwareState = new Map(frontendHardwareState);
   const mainMenuPaletteState = extractConstantStores(
-    extractRoutine(source, "set_main_menu_palette"),
+    extractRoutine(source, "set_frontend_standard_palette"),
     constants,
   );
   for (const register of ["COLBK", "COLPF0", "COLPF1", "COLPF2", "COLPF3"]) {
@@ -949,13 +951,6 @@ export function readGameGraphicsSource(
       register,
       requireValue(mainMenuPaletteState, register),
     );
-  }
-  const menuSceneState = extractConstantStores(
-    extractRoutine(source, "draw_main_menu_scene"),
-    constants,
-  );
-  for (const register of ["HPOSP0", "HPOSP2", "HPOSP3", "SIZEP0", "SIZEP3"]) {
-    mainMenuHardwareState.set(register, requireValue(menuSceneState, register));
   }
   const frontendHintHardwareState = new Map(mainMenuHardwareState);
   const hintDliState = extractConstantStores(
@@ -1022,17 +1017,23 @@ export function readGameGraphicsSource(
   return graphics;
 }
 
-function decodeMainMenuDisplayList(bytes, screenAddress) {
+function decodeMainMenuDisplayList(
+  bytes,
+  screenAddress,
+  expectedHeight = SOURCE_HEIGHT,
+  countBlankRows = false,
+) {
   const rows = [];
   let offset = 0;
   let screenOffset = 0;
   let y = 0;
 
-  while (offset < bytes.length && y < SOURCE_HEIGHT) {
+  while (offset < bytes.length && y < expectedHeight) {
     const opcode = bytes[offset];
     offset += 1;
     const mode = opcode & 0x0f;
     if (mode === 0) {
+      if (countBlankRows) y += 8;
       continue;
     }
     if (![2, 4, 6, 7].includes(mode)) {
@@ -1061,10 +1062,10 @@ function decodeMainMenuDisplayList(bytes, screenAddress) {
     y += height;
   }
 
-  if (y !== SOURCE_HEIGHT || screenOffset > 1024) {
-    throw new Error("Main-menu display list does not describe a bounded 320x192 screen");
+  if (y !== expectedHeight || screenOffset > 1024) {
+    throw new Error(`Frontend display list does not describe a bounded 320x${expectedHeight} screen`);
   }
-  return { rows, screenBytes: screenOffset };
+  return { rows, screenBytes: screenOffset, height: expectedHeight };
 }
 
 function decodeFrontendScreen(bytes, screenAddress, layout) {
@@ -1132,13 +1133,10 @@ export function readFrontendGraphicsSource(source) {
   const mainMenuLayout = decodeMainMenuDisplayList(
     mainMenuDisplayList,
     screenAddress,
+    216,
+    true,
   );
-  const glyphRows = extractLabeledData(
-    source,
-    "frontend_glyph_rows",
-    graphics.constants,
-    "frontend_glyph_rows_end",
-  );
+  const glyphRows = frontendH31Asset.fontRows;
   requireLength(
     "frontend 6x7 glyph rows",
     glyphRows,
@@ -1152,11 +1150,7 @@ export function readFrontendGraphicsSource(source) {
       (firstGlyph + glyph) * CHARACTER_HEIGHT,
     );
   }
-  const graphicsBase = requireValue(graphics.constants, "FRONTEND_GRAPHICS_BASE");
-  frontendCharset.set(
-    graphics.sourceCharset.subarray(0, 16 * CHARACTER_HEIGHT),
-    graphicsBase * CHARACTER_HEIGHT,
-  );
+  frontendCharset.set(frontendH31Asset.extendedGlyphs, 48 * CHARACTER_HEIGHT);
   const markerBytes = extractLabeledData(
     source,
     "frontend_marker_positions",
@@ -1413,42 +1407,21 @@ function createStartMenuScreen(graphics, selection) {
     }
   }
 
-  const hangarLayers = [
-    ["OUTER", "CH_FRONT_PANEL_SOLID"],
-    ["MID", "CH_FRONT_PANEL_FRAME"],
-    ["INNER", "CH_FRONT_PANEL_TRUSS"],
-    ["BAY", "CH_FRONT_PANEL_EDGE"],
-  ];
-  for (const [layer, tileName] of hangarLayers) {
-    const top = requireValue(graphics.constants, `MAIN_MENU_HANGAR_${layer}_TOP_OFFSET`);
-    const bottom = requireValue(graphics.constants, `MAIN_MENU_HANGAR_${layer}_BOTTOM_OFFSET`);
-    const last = requireValue(graphics.constants, `MAIN_MENU_HANGAR_${layer}_LAST`);
-    const tile = requireValue(graphics.constants, tileName);
-    screen.fill(tile, top, top + last + 1);
-    screen.fill(tile, bottom, bottom + last + 1);
+  const line = requireValue(graphics.constants, "CH_FRONT_LINE");
+  for (const base of ["MAIN_MENU_LINE_TOP_OFFSET", "MAIN_MENU_LINE_BOTTOM_OFFSET"]) {
+    const offset = requireValue(graphics.constants, base);
+    screen.fill(line, offset + 7, offset + 33);
   }
-  const frame = requireValue(graphics.constants, "CH_FRONT_PANEL_FRAME");
-  for (const offset of [
-    requireValue(graphics.constants, "MAIN_MENU_SCENE_11_OFFSET") + 5,
-    requireValue(graphics.constants, "MAIN_MENU_SCENE_13_OFFSET") + 2,
-    requireValue(graphics.constants, "MAIN_MENU_SCENE_15_OFFSET") + 2,
-    requireValue(graphics.constants, "MAIN_MENU_HANGAR_BAY_BOTTOM_OFFSET") + 5,
-  ]) {
-    screen[offset] = frame;
+  const viper = requireValue(graphics.constants, "CH_FRONT_VIPER_TOP_LEFT");
+  for (let x = 0; x < 3; x += 1) {
+    screen[requireValue(graphics.constants, "MAIN_MENU_VIPER_TOP_OFFSET") + 18 + x] = viper + x;
+    screen[requireValue(graphics.constants, "MAIN_MENU_VIPER_BOTTOM_OFFSET") + 18 + x] = viper + 3 + x;
   }
-  const dimStar = requireValue(graphics.constants, "CH_FRONT_DOT_GRAPHIC");
-  const brightStar = requireValue(graphics.constants, "CH_FRONT_STAR");
-  for (const index of [0, 2, 4, 6]) {
-    screen[requireValue(graphics.constants, `MAIN_MENU_STAR_${index}`)] = dimStar;
+  const title = graphics.mainMenuRecords.find(({ text }) => text === "DARK FIGHTER");
+  for (let index = 0; index < title.text.length; index += 1) {
+    screen[title.address - screenAddress + index] |=
+      requireValue(graphics.constants, "ANTIC67_COLOR_PF1");
   }
-  for (const index of [1, 3, 5]) {
-    screen[requireValue(graphics.constants, `MAIN_MENU_STAR_${index}`)] = brightStar;
-  }
-  screen.fill(
-    requireValue(graphics.constants, "CH_FRONT_SEPARATOR"),
-    requireValue(graphics.constants, "MAIN_MENU_DIVIDER_OFFSET"),
-    requireValue(graphics.constants, "MAIN_MENU_DIVIDER_OFFSET") + 40,
-  );
 
   if (!Number.isInteger(selection) || selection < 0 || selection >= 4) {
     throw new Error("Main-menu selection must be an index from 0 through 3");
@@ -1465,7 +1438,7 @@ function createStartMenuScreen(graphics, selection) {
     graphics.constants,
     "MAIN_MENU_HIGHLIGHT_XOR",
   );
-  for (let offset = 2; offset <= 11; offset += 1) {
+  for (let offset = 1; offset <= 10; offset += 1) {
     if (screen[markerOffset + offset] !== 0) {
       screen[markerOffset + offset] ^= highlightXor;
     }
@@ -1539,7 +1512,7 @@ function drawGameplayMixedScreen(colorRegisters, screen, graphics) {
 }
 
 function drawMixedMainMenuScreen(screen, graphics) {
-  const pixels = new Uint8Array(SOURCE_WIDTH * SOURCE_HEIGHT);
+  const pixels = new Uint8Array(SOURCE_WIDTH * graphics.mainMenuLayout.height);
   let registers = graphics.mainMenuHardwareState;
   pixels.fill(requireValue(registers, "COLBK"));
 
@@ -5665,7 +5638,6 @@ export function readStartMenuRuntimeState(source, selection) {
   const effectiveSelection = selection ?? graphics.defaultSelection;
   const screen = createStartMenuScreen(graphics, effectiveSelection);
   const registerPixels = drawMixedMainMenuScreen(screen, graphics);
-  overlayStartMenuPmg(registerPixels, graphics);
   return { graphics, screen, registerPixels, selection: effectiveSelection };
 }
 

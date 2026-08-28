@@ -31,6 +31,7 @@ const SPREAD_SHOT_ENTITY_BASELINE_BYTES = 1444;
 const SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES = 15346;
 const SHIELD_BOOSTER_ENTITY_BASELINE_BYTES = 1869;
 const SHIELD_BOOSTER_RUNTIME_HARD_DELTA_BYTES = 512;
+const FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES = 1280;
 const MINIMUM_SPREAD_SHOT_RESERVE_BYTES = 64;
 const BOOT_PAYLOAD_TRAILER = Buffer.from([0x44, 0x46, 0x42, 0x31]); // "DFB1"
 
@@ -187,7 +188,7 @@ export function validateBuildDirectory(rootDirectory) {
     transport.remainingAtrTransportBytes === transport.remainingAtrSectors * ATR_SECTOR_SIZE &&
     transport.maximumNewSimultaneousResidencyBytes === 6841 &&
     transport.remainingSafeResidencyBytes ===
-      6841 - manifest.runtimeCodeBudget.weaponPickupShield.actualDeltaBytes &&
+      6841 - manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes &&
     transport.loaderResidentBytes === 0,
   "Transport and runtime residency capacities are conflated or inconsistent");
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
@@ -234,8 +235,12 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.codeBudget.weaponPickupShield.baselineBytes ===
       SHIELD_BOOSTER_ENTITY_BASELINE_BYTES &&
     manifest.entityEffects.codeBudget.weaponPickupShield.actualDeltaBytes <=
-      SHIELD_BOOSTER_RUNTIME_HARD_DELTA_BYTES,
-  "Shield exceeds its ENTITY_CODE/runtime budget");
+      SHIELD_BOOSTER_RUNTIME_HARD_DELTA_BYTES &&
+    manifest.entityEffects.codeBudget.frontendH31.baselineBytes ===
+      SHIELD_BOOSTER_ENTITY_BASELINE_BYTES &&
+    manifest.entityEffects.codeBudget.frontendH31.actualDeltaBytes <=
+      FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES,
+  "H3.1 exceeds its ENTITY_CODE/runtime budget");
   invariant(manifest.entityEffects.debrisGlyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
     manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 8 &&
     manifest.entityEffects.effectGlyphCount === 2 &&
@@ -285,6 +290,11 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.runtimeCodeBudget.weaponPickupShield.actualDeltaBytes <=
       SHIELD_BOOSTER_RUNTIME_HARD_DELTA_BYTES,
   "Shield exceeds its linked runtime hard budget");
+  invariant(manifest.runtimeCodeBudget?.frontendH31?.baselineBytes ===
+    SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES &&
+    manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <=
+      FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES,
+  "H3.1 exceeds its linked runtime hard budget");
   invariant(manifest.residentRuntime?.loadAddress === 0x2000 &&
     manifest.residentRuntime.runAddress === 0x2000 &&
     manifest.residentRuntime.rawBytes === 0x2000 &&

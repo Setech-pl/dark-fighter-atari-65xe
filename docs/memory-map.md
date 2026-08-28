@@ -12,23 +12,23 @@ lifetime phases and are not additive free memory.
 | `$0080-$009F` | 32 B | zero-page runtime variables |
 | `$0100-$01FF` | 256 B | 6502 stack |
 | `$0200-$03FF` | 512 B | OS workspace and vectors |
-| `$2000-$3098` | 4,249 B | resident `CODE` |
-| `$3099-$3F70` | 3,800 B | resident `RODATA` |
+| `$2000-$30AF` | 4,272 B | resident `CODE` |
+| `$30B0-$3F84` | 3,797 B | resident `RODATA` |
 | `$5400-$54C9` | 202 B | `PROJECTILES`: 19 fighter slots, burst controllers, and two shared fighter explosions |
 | `$552A-$5DE1` | 2,232 B | relocated `STARFIELD` runtime; 2,278 B reserved through `$5E0F` |
-| `$5E10-$7802` | 6,643 B | relocated `BROADSIDE`/frontend/enemy/weapon runtime; 6,656 B reserved through `$780F` |
+| `$5E10-$780F` | 6,656 B | relocated `BROADSIDE`/frontend/enemy/weapon runtime; exact reservation fit |
 | `$8000-$80FF` | 256 B | `ENTITY_STATE` BSS |
 | `$9000-$90CE` | 207 B | relocated A2 kernel; 256 B reserved through `$90FF` |
-| `$9100-$99F4` | 2,293 B | relocated `ENTITY_CODE`; 3,840 B reserved through `$9FFF` |
+| `$9100-$9D70` | 3,185 B | relocated `ENTITY_CODE`, including H3.1 display lists and frontend helpers; 3,840 B reserved through `$9FFF` |
 | `$21C1-$2661` | 1,185 B | boot-only `BOOT_STAGE2` overlay; replaced by the resident suffix before runtime |
 
 The linked runtime/code/data budget is `CODE + STARFIELD + BROADSIDE +
-A2_KERNEL + ENTITY_CODE = 15,624 B`.
+A2_KERNEL + ENTITY_CODE = 16,552 B`.
 
 ## Boot transport layout
 
-The production transport is 17,920 bytes in 140 occupied sectors. BRCNT is
-dynamic and loads only the 12,160-byte/95-sector initial block at `$2000-$4F7F`;
+The production transport is 18,432 bytes in 144 occupied sectors. BRCNT is
+dynamic and loads only the 12,672-byte/99-sector initial block at `$2000-$517F`;
 the entry point remains `$201E`. The last-sector envelope is 121 bytes of
 source-owned metadata/fill required by sector alignment, not reserved capacity.
 
@@ -36,26 +36,34 @@ source-owned metadata/fill required by sector alignment, not reserved capacity.
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
 | `$21C1-$2661` | 1,185 B | stage-2 SIO/CRC/manifest overlay; later restored resident bytes replace it |
-| `$2662-$3FBF` | 6,494 B | packed 7,743-byte resident suffix; staged at `$8100-$9A5D`, restored to `$21C1-$3FFF` |
-| `$3FC0-$46AA` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
-| `$46AB-$4779` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
-| `$477A-$4F2A` | 1,969 B | packed 2,293-byte entity/effect code; staged at `$5140-$58F0`, expands to `$9100-$99F4` |
-| `$4F2B-$4F2E` | 4 B | source-owned `DFB1` trailer |
-| `$4F2F-$4F7F` | 81 B | dynamic `DFI2` initial-sector envelope |
-| ATR sectors 96-140 | 5,760 B | external BROADSIDE chunk: 5,655 B LZ plus `DFC2` footer/fill; stage `$8100-$977F`, final `$5E10-$7802` |
+| `$2662-$3FDB` | 6,522 B | packed 7,743-byte resident suffix; staged at `$8100-$9A79`, restored to `$21C1-$3FFF` |
+| `$3FD1-$46BB` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
+| `$46BC-$478A` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
+| `$478B-$5154` | 2,506 B | packed 3,185-byte entity/effect/H3.1 runtime; staged at `$5160-$5B28`, expands to `$9100-$9D70` |
+| `$5155-$5158` | 4 B | source-owned `DFB1` trailer |
+| `$5159-$517F` | 39 B | dynamic `DFI2` initial-sector envelope; staging may overwrite from `$5160` only after the packed entity source has been consumed |
+| ATR sectors 100-144 | 5,760 B | external BROADSIDE chunk: 5,662 B LZ plus `DFC2` footer/fill; stage `$8100-$977F`, final `$5E10-$780F` |
 
 The `DFMC` v1 manifest is 30 B for the current one record and reserves 142 B
-inside stage-2 for at most eight records. The ATR has 580 free sectors
-(74,240 B). With the current eight-record/50-sector-per-chunk loader limits,
+inside stage-2 for at most eight records. The ATR has 576 free sectors
+(73,728 B). With the current eight-record/50-sector-per-chunk loader limits,
 seven further chunks provide 44,800 B additional transport capacity. Runtime
-residency has a 6,841-byte architectural ceiling and 6,563 B currently remain.
+residency has a 6,841-byte architectural ceiling and 5,635 B currently remain.
+The capacity model uses the 15,346-byte pre-Shield linked-runtime checkpoint as
+its common reference. The accepted `e63cbf2` image was 15,624 B, so it had
+already consumed 278 B of that capacity and left 6,563 B. H3.1 raises the
+linked runtime to 16,552 B: a 928-byte net increase over `e63cbf2`, and a
+1,206-byte cumulative charge against the common reference. Therefore the
+remaining safe residency is `6,841 - 1,206 = 5,635 B`. The manifest does not
+identify the 278-byte checkpoint charge as a standalone legacy-frontend
+footprint, so it must not be reported as one.
 
 ## Loader-time ownership
 
 | Range | Size | Loader role |
 | --- | ---: | --- |
-| `$333D-$335F` | 35 B | packed 202-byte loader display-list source |
-| `$37A4-$3F70` | 1,997 B | packed loader-bitmap source |
+| `$3315-$3337` | 35 B | packed 202-byte loader display-list source |
+| `$37B8-$3F84` | 1,997 B | packed loader-bitmap source |
 | `$3800-$38C9` | 202 B | expanded loader display list after its overlapping source has been consumed |
 | `$4010-$4FFF` | 4,080 B | bitmap lines 0-101 |
 | `$5000-$5E0F` | 3,600 B | bitmap lines 102-191 via second LMS at `$5000` |
@@ -102,13 +110,13 @@ this lifetime.
 | `$8060-$807F` | 32 B | initialized alignment/reserve |
 | `$8080-$80F3` | 116 B | six physical effect slots plus global state; release active limit 5 |
 | `$80F4-$80FF` | 12 B | initialized BSS tail |
-| `$8100-$9A53` | 6,484 B | cold-start resident-suffix staging only |
+| `$8100-$9A79` | 6,522 B | cold-start resident-suffix staging only |
 | `$8100-$812F` | 48 B | exact physical-screen pointers for 24 rendered far stars after cold startup |
 | `$8130-$8FFF` | 3,792 B | unowned after cold startup; retained reservation, not current gameplay state |
 | `$9000-$90CE` | 207 B | A2 kernel |
 | `$90CF-$90FF` | 49 B | free A2 reservation tail |
-| `$9100-$99F4` | 2,293 B | entity/effect/booster/projectile-composite runtime |
-| `$99F5-$9FFF` | 1,547 B | free entity-code reservation tail after cold staging |
+| `$9100-$9D70` | 3,185 B | entity/effect/booster/projectile-composite and H3.1 frontend runtime |
+| `$9D71-$9FFF` | 655 B | free entity-code reservation tail after cold staging |
 | `$A000-$BFFF` | 8,192 B | deliberately unused BASIC-ROM window |
 | `$C000-$FFFF` | 16,384 B | OS ROM and I/O; not gameplay RAM |
 

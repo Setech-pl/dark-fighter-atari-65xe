@@ -112,9 +112,9 @@ function insertScore(memory, score, hooks = {}) {
 function renderedTopScores(memory) {
   runAssembledRoutine(memory, addresses.drawTop);
   return Array.from({ length: 10 }, (_, row) => {
-    const digits = memory.subarray(addresses.screen + (5 + row) * 40 + 21,
-      addresses.screen + (5 + row) * 40 + 27);
-    return Number.parseInt([...digits].map((code) => code - 1).join(""), 10);
+    const digits = memory.subarray(addresses.screen + 80 + row * 20 + 11,
+      addresses.screen + 80 + row * 20 + 17);
+    return Number.parseInt([...digits].map((code) => (code & 0x3f) - 1).join(""), 10);
   });
 }
 

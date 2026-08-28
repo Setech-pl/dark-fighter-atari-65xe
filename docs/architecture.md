@@ -76,7 +76,7 @@ Cold staging also copies:
 - validated external broadside/runtime data to `$5E10-$7802` before takeover;
 - packed starfield/music data through `$7810-$7EFA` to `$552A-$5DE1`;
 - the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
-- packed entity/effect code through `$5140-$58F0` to `$9100-$99F4`.
+- packed entity/effect/frontend code through boot-only staging beginning at `$5160` to the resident `$9100-$9FFF` range. The staging write begins only after the initial packed source ending at `$5154` has been consumed.
 
 The BSS is exactly `$8000-$80FF` and is initialized deterministically. The
 runtime does not use `$A000-$BFFF`; compatibility never assumes that BASIC ROM
@@ -90,6 +90,13 @@ options, top-scores, exit, pause, and Game Over states. Menu music and gameplay
 music are independent deterministic POKEY sequences. OS VBI service remains
 disabled after takeover; the production runtime enables only the required DLI
 NMI path.
+
+The production H3.1 frontend uses one 1 KiB charset at `$4800` and limits all
+ANTIC 6/7 screen codes to glyphs 0-63. Large headings use ANTIC 7, menu/data
+rows use ANTIC 6, structural rows use ANTIC 4, and the two small control hints
+use ANTIC 2. Main Menu and Options each have one DLI to select the monochrome
+hint palette; TOP SCORES and Game Over use no DLI. The menu Viper is a 3x2
+ANTIC 4 character figure in glyphs 58-63, so frontend PMG remains disabled.
 
 New Game performs a bounded state reset. Life loss resets life-scoped combat
 state, while a live sector transition preserves session-scoped score and

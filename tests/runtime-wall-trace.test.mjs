@@ -73,7 +73,7 @@ test("real Atari800 XEX/ATR cold boots reach visible gameplay by frame 750", () 
       byFrame.get(500).charset_address,
       byFrame.get(500).dma_ctl,
       byFrame.get(500).nmi_en,
-    ], [0, 1, smoke.expected_addresses.main_menu_dlist, 0x4800, 0x3a, 0x80]);
+    ], [0, 1, smoke.expected_addresses.main_menu_dlist, 0x4800, 0x22, 0x80]);
     assert.deepEqual([
       byFrame.get(750).game_state,
       byFrame.get(750).charset_address,
@@ -620,9 +620,9 @@ test("ten heaviest frames retain exact clock positions, VBI IDs and state", () =
   }
 });
 
-test("current Shield maximum, subsystem profile and accepted PAL-recovery baseline are exact", () => {
+test("current frontend maximum, subsystem profile and accepted PAL-recovery baseline are exact", () => {
   const maximum = report.five_heaviest_frames[0];
-  assert.deepEqual([maximum.wall_cycles, maximum.physical_headroom], [32_108, 3_460]);
+  assert.deepEqual([maximum.wall_cycles, maximum.physical_headroom], [32_040, 3_528]);
   assert.equal(maximum.wall_cycles, report.semantics.measured_wall_cycles_dma_on);
   assert.ok(report.five_heaviest_frames.every((frame, index, frames) =>
     index === 0 || frames[index - 1].wall_cycles >= frame.wall_cycles));
@@ -652,7 +652,7 @@ test("current Shield maximum, subsystem profile and accepted PAL-recovery baseli
     shield.actual_delta_cycles, shield.measured_physical_headroom,
     shield.remaining_target_cycles, shield.remaining_hard_cycles,
     shield.shield_frames, shield.passed],
-  [32_072, 32_108, 36, 3_460, 314, 460, 373, true]);
+  [32_072, 32_040, -32, 3_528, 382, 528, 373, true]);
 });
 
 test("every difficulty contains a complete legal debris flight", () => {
@@ -673,8 +673,8 @@ test("XEX and ATR legal hunt traces have identical maxima and a reproducible fin
   const sessions = report.replay.sessions.filter(({ kind, policy }) =>
     kind === "memory-integrity-120s" && policy === "hunt");
   assert.deepEqual(sessions.map(({ medium, maximum_wall_cycles }) =>
-    [medium, maximum_wall_cycles]), [["XEX", 30_681], ["ATR", 30_681]]);
+    [medium, maximum_wall_cycles]), [["XEX", 30_728], ["ATR", 30_728]]);
   assert.equal(report.determinism.replay_fingerprint_sha256,
-    "30ad02974b3cee0c5543248cb61fc2de060b0d9355022f610c8f9374f4e3c016");
+    "1e111fa16fe51e3c48df861cb96ead0c9db4c1a3112e2e070db6b456ae18a376");
   assert.ok(report.determinism.ordered_frames > 0);
 });

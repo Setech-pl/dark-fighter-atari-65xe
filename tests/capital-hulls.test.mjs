@@ -552,11 +552,11 @@ test("runtime map reservation and payload remain bounded and do not consume PMG 
   assert.match(source, /scroll_hull_columns:[\s\S]+jsr draw_hull_row/);
 });
 
-test("loader and accepted menu previews remain unchanged while hull previews are source-derived", () => {
+test("loader remains unchanged and the accepted H3.1 menu preview is source-derived", () => {
   const loader = createLoaderPreview(loadLoaderBitmapDefinition(loaderDefinitionPath));
   const menu = createStartMenuPreview(source);
   assert.equal(sha256(loader), "83a8b4f7fff4791206b220e773272b2bb014b517049aedd83e070cecc3edd494");
-  assert.equal(sha256(menu), "5a1af8a1757930d053e0f50a1c0b67c8e22048587d7c80b08a405accdb688551");
+  assert.equal(sha256(menu), "90c24ccbf0c00122896b959059f76f4748e55fbf304f58672d0cc4f867e7ae2c");
 
   const gameplay = createGameplayPreview(source, definition);
   const strip = createCapitalHullsStripPreview(source, definition);

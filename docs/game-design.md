@@ -13,6 +13,11 @@ The player flies a Viper with joystick port 1 and fires with one button.
 The frontend contains the title loader, main menu, options, top scores, exit
 screen, menu music, and a gameplay-music option. Gameplay can be paused and
 resumed. Pause freezes active gameplay simulation and booster countdowns.
+The post-loader frontend uses the accepted Showcase Tactical Lite hierarchy:
+large display headings, wide 20-column options/data, one restrained steel
+structure, amber values, and green only for the active action. TOP SCORES
+continues to show the ten live RAM records, and Game Over shows the live final
+and top scores rather than demonstration data.
 
 ### HUD and player lifecycle
 

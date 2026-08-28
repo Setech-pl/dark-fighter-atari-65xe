@@ -94,10 +94,17 @@ test("protected linked segments do not regress beyond the accepted feature basel
     `Spread Shot runtime delta ${manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes} exceeds 448 bytes`);
   assert.deepEqual(manifest.runtimeCodeBudget.weaponPickupShield, {
     baselineBytes: 15_346,
-    actualBytes: manifest.runtimeCodeBudget.actualBytes,
-    actualDeltaBytes: manifest.runtimeCodeBudget.actualBytes - 15_346,
+    actualBytes: 15_346,
+    actualDeltaBytes: 0,
     hardDeltaBytes: 512,
   });
+  assert.deepEqual(manifest.runtimeCodeBudget.frontendH31, {
+    baselineBytes: 15_346,
+    actualBytes: manifest.runtimeCodeBudget.actualBytes,
+    actualDeltaBytes: manifest.runtimeCodeBudget.actualBytes - 15_346,
+    hardDeltaBytes: 1280,
+  });
+  assert.ok(manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <= 1280);
   assert.ok(manifest.payloadBudget.weaponPickupSpreadShot.remainingReserveBytes >= 64);
 });
 

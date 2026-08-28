@@ -968,7 +968,7 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
       `${definition.id} loader countdown did not advance between frames 250 and 300`);
     invariant(menu.loader_timer === 0 && menu.game_state === 1 &&
       menu.dlist === expected.main_menu_dlist && menu.charset_address === 0x4800 &&
-      menu.pm_base === 0x3800 && menu.dma_ctl === 0x3a && menu.nmi_en === 0x80 &&
+      menu.pm_base === 0x3800 && menu.dma_ctl === 0x22 && menu.nmi_en === 0x80 &&
       menu.vdslst === expected.frontend_dli,
     `${definition.id} did not reach a valid visible main menu by frame 500`);
     invariant(gameplay.game_state === 6 && gameplay.charset_address === 0x5000 &&

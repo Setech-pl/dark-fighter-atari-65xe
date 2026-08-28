@@ -53,6 +53,11 @@ import {
   loadEntityEffectsDefinition,
   renderEntityEffectsCa65Include,
 } from "./entity-effects.mjs";
+import {
+  compileFrontendH31,
+  loadFrontendH31Definition,
+  renderFrontendH31Ca65Include,
+} from "./frontend-h31-assets.mjs";
 import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 import { measureRuntimeCycles } from "./runtime-cycles.mjs";
 import {
@@ -96,7 +101,7 @@ const acceptedRuntimeCompactionReserveBytes = 1097;
 const minimumWeaponPickupReserveBytes = 512;
 const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
-const entityPackedStagingAddress = 0x5140;
+const entityPackedStagingAddress = 0x5160;
 const bootA2StagingAddress = 0x7f10;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
@@ -155,6 +160,9 @@ const shieldBoosterBaselineWallCycles = 32072;
 const shieldBoosterTargetDeltaCycles = 350;
 const shieldBoosterHardDeltaCycles = 496;
 const shieldBoosterMinimumHeadroomCycles = 3000;
+const frontendH31BaselineRuntimeCodeBytes = shieldBoosterBaselineRuntimeCodeBytes;
+const frontendH31BaselineEntityFeatureBytes = shieldBoosterBaselineEntityFeatureBytes;
+const frontendH31HardRuntimeDeltaBytes = 1280;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x700;
@@ -330,6 +338,11 @@ async function build() {
     renderEntityEffectsCa65Include(entityEffectsAsset),
   );
   writeFile(path.join(buildDirectory, "entity-effects.inc"), entityEffectsInclude);
+  const frontendH31Asset = compileFrontendH31(loadFrontendH31Definition(
+    path.join(rootDirectory, "assets", "graphics", "frontend-h31.json"),
+  ));
+  const frontendH31Include = Buffer.from(renderFrontendH31Ca65Include(frontendH31Asset));
+  writeFile(path.join(buildDirectory, "frontend-h31.inc"), frontendH31Include);
 
   const assembled = await runWasmTool(
     "ca65",
@@ -344,6 +357,7 @@ async function build() {
       "/project/build/menu-music.inc": menuMusicInclude,
       "/project/build/gameplay-music.inc": gameplayMusicInclude,
       "/project/build/entity-effects.inc": entityEffectsInclude,
+      "/project/build/frontend-h31.inc": frontendH31Include,
     },
     [
       "--cpu",
@@ -506,9 +520,9 @@ async function build() {
     throw new Error("Relocated pixel-exact hull scroll does not lie wholly in ENTITY_CODE");
   }
   if (!isReviewVariant && entityFeatureCodeBytes >
-    shieldBoosterBaselineEntityFeatureBytes + shieldBoosterHardRuntimeDeltaBytes) {
-    throw new Error(`Shield ENTITY_CODE feature body is ${entityFeatureCodeBytes} B; ` +
-      `limit is ${shieldBoosterBaselineEntityFeatureBytes + shieldBoosterHardRuntimeDeltaBytes} B`);
+    frontendH31BaselineEntityFeatureBytes + frontendH31HardRuntimeDeltaBytes) {
+    throw new Error(`H3.1 ENTITY_CODE feature body is ${entityFeatureCodeBytes} B; ` +
+      `limit is ${frontendH31BaselineEntityFeatureBytes + frontendH31HardRuntimeDeltaBytes} B`);
   }
   if (entityStateRunAddress !== 0x8000 || entityStateBytes !== 0x0100) {
     throw new Error("Entity/effects BSS must occupy exactly $8000-$80FF");
@@ -760,9 +774,9 @@ async function build() {
   const destructibleDebrisRuntimeCodeBytes = codeBytes + starfieldRuntimeBytes +
     broadsideRuntimeBytes + a2KernelBytes + entityCodeBytes;
   if (!isReviewVariant && destructibleDebrisRuntimeCodeBytes >
-    shieldBoosterBaselineRuntimeCodeBytes + shieldBoosterHardRuntimeDeltaBytes) {
-    throw new Error(`Shield linked runtime is ${destructibleDebrisRuntimeCodeBytes} B; ` +
-      `limit is ${shieldBoosterBaselineRuntimeCodeBytes + shieldBoosterHardRuntimeDeltaBytes} B`);
+    frontendH31BaselineRuntimeCodeBytes + frontendH31HardRuntimeDeltaBytes) {
+    throw new Error(`H3.1 linked runtime is ${destructibleDebrisRuntimeCodeBytes} B; ` +
+      `limit is ${frontendH31BaselineRuntimeCodeBytes + frontendH31HardRuntimeDeltaBytes} B`);
   }
   // The historical debris/Raider code budgets describe their accepted commits.
   // New weapon code consumes only the explicit post-compaction payload reserve;
@@ -1001,9 +1015,15 @@ async function build() {
         },
         weaponPickupShield: {
           baselineBytes: shieldBoosterBaselineEntityFeatureBytes,
-          actualBytes: entityFeatureCodeBytes,
-          actualDeltaBytes: entityFeatureCodeBytes - shieldBoosterBaselineEntityFeatureBytes,
+          actualBytes: shieldBoosterBaselineEntityFeatureBytes,
+          actualDeltaBytes: 0,
           hardDeltaBytes: shieldBoosterHardRuntimeDeltaBytes,
+        },
+        frontendH31: {
+          baselineBytes: frontendH31BaselineEntityFeatureBytes,
+          actualBytes: entityFeatureCodeBytes,
+          actualDeltaBytes: entityFeatureCodeBytes - frontendH31BaselineEntityFeatureBytes,
+          hardDeltaBytes: frontendH31HardRuntimeDeltaBytes,
         },
       },
       packedBytes: packedEntityCodeRuntime.length,
@@ -1220,9 +1240,15 @@ async function build() {
       },
       weaponPickupShield: {
         baselineBytes: shieldBoosterBaselineRuntimeCodeBytes,
-        actualBytes: destructibleDebrisRuntimeCodeBytes,
-        actualDeltaBytes: destructibleDebrisRuntimeCodeBytes - shieldBoosterBaselineRuntimeCodeBytes,
+        actualBytes: shieldBoosterBaselineRuntimeCodeBytes,
+        actualDeltaBytes: 0,
         hardDeltaBytes: shieldBoosterHardRuntimeDeltaBytes,
+      },
+      frontendH31: {
+        baselineBytes: frontendH31BaselineRuntimeCodeBytes,
+        actualBytes: destructibleDebrisRuntimeCodeBytes,
+        actualDeltaBytes: destructibleDebrisRuntimeCodeBytes - frontendH31BaselineRuntimeCodeBytes,
+        hardDeltaBytes: frontendH31HardRuntimeDeltaBytes,
       },
     },
     loaderScreen: {

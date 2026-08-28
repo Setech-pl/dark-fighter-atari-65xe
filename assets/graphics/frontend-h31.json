@@ -1,0 +1,29 @@
+{
+  "format": "dark-fighter-frontend-h31-v1",
+  "description": "Accepted H3.1 frontend font and ANTIC 4 structures.",
+  "fontRowsHex": [
+    "7cc6ced6e6c67c", "307030303030fc", "7cc6061c70c0fe", "fc06067c0606fc",
+    "1c3c6cccfe0c0c", "fec0c0fc0606fc", "7cc0c0fcc6c67c", "fe060c18303030",
+    "7cc6c67cc6c67c", "7cc6c67e06067c", "7cc6c6fec6c6c6", "fcc6c6fcc6c6fc",
+    "7ec0c0c0c0c07e", "fcc6c6c6c6c6fc", "fec0c0fcc0c0fe", "fec0c0fcc0c0c0",
+    "7ec0c0dec6c67c", "c6c6c6fec6c6c6", "fe3030303030fe", "3e0c0c0ccccc78",
+    "c6ccd8f0d8ccc6", "c0c0c0c0c0c0fe", "c6eefed6c6c6c6", "c6e6f6decec6c6",
+    "7cc6c6c6c6c67c", "fcc6c6fcc0c0c0", "7cc6c6c6d6cc7a", "fcc6c6fcd8ccc6",
+    "7ec0c07c0606fc", "fe303030303030", "c6c6c6c6c6c67c", "c6c6c6c6c66c38",
+    "c6c6c6d6feeec6", "c66c3838386cc6", "c6c66c38303030", "fe0c183060c0fe",
+    "000000fe000000", "00000000000030", "060c183060c080", "00303000303000",
+    "78cc0c18300030", "80c0603060c080", "30303030303030"
+  ],
+  "extendedGlyphBase": 48,
+  "extendedGlyphsHex": "fffffffffffffffffcc0c0c0c0c0c0fc0000000000000000000000000000000001010515165659594040505494956565565615050a12100095955450a084040000000000000000000000000000000000000000011454541414555555555555550000004014151514010000010505000055555541000028284000004050500000",
+  "maximumAntic67Glyph": 63,
+  "viperGlyphs": [58, 59, 60, 61, 62, 63],
+  "palette": {
+    "background": 0,
+    "white": 14,
+    "amber": 30,
+    "steel": 132,
+    "alert": 70,
+    "activeGreen": 216
+  }
+}
