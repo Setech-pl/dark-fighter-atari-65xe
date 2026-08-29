@@ -101,7 +101,7 @@ const acceptedRuntimeCompactionReserveBytes = 1097;
 const minimumWeaponPickupReserveBytes = 512;
 const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
-const entityPackedStagingAddress = 0x51c0;
+const entityPackedStagingAddress = 0x5300;
 const bootA2StagingAddress = 0x7f10;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
@@ -596,9 +596,9 @@ async function build() {
   const entityStagedEndAddress = entityStagedSourceAddress + packedEntityCodeRuntime.length;
   const initialPackedSourcesEnd = entityPackedSourceAddress + packedEntityCodeRuntime.length;
   const initialPackedSourcesLastAddress = initialPackedSourcesEnd - 1;
-  if (!(initialPackedSourcesLastAddress < entityStagedSourceAddress)) {
+  if (!(initialPackedSourcesEnd <= entityStagedSourceAddress)) {
     throw new Error(
-      `Initial packed sources ending at $${initialPackedSourcesLastAddress.toString(16)} ` +
+      `Initial packed sources ending exclusively at $${initialPackedSourcesEnd.toString(16)} ` +
       `must precede ENTITY_CODE staging $${entityStagedSourceAddress.toString(16)}`,
     );
   }
@@ -607,6 +607,19 @@ async function build() {
       `Packed ENTITY_CODE staging ending exclusively at $${entityStagedEndAddress.toString(16)} ` +
       `must not exceed BROADSIDE destination $${broadsideRunAddress.toString(16)}`,
     );
+  }
+  const starfieldRunEndAddress = starfieldRunAddress + starfieldRuntimeBytes;
+  const entityStagingStarfieldOverlapStart = Math.max(
+    entityStagedSourceAddress, starfieldRunAddress,
+  );
+  const entityStagingStarfieldOverlapEnd = Math.min(
+    entityStagedEndAddress, starfieldRunEndAddress,
+  );
+  const entityStagingStarfieldOverlapBytes = Math.max(
+    0, entityStagingStarfieldOverlapEnd - entityStagingStarfieldOverlapStart,
+  );
+  if (!(entityStagingStarfieldOverlapBytes > 0)) {
+    throw new Error("ENTITY_CODE cold staging must overlap the later starfield destination");
   }
 
   residentMain.writeUInt16LE(
@@ -1040,6 +1053,14 @@ async function build() {
       stagedEndExclusive: entityStagedEndAddress,
       sourceToStagingMarginBytes: entityStagedSourceAddress - initialPackedSourcesEnd,
       stagingToBroadsideMarginBytes: broadsideRunAddress - entityStagedEndAddress,
+      stagingLifecycle: {
+        starfieldDestinationAddress: starfieldRunAddress,
+        starfieldDestinationEndExclusive: starfieldRunEndAddress,
+        starfieldDestinationOverlapStartAddress: entityStagingStarfieldOverlapStart,
+        starfieldDestinationOverlapEndExclusive: entityStagingStarfieldOverlapEnd,
+        starfieldDestinationOverlapBytes: entityStagingStarfieldOverlapBytes,
+        stagingReleasedBeforeStarfieldExpansion: true,
+      },
       compression: "LZ-10/5",
       deterministicFillTestByte: 0xa5,
       gameplayTopScanline: entityEffectsAsset.coordinateSystem.gameplayTopScanline,

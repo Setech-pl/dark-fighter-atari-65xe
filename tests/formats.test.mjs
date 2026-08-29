@@ -9,6 +9,7 @@ import { unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
+const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 
 test("generated artifact set is internally consistent", () => {
   const { manifest } = validateBuildDirectory(rootDirectory);
@@ -106,7 +107,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
   assert.deepEqual(parsedXex.segments[0].data,
     boot.subarray(0, manifest.transportCapacity.initialBootBytes));
   assert.deepEqual(parsedAtr.body.subarray(0, boot.length), boot);
-  assert.equal(manifest.entityEffects.stagedSourceAddress, 0x51c0);
+  assert.equal(manifest.entityEffects.stagedSourceAddress, 0x5300);
   assert.ok(manifest.entityEffects.initialPackedSourcesLastAddress <
     manifest.entityEffects.stagedSourceAddress);
   assert.ok(manifest.entityEffects.initialPackedSourcesEndExclusive <=
@@ -119,4 +120,32 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
       manifest.entityEffects.initialPackedSourcesEndExclusive);
   assert.equal(manifest.entityEffects.stagingToBroadsideMarginBytes,
     manifest.broadsideRuntime.runAddress - manifest.entityEffects.stagedEndExclusive);
+  assert.deepEqual([
+    manifest.entityEffects.initialPackedSourcesEndExclusive,
+    manifest.entityEffects.stagedSourceAddress,
+    manifest.entityEffects.stagedEndExclusive,
+    manifest.broadsideRuntime.runAddress,
+    manifest.entityEffects.sourceToStagingMarginBytes,
+    manifest.entityEffects.stagingToBroadsideMarginBytes,
+  ], [0x51bb, 0x5300, 0x5cef, 0x5e10, 325, 289]);
+
+  const lifecycle = manifest.entityEffects.stagingLifecycle;
+  assert.equal(lifecycle.stagingReleasedBeforeStarfieldExpansion, true);
+  assert.deepEqual([
+    lifecycle.starfieldDestinationAddress,
+    lifecycle.starfieldDestinationEndExclusive,
+    lifecycle.starfieldDestinationOverlapStartAddress,
+    lifecycle.starfieldDestinationOverlapEndExclusive,
+    lifecycle.starfieldDestinationOverlapBytes,
+  ], [0x552a, 0x5de2, 0x552a, 0x5cef, 1989]);
+  assert.match(source,
+    /jsr stage_boot_streams[\s\S]+jsr unpack_resident_runtime\s+jsr unpack_entity_runtime[\s\S]+jsr unpack_loader_bitmap\s+jsr show_loader\s+jsr unpack_starfield_runtime/,
+    "ENTITY_CODE staging must be consumed before loader/starfield destinations overwrite it");
+
+  for (const range of manifest.runtimeTiming.memory.runtimeRanges) {
+    assert.ok(range.end < 0x0600 || range.start > 0x1fff,
+      `${range.name} enters excluded low RAM $0600-$1FFF`);
+    assert.ok(range.end < 0xa000 || range.start > 0xbfff,
+      `${range.name} enters conditional BASIC-ROM RAM $A000-$BFFF`);
+  }
 });

@@ -13,8 +13,11 @@ Before manual testing, run the evidence phases in order:
 - [ ] `npm run build` binds the complete report to the same boot BIN, XEX, and
       ATR hashes.
 - [ ] `npm run verify` accepts the final-bound manifest and report hash.
+- [ ] The manifest reports ENTITY_CODE staging `$5300-$5CEE`, 325 B before it,
+      and 289 B before BROADSIDE; startup consumes it before loader bitmap and
+      starfield expansion reuse the same low-memory range.
 - [ ] A second unchanged full trace has replay fingerprint
-      `e67d86283a0768411177769cb1353606998024c477f87e440dce8f1cf13e5515`,
+      `a6978c46db70261429115faee7e013c939224a30854c509edfe4129dd06ed5d3`,
       a 32,040-cycle maximum, and 3,528-cycle physical headroom.
 
 ## Atari800 PAL test

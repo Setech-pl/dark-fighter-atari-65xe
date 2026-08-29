@@ -25,6 +25,14 @@ lifetime phases and are not additive free memory.
 The linked runtime/code/data budget is `CODE + STARFIELD + BROADSIDE +
 A2_KERNEL + ENTITY_CODE = 16,556 B`.
 
+The preceding difficulty-damage change emitted seven bytes: four in
+`ENTITY_CODE` and three in resident `RODATA`. The 8 KiB `MAIN` file image is
+fixed and fill-backed through `$3FFF`, so the three RODATA bytes consumed three
+bytes of existing tail padding rather than enlarging that image. The manifest's
+historical linked-runtime metric intentionally sums `CODE`, `STARFIELD`,
+`BROADSIDE`, `A2_KERNEL`, and `ENTITY_CODE` (not `RODATA`), so it rose only by
+the four ENTITY_CODE bytes, from 16,552 B to 16,556 B.
+
 ## Boot transport layout
 
 The production transport is 18,560 bytes in 145 occupied sectors. BRCNT is
@@ -39,9 +47,9 @@ source-owned metadata/fill required by sector alignment, not reserved capacity.
 | `$2662-$4011` | 6,576 B | packed 7,743-byte resident suffix; staged at `$8100-$9AAF`, restored to `$21C1-$3FFF` |
 | `$4012-$46FC` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
 | `$46FD-$47CB` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
-| `$47CC-$51BA` | 2,543 B | packed 3,189-byte entity/effect/H3.1/H4.1 runtime; staged at `$51C0-$5BAE`, expands to `$9100-$9D74` |
+| `$47CC-$51BA` | 2,543 B | packed 3,189-byte entity/effect/H3.1/H4.1 runtime; staged at `$5300-$5CEE`, expands to `$9100-$9D74` |
 | `$51BB-$51BE` | 4 B | source-owned `DFB1` trailer |
-| `$51BF-$51FF` | 65 B | dynamic `DFI2` initial-sector envelope; staging may overwrite from `$51C0` only after the packed entity source has been consumed |
+| `$51BF-$51FF` | 65 B | dynamic `DFI2` initial-sector envelope; remains below ENTITY_CODE staging at `$5300` |
 | ATR sectors 101-145 | 5,760 B | external BROADSIDE chunk: 5,661 B LZ plus `DFC2` footer/fill; stage `$8100-$977F`, final `$5E10-$780F` |
 
 The `DFMC` v1 manifest is 30 B for the current one record and reserves 142 B
@@ -122,6 +130,16 @@ this lifetime.
 
 Cold startup initializes every byte of `$8000-$80FF`. No current code, state,
 charset, loader data, or staging buffer uses `$A000-$BFFF`.
+
+## Boot-only ENTITY_CODE staging lifecycle
+
+The packed initial sources end exclusively at `$51BB`. ENTITY_CODE staging is
+`$5300-$5CEE` (2,543 B), so the pre-staging margin is 325 B. Its end-exclusive
+address `$5CEF` is 289 B below BROADSIDE at `$5E10`. The packed stream is copied
+only after the initial block is resident, expanded to `$9100-$9D74`, and then
+released. The later starfield destination `$552A-$5DE1` overlaps the released
+staging range over `$552A-$5CEE` (1,989 B); it is never live concurrently with
+the packed ENTITY_CODE source. Loader-resident RAM after startup remains 0 B.
 
 ## PMG ownership
 

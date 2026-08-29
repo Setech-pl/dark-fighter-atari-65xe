@@ -17,23 +17,23 @@
     "dark-fighter-boot.bin": {
       "path": "dist/dark-fighter-boot.bin",
       "bytes": 18560,
-      "sha256": "c66375575ed3ab52a12f8cd7d6abb5c75f372b6df723e9ca72af050163f2aa1d"
+      "sha256": "e8b571eccf52c4ecd14ffa4cce0c92c43116f4b47bb17bc532865128bb8ed9e1"
     },
     "dark-fighter.xex": {
       "path": "dist/dark-fighter.xex",
       "bytes": 19472,
-      "sha256": "baa6a691a6c08125dede8141afaf24e49759f5ecd7e7ed2f8bca485e6bf0ab13"
+      "sha256": "19004aeeb02037550339d66470d3a5c47cff73be5937ad2bb9cb28fe60a7d7b1"
     },
     "dark-fighter.atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "3eb3cc838626ea21376091e8d8b4a2a9661fda3143014c4133c318a50fe734b1"
+      "sha256": "be4604a6d9374d1d91d4b91db5b1136dcd2dc0b9de55a2936a0da49e50ccbda0"
     }
   },
   "artifact": {
     "path": "dist/dark-fighter.xex",
     "bytes": 19472,
-    "sha256": "baa6a691a6c08125dede8141afaf24e49759f5ecd7e7ed2f8bca485e6bf0ab13"
+    "sha256": "19004aeeb02037550339d66470d3a5c47cff73be5937ad2bb9cb28fe60a7d7b1"
   },
   "emulator": {
     "name": "Atari800",
@@ -78,7 +78,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 19472,
-          "sha256": "baa6a691a6c08125dede8141afaf24e49759f5ecd7e7ed2f8bca485e6bf0ab13"
+          "sha256": "19004aeeb02037550339d66470d3a5c47cff73be5937ad2bb9cb28fe60a7d7b1"
         },
         "snapshots": [
           {
@@ -226,7 +226,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 19472,
-          "sha256": "baa6a691a6c08125dede8141afaf24e49759f5ecd7e7ed2f8bca485e6bf0ab13"
+          "sha256": "19004aeeb02037550339d66470d3a5c47cff73be5937ad2bb9cb28fe60a7d7b1"
         },
         "snapshots": [
           {
@@ -374,7 +374,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "3eb3cc838626ea21376091e8d8b4a2a9661fda3143014c4133c318a50fe734b1"
+          "sha256": "be4604a6d9374d1d91d4b91db5b1136dcd2dc0b9de55a2936a0da49e50ccbda0"
         },
         "snapshots": [
           {
@@ -522,7 +522,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "3eb3cc838626ea21376091e8d8b4a2a9661fda3143014c4133c318a50fe734b1"
+          "sha256": "be4604a6d9374d1d91d4b91db5b1136dcd2dc0b9de55a2936a0da49e50ccbda0"
         },
         "snapshots": [
           {

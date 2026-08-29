@@ -5,16 +5,16 @@
     "xex": {
       "path": "dist/dark-fighter.xex",
       "bytes": 19472,
-      "sha256": "baa6a691a6c08125dede8141afaf24e49759f5ecd7e7ed2f8bca485e6bf0ab13"
+      "sha256": "19004aeeb02037550339d66470d3a5c47cff73be5937ad2bb9cb28fe60a7d7b1"
     },
     "atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "3eb3cc838626ea21376091e8d8b4a2a9661fda3143014c4133c318a50fe734b1"
+      "sha256": "be4604a6d9374d1d91d4b91db5b1136dcd2dc0b9de55a2936a0da49e50ccbda0"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "d899823031ad9c0ca6ac6bb0e176be7184eeb3cf8743bfaf9211b048952b1657"
+      "sha256": "beba76a724ef66ec12a2c8622d622fdca7463a590c408e4669f2bc9bace52bb6"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },

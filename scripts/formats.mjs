@@ -221,6 +221,23 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.codeBytes > 0 &&
     manifest.entityEffects.codeBytes <= manifest.entityEffects.codeReservedBytes,
   "ENTITY_CODE exceeds its $9100-$9FFF runtime reservation");
+  invariant(manifest.entityEffects.stagedSourceAddress === 0x5300 &&
+    manifest.entityEffects.initialPackedSourcesEndExclusive <=
+      manifest.entityEffects.stagedSourceAddress &&
+    manifest.entityEffects.stagedEndExclusive <= manifest.broadsideRuntime.runAddress &&
+    manifest.entityEffects.sourceToStagingMarginBytes ===
+      manifest.entityEffects.stagedSourceAddress -
+        manifest.entityEffects.initialPackedSourcesEndExclusive &&
+    manifest.entityEffects.stagingToBroadsideMarginBytes ===
+      manifest.broadsideRuntime.runAddress - manifest.entityEffects.stagedEndExclusive,
+  "ENTITY_CODE cold staging ranges or reported margins are inconsistent");
+  invariant(manifest.entityEffects.stagingLifecycle?.stagingReleasedBeforeStarfieldExpansion === true &&
+    manifest.entityEffects.stagingLifecycle.starfieldDestinationAddress ===
+      manifest.starfieldRuntime.runAddress &&
+    manifest.entityEffects.stagingLifecycle.starfieldDestinationEndExclusive ===
+      manifest.starfieldRuntime.runAddress + manifest.starfieldRuntime.bytes &&
+    manifest.entityEffects.stagingLifecycle.starfieldDestinationOverlapBytes > 0,
+  "Later starfield destination does not retain the released ENTITY_CODE staging lifecycle");
   invariant(
     manifest.entityEffects.codeBudget?.baselineBytes === ENTITY_CODE_FOUNDATION_BYTES &&
     manifest.entityEffects.codeBudget?.approvedDeltaBytes === DEBRIS_VISUAL_POLISH_CODE_BUDGET &&
