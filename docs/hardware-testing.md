@@ -13,7 +13,7 @@ Before manual testing, run the evidence phases in order:
 - [ ] `npm run build` binds the complete report to the same boot BIN, XEX, and
       ATR hashes.
 - [ ] `npm run verify` accepts the final-bound manifest and report hash.
-- [ ] The manifest reports ENTITY_CODE staging `$5300-$5CEE`, 325 B before it,
+- [ ] The manifest reports ENTITY_CODE staging `$5300-$5CEE`, 374 B before it,
       and 289 B before BROADSIDE; startup consumes it before loader bitmap and
       starfield expansion reuse the same low-memory range.
 - [ ] A second unchanged full trace has replay fingerprint

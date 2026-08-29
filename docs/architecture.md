@@ -78,10 +78,10 @@ Cold staging also copies:
 - the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
 - packed entity/effect/frontend code through boot-only staging at `$5300-$5CEE`
   to the resident `$9100-$9FFF` range. The staging write begins only after the
-  initial packed source ending at `$51BA` has been consumed. Its end-exclusive
+  initial packed source ending at `$5189` has been consumed. Its end-exclusive
   `$5CEF` remains 289 bytes below the BROADSIDE destination at `$5E10`.
 
-The initial packed sources end exclusively at `$51BB`, leaving 325 bytes before
+The initial packed sources end exclusively at `$518A`, leaving 374 bytes before
 the `$5300` staging start. Startup copies ENTITY_CODE there, expands the stream
 to its current live `$9100-$9D74` range, and immediately releases the staging
 range. `unpack_loader_bitmap` may then overwrite it while preparing the loader;

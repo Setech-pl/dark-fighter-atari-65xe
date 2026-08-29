@@ -333,6 +333,65 @@ test("engine banks are character-animated, non-weapon modules with no PMG alloca
   assert.equal(asset.sector.engineAnimationFrames, 8);
 });
 
+test("capital-engine phases preserve H4.1 hull glyphs outside declared engine cells", () => {
+  const structuralGlyphNames = [
+    "allied_plate_mass", "allied_plate_edge", "allied_plate_lip", "allied_vertical_rib",
+    "allied_vent", "allied_service", "allied_inner_edge", "allied_turret_base",
+    "allied_turret_housing", "enemy_slab_mass", "enemy_slab_void", "enemy_vertical_rib",
+    "enemy_slab_cap", "enemy_seam", "enemy_sensor", "enemy_inner_edge",
+    "enemy_turret_base", "enemy_turret_housing",
+  ];
+  assert.equal(sha256(Buffer.concat(structuralGlyphNames.map((name) =>
+    Buffer.from(asset.glyphs.find((glyph) => glyph.name === name).bytes)))),
+  "4db510f6891566abc9e545818762230a11250c8c55c41d7e1f92681ddf02d900",
+  "approved structural panels must not regress to the fc0ed31 speckled glyph set");
+
+  for (const side of ["allied", "enemy"]) {
+    const engineGlyph = asset.sector.engineGlyphs.get(side);
+    const screenRows = asset.sector.sectorScreenRowsBySide.get(side);
+    const legalCells = new Set();
+    const observedCells = new Set();
+
+    for (let sectorRow = 0; sectorRow < asset.sector.totalRows; sectorRow += 1) {
+      const moduleId = asset.sector.moduleIdFor(side, sectorRow);
+      if (moduleId === asset.sector.engineModuleIds.get(side)) {
+        const mask = asset.sector.engineOverlayMasks.get(side)[sectorRow % asset.sector.moduleRows];
+        for (let baseColumn = 0; baseColumn < 8; baseColumn += 1) {
+          if (mask & (1 << baseColumn)) {
+            const mapColumn = side === "allied" ? baseColumn : baseColumn + 1;
+            legalCells.add(`${sectorRow}:${mapColumn}`);
+          }
+        }
+      }
+      for (let mapColumn = 0; mapColumn < screenRows[sectorRow].length; mapColumn += 1) {
+        if (screenRows[sectorRow][mapColumn] === engineGlyph.screenCode) {
+          observedCells.add(`${sectorRow}:${mapColumn}`);
+        }
+      }
+    }
+
+    assert.deepEqual(observedCells, legalCells,
+      `${side} engine glyph may occur only in declared engine-overlay cells`);
+    assert.equal(asset.decodedMaps.get(side).flat().includes(engineGlyph.screenCode), false,
+      `${side} reusable hull map must not share the animated engine glyph`);
+    assert.deepEqual(engineGlyph.animationBytes[0], engineGlyph.bytes,
+      `${side} phase zero must preserve the accepted H4.1 engine/nozzle artwork`);
+
+    const stableGlyphs = asset.glyphs.filter(({ screenCode }) =>
+      screenCode !== engineGlyph.screenCode).map(({ bytes }) => Buffer.from(bytes));
+    for (const phase of [0, 1, 0]) {
+      assert.equal(engineGlyph.animationBytes[phase].length, 8,
+        `${side} phase ${phase} writes one complete glyph only`);
+      assert.deepEqual(
+        asset.glyphs.filter(({ screenCode }) => screenCode !== engineGlyph.screenCode)
+          .map(({ bytes }) => Buffer.from(bytes)),
+        stableGlyphs,
+        `${side} phase ${phase} must leave every non-engine hull glyph stable`,
+      );
+    }
+  }
+});
+
 test("stern-first modules expand from exhaust into nozzles and finish in tapered bow tips", () => {
   for (const side of ["allied", "enemy"]) {
     const masks = [...asset.sector.engineOverlayMasks.get(side)];

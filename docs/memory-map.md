@@ -44,12 +44,12 @@ source-owned metadata/fill required by sector alignment, not reserved capacity.
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
 | `$21C1-$2661` | 1,185 B | stage-2 SIO/CRC/manifest overlay; later restored resident bytes replace it |
-| `$2662-$4011` | 6,576 B | packed 7,743-byte resident suffix; staged at `$8100-$9AAF`, restored to `$21C1-$3FFF` |
-| `$4012-$46FC` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
-| `$46FD-$47CB` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
-| `$47CC-$51BA` | 2,543 B | packed 3,189-byte entity/effect/H3.1/H4.1 runtime; staged at `$5300-$5CEE`, expands to `$9100-$9D74` |
-| `$51BB-$51BE` | 4 B | source-owned `DFB1` trailer |
-| `$51BF-$51FF` | 65 B | dynamic `DFI2` initial-sector envelope; remains below ENTITY_CODE staging at `$5300` |
+| `$2662-$3FE0` | 6,527 B | packed 7,743-byte resident suffix; staged at `$8100-$997E`, restored to `$21C1-$3FFF` |
+| `$3FE1-$46CB` | 1,771 B | packed 2,232-byte starfield/music runtime; staged at `$7810-$7EFA`, expands to `$552A-$5DE1` |
+| `$46CC-$479A` | 207 B | A2 kernel source; staged at `$7F10-$7FDE`, copied to `$9000-$90CE` |
+| `$479B-$5189` | 2,543 B | packed 3,189-byte entity/effect/H3.1/H4.1 runtime; staged at `$5300-$5CEE`, expands to `$9100-$9D74` |
+| `$518A-$518D` | 4 B | source-owned `DFB1` trailer |
+| `$518E-$51FF` | 114 B | dynamic `DFI2` initial-sector envelope; remains below ENTITY_CODE staging at `$5300` |
 | ATR sectors 101-145 | 5,760 B | external BROADSIDE chunk: 5,661 B LZ plus `DFC2` footer/fill; stage `$8100-$977F`, final `$5E10-$780F` |
 
 The `DFMC` v1 manifest is 30 B for the current one record and reserves 142 B
@@ -133,8 +133,8 @@ charset, loader data, or staging buffer uses `$A000-$BFFF`.
 
 ## Boot-only ENTITY_CODE staging lifecycle
 
-The packed initial sources end exclusively at `$51BB`. ENTITY_CODE staging is
-`$5300-$5CEE` (2,543 B), so the pre-staging margin is 325 B. Its end-exclusive
+The packed initial sources end exclusively at `$518A`. ENTITY_CODE staging is
+`$5300-$5CEE` (2,543 B), so the pre-staging margin is 374 B. Its end-exclusive
 address `$5CEF` is 289 B below BROADSIDE at `$5E10`. The packed stream is copied
 only after the initial block is resident, expanded to `$9100-$9D74`, and then
 released. The later starfield destination `$552A-$5DE1` overlaps the released

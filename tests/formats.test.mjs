@@ -127,7 +127,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     manifest.broadsideRuntime.runAddress,
     manifest.entityEffects.sourceToStagingMarginBytes,
     manifest.entityEffects.stagingToBroadsideMarginBytes,
-  ], [0x51bb, 0x5300, 0x5cef, 0x5e10, 325, 289]);
+  ], [0x518a, 0x5300, 0x5cef, 0x5e10, 374, 289]);
 
   const lifecycle = manifest.entityEffects.stagingLifecycle;
   assert.equal(lifecycle.stagingReleasedBeforeStarfieldExpansion, true);
