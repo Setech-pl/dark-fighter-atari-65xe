@@ -27,11 +27,11 @@ read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
 controlled destination. Any failure blanks DMA, selects a fixed red error
 background, and halts before partially loaded code can execute.
 
-The first production migration moves the 5,662-byte packed BROADSIDE stream to
+The first production migration moves the 5,661-byte packed BROADSIDE stream to
 sectors 101-145. ATR stages its 5,760-byte sector image at `$8100-$977F`, checks
-CRC `$4A66`, and expands 6,656 bytes to `$5E10-$780F`. The last BROADSIDE source
+CRC `$05D8`, and expands 6,656 bytes to `$5E10-$780F`. The last BROADSIDE source
 read makes `$8100` reusable; only then does startup copy the packed resident
-suffix and stages it at `$8100-$9AAC`. The 7,743-byte suffix is stored as a 6,573-byte LZ-10/5 stream
+suffix and stages it at `$8100-$9AAF`. The 7,743-byte suffix is stored as a 6,576-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. No loader byte remains resident or enters gameplay.
 
@@ -58,7 +58,7 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production record 0 is `{101,45,5662,6656,$5E10,$4A66,1,1,$8100}`.
+Production record 0 is `{101,45,5661,6656,$5E10,$05D8,1,1,$8100}`.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
 mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to
@@ -76,10 +76,10 @@ Cold staging also copies:
 - validated external broadside/runtime data to `$5E10-$780F` before takeover;
 - packed starfield/music data through `$7810-$7EFA` to `$552A-$5DE1`;
 - the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
-- packed entity/effect/frontend code through boot-only staging at `$51C0-$5BA8`
+- packed entity/effect/frontend code through boot-only staging at `$51C0-$5BAE`
   to the resident `$9100-$9FFF` range. The staging write begins only after the
-  initial packed source ending at `$51B1` has been consumed. Its end-exclusive
-  `$5BA9` remains 615 bytes below the BROADSIDE destination at `$5E10`.
+  initial packed source ending at `$51BA` has been consumed. Its end-exclusive
+  `$5BAF` remains 609 bytes below the BROADSIDE destination at `$5E10`.
 
 The BSS is exactly `$8000-$80FF` and is initialized deterministically. The
 runtime does not use `$A000-$BFFF`; compatibility never assumes that BASIC ROM
@@ -190,8 +190,14 @@ Debris is the implemented interactive entity in slot 0. It has bounded
 trajectories, two shapes, two tumble phases, three hit points, contact damage,
 and no score award. Player/debris contact uses the full 16-HPOS width of the
 double-width Viper PMG, while retaining the existing vertical player envelope
-and 8x8 debris box. Its destruction and Raider breakup materialize into the
-five-slot active effects envelope and are erased before lower layers move.
+and 8x8 debris box. Its single accepted damage event indexes a three-byte
+Easy/Medium/Hard table containing 2/5/7 HULL units, then uses the canonical
+atomic saturating damage/death/HUD path. Its destruction and Raider breakup
+materialize into the five-slot active effects envelope and are erased before
+lower layers move. The difficulty lookup replaces the former immediate load
+with `LDX abs` plus `LDA abs,X`: +6 CPU cycles only after a geometric overlap
+passes the earlier latch check, with no cost on inactive or collision-miss
+paths and no persistent-RAM allocation.
 
 Slot 1 owns the sole 2x2 pickup capsule. A qualifying Viper-projectile Raider
 kill advances the three-kill drop counter. The next-type selector rotates

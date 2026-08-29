@@ -4,7 +4,7 @@ This is the current performance summary after the accepted PAL headroom
 recovery pass, the completed Spread Shot rebuild, Shield Booster, the H3.1
 frontend, and the data-only H4.1 gameplay art update. The local runtime includes
 distinct HULL plates, the full BOOST HUD field, and the multi-position TOP
-SCORES fix.
+SCORES fix, plus fixed 2/5/7 difficulty-scaled player/debris damage.
 The machine-readable source is
 [runtime-wall-trace.json](runtime-wall-trace.json), generated from and bound to
 the packed boot BIN, XEX, and ATR.
@@ -18,14 +18,14 @@ the packed boot BIN, XEX, and ATR.
 | Total occupied transport | 18,560 B / 145 sectors | no preallocated empty sectors |
 | Additional loader capacity | 44,800 B | at least 8 KiB |
 | Free ATR transport | 73,600 B / 575 sectors | reported separately from residency |
-| Remaining safe residency | 5,635 B fragmented | 1,206 B cumulative charge from the 15,346-byte capacity reference |
+| Remaining safe residency | 5,631 B fragmented | 1,210 B cumulative charge from the 15,346-byte capacity reference |
 | XEX size | 19,472 B | artifact format result |
 | ATR size | 92,176 B | standard 90 KB single-density image |
 | PAL frame | 35,568 cycles | fixed PAL frame |
 | Worst measured wall | 32,040 cycles | no gameplay regression; Shield hard 32,568 |
 | Physical headroom | 3,528 cycles | hard minimum 3,000 |
 | Spread delta from accepted 32,040 baseline | 32 cycles | preferred at most 200; hard 500 |
-| Shield delta from accepted 32,072 baseline | 36 cycles | preferred at most 350; hard 496 |
+| Shield delta from accepted 32,072 baseline | -32 cycles | preferred at most 350; hard 496 |
 | H3.1 delta from accepted 32,108 Shield checkpoint | -68 cycles | no gameplay hot-path cost |
 | Missed synchronization | 0 | 0 |
 | Deadline overruns | 0 | 0 |
@@ -41,10 +41,10 @@ entity/debris foundation.
 
 The residency accounting reference is 15,346 linked runtime bytes. The
 accepted `e63cbf2` image occupied 15,624 B, a 278-byte charge against that
-reference, and therefore left `6,841 - 278 = 6,563 B`. H3.1 occupies 16,552
-linked runtime bytes. This is a 928-byte net increase over `e63cbf2`, while its
-cumulative charge against the same reference is 1,206 B. The current safe
-remainder is consequently `6,841 - 1,206 = 5,635 B`. The manifest attributes
+reference, and therefore left `6,841 - 278 = 6,563 B`. The current image occupies
+16,556 linked runtime bytes. This is a 932-byte net increase over `e63cbf2`, while
+its cumulative charge against the same reference is 1,210 B. The current safe
+remainder is consequently `6,841 - 1,210 = 5,631 B`. The manifest attributes
 the earlier 278-byte feature delta to the Shield checkpoint; it does not prove
 that value to be a separable legacy-frontend footprint.
 
@@ -77,9 +77,9 @@ must not be added to the wall total.
 
 ## Artifact and cold-start evidence
 
-- Boot BIN: `f538f20d5648d5b1f3a784ebf634bd4f25d51329ddeb0a4af5b05b967425e5ed`.
-- XEX: `b35c9018584e1a1fb78097cd9ae51cdc84adb6a614ca47d4187d8dab66ae4e6b`.
-- ATR: `6027956b4753fde5c157beb31ce085cdfa9e640f413d8138743df513bf2ebd52`.
+- Boot BIN: `c66375575ed3ab52a12f8cd7d6abb5c75f372b6df723e9ca72af050163f2aa1d`.
+- XEX: `baa6a691a6c08125dede8141afaf24e49759f5ecd7e7ed2f8bca485e6bf0ab13`.
+- ATR: `3eb3cc838626ea21376091e8d8b4a2a9661fda3143014c4133c318a50fe734b1`.
 - XEX and ATR cold boots pass with `$A5` and `$5A` fills across
   `$8000-$9FFF`.
 - XEX and ATR each run two 3,000-frame integrity sessions, for 6,000 frames

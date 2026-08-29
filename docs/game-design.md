@@ -35,8 +35,10 @@ to their prior blank contents. The optional type glyph is omitted because the
 40-column HUD has exactly ten unclaimed cells and one active booster at a time.
 
 - A new game starts with three playable Vipers and a full 100% hull.
-- The hull has ten health units. Ordinary Raider pulse and debris contact damage
-  remove one unit (10%); capital-ship fire removes two units (20%). Debris
+- The hull has ten health units. An ordinary Raider pulse removes one unit
+  (10%), while capital-ship fire removes two units (20%). Debris contact removes
+  a fixed two, five, or seven units on Easy, Medium, or Hard (20%/50%/70% of
+  maximum HULL); it never computes a percentage of remaining HULL. Debris
   contact tests the Viper's complete double-width 16-HPOS visible envelope;
   its vertical contract and the debris 8x8 hitbox remain unchanged.
 - A direct Raider collision destroys the current Viper.
@@ -64,8 +66,8 @@ frame, live for at most 96 frames, and use a separate nine-slot pool.
 
 A Raider is worth 10 points when destroyed by a Viper projectile, player
 contact, or Cylon friendly fire. A capital-ship hit or lifecycle cleanup awards
-no points. Debris has three hit points, causes 10% hull damage on contact, and
-never awards score when destroyed.
+no points. Debris has three hit points, causes fixed 20%/50%/70% maximum-hull
+damage on Easy/Medium/Hard contact, and never awards score when destroyed.
 
 Raider and debris destruction use the implemented entity/effects foundation.
 Raider breakup has a core, two wing fragments, a central fragment, and a red

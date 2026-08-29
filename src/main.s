@@ -346,6 +346,9 @@ FIGHTER_EXPLOSION_ENEMY_SLOT = 1
 PLAYER_HEALTH_UNITS = 10
 CAPITAL_DAMAGE_UNITS = 2
 ENEMY_PULSE_DAMAGE_UNITS = 1
+DEBRIS_DAMAGE_EASY = 2
+DEBRIS_DAMAGE_MEDIUM = 5
+DEBRIS_DAMAGE_HARD = 7
 ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = GAMEPLAY_BOTTOM
 
 PLAYER_H    = 16
@@ -660,6 +663,9 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert ENEMY_SINGLE_PULSE_DAMAGE = 10, error, "Raider single-pulse damage must remain 10"
 .assert CAPITAL_DAMAGE_UNITS*10 = BROADSIDE_PLAYER_DAMAGE, error, "capital damage scale changed"
 .assert ENEMY_PULSE_DAMAGE_UNITS*10 = ENEMY_SINGLE_PULSE_DAMAGE, error, "pulse damage scale changed"
+.assert DEBRIS_DAMAGE_EASY = 2, error, "EASY debris contact must remove two HULL units"
+.assert DEBRIS_DAMAGE_MEDIUM = 5, error, "MEDIUM debris contact must remove five HULL units"
+.assert DEBRIS_DAMAGE_HARD = 7, error, "HARD debris contact must remove seven HULL units"
 .assert ENEMY_PULSE_POOL_SLOTS = RAIDER_PROJECTILE_SLOT_COUNT, error, "Raider pool definitions diverged"
 .assert ENEMY_PULSE_BURST_COUNT = RAIDER_BURST_COUNT, error, "Raider burst definitions diverged"
 .assert ENEMY_PULSE_BURST_INTERVAL = RAIDER_BURST_INTERVAL, error, "Raider interval definitions diverged"
@@ -6880,6 +6886,11 @@ difficulty_value_table:
     .byte CH_FRONT_SPACE,CH_FRONT_SPACE,CH_FRONT_A+7|ANTIC67_COLOR_PF1
     .byte CH_FRONT_A|ANTIC67_COLOR_PF1,CH_FRONT_A+17|ANTIC67_COLOR_PF1,CH_FRONT_A+3|ANTIC67_COLOR_PF1
 
+; Fixed HULL units derived from MAX HULL=10. Player/debris contact indexes
+; this table once; no runtime percentage calculation or persistent state exists.
+debris_contact_damage_by_difficulty:
+    .byte DEBRIS_DAMAGE_EASY,DEBRIS_DAMAGE_MEDIUM,DEBRIS_DAMAGE_HARD
+
 .segment "BROADSIDE"
 
 options_label_destinations:
@@ -9351,7 +9362,8 @@ entity_collide_player_active:
 entity_player_debris_overlap = *
     lda BROAD_DAMAGE_APPLIED
     bne entity_collision_miss
-    lda #$01
+    ldx DIFFICULTY_SETTING
+    lda debris_contact_damage_by_difficulty,x
     jsr apply_player_damage
     lda BROAD_DAMAGE_APPLIED
     beq entity_collision_miss

@@ -86,9 +86,12 @@ const addresses = {
   playerX: labels.get("player_x"),
   playerY: labels.get("player_y"),
   playerLifecycle: labels.get("PLAYER_LIFECYCLE") ?? 0x4eaa,
+  playerLives: (labels.get("PLAYER_LIFECYCLE") ?? 0x4eaa) + 1,
   playerHealth: 0x4e5d,
   damageCooldown: 0x4e5e,
+  deathTimer: 0x4e5f,
   damageApplied: 0x4e65,
+  difficulty: labels.get("DIFFICULTY_SETTING"),
   boosterState: labels.get("ENTITY_STATE") + 2,
   sectorState: labels.get("CAPITAL_SECTOR_STATE") ?? 0x4ea5,
   sectorDrainRows: (labels.get("CAPITAL_SECTOR_STATE") ?? 0x4ea5) + 1,
@@ -156,17 +159,21 @@ function runRoutineTrace(memory, name, watchedNames) {
     return [address, label];
   }));
   const visited = new Set();
+  const callCounts = new Map(watchedNames.map((label) => [label, 0]));
   cpu.push((stop - 1) >> 8);
   cpu.push((stop - 1) & 0xff);
   cpu.pc = labels.get(name);
   assert.ok(Number.isInteger(cpu.pc), `missing linked routine ${name}`);
   for (let steps = 0; steps < 200_000 && cpu.pc !== stop; steps += 1) {
     const label = watched.get(cpu.pc);
-    if (label) visited.add(label);
+    if (label) {
+      visited.add(label);
+      callCounts.set(label, callCounts.get(label) + 1);
+    }
     cpu.step();
   }
   assert.equal(cpu.pc, stop, `${name} did not return`);
-  return { cycles: cpu.cycles, visited };
+  return { cycles: cpu.cycles, visited, callCounts };
 }
 
 function initialiseRows(memory, head = 0) {
@@ -202,6 +209,9 @@ function exercisePlayerDebrisCollision({
   cooldown = 0,
   lifecycle = 0,
   priorLatch = 0,
+  difficulty = 0,
+  playerHealth = 10,
+  playerLives = 3,
   routine = "entity_collide_player",
   vx = 0,
   verticalAccumulator = 0,
@@ -213,11 +223,13 @@ function exercisePlayerDebrisCollision({
   memory[addresses.renderId] = renderId;
   memory[addresses.playerX] = playerX;
   memory[addresses.playerY] = playerY;
-  memory[addresses.playerHealth] = 10;
+  memory[addresses.playerHealth] = playerHealth;
+  memory[addresses.playerLives] = playerLives;
   memory[addresses.damageCooldown] = cooldown;
   memory[addresses.damageApplied] = priorLatch;
   memory[addresses.playerLifecycle] = lifecycle;
   memory[addresses.boosterState] = shield ? 5 : 0;
+  memory[addresses.difficulty] = difficulty;
   memory[addresses.vx] = vx;
   memory[addresses.verticalAccumulator] = verticalAccumulator;
   memory[addresses.moveAccumulator] = moveAccumulator;
@@ -229,7 +241,7 @@ function exercisePlayerDebrisCollision({
   ]);
   const detected = trace.visited.has("entity_player_debris_overlap");
   const attempted = trace.visited.has("apply_player_damage");
-  const applied = memory[addresses.playerHealth] === 9;
+  const applied = memory[addresses.playerHealth] !== playerHealth;
   let suppressed = null;
   if (detected && !applied) {
     if (priorLatch !== 0) suppressed = "prior-damage-latch";
@@ -243,6 +255,7 @@ function exercisePlayerDebrisCollision({
     trace,
     detected,
     attempted,
+    damageCallCount: trace.callCounts.get("apply_player_damage"),
     applied,
     suppressed,
     eventAccepted: trace.visited.has("entity_damage_applied"),
@@ -873,6 +886,83 @@ test("player-debris collision uses one explicit 16-HPOS visible-width operand", 
     "the visible-width contract must be confined to player/debris collision");
 });
 
+test("player-debris damage uses fixed EASY/MEDIUM/HARD HULL units atomically", () => {
+  const contracts = [
+    { difficulty: 0, damage: 2, examples: [[10, 8], [2, 0], [1, 0]] },
+    { difficulty: 1, damage: 5, examples: [[10, 5], [5, 0], [4, 0]] },
+    { difficulty: 2, damage: 7, examples: [[10, 3], [7, 0], [6, 0]] },
+  ];
+  assert.match(source,
+    /debris_contact_damage_by_difficulty:\s*\n\s*\.byte DEBRIS_DAMAGE_EASY,DEBRIS_DAMAGE_MEDIUM,DEBRIS_DAMAGE_HARD/);
+  assert.match(source,
+    /entity_player_debris_overlap = \*[\s\S]+ldx DIFFICULTY_SETTING\s+lda debris_contact_damage_by_difficulty,x\s+jsr apply_player_damage/);
+
+  for (const { difficulty, damage, examples } of contracts) {
+    for (let health = 1; health <= 10; health += 1) {
+      const result = exercisePlayerDebrisCollision({ difficulty, playerHealth: health });
+      assert.equal(result.memory[addresses.playerHealth], Math.max(0, health - damage),
+        `difficulty ${difficulty}, HULL ${health} underflowed or used the wrong fixed damage`);
+      assert.equal(result.damageCallCount, 1,
+        `difficulty ${difficulty}, HULL ${health} must call apply_player_damage exactly once`);
+      assert.equal(result.memory[addresses.damageApplied], 1);
+      assert.equal(result.memory[addresses.damageCooldown], 25);
+      assert.equal(result.consumed, true);
+    }
+    for (const [health, expected] of examples) {
+      const result = exercisePlayerDebrisCollision({ difficulty, playerHealth: health });
+      assert.equal(result.memory[addresses.playerHealth], expected,
+        `difficulty ${difficulty} matrix mismatch for ${health}->${expected}`);
+    }
+  }
+});
+
+test("debris damage updates HULL plates in the contact frame and enters canonical death flow", () => {
+  const live = exercisePlayerDebrisCollision({ difficulty: 1, playerHealth: 10 });
+  assert.deepEqual([...live.memory.subarray(0x4019, 0x401d)], [5, 5, 12, 12],
+    "MEDIUM 10->5 must be visible in the HUD before the collision routine returns");
+
+  const lethal = exercisePlayerDebrisCollision({
+    difficulty: 2,
+    playerHealth: 6,
+    playerLives: 1,
+  });
+  assert.deepEqual({
+    health: lethal.memory[addresses.playerHealth],
+    lives: lethal.memory[addresses.playerLives],
+    lifecycle: lethal.memory[addresses.playerLifecycle],
+    deathTimer: lethal.memory[addresses.deathTimer],
+    damageCalls: lethal.damageCallCount,
+  }, { health: 0, lives: 0, lifecycle: 1, deathTimer: 24, damageCalls: 1 });
+  assert.deepEqual([...lethal.memory.subarray(0x4019, 0x401d)], [12, 12, 12, 12]);
+
+  for (let frame = 0; frame < 24; frame += 1) runRoutine(lethal.memory, "update_player_death");
+  assert.equal(lethal.memory[addresses.playerLifecycle], 3,
+    "final-life debris death must reach the existing GAME OVER lifecycle");
+});
+
+test("non-debris damage callers retain their existing one- and two-unit contracts", () => {
+  assert.match(source, /ENEMY_PULSE_DAMAGE_UNITS = 1/);
+  assert.match(source, /CAPITAL_DAMAGE_UNITS = 2/);
+  assert.match(source,
+    /jsr raider_projectile_hits_player\s+bcc @raider_next[\s\S]+lda #ENEMY_PULSE_DAMAGE_UNITS\s+stx BROAD_WORK_SLOT\s+jsr apply_player_damage/);
+  assert.match(source,
+    /apply_broadside_player_damage:\s*\n\s*lda #CAPITAL_DAMAGE_UNITS/);
+
+  for (const difficulty of [0, 1, 2]) {
+    const memory = createRuntimeMemory();
+    memory[addresses.playerLifecycle] = 0;
+    memory[addresses.playerLives] = 3;
+    memory[addresses.playerHealth] = 10;
+    memory[addresses.damageCooldown] = 0;
+    memory[addresses.damageApplied] = 0;
+    memory[addresses.boosterState] = 0;
+    memory[addresses.difficulty] = difficulty;
+    runRoutine(memory, "apply_player_damage", { accumulator: 1 });
+    assert.equal(memory[addresses.playerHealth], 9,
+      `ordinary one-unit damage changed at difficulty ${difficulty}`);
+  }
+});
+
 test("all four debris forms detect every visible Viper HPOS from 0 through 15", () => {
   for (const renderId of [110, 112, 114, 116]) {
     for (let offset = 0; offset < 16; offset += 1) {
@@ -1193,7 +1283,7 @@ test("debris and Raider arbitration follows upward first-contact order with debr
     "the lower Raider must receive the one consumed projectile first");
 });
 
-test("shot resolution precedes player contact while an unshot debris still deals one damage", () => {
+test("shot resolution precedes player contact while unshot debris uses difficulty damage", () => {
   const shot = createRuntimeMemory();
   initialiseRows(shot);
   initialiseShootableDebris(shot, { x: 124, y: 100, hp: 1 });
@@ -1218,9 +1308,10 @@ test("shot resolution precedes player contact while an unshot debris still deals
   contact[addresses.playerHealth] = 10;
   contact[addresses.damageCooldown] = 0;
   contact[addresses.damageApplied] = 0;
+  contact[addresses.difficulty] = 1;
   runRoutine(contact, "entity_effects_update");
-  assert.deepEqual([contact[addresses.activeMask], contact[addresses.playerHealth]], [0, 9],
-    "unshot debris must retain canonical apply_player_damage(1)");
+  assert.deepEqual([contact[addresses.activeMask], contact[addresses.playerHealth]], [0, 5],
+    "unshot debris must use MEDIUM's fixed five-unit contact damage");
 });
 
 test("Raider and broadside projectiles cannot enter the debris target path", () => {
