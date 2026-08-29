@@ -89,6 +89,7 @@ const addresses = {
   playerHealth: 0x4e5d,
   damageCooldown: 0x4e5e,
   damageApplied: 0x4e65,
+  boosterState: labels.get("ENTITY_STATE") + 2,
   sectorState: labels.get("CAPITAL_SECTOR_STATE") ?? 0x4ea5,
   sectorDrainRows: (labels.get("CAPITAL_SECTOR_STATE") ?? 0x4ea5) + 1,
   ringFlags: labels.get("PLAYFIELD_RING_FLAGS"),
@@ -146,6 +147,28 @@ function runRoutine(memory, name, { accumulator = 0, beforeExecute } = {}) {
   return cpu.cycles;
 }
 
+function runRoutineTrace(memory, name, watchedNames) {
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  const watched = new Map(watchedNames.map((label) => {
+    const address = labels.get(label);
+    assert.ok(Number.isInteger(address), `missing linked trace label ${label}`);
+    return [address, label];
+  }));
+  const visited = new Set();
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = labels.get(name);
+  assert.ok(Number.isInteger(cpu.pc), `missing linked routine ${name}`);
+  for (let steps = 0; steps < 200_000 && cpu.pc !== stop; steps += 1) {
+    const label = watched.get(cpu.pc);
+    if (label) visited.add(label);
+    cpu.step();
+  }
+  assert.equal(cpu.pc, stop, `${name} did not return`);
+  return { cycles: cpu.cycles, visited };
+}
+
 function initialiseRows(memory, head = 0) {
   for (let logical = 0; logical < 22; logical += 1) {
     const physical = (head + logical) % 22;
@@ -167,6 +190,64 @@ function initialiseEntity(memory, { x = 124, y = 24 } = {}) {
   memory[addresses.playerY] = 184;
   memory[addresses.playerLifecycle] = 0;
   memory[addresses.sectorState] = 0;
+}
+
+function exercisePlayerDebrisCollision({
+  renderId = 110,
+  playerX = 100,
+  playerY = 100,
+  entityX = 100,
+  entityY = 100,
+  shield = false,
+  cooldown = 0,
+  lifecycle = 0,
+  priorLatch = 0,
+  routine = "entity_collide_player",
+  vx = 0,
+  verticalAccumulator = 0,
+  moveAccumulator = 0,
+  events = 0,
+} = {}) {
+  const memory = createRuntimeMemory();
+  initialiseEntity(memory, { x: entityX, y: entityY });
+  memory[addresses.renderId] = renderId;
+  memory[addresses.playerX] = playerX;
+  memory[addresses.playerY] = playerY;
+  memory[addresses.playerHealth] = 10;
+  memory[addresses.damageCooldown] = cooldown;
+  memory[addresses.damageApplied] = priorLatch;
+  memory[addresses.playerLifecycle] = lifecycle;
+  memory[addresses.boosterState] = shield ? 5 : 0;
+  memory[addresses.vx] = vx;
+  memory[addresses.verticalAccumulator] = verticalAccumulator;
+  memory[addresses.moveAccumulator] = moveAccumulator;
+  memory[addresses.events] = events;
+  const trace = runRoutineTrace(memory, routine, [
+    "entity_player_debris_overlap",
+    "apply_player_damage",
+    "entity_damage_applied",
+  ]);
+  const detected = trace.visited.has("entity_player_debris_overlap");
+  const attempted = trace.visited.has("apply_player_damage");
+  const applied = memory[addresses.playerHealth] === 9;
+  let suppressed = null;
+  if (detected && !applied) {
+    if (priorLatch !== 0) suppressed = "prior-damage-latch";
+    else if (lifecycle !== 0) suppressed = "player-lifecycle";
+    else if (shield) suppressed = "shield";
+    else if (cooldown !== 0) suppressed = "damage-cooldown";
+    else suppressed = "unknown";
+  }
+  return {
+    memory,
+    trace,
+    detected,
+    attempted,
+    applied,
+    suppressed,
+    eventAccepted: trace.visited.has("entity_damage_applied"),
+    consumed: memory[addresses.activeMask] === 0,
+  };
 }
 
 function initialiseShootableDebris(memory, { hp = 3, ...options } = {}) {
@@ -784,71 +865,223 @@ test("phase and position changes preserve backing across A2 ring wrap without gh
   assert.equal(memory[newCell + 1], 0x67, "new right cell must restore exact backing");
 });
 
-test("debris damage uses the canonical one-event gate and invulnerability does not consume it", () => {
-  const vulnerable = createRuntimeMemory();
-  initialiseEntity(vulnerable, { x: 124, y: 184 });
-  vulnerable[addresses.playerX] = 124;
-  vulnerable[addresses.playerY] = 184;
-  vulnerable[addresses.playerHealth] = 10;
-  vulnerable[addresses.damageCooldown] = 0;
-  vulnerable[addresses.damageApplied] = 0;
-  runRoutine(vulnerable, "entity_effects_update");
-  assert.deepEqual([
-    vulnerable[addresses.playerHealth], vulnerable[addresses.damageApplied],
-    vulnerable[addresses.activeMask], vulnerable[addresses.activeCount],
-  ], [9, 1, 0, 0]);
-
-  const invulnerable = createRuntimeMemory();
-  initialiseEntity(invulnerable, { x: 124, y: 184 });
-  invulnerable[addresses.playerX] = 124;
-  invulnerable[addresses.playerY] = 184;
-  invulnerable[addresses.playerHealth] = 10;
-  invulnerable[addresses.playerLifecycle] = 2;
-  invulnerable[addresses.damageCooldown] = 0;
-  invulnerable[addresses.damageApplied] = 0;
-  runRoutine(invulnerable, "entity_effects_update");
-  assert.deepEqual([
-    invulnerable[addresses.playerHealth], invulnerable[addresses.damageApplied],
-    invulnerable[addresses.activeMask], invulnerable[addresses.activeCount],
-  ], [10, 0, 1, 1]);
-
-  const alreadyDamaged = createRuntimeMemory();
-  initialiseEntity(alreadyDamaged, { x: 124, y: 184 });
-  alreadyDamaged[addresses.playerX] = 124;
-  alreadyDamaged[addresses.playerY] = 184;
-  alreadyDamaged[addresses.playerHealth] = 10;
-  alreadyDamaged[addresses.damageApplied] = 1;
-  runRoutine(alreadyDamaged, "entity_effects_update");
-  assert.deepEqual([
-    alreadyDamaged[addresses.playerHealth], alreadyDamaged[addresses.activeMask],
-  ], [10, 1]);
+test("player-debris collision uses one explicit 16-HPOS visible-width operand", () => {
+  assert.match(source, /PLAYER_VISIBLE_WIDTH_HPOS = 16/);
+  assert.match(source,
+    /entity_collide_player_active:[\s\S]*cmp #\(256-\(PLAYER_VISIBLE_WIDTH_HPOS-1\)\)[\s\S]*entity_player_debris_overlap = \*/);
+  assert.equal((source.match(/cmp #\(256-\(PLAYER_VISIBLE_WIDTH_HPOS-1\)\)/g) ?? []).length, 1,
+    "the visible-width contract must be confined to player/debris collision");
 });
 
-test("debris collision covers the full visible 16x8 box with half-open edges", () => {
-  const collideAt = (playerX, playerY) => {
-    const memory = createRuntimeMemory();
-    initialiseEntity(memory, { x: 124, y: 184 });
-    memory[addresses.playerX] = playerX;
-    memory[addresses.playerY] = playerY;
-    memory[addresses.playerHealth] = 10;
-    memory[addresses.damageCooldown] = 0;
-    memory[addresses.damageApplied] = 0;
-    runRoutine(memory, "entity_collide_player");
-    return [memory[addresses.playerHealth], memory[addresses.activeMask]];
-  };
+test("all four debris forms detect every visible Viper HPOS from 0 through 15", () => {
+  for (const renderId of [110, 112, 114, 116]) {
+    for (let offset = 0; offset < 16; offset += 1) {
+      const result = exercisePlayerDebrisCollision({
+        renderId,
+        playerX: 100,
+        playerY: 100,
+        entityX: 100 + offset,
+        entityY: 100,
+      });
+      assert.deepEqual({
+        detected: result.detected,
+        attempted: result.attempted,
+        applied: result.applied,
+        suppressed: result.suppressed,
+        consumed: result.consumed,
+      }, {
+        detected: true,
+        attempted: true,
+        applied: true,
+        suppressed: null,
+        consumed: true,
+      }, `debris glyph ${renderId} missed visible Viper HPOS ${offset}`);
+    }
+  }
+});
 
-  assert.deepEqual(collideAt(131, 184), [9, 0],
-    "the second debris cell must participate in collision");
-  assert.deepEqual(collideAt(132, 184), [10, 1],
-    "the exclusive right edge must not collide");
-  assert.deepEqual(collideAt(117, 184), [9, 0],
-    "the first visible HPOS must collide with the player's last HPOS");
-  assert.deepEqual(collideAt(116, 184), [10, 1],
-    "the exclusive left edge must not collide");
-  assert.deepEqual(collideAt(124, 191), [9, 0],
-    "the eighth visible scanline must collide");
-  assert.deepEqual(collideAt(124, 192), [10, 1],
-    "the exclusive bottom edge must not collide");
+test("player-debris half-open boundaries cover every edge and corner", () => {
+  const contacts = [
+    [93, 100, "left edge"], [115, 100, "right edge"],
+    [100, 93, "top edge"], [100, 114, "bottom edge"],
+    [93, 93, "top-left corner"], [115, 93, "top-right corner"],
+    [93, 114, "bottom-left corner"], [115, 114, "bottom-right corner"],
+  ];
+  for (const [entityX, entityY, description] of contacts) {
+    const result = exercisePlayerDebrisCollision({ entityX, entityY });
+    assert.deepEqual([result.detected, result.attempted, result.applied], [true, true, true],
+      `${description} must collide`);
+  }
+
+  const misses = [
+    [92, 100, "one HPOS beyond left"], [116, 100, "one HPOS beyond right"],
+    [100, 92, "one scanline beyond top"], [100, 115, "one scanline beyond bottom"],
+    [92, 92, "one unit beyond top-left"], [116, 92, "one unit beyond top-right"],
+    [92, 115, "one unit beyond bottom-left"], [116, 115, "one unit beyond bottom-right"],
+  ];
+  for (const [entityX, entityY, description] of misses) {
+    const result = exercisePlayerDebrisCollision({ entityX, entityY });
+    assert.deepEqual({
+      detected: result.detected,
+      attempted: result.attempted,
+      applied: result.applied,
+      suppressed: result.suppressed,
+      consumed: result.consumed,
+    }, {
+      detected: false,
+      attempted: false,
+      applied: false,
+      suppressed: null,
+      consumed: false,
+    }, `${description} must remain outside`);
+  }
+});
+
+test("nose, wings and engines use the same full visible Viper envelope", () => {
+  const anatomyContacts = [
+    { entityX: 107, entityY: 93, part: "nose" },
+    { entityX: 100, entityY: 106, part: "left wing" },
+    { entityX: 115, entityY: 106, part: "right wing" },
+    { entityX: 102, entityY: 114, part: "left engine" },
+    { entityX: 113, entityY: 114, part: "right engine" },
+  ];
+  for (const renderId of [110, 112, 114, 116]) {
+    for (const { entityX, entityY, part } of anatomyContacts) {
+      const result = exercisePlayerDebrisCollision({ renderId, entityX, entityY });
+      assert.deepEqual([result.detected, result.applied, result.consumed], [true, true, true],
+        `${part} missed debris glyph ${renderId}`);
+    }
+  }
+});
+
+test("debris movement samples collision after horizontal +/-4 HPOS and vertical +8 scanlines", () => {
+  for (const renderId of [110, 112, 114, 116]) {
+    const right = exercisePlayerDebrisCollision({
+      renderId,
+      playerX: 112,
+      playerY: 100,
+      entityX: 108,
+      entityY: 100,
+      vx: 4,
+      moveAccumulator: 3,
+      events: 1,
+      routine: "entity_effects_update",
+    });
+    assert.equal(right.memory[addresses.x], 112);
+    assert.deepEqual([right.detected, right.applied, right.consumed], [true, true, true]);
+
+    const left = exercisePlayerDebrisCollision({
+      renderId,
+      playerX: 100,
+      playerY: 100,
+      entityX: 104,
+      entityY: 100,
+      vx: 0xfc,
+      moveAccumulator: 3,
+      events: 1,
+      routine: "entity_effects_update",
+    });
+    assert.equal(left.memory[addresses.x], 100);
+    assert.deepEqual([left.detected, left.applied, left.consumed], [true, true, true]);
+
+    const down = exercisePlayerDebrisCollision({
+      renderId,
+      playerX: 100,
+      playerY: 108,
+      entityX: 100,
+      entityY: 93,
+      verticalAccumulator: 4,
+      events: 1,
+      routine: "entity_effects_update",
+    });
+    assert.equal(down.memory[addresses.y], 101);
+    assert.deepEqual([down.detected, down.applied, down.consumed], [true, true, true]);
+  }
+});
+
+test("debris contact reports damage gates without changing their semantics", () => {
+  for (const cooldown of [0, 1, 2, 25]) {
+    const result = exercisePlayerDebrisCollision({ cooldown });
+    assert.deepEqual({
+      detected: result.detected,
+      attempted: result.attempted,
+      applied: result.applied,
+      suppressed: result.suppressed,
+      eventAccepted: result.eventAccepted,
+      consumed: result.consumed,
+    }, cooldown === 0 ? {
+      detected: true,
+      attempted: true,
+      applied: true,
+      suppressed: null,
+      eventAccepted: true,
+      consumed: true,
+    } : {
+      detected: true,
+      attempted: true,
+      applied: false,
+      suppressed: "damage-cooldown",
+      eventAccepted: false,
+      consumed: false,
+    }, `unexpected result at damage cooldown ${cooldown}`);
+  }
+
+  const shield = exercisePlayerDebrisCollision({ shield: true, cooldown: 25 });
+  assert.deepEqual({
+    detected: shield.detected,
+    attempted: shield.attempted,
+    applied: shield.applied,
+    suppressed: shield.suppressed,
+    eventAccepted: shield.eventAccepted,
+    consumed: shield.consumed,
+    health: shield.memory[addresses.playerHealth],
+    cooldown: shield.memory[addresses.damageCooldown],
+    latch: shield.memory[addresses.damageApplied],
+  }, {
+    detected: true,
+    attempted: true,
+    applied: false,
+    suppressed: "shield",
+    eventAccepted: true,
+    consumed: true,
+    health: 10,
+    cooldown: 25,
+    latch: 1,
+  });
+
+  const respawn = exercisePlayerDebrisCollision({ lifecycle: 2 });
+  assert.deepEqual({
+    detected: respawn.detected,
+    attempted: respawn.attempted,
+    applied: respawn.applied,
+    suppressed: respawn.suppressed,
+    eventAccepted: respawn.eventAccepted,
+    consumed: respawn.consumed,
+  }, {
+    detected: true,
+    attempted: true,
+    applied: false,
+    suppressed: "player-lifecycle",
+    eventAccepted: false,
+    consumed: false,
+  });
+
+  const latched = exercisePlayerDebrisCollision({ priorLatch: 1 });
+  assert.deepEqual({
+    detected: latched.detected,
+    attempted: latched.attempted,
+    applied: latched.applied,
+    suppressed: latched.suppressed,
+    eventAccepted: latched.eventAccepted,
+    consumed: latched.consumed,
+  }, {
+    detected: true,
+    attempted: false,
+    applied: false,
+    suppressed: "prior-damage-latch",
+    eventAccepted: false,
+    consumed: false,
+  });
 });
 
 test("three Viper hits destroy every debris form while score and enemy paths remain unchanged", () => {

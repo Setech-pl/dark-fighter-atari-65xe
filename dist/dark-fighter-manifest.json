@@ -10,7 +10,7 @@
   "bootSectors": 100,
   "payloadBytes": 18560,
   "bootPayloadTrailer": {
-    "address": 20914,
+    "address": 20916,
     "bytes": 4,
     "ascii": "DFB1",
     "hex": "44464231",
@@ -56,7 +56,7 @@
       "recoveredReserveBytes": 1097,
       "residentSuffixGrossSavingsBytes": 1170,
       "relocatedColdInitBytes": 2460,
-      "relocatedColdInitPackedCostBytes": 1886,
+      "relocatedColdInitPackedCostBytes": 1888,
       "reserveAddress": 24499,
       "reserveEndAddress": 24571,
       "sourceOwned": true,
@@ -80,8 +80,8 @@
   "transportCapacity": {
     "format": "DFMC-v1 multi-chunk",
     "initialBootBytes": 12800,
-    "initialBootContentBytes": 12726,
-    "initialBootEnvelopeBytes": 74,
+    "initialBootContentBytes": 12728,
+    "initialBootEnvelopeBytes": 72,
     "initialBootSectors": 100,
     "extensionBytes": 5760,
     "extensionSectors": 45,
@@ -240,15 +240,15 @@
         "hardDeltaBytes": 1280
       }
     },
-    "packedBytes": 2537,
+    "packedBytes": 2539,
     "packedSourceAddress": 18377,
-    "initialPackedSourcesEndExclusive": 20914,
-    "initialPackedSourcesLastAddress": 20913,
+    "initialPackedSourcesEndExclusive": 20916,
+    "initialPackedSourcesLastAddress": 20915,
     "stagedSourceAddress": 20928,
-    "stagedEndAddress": 23464,
-    "stagedEndExclusive": 23465,
-    "sourceToStagingMarginBytes": 14,
-    "stagingToBroadsideMarginBytes": 615,
+    "stagedEndAddress": 23466,
+    "stagedEndExclusive": 23467,
+    "sourceToStagingMarginBytes": 12,
+    "stagingToBroadsideMarginBytes": 613,
     "compression": "LZ-10/5",
     "deterministicFillTestByte": 165,
     "gameplayTopScanline": 24,
@@ -25088,11 +25088,11 @@
     "estimated_additive_cycles": 32924,
     "wallTrace": {
       "reportPath": "docs/runtime-wall-trace.json",
-      "reportSha256": "566e2e905141f90bcedc6dca3c5cb5356ee9b9cdab0578a24bff1a856a62eade",
+      "reportSha256": "8dcb515c221d9462ca99a5f360e1fda19e9b945ec483547efc3c1e966dda873e",
       "artifact": {
         "path": "dist/dark-fighter.xex",
         "bytes": 19472,
-        "sha256": "b35c9018584e1a1fb78097cd9ae51cdc84adb6a614ca47d4187d8dab66ae4e6b"
+        "sha256": "7706a889920b5c748d64c3b324de9e54edfd859bb2e5666d69ed47f06d8e0139"
       },
       "emulator": {
         "name": "Atari800",
@@ -25327,8 +25327,8 @@
           "remaining_hard_cycles": 169,
           "target_overrun_frames": 0,
           "hard_overrun_frames": 0,
-          "qualified_kill_events": 52,
-          "pending_frames": 520,
+          "qualified_kill_events": 54,
+          "pending_frames": 545,
           "pending_partial_kill_frame_included": true,
           "pending_complete_frame_runs": [
             30,
@@ -25349,18 +25349,19 @@
           ],
           "pending_lifecycle_interrupted_frame_runs": [
             23,
-            30
+            26,
+            28
           ],
-          "active_frames": 643,
+          "active_frames": 600,
           "maximum_simultaneous_footprints": 1,
           "maximum_pickup_glyph_cells": 4,
           "layer_fences_per_active_frame": 3,
           "maximum_stationary_active_frames": 4,
           "logical_step_scanlines": 8,
           "physical_address_changes_during_native_motion": 0,
-          "release_frames": 15,
-          "rapid_frames": 1078,
-          "pickup_events": 9,
+          "release_frames": 14,
+          "rapid_frames": 823,
+          "pickup_events": 7,
           "passed": true
         },
         "weapon_pickup_spread_shot": {
@@ -25378,9 +25379,9 @@
           "remaining_hard_cycles": 468,
           "target_overrun_frames": 0,
           "hard_overrun_frames": 0,
-          "rapid_frames": 1078,
-          "spread_frames": 811,
-          "pickup_events": 9,
+          "rapid_frames": 823,
+          "spread_frames": 805,
+          "pickup_events": 7,
           "created_capsule_render_ids": [
             120,
             252,
@@ -25398,7 +25399,8 @@
             252,
             124,
             120,
-            252
+            252,
+            124
           ],
           "collected_states": [
             4,
@@ -25406,14 +25408,12 @@
             5,
             3,
             3,
-            3,
             4,
-            5,
-            3
+            5
           ],
-          "spread_volley_frames": 810,
-          "active_capsule_three_projectile_frames": 643,
-          "active_capsule_during_booster_frames": 436,
+          "spread_volley_frames": 804,
+          "active_capsule_three_projectile_frames": 600,
+          "active_capsule_during_booster_frames": 388,
           "worst_legal_capsule_three_projectiles": {
             "trace_kind": "weapon-pickup-coverage",
             "session": "weapon-pickup-2-hunt-fire4",
@@ -25523,8 +25523,8 @@
           "remaining_hard_cycles": 528,
           "target_overrun_frames": 0,
           "hard_overrun_frames": 0,
-          "shield_frames": 373,
-          "pickup_events": 9,
+          "shield_frames": 418,
+          "pickup_events": 7,
           "passed": true
         },
         "shield_preimplementation_baseline": {
@@ -27326,12 +27326,12 @@
         "baseline_9040_missed_frames": 0,
         "targeted_deadline_overrun_frames": 0,
         "targeted_missed_frames": 0,
-        "baseline_9040_active_frames_crossing_host_vbi": 5239,
-        "baseline_9040_host_vbi_boundary_crossings": 5239,
+        "baseline_9040_active_frames_crossing_host_vbi": 5238,
+        "baseline_9040_host_vbi_boundary_crossings": 5238,
         "targeted_active_frames_crossing_host_vbi": 569,
         "targeted_host_vbi_boundary_crossings": 569,
-        "active_frames_crossing_host_vbi": 17653,
-        "host_vbi_boundary_crossings": 17653,
+        "active_frames_crossing_host_vbi": 17758,
+        "host_vbi_boundary_crossings": 17758,
         "extra_vbi_boundaries": 0,
         "passed": true
       },
@@ -27376,34 +27376,34 @@
       "dark-fighter-boot.bin": {
         "path": "dist/dark-fighter-boot.bin",
         "bytes": 18560,
-        "sha256": "f538f20d5648d5b1f3a784ebf634bd4f25d51329ddeb0a4af5b05b967425e5ed"
+        "sha256": "077d031d12f8f407c1dd058521ddee5604cd632e9dece3b2d092c5d20a935a6e"
       },
       "dark-fighter.xex": {
         "path": "dist/dark-fighter.xex",
         "bytes": 19472,
-        "sha256": "b35c9018584e1a1fb78097cd9ae51cdc84adb6a614ca47d4187d8dab66ae4e6b"
+        "sha256": "7706a889920b5c748d64c3b324de9e54edfd859bb2e5666d69ed47f06d8e0139"
       },
       "dark-fighter.atr": {
         "path": "dist/dark-fighter.atr",
         "bytes": 92176,
-        "sha256": "6027956b4753fde5c157beb31ce085cdfa9e640f413d8138743df513bf2ebd52"
+        "sha256": "ac0e23cdf8d866a9e1c84a7b17910370d96b45a7fc1903df58718d4fbe9f1423"
       }
     },
     "reportPath": "docs/runtime-wall-trace.json",
-    "reportSha256": "566e2e905141f90bcedc6dca3c5cb5356ee9b9cdab0578a24bff1a856a62eade"
+    "reportSha256": "8dcb515c221d9462ca99a5f360e1fda19e9b945ec483547efc3c1e966dda873e"
   },
   "artifacts": {
     "dark-fighter-boot.bin": {
       "bytes": 18560,
-      "sha256": "f538f20d5648d5b1f3a784ebf634bd4f25d51329ddeb0a4af5b05b967425e5ed"
+      "sha256": "077d031d12f8f407c1dd058521ddee5604cd632e9dece3b2d092c5d20a935a6e"
     },
     "dark-fighter.xex": {
       "bytes": 19472,
-      "sha256": "b35c9018584e1a1fb78097cd9ae51cdc84adb6a614ca47d4187d8dab66ae4e6b"
+      "sha256": "7706a889920b5c748d64c3b324de9e54edfd859bb2e5666d69ed47f06d8e0139"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "6027956b4753fde5c157beb31ce085cdfa9e640f413d8138743df513bf2ebd52"
+      "sha256": "ac0e23cdf8d866a9e1c84a7b17910370d96b45a7fc1903df58718d4fbe9f1423"
     }
   }
 }

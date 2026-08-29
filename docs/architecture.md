@@ -188,7 +188,9 @@ glyphs, collision ownership, and lifetime rules.
 
 Debris is the implemented interactive entity in slot 0. It has bounded
 trajectories, two shapes, two tumble phases, three hit points, contact damage,
-and no score award. Its destruction and Raider breakup materialize into the
+and no score award. Player/debris contact uses the full 16-HPOS width of the
+double-width Viper PMG, while retaining the existing vertical player envelope
+and 8x8 debris box. Its destruction and Raider breakup materialize into the
 five-slot active effects envelope and are erased before lower layers move.
 
 Slot 1 owns the sole 2x2 pickup capsule. A qualifying Viper-projectile Raider

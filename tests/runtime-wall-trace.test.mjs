@@ -652,7 +652,7 @@ test("current frontend maximum, subsystem profile and accepted PAL-recovery base
     shield.actual_delta_cycles, shield.measured_physical_headroom,
     shield.remaining_target_cycles, shield.remaining_hard_cycles,
     shield.shield_frames, shield.passed],
-  [32_072, 32_040, -32, 3_528, 382, 528, 373, true]);
+  [32_072, 32_040, -32, 3_528, 382, 528, 418, true]);
 });
 
 test("every difficulty contains a complete legal debris flight", () => {
@@ -675,6 +675,6 @@ test("XEX and ATR legal hunt traces have identical maxima and a reproducible fin
   assert.deepEqual(sessions.map(({ medium, maximum_wall_cycles }) =>
     [medium, maximum_wall_cycles]), [["XEX", 30_728], ["ATR", 30_728]]);
   assert.equal(report.determinism.replay_fingerprint_sha256,
-    "e67d86283a0768411177769cb1353606998024c477f87e440dce8f1cf13e5515");
+    "c8a672d6e1970a14ceaa93f3862f68ee4acef76dcfcfd0017221679b704d8bd3");
   assert.ok(report.determinism.ordered_frames > 0);
 });

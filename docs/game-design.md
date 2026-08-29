@@ -36,7 +36,9 @@ to their prior blank contents. The optional type glyph is omitted because the
 
 - A new game starts with three playable Vipers and a full 100% hull.
 - The hull has ten health units. Ordinary Raider pulse and debris contact damage
-  remove one unit (10%); capital-ship fire removes two units (20%).
+  remove one unit (10%); capital-ship fire removes two units (20%). Debris
+  contact tests the Viper's complete double-width 16-HPOS visible envelope;
+  its vertical contract and the debris 8x8 hitbox remain unchanged.
 - A direct Raider collision destroys the current Viper.
 - Losing a Viper plays a 24-frame breakup. If a life remains, the replacement
   Viper receives 250 active frames (5 seconds) of invulnerability and blinks in

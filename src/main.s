@@ -350,6 +350,10 @@ ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = GAMEPLAY_BOTTOM
 
 PLAYER_H    = 16
 PLAYER_COLLISION_WIDTH = 8
+; The Viper's eight PMG bits are rendered double-width, so player/debris
+; contact owns the complete visible 16-HPOS horizontal envelope. Other combat
+; collision contracts intentionally retain PLAYER_COLLISION_WIDTH.
+PLAYER_VISIBLE_WIDTH_HPOS = 16
 PLAYER_COLLISION_LAST_ROW = 14
 PLAYER_X_MIN = 48
 PLAYER_X_MAX = 200
@@ -602,6 +606,7 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert GAMEPLAY_TOP & $07 = 0, error, "projectile row reduction requires an eight-scanline gameplay origin"
 .assert STAR_NEAR_END <= VIPER_PROJECTILE_GLYPH_BASE, error, "star glyphs overlap Viper projectile glyphs"
 .assert PLAYER_RESPAWN_X = 124, error, "player respawn must center the eight-HPOS envelope in the 24-column corridor"
+.assert PLAYER_VISIBLE_WIDTH_HPOS = 16, error, "double-width Viper must expose sixteen HPOS to debris contact"
 .assert ENEMY_X_MIN = 80, error, "enemy left edge must begin at the central corridor"
 .assert ENEMY_X_MAX = 160, error, "double-width enemy must end before the enemy hull"
 .assert ENEMY_X_MAX+ENEMY_RELEASE_VISIBLE_WIDTH = CORRIDOR_RIGHT_HPOS, error, "enemy envelope must fit the corridor exactly"
@@ -9340,9 +9345,10 @@ entity_collide_player_active:
     sbc ENTITY_X
     cmp #ENTITY_DEBRIS_WIDTH_HPOS
     bcc @overlap
-    cmp #(256-(PLAYER_COLLISION_WIDTH-1))
+    cmp #(256-(PLAYER_VISIBLE_WIDTH_HPOS-1))
     bcc entity_collision_miss
 @overlap:
+entity_player_debris_overlap = *
     lda BROAD_DAMAGE_APPLIED
     bne entity_collision_miss
     lda #$01
@@ -10128,7 +10134,7 @@ entity_trajectory_vx:
 .export ENTITY_DEBRIS_GLYPH_BASE
 .export WEAPON_PICKUP_GLYPH_BASE, WEAPON_PICKUP_SPREAD_GLYPH_BASE, WEAPON_PICKUP_SHIELD_GLYPH_BASE, weapon_pickup_glyph
 .export entity_effects_erase, entity_effects_update, entity_effects_render
-.export entity_spawn_debris, entity_damage_applied, entity_despawn_debris
+.export entity_spawn_debris, entity_player_debris_overlap, entity_damage_applied, entity_despawn_debris
 .export entity_begin_sector_complete, entity_complete_scroll_tick
 .export update_weapon_pickup_active, update_weapon_booster_active
 .export weapon_pickup_collide_player, weapon_pickup_collect
