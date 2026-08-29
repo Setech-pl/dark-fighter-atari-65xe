@@ -212,6 +212,7 @@ test("entity descriptor and glyph generation are deterministic and bounded", () 
   assert.deepEqual([...first.descriptor.slice(5, 10)], [8, 8, 1, 0, 8]);
   assert.equal(first.descriptor[12], 0,
     "ENTITY_TIMER must start at zero for the deterministic 3/5 accumulator");
+  const debrisOccupancies = [];
   for (const [variantIndex, { phases }] of first.debrisVisuals.variants.entries()) {
     for (const [phaseIndex, glyphs] of phases.entries()) {
       const activePixels = [];
@@ -228,21 +229,20 @@ test("entity descriptor and glyph generation are deterministic and bounded", () 
           }
         });
       });
-      const xs = activePixels.map(([x]) => x);
       const ys = activePixels.map(([, y]) => y);
-      assert.ok(Math.max(...xs) - Math.min(...xs) + 1 >= 15);
-      assert.ok(Math.max(...ys) - Math.min(...ys) + 1 >= 7);
-      assert.ok(selectors.every((selector) => selector === 2 || selector === 3),
-        `variant ${variantIndex} phase ${phaseIndex} reused the white star bank`);
-      const previousLitPixels = variantIndex === 0 ? 36 : 34;
-      const growth = selectors.length / previousLitPixels - 1;
-      assert.ok(growth >= 0.25 && growth <= 0.35,
-        `variant ${variantIndex} phase ${phaseIndex} grew ${(growth * 100).toFixed(1)}%`);
-      if (variantIndex === 0) assert.ok(selectors.length >= 45 && selectors.length <= 48);
-      else assert.ok(selectors.length >= 43 && selectors.length <= 45);
+      assert.ok(Math.max(...ys) - Math.min(...ys) + 1 >= 6);
+      assert.ok(glyphs.every((rows) => rows.some((row) => row !== 0)));
+      assert.ok(selectors.every((selector) => selector === 1 || selector === 2),
+        `variant ${variantIndex} phase ${phaseIndex} used a non-white/non-steel selector`);
+      assert.ok(selectors.filter((selector) => selector === 1).length >= 8);
+      assert.ok(selectors.filter((selector) => selector === 2).length >= 8);
+      assert.ok(selectors.length >= 36 && selectors.length <= 44);
+      debrisOccupancies.push(selectors.length);
     }
     assert.notDeepEqual(phases[0], phases[1]);
   }
+  assert.deepEqual(debrisOccupancies, [42, 41, 37, 40]);
+  assert.ok(Math.max(...debrisOccupancies) - Math.min(...debrisOccupancies) <= 6);
 });
 
 test("entity memory and code reservations are exact and do not use BASIC ROM", () => {

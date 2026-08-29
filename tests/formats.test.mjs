@@ -106,6 +106,17 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
   assert.deepEqual(parsedXex.segments[0].data,
     boot.subarray(0, manifest.transportCapacity.initialBootBytes));
   assert.deepEqual(parsedAtr.body.subarray(0, boot.length), boot);
-  assert.equal(manifest.entityEffects.stagedSourceAddress, 0x5160);
-  assert.ok(manifest.entityEffects.stagedEndAddress < manifest.broadsideRuntime.runAddress);
+  assert.equal(manifest.entityEffects.stagedSourceAddress, 0x51c0);
+  assert.ok(manifest.entityEffects.initialPackedSourcesLastAddress <
+    manifest.entityEffects.stagedSourceAddress);
+  assert.ok(manifest.entityEffects.initialPackedSourcesEndExclusive <=
+    manifest.entityEffects.stagedSourceAddress);
+  assert.equal(manifest.entityEffects.stagedEndExclusive,
+    manifest.entityEffects.stagedEndAddress + 1);
+  assert.ok(manifest.entityEffects.stagedEndExclusive <= manifest.broadsideRuntime.runAddress);
+  assert.equal(manifest.entityEffects.sourceToStagingMarginBytes,
+    manifest.entityEffects.stagedSourceAddress -
+      manifest.entityEffects.initialPackedSourcesEndExclusive);
+  assert.equal(manifest.entityEffects.stagingToBroadsideMarginBytes,
+    manifest.broadsideRuntime.runAddress - manifest.entityEffects.stagedEndExclusive);
 });

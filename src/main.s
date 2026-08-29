@@ -6486,17 +6486,17 @@ shared_fighter_explosion_core_masks:
 player_shape:
     .byte %00011000
     .byte %00011000
+    .byte %00011000
     .byte %00111100
     .byte %01111110
-    .byte %01111110
-    .byte %11111111
-    .byte %11111111
     .byte %11011011
     .byte %11111111
+    .byte %11011011
     .byte %11111111
     .byte %01111110
     .byte %00111100
     .byte %00100100
+    .byte %01100110
     .byte %01000010
     .byte %01000010
     .byte %00000000
@@ -6506,13 +6506,15 @@ player_engine_shape:
     .byte %00011000
     .byte %00011000
     .byte %00100100
+    .byte %00011000
+    .byte %00011000
+    .byte %00011000
     .byte %00100100
-    .byte %00011000
-    .byte %00011000
-    .byte $00,$00
-    .byte %00111100
-    .byte %00011000
-    .byte $00,$00
+    .byte %00100100
+    .byte %00100100
+    .byte %01000010
+    .byte %01000010
+    .byte $00
 
 .segment "ENTITY_CODE"
 

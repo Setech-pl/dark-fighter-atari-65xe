@@ -1,8 +1,8 @@
 # Current PAL runtime headroom
 
 This is the current performance summary after the accepted PAL headroom
-recovery pass, the completed Spread Shot rebuild, Shield Booster, and the H3.1
-frontend. The local runtime includes
+recovery pass, the completed Spread Shot rebuild, Shield Booster, the H3.1
+frontend, and the data-only H4.1 gameplay art update. The local runtime includes
 distinct HULL plates, the full BOOST HUD field, and the multi-position TOP
 SCORES fix.
 The machine-readable source is
@@ -13,13 +13,13 @@ the packed boot BIN, XEX, and ATR.
 
 | Measure | Current result | Current gate |
 | --- | ---: | ---: |
-| Initial boot block | 12,672 B / 99 sectors | dynamic BRCNT 1..255 |
+| Initial boot block | 12,800 B / 100 sectors | dynamic BRCNT 1..255 |
 | Extension chunks | 5,760 B / 45 sectors | dynamic, manifest-owned |
-| Total occupied transport | 18,432 B / 144 sectors | no preallocated empty sectors |
+| Total occupied transport | 18,560 B / 145 sectors | no preallocated empty sectors |
 | Additional loader capacity | 44,800 B | at least 8 KiB |
-| Free ATR transport | 73,728 B / 576 sectors | reported separately from residency |
+| Free ATR transport | 73,600 B / 575 sectors | reported separately from residency |
 | Remaining safe residency | 5,635 B fragmented | 1,206 B cumulative charge from the 15,346-byte capacity reference |
-| XEX size | 19,344 B | artifact format result |
+| XEX size | 19,472 B | artifact format result |
 | ATR size | 92,176 B | standard 90 KB single-density image |
 | PAL frame | 35,568 cycles | fixed PAL frame |
 | Worst measured wall | 32,040 cycles | no gameplay regression; Shield hard 32,568 |
@@ -77,9 +77,9 @@ must not be added to the wall total.
 
 ## Artifact and cold-start evidence
 
-- Boot BIN: `847c35817c4f4d5b7e5cba8467860b282486714f7dbf5ae89552af056616d7f2`.
-- XEX: `1eb52ad63db7d45fadb6157b1eb0e7e7ab066ef6d6dca221e7a35384751cc530`.
-- ATR: `a6cf6c076f142ef3f077f31ec8180f24edac7ce21c1954e836c672a40b526360`.
+- Boot BIN: `f538f20d5648d5b1f3a784ebf634bd4f25d51329ddeb0a4af5b05b967425e5ed`.
+- XEX: `b35c9018584e1a1fb78097cd9ae51cdc84adb6a614ca47d4187d8dab66ae4e6b`.
+- ATR: `6027956b4753fde5c157beb31ce085cdfa9e640f413d8138743df513bf2ebd52`.
 - XEX and ATR cold boots pass with `$A5` and `$5A` fills across
   `$8000-$9FFF`.
 - XEX and ATR each run two 3,000-frame integrity sessions, for 6,000 frames

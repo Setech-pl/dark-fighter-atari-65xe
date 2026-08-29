@@ -185,8 +185,9 @@ test("shared fighter explosion has six distinct expanding and fading native phas
   assert.equal(new Set(frames.map((frame) => frame.join(","))).size, 6);
   const occupied = frames.map((frame) => frame.reduce((sum, byte) =>
     sum + byte.toString(2).replaceAll("0", "").length, 0));
+  assert.deepEqual(occupied, [4, 18, 44, 22, 14, 7]);
   assert.ok(occupied[0] < occupied[1] && occupied[1] < occupied[2]);
-  assert.ok(occupied[3] >= occupied[2]);
+  assert.ok(occupied[3] < occupied[2]);
   assert.ok(occupied[4] < occupied[3] && occupied[5] < occupied[4]);
 });
 

@@ -51,6 +51,13 @@ Both capital hulls must remain continuous through prow, forward modules, combat
 modules, aft modules, and engines. Overlays may not leave blank segments,
 vertical lines, stale glyphs, or wrap artifacts.
 
+The accepted H4 gameplay set keeps the existing PMG and character footprints:
+the Viper reads as a narrow top-down fighter, the Raider retains a crescent
+silhouette and three scanner phases, and capital armour uses the fixed glyph
+range 59-89. H4.1 debris remains two characters by eight scanlines in glyphs
+110-117, with four asymmetric white/steel silhouettes. Fighter and capital
+explosions retain exactly six phases and their existing timing.
+
 Engine banks have exactly two phases: `dim` and `bright`. Each phase lasts eight
 active PAL frames, producing a 16-frame loop. The phases change only the engine
 pixels while preserving the established hull silhouette and backing behavior.

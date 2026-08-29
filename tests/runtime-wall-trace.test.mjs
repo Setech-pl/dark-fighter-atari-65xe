@@ -675,6 +675,6 @@ test("XEX and ATR legal hunt traces have identical maxima and a reproducible fin
   assert.deepEqual(sessions.map(({ medium, maximum_wall_cycles }) =>
     [medium, maximum_wall_cycles]), [["XEX", 30_728], ["ATR", 30_728]]);
   assert.equal(report.determinism.replay_fingerprint_sha256,
-    "1e111fa16fe51e3c48df861cb96ead0c9db4c1a3112e2e070db6b456ae18a376");
+    "e67d86283a0768411177769cb1353606998024c477f87e440dce8f1cf13e5515");
   assert.ok(report.determinism.ordered_frames > 0);
 });

@@ -110,6 +110,7 @@ export function loadEntityEffectsDefinition(sourcePath) {
   invariant(visuals.variants.map(({ id }) => id).join(",") ===
     "armour-shard,truss-fragment",
   "Debris variants must retain their stable identities");
+  const debrisOccupancies = [];
   for (const [variantIndex, variant] of visuals.variants.entries()) {
     invariant(Array.isArray(variant.phases) && variant.phases.length === 2,
       `debrisVisuals.variants[${variantIndex}] must contain two phases`);
@@ -135,21 +136,25 @@ export function loadEntityEffectsDefinition(sourcePath) {
           }
         });
       });
-      const xs = occupiedPixels.map(([x]) => x);
       const ys = occupiedPixels.map(([, y]) => y);
-      invariant(Math.max(...xs) - Math.min(...xs) + 1 >= 15 &&
-        Math.max(...ys) - Math.min(...ys) + 1 >= 7,
-      `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must occupy at least 15x7 of its 16x8 canvas`);
-      invariant(selectors.every((selector) => selector === 2 || selector === 3),
-        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must avoid white star selectors`);
-      invariant(variantIndex !== 0 || selectors.length >= 45 && selectors.length <= 48,
-        `armour-shard phase ${phaseIndex} must contain 45-48 lit ANTIC pixels`);
-      invariant(variantIndex !== 1 || selectors.length >= 43 && selectors.length <= 45,
-        `truss-fragment phase ${phaseIndex} must contain 43-45 lit ANTIC pixels and retain openings`);
+      invariant(Math.max(...ys) - Math.min(...ys) + 1 >= 6,
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must use at least six rows`);
+      invariant(glyphs.every((rows) => rows.some((row) => row !== 0)),
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must use both glyph cells`);
+      invariant(selectors.every((selector) => selector === 1 || selector === 2),
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must use only white and steel`);
+      invariant(selectors.filter((selector) => selector === 1).length >= 8 &&
+        selectors.filter((selector) => selector === 2).length >= 8,
+      `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must retain clear white and steel fields`);
+      invariant(selectors.length >= 36 && selectors.length <= 44,
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must contain 36-44 lit ANTIC pixels`);
+      debrisOccupancies.push(selectors.length);
     }
     invariant(JSON.stringify(variant.phases[0]) !== JSON.stringify(variant.phases[1]),
       `debrisVisuals variant ${variantIndex} phases must remain visibly distinct`);
   }
+  invariant(Math.max(...debrisOccupancies) - Math.min(...debrisOccupancies) <= 6,
+    "Debris phase occupancy spread must not exceed six ANTIC pixels");
 
   const destruction = definition.debrisDestruction;
   invariant(destruction?.hitFlashFrames === 2,

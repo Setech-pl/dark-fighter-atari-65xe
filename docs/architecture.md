@@ -19,7 +19,7 @@ verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
 
 ## Cold startup and loader
 
-The 95-sector initial block enters at `$201E` with a 449-byte raw bootstrap
+The 100-sector initial block enters at `$201E` with a 449-byte raw bootstrap
 prefix. A 1,185-byte stage-2 overlay runs at `$21C1-$2661`; after it validates
 the complete manifest, it reads extension sectors through standard OS SIOV
 while OS IRQ/NMI and disk services are still available. Each chunk is fully
@@ -27,18 +27,18 @@ read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
 controlled destination. Any failure blanks DMA, selects a fixed red error
 background, and halts before partially loaded code can execute.
 
-The first production migration moves the 5,655-byte packed BROADSIDE stream to
-sectors 96-140. ATR stages its 5,760-byte sector image at `$8100-$977F`, checks
-CRC `$8536`, and expands 6,643 bytes to `$5E10-$7802`. The last BROADSIDE source
+The first production migration moves the 5,662-byte packed BROADSIDE stream to
+sectors 101-145. ATR stages its 5,760-byte sector image at `$8100-$977F`, checks
+CRC `$4A66`, and expands 6,656 bytes to `$5E10-$780F`. The last BROADSIDE source
 read makes `$8100` reusable; only then does startup copy the packed resident
-suffix and stages it at `$8100-$9A5D`. The 7,743-byte suffix is stored as a 6,494-byte LZ-10/5 stream
+suffix and stages it at `$8100-$9AAC`. The 7,743-byte suffix is stored as a 6,573-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. No loader byte remains resident or enters gameplay.
 
 The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
-accepts RAW or LZ records. The current 95-sector initial block plus one 45-sector
-extension use 140 sectors. Seven additional 50-sector chunks provide 44,800 B
-of format/loader growth without padding; the ATR itself has 74,240 B free.
+accepts RAW or LZ records. The current 100-sector initial block plus one 45-sector
+extension use 145 sectors. Seven additional 50-sector chunks provide 44,800 B
+of format/loader growth without padding; the ATR itself has 73,600 B free.
 
 ### DFMC v1 byte format
 
@@ -58,7 +58,7 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production record 0 is `{96,45,5655,6643,$5E10,$8536,1,1,$8100}`.
+Production record 0 is `{101,45,5662,6656,$5E10,$4A66,1,1,$8100}`.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
 mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to
@@ -73,10 +73,13 @@ footer palette zones. The loader remains visible for 250 complete PAL frames
 
 Cold staging also copies:
 
-- validated external broadside/runtime data to `$5E10-$7802` before takeover;
+- validated external broadside/runtime data to `$5E10-$780F` before takeover;
 - packed starfield/music data through `$7810-$7EFA` to `$552A-$5DE1`;
 - the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
-- packed entity/effect/frontend code through boot-only staging beginning at `$5160` to the resident `$9100-$9FFF` range. The staging write begins only after the initial packed source ending at `$5154` has been consumed.
+- packed entity/effect/frontend code through boot-only staging at `$51C0-$5BA8`
+  to the resident `$9100-$9FFF` range. The staging write begins only after the
+  initial packed source ending at `$51B1` has been consumed. Its end-exclusive
+  `$5BA9` remains 615 bytes below the BROADSIDE destination at `$5E10`.
 
 The BSS is exactly `$8000-$80FF` and is initialized deterministically. The
 runtime does not use `$A000-$BFFF`; compatibility never assumes that BASIC ROM

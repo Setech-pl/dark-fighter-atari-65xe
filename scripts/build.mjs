@@ -101,7 +101,7 @@ const acceptedRuntimeCompactionReserveBytes = 1097;
 const minimumWeaponPickupReserveBytes = 512;
 const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
-const entityPackedStagingAddress = 0x5160;
+const entityPackedStagingAddress = 0x51c0;
 const bootA2StagingAddress = 0x7f10;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
@@ -595,12 +595,17 @@ async function build() {
   const entityStagedSourceAddress = entityPackedStagingAddress;
   const entityStagedEndAddress = entityStagedSourceAddress + packedEntityCodeRuntime.length;
   const initialPackedSourcesEnd = entityPackedSourceAddress + packedEntityCodeRuntime.length;
-  if (entityStagedSourceAddress < initialPackedSourcesEnd ||
-    entityStagedEndAddress > broadsideRunAddress) {
+  const initialPackedSourcesLastAddress = initialPackedSourcesEnd - 1;
+  if (!(initialPackedSourcesLastAddress < entityStagedSourceAddress)) {
     throw new Error(
-      `Packed ENTITY_CODE staging $${entityStagedSourceAddress.toString(16)}-$${(entityStagedEndAddress - 1).toString(16)} ` +
-      `must follow the initial packed sources ending at $${(initialPackedSourcesEnd - 1).toString(16)} ` +
-      `and end before BROADSIDE destination $${broadsideRunAddress.toString(16)}`,
+      `Initial packed sources ending at $${initialPackedSourcesLastAddress.toString(16)} ` +
+      `must precede ENTITY_CODE staging $${entityStagedSourceAddress.toString(16)}`,
+    );
+  }
+  if (!(entityStagedEndAddress <= broadsideRunAddress)) {
+    throw new Error(
+      `Packed ENTITY_CODE staging ending exclusively at $${entityStagedEndAddress.toString(16)} ` +
+      `must not exceed BROADSIDE destination $${broadsideRunAddress.toString(16)}`,
     );
   }
 
@@ -1028,8 +1033,13 @@ async function build() {
       },
       packedBytes: packedEntityCodeRuntime.length,
       packedSourceAddress: entityPackedSourceAddress,
+      initialPackedSourcesEndExclusive: initialPackedSourcesEnd,
+      initialPackedSourcesLastAddress,
       stagedSourceAddress: entityStagedSourceAddress,
       stagedEndAddress: entityStagedEndAddress - 1,
+      stagedEndExclusive: entityStagedEndAddress,
+      sourceToStagingMarginBytes: entityStagedSourceAddress - initialPackedSourcesEnd,
+      stagingToBroadsideMarginBytes: broadsideRunAddress - entityStagedEndAddress,
       compression: "LZ-10/5",
       deterministicFillTestByte: 0xa5,
       gameplayTopScanline: entityEffectsAsset.coordinateSystem.gameplayTopScanline,
