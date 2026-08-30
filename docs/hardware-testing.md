@@ -17,7 +17,7 @@ Before manual testing, run the evidence phases in order:
       and 289 B before BROADSIDE; startup consumes it before loader bitmap and
       starfield expansion reuse the same low-memory range.
 - [ ] A second unchanged full trace has replay fingerprint
-      `a6978c46db70261429115faee7e013c939224a30854c509edfe4129dd06ed5d3`,
+      `4a8c2186b8905840c2a70a99dc17ded77161c356542ea1a80ee67a0763a59597`,
       a 32,040-cycle maximum, and 3,528-cycle physical headroom.
 
 ## Atari800 PAL test
@@ -43,6 +43,10 @@ For both XEX and ATR:
       for eight active frames.
 - [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
       Raider breakup, and debris breakup behave normally.
+- [ ] Without Shield, an accepted direct Raider contact destroys the Viper
+      immediately at every HULL value; Shield, respawn invulnerability, the
+      post-hit cooldown, and the same-frame damage latch retain their gates,
+      while the Raider enters its normal scored breakup exactly once.
 - [ ] Rapid Fire capsule moves as one stable 2x2 footprint; collection displays
       the full `BOOST` label and four tall energy segments, emits ten yellow shots at two-frame
       intervals with the existing 12-frame post-burst pause, and expires after

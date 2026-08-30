@@ -4580,8 +4580,8 @@ handle_collisions_player_collision = *
     lda #$01
     ldy #DAMAGE_PLAYER_CONTACT
     jsr queue_enemy_damage
-    ldx #$00
-    jsr apply_broadside_player_damage
+    lda #PLAYER_HEALTH_UNITS
+    jsr apply_player_damage
 
 handle_collisions_heavy_projectiles = *
 profile_after_player_enemy_collision = *
@@ -7659,9 +7659,10 @@ update_sector_completion:
 apply_broadside_player_damage:
     lda #CAPITAL_DAMAGE_UNITS
 
-; A is damage in ten-point units. Capital shells and hull contact pass two;
-; the ordinary Raider pulse passes one. Every damage source retains the same
-; lifecycle, cooldown, one-event-per-frame, death and respawn gate.
+; A is damage in ten-point units. Direct Raider contact passes the full ten;
+; capital shells and hull contact pass two; the ordinary Raider pulse passes
+; one. Every damage source retains the same lifecycle, cooldown,
+; one-event-per-frame, death and respawn gate.
 apply_player_damage:
     sta BROAD_WORK_VALUE
     lda PLAYER_LIFECYCLE

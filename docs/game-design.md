@@ -41,7 +41,10 @@ to their prior blank contents. The optional type glyph is omitted because the
   maximum HULL); it never computes a percentage of remaining HULL. Debris
   contact tests the Viper's complete double-width 16-HPOS visible envelope;
   its vertical contract and the debris 8x8 hitbox remain unchanged.
-- A direct Raider collision destroys the current Viper.
+- An accepted direct Raider collision destroys the current Viper at any HULL
+  from one through ten. Shield absorbs it; respawn invulnerability, the shared
+  post-hit cooldown, and an earlier same-frame damage event retain their normal
+  gates. The Raider still follows its established scored breakup lifecycle.
 - Losing a Viper plays a 24-frame breakup. If a life remains, the replacement
   Viper receives 250 active frames (5 seconds) of invulnerability and blinks in
   an 8-frame visible/8-frame hidden rhythm.

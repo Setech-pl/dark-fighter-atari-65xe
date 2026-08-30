@@ -78,9 +78,9 @@ must not be added to the wall total.
 
 ## Artifact and cold-start evidence
 
-- Boot BIN: `7ffcb1a2f39c14e3ee0f4723b6ac9e6ef4796702631745b6fcf6bdde8e3b9142`.
-- XEX: `dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647`.
-- ATR: `2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab`.
+- Boot BIN: `60c4e63ab68144b93ddc544b7db75e083a739b8fba6675aa5f4b4f46409f68f7`.
+- XEX: `48b67214a9abfe2c378336fcaa9c0e277a1451a680549c02ae5968bb4f9b4c9b`.
+- ATR: `0ce1e54e6de3b8a1fb9a1382aebb4934df6a651c5d024be5359680068cb1e921`.
 - XEX and ATR cold boots pass with `$A5` and `$5A` fills across
   `$8000-$9FFF`.
 - XEX and ATR each run two 3,000-frame integrity sessions, for 6,000 frames

@@ -672,7 +672,7 @@ test("every difficulty contains a complete legal debris flight", () => {
   const cadence = report.coverage.parallax_cadence;
   assert.deepEqual(cadence.map(({ difficulty, full_debris_flight_frames }) =>
     [difficulty, full_debris_flight_frames]), [
-    [0, [91, 91]], [1, [82, 82]], [2, [74, 74]],
+    [0, [91, 91]], [1, [82, 82]], [2, [74, 74, 74]],
   ]);
   const sessions = report.replay.sessions.filter(({ kind }) => kind === "parallax-cadence");
   assert.deepEqual(sessions.map(({ id, fire_delay }) => [id, fire_delay]), [
@@ -688,6 +688,6 @@ test("XEX and ATR legal hunt traces have identical maxima and a reproducible fin
   assert.deepEqual(sessions.map(({ medium, maximum_wall_cycles }) =>
     [medium, maximum_wall_cycles]), [["XEX", 30_728], ["ATR", 30_728]]);
   assert.equal(report.determinism.replay_fingerprint_sha256,
-    "a6978c46db70261429115faee7e013c939224a30854c509edfe4129dd06ed5d3");
+    "4a8c2186b8905840c2a70a99dc17ded77161c356542ea1a80ee67a0763a59597");
   assert.ok(report.determinism.ordered_frames > 0);
 });

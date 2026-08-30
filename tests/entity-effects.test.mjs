@@ -136,6 +136,24 @@ function createRuntimeMemory(fill = 0) {
   return memory;
 }
 
+function createBootedArtifactRuntimeMemory(artifact, fill = 0) {
+  const memory = new Uint8Array(0x10000).fill(fill);
+  const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
+  if (requiresBroadsideUnpack) runRoutine(memory, "unpack_boot_broadside_runtime");
+  for (const name of [
+    "stage_boot_streams",
+    "unpack_resident_runtime",
+    "unpack_entity_runtime",
+    "stage_a2_kernel",
+    "unpack_starfield_runtime",
+    "init_entity_effects",
+    "init_fighter_projectiles",
+    "init_broadside",
+  ]) runRoutine(memory, name);
+  initialiseRows(memory);
+  return memory;
+}
+
 function runRoutine(memory, name, { accumulator = 0, beforeExecute } = {}) {
   const cpu = new Nmos6502(memory);
   const stop = 0x7fff;
@@ -261,6 +279,55 @@ function exercisePlayerDebrisCollision({
     eventAccepted: trace.visited.has("entity_damage_applied"),
     consumed: memory[addresses.activeMask] === 0,
   };
+}
+
+function exercisePlayerRaiderContact({
+  playerX = 124,
+  playerY = 100,
+  enemyX = 124,
+  enemyY = 100,
+  shield = false,
+  cooldown = 0,
+  lifecycle = 0,
+  priorLatch = 0,
+  difficulty = 0,
+  playerHealth = 10,
+  playerLives = 3,
+  baseMemory = null,
+} = {}) {
+  const memory = baseMemory ? Uint8Array.from(baseMemory) : createRuntimeMemory();
+  if (!baseMemory) {
+    initialiseRows(memory);
+    runRoutine(memory, "init_entity_effects");
+  }
+  memory[addresses.playerX] = playerX;
+  memory[addresses.playerY] = playerY;
+  memory[addresses.playerHealth] = playerHealth;
+  memory[addresses.playerLives] = playerLives;
+  memory[addresses.damageCooldown] = cooldown;
+  memory[addresses.damageApplied] = priorLatch;
+  memory[addresses.playerLifecycle] = lifecycle;
+  memory[addresses.boosterState] = shield ? 5 : 0;
+  memory[addresses.difficulty] = difficulty;
+  memory[addresses.enemyActive] = 1;
+  memory[addresses.enemyArchetype] = 0;
+  memory[addresses.enemyHp] = 1;
+  memory[addresses.enemyPendingDamage] = 0;
+  memory[addresses.enemyPendingSource] = 5;
+  memory[addresses.enemyX] = enemyX;
+  memory[addresses.enemyY] = enemyY;
+  memory[addresses.broadsideTimer] = 0xff;
+  memory[addresses.scoreLo] = 0;
+  memory[addresses.scoreHi] = 0;
+  const trace = runRoutineTrace(memory, "handle_collisions", [
+    "apply_broadside_player_damage",
+    "apply_player_damage",
+    "begin_player_fighter_explosion",
+    "resolve_enemy_damage",
+    "spawn_raider_breakup_effects",
+    "update_hud_status",
+  ]);
+  return { memory, trace };
 }
 
 function initialiseShootableDebris(memory, { hp = 3, ...options } = {}) {
@@ -940,7 +1007,7 @@ test("debris damage updates HULL plates in the contact frame and enters canonica
     "final-life debris death must reach the existing GAME OVER lifecycle");
 });
 
-test("non-debris damage callers retain their existing one- and two-unit contracts", () => {
+test("Raider pulse and capital damage retain their one- and two-unit contracts", () => {
   assert.match(source, /ENEMY_PULSE_DAMAGE_UNITS = 1/);
   assert.match(source, /CAPITAL_DAMAGE_UNITS = 2/);
   assert.match(source,
@@ -960,6 +1027,210 @@ test("non-debris damage callers retain their existing one- and two-unit contract
     runRoutine(memory, "apply_player_damage", { accumulator: 1 });
     assert.equal(memory[addresses.playerHealth], 9,
       `ordinary one-unit damage changed at difficulty ${difficulty}`);
+
+    const capital = createRuntimeMemory();
+    capital[addresses.playerLifecycle] = 0;
+    capital[addresses.playerLives] = 3;
+    capital[addresses.playerHealth] = 10;
+    capital[addresses.damageCooldown] = 0;
+    capital[addresses.damageApplied] = 0;
+    capital[addresses.boosterState] = 0;
+    capital[addresses.difficulty] = difficulty;
+    runRoutine(capital, "apply_broadside_player_damage");
+    assert.equal(capital[addresses.playerHealth], 8,
+      `capital two-unit damage changed at difficulty ${difficulty}`);
+  }
+});
+
+test("accepted direct Raider contact is lethal at every HULL and difficulty", () => {
+  for (const difficulty of [0, 1, 2]) {
+    for (let health = 1; health <= 10; health += 1) {
+      const { memory, trace } = exercisePlayerRaiderContact({ difficulty, playerHealth: health });
+      assert.deepEqual({
+        health: memory[addresses.playerHealth],
+        lifecycle: memory[addresses.playerLifecycle],
+        lives: memory[addresses.playerLives],
+        damageCalls: trace.callCounts.get("apply_player_damage"),
+        deathCalls: trace.callCounts.get("begin_player_fighter_explosion"),
+      }, {
+        health: 0,
+        lifecycle: 1,
+        lives: 2,
+        damageCalls: 1,
+        deathCalls: 1,
+      }, `difficulty ${difficulty}, HULL ${health} did not enter one lethal contact flow`);
+    }
+  }
+});
+
+test("Raider contact geometry covers centre, edges, corners, and exact outside misses", () => {
+  const enemyX = 124;
+  const enemyY = 100;
+  const hits = [
+    [0, 0], [-7, 0], [15, 0], [0, -14], [0, 13],
+    [-7, -14], [15, -14], [-7, 13], [15, 13],
+  ];
+  for (const [dx, dy] of hits) {
+    const { memory, trace } = exercisePlayerRaiderContact({
+      playerX: enemyX + dx,
+      playerY: enemyY + dy,
+      enemyX,
+      enemyY,
+    });
+    assert.deepEqual([
+      memory[addresses.playerHealth], memory[addresses.enemyActive],
+      trace.callCounts.get("apply_player_damage"),
+      trace.callCounts.get("begin_player_fighter_explosion"),
+    ], [0, 2, 1, 1], `legal contact offset ${dx},${dy} was missed`);
+  }
+
+  for (const [dx, dy] of [[-8, 0], [16, 0], [0, -15], [0, 14]]) {
+    const { memory, trace } = exercisePlayerRaiderContact({
+      playerX: enemyX + dx,
+      playerY: enemyY + dy,
+      enemyX,
+      enemyY,
+    });
+    assert.deepEqual([
+      memory[addresses.playerHealth], memory[addresses.enemyActive],
+      trace.callCounts.get("apply_player_damage"),
+      trace.callCounts.get("begin_player_fighter_explosion"),
+    ], [10, 1, 0, 0], `one-unit-outside offset ${dx},${dy} collided`);
+  }
+});
+
+test("Raider contact preserves Shield, cooldown, respawn, and prior-latch gates", () => {
+  const accepted = exercisePlayerRaiderContact({ cooldown: 0 });
+  assert.deepEqual([
+    accepted.memory[addresses.playerHealth], accepted.memory[addresses.damageApplied],
+    accepted.memory[addresses.damageCooldown],
+  ], [0, 1, 24]);
+
+  for (const cooldown of [1, 2, 25]) {
+    const { memory, trace } = exercisePlayerRaiderContact({ cooldown });
+    assert.deepEqual([
+      memory[addresses.playerHealth], memory[addresses.playerLifecycle],
+      memory[addresses.playerLives], memory[addresses.damageApplied],
+      memory[addresses.damageCooldown], memory[addresses.enemyActive],
+      trace.callCounts.get("apply_player_damage"),
+      trace.callCounts.get("begin_player_fighter_explosion"),
+    ], [10, 0, 3, 0, cooldown - 1, 2, 1, 0],
+    `cooldown ${cooldown} changed the established contact gate`);
+  }
+
+  const shield = exercisePlayerRaiderContact({ shield: true });
+  assert.deepEqual([
+    shield.memory[addresses.playerHealth], shield.memory[addresses.playerLifecycle],
+    shield.memory[addresses.playerLives], shield.memory[addresses.damageApplied],
+    shield.memory[addresses.damageCooldown], shield.memory[addresses.enemyActive],
+    shield.trace.callCounts.get("begin_player_fighter_explosion"),
+  ], [10, 0, 3, 1, 0, 2, 0]);
+
+  const respawn = exercisePlayerRaiderContact({ lifecycle: 2 });
+  assert.deepEqual([
+    respawn.memory[addresses.playerHealth], respawn.memory[addresses.playerLifecycle],
+    respawn.memory[addresses.damageApplied], respawn.memory[addresses.enemyActive],
+    respawn.trace.callCounts.get("begin_player_fighter_explosion"),
+  ], [10, 2, 0, 2, 0]);
+
+  const latched = exercisePlayerRaiderContact({ priorLatch: 1 });
+  assert.deepEqual([
+    latched.memory[addresses.playerHealth], latched.memory[addresses.playerLifecycle],
+    latched.memory[addresses.damageApplied], latched.memory[addresses.enemyActive],
+    latched.trace.callCounts.get("begin_player_fighter_explosion"),
+  ], [10, 0, 1, 2, 0]);
+});
+
+test("lethal Raider contact updates HUD, uses one death event, and reaches Game Over", () => {
+  const { memory, trace } = exercisePlayerRaiderContact({
+    playerHealth: 10,
+    playerLives: 1,
+  });
+  assert.deepEqual({
+    health: memory[addresses.playerHealth],
+    lives: memory[addresses.playerLives],
+    lifecycle: memory[addresses.playerLifecycle],
+    deathTimer: memory[addresses.deathTimer],
+    damageCalls: trace.callCounts.get("apply_player_damage"),
+    deathCalls: trace.callCounts.get("begin_player_fighter_explosion"),
+    hudCalls: trace.callCounts.get("update_hud_status"),
+    hullHud: [...memory.subarray(0x4019, 0x401d)],
+  }, {
+    health: 0,
+    lives: 0,
+    lifecycle: 1,
+    deathTimer: 24,
+    damageCalls: 1,
+    deathCalls: 1,
+    hudCalls: 1,
+    hullHud: [12, 12, 12, 12],
+  });
+  for (let frame = 0; frame < 24; frame += 1) runRoutine(memory, "update_player_death");
+  assert.equal(memory[addresses.playerLifecycle], 3);
+});
+
+test("Raider lifecycle and score remain the canonical contact breakup path", () => {
+  const { memory, trace } = exercisePlayerRaiderContact();
+  assert.deepEqual({
+    state: memory[addresses.enemyActive],
+    hp: memory[addresses.enemyHp],
+    explosionTimer: memory[addresses.fighterExplosionTimer + 1],
+    effectPending: memory[addresses.effectPending],
+    score: memory[addresses.scoreHi] << 8 | memory[addresses.scoreLo],
+    resolves: trace.callCounts.get("resolve_enemy_damage"),
+    breakups: trace.callCounts.get("spawn_raider_breakup_effects"),
+  }, {
+    state: 2,
+    hp: 1,
+    explosionTimer: 24,
+    effectPending: 2,
+    score: 0x10,
+    resolves: 1,
+    breakups: 1,
+  });
+});
+
+test("Raider contact result is byte-identical after XEX and ATR cold boot", () => {
+  const snapshot = (memory, trace) => ({
+    health: memory[addresses.playerHealth],
+    lives: memory[addresses.playerLives],
+    lifecycle: memory[addresses.playerLifecycle],
+    cooldown: memory[addresses.damageCooldown],
+    latch: memory[addresses.damageApplied],
+    enemyState: memory[addresses.enemyActive],
+    enemyExplosionTimer: memory[addresses.fighterExplosionTimer + 1],
+    effectPending: memory[addresses.effectPending],
+    scoreLo: memory[addresses.scoreLo],
+    scoreHi: memory[addresses.scoreHi],
+    hullHud: [...memory.subarray(0x4019, 0x401d)],
+    damageCalls: trace.callCounts.get("apply_player_damage"),
+    deathCalls: trace.callCounts.get("begin_player_fighter_explosion"),
+    breakups: trace.callCounts.get("spawn_raider_breakup_effects"),
+  });
+  for (const fill of [0xa5, 0x5a]) {
+    const traces = ["xex", "atr"].map((artifact) => {
+      const baseMemory = createBootedArtifactRuntimeMemory(artifact, fill);
+      const result = exercisePlayerRaiderContact({ baseMemory });
+      return snapshot(result.memory, result.trace);
+    });
+    assert.deepEqual(traces[0], traces[1],
+      `Raider contact diverged between XEX and ATR with cold fill $${fill.toString(16)}`);
+    assert.deepEqual(traces[0], {
+      health: 0,
+      lives: 2,
+      lifecycle: 1,
+      cooldown: 24,
+      latch: 1,
+      enemyState: 2,
+      enemyExplosionTimer: 24,
+      effectPending: 2,
+      scoreLo: 0x10,
+      scoreHi: 0,
+      hullHud: [12, 12, 12, 12],
+      damageCalls: 1,
+      deathCalls: 1,
+      breakups: 1,
+    });
   }
 });
 

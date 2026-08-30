@@ -25007,11 +25007,11 @@
     "estimated_additive_cycles": 32924,
     "wallTrace": {
       "reportPath": "docs/runtime-wall-trace.json",
-      "reportSha256": "dd1a57bcdf756214e737c1f1a2bc56985101e5b4250d9073156159fdc07148f9",
+      "reportSha256": "6ee34c7d77dc0d1d445b5f033fead369407620164343165209e1aa335dc92202",
       "artifact": {
         "path": "dist/dark-fighter.xex",
         "bytes": 19472,
-        "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
+        "sha256": "48b67214a9abfe2c378336fcaa9c0e277a1451a680549c02ae5968bb4f9b4c9b"
       },
       "emulator": {
         "name": "Atari800",
@@ -27244,8 +27244,8 @@
         "baseline_9040_host_vbi_boundary_crossings": 5010,
         "targeted_active_frames_crossing_host_vbi": 532,
         "targeted_host_vbi_boundary_crossings": 532,
-        "active_frames_crossing_host_vbi": 17969,
-        "host_vbi_boundary_crossings": 17969,
+        "active_frames_crossing_host_vbi": 17993,
+        "host_vbi_boundary_crossings": 17993,
         "extra_vbi_boundaries": 0,
         "passed": true
       },
@@ -27290,34 +27290,34 @@
       "dark-fighter-boot.bin": {
         "path": "dist/dark-fighter-boot.bin",
         "bytes": 18560,
-        "sha256": "7ffcb1a2f39c14e3ee0f4723b6ac9e6ef4796702631745b6fcf6bdde8e3b9142"
+        "sha256": "60c4e63ab68144b93ddc544b7db75e083a739b8fba6675aa5f4b4f46409f68f7"
       },
       "dark-fighter.xex": {
         "path": "dist/dark-fighter.xex",
         "bytes": 19472,
-        "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
+        "sha256": "48b67214a9abfe2c378336fcaa9c0e277a1451a680549c02ae5968bb4f9b4c9b"
       },
       "dark-fighter.atr": {
         "path": "dist/dark-fighter.atr",
         "bytes": 92176,
-        "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
+        "sha256": "0ce1e54e6de3b8a1fb9a1382aebb4934df6a651c5d024be5359680068cb1e921"
       }
     },
     "reportPath": "docs/runtime-wall-trace.json",
-    "reportSha256": "dd1a57bcdf756214e737c1f1a2bc56985101e5b4250d9073156159fdc07148f9"
+    "reportSha256": "6ee34c7d77dc0d1d445b5f033fead369407620164343165209e1aa335dc92202"
   },
   "artifacts": {
     "dark-fighter-boot.bin": {
       "bytes": 18560,
-      "sha256": "7ffcb1a2f39c14e3ee0f4723b6ac9e6ef4796702631745b6fcf6bdde8e3b9142"
+      "sha256": "60c4e63ab68144b93ddc544b7db75e083a739b8fba6675aa5f4b4f46409f68f7"
     },
     "dark-fighter.xex": {
       "bytes": 19472,
-      "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
+      "sha256": "48b67214a9abfe2c378336fcaa9c0e277a1451a680549c02ae5968bb4f9b4c9b"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
+      "sha256": "0ce1e54e6de3b8a1fb9a1382aebb4934df6a651c5d024be5359680068cb1e921"
     }
   }
 }

@@ -196,6 +196,17 @@ score, pursuit profile, weapon profile, and PMG appearance. Raider projectiles
 share the fighter-projectile state allocation but use separate slots, red
 glyphs, collision ownership, and lifetime rules.
 
+Direct Raider/Viper overlap is resolved after fighter projectiles and before
+broadside work. It queues the existing one-point contact hit against the
+Raider, then passes all ten HULL units to the canonical player-damage routine.
+An accepted unshielded contact therefore saturates HULL at zero and uses the
+existing HUD, breakup, life-loss, respawn, and Game Over flow in one event.
+`PLAYER_LIFECYCLE`, Shield, the 25-frame post-hit cooldown, and the per-frame
+damage latch remain the ordered gates. Raider destruction is resolved
+independently afterward through the established scored `EXPLODING`/breakup
+path, including when a player-side gate suppresses damage. Collision geometry,
+movement, scheduling, and persistent state are unchanged.
+
 Debris is the implemented interactive entity in slot 0. It has bounded
 trajectories, two shapes, two tumble phases, three hit points, contact damage,
 and no score award. Player/debris contact uses the full 16-HPOS width of the

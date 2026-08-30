@@ -1201,7 +1201,7 @@ test("heavy, hull, and fighter damage share the lifecycle gate without pausing t
 
   const collisions = routine("handle_collisions", "update_score_display");
   assert.match(collisions,
-    /jsr player_contacts_enemy[\s\S]+jsr apply_broadside_player_damage[\s\S]+jsr update_broadside/);
+    /jsr player_contacts_enemy[\s\S]+lda #PLAYER_HEALTH_UNITS\s+jsr apply_player_damage[\s\S]+jsr update_broadside/);
   const gate = routine("apply_broadside_player_damage", "update_hud_status");
   assert.match(gate, /PLAYER_LIFECYCLE[\s\S]+cmp #PLAYER_ALIVE[\s\S]+bne @done/);
   assert.doesNotMatch(routine("update_broadside", "schedule_broadside"),
