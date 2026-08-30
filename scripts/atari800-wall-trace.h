@@ -1605,9 +1605,12 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 
 	/* BOOT_STAGE2 deliberately overlays the later resident suffix, so its
 	 * transient PC can alias frontend_input_poll before start has restored the
-	 * runtime image.  Only arm frontend input once the menu state is published. */
+	 * runtime image. Drive only published frontend states; OPTIONS must remain
+	 * reachable so non-default difficulties use the production input path. */
 	if (!dftrace_active && pc == dftrace_pc_frontend_poll &&
-		MEMORY_mem[dftrace_game_state] == 1u) {
+		(MEMORY_mem[dftrace_game_state] == 1u ||
+		 MEMORY_mem[dftrace_game_state] == 2u ||
+		 MEMORY_mem[dftrace_game_state] == 7u)) {
 		dftrace_set_frontend_input();
 	}
 

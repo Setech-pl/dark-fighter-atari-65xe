@@ -8,9 +8,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const report = JSON.parse(fs.readFileSync(
   path.join(root, "docs", "runtime-wall-trace.json"), "utf8"));
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
+const observerSource = fs.readFileSync(
+  path.join(root, "scripts", "atari800-wall-trace.h"), "utf8");
 
 test("wall trace uses the unambiguous current coverage schema", () => {
   assert.equal(report.schema_version, 2);
+});
+
+test("wall-trace frontend driver can select non-default difficulty through OPTIONS", () => {
+  const gate = observerSource.slice(
+    observerSource.indexOf("BOOT_STAGE2 deliberately overlays"),
+    observerSource.indexOf("if (dftrace_dli_integrity_enabled"),
+  );
+  assert.match(gate, /dftrace_game_state\] == 1u/);
+  assert.match(gate, /dftrace_game_state\] == 2u/);
+  assert.match(gate, /dftrace_game_state\] == 7u/);
+  assert.match(gate, /dftrace_set_frontend_input\(\)/);
 });
 
 test("wall trace keeps CPU comparison, measured wall time and additive estimate distinct", () => {
