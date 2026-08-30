@@ -58,6 +58,12 @@ range 59-89. H4.1 debris remains two characters by eight scanlines in glyphs
 110-117, with four asymmetric white/steel silhouettes. Fighter and capital
 explosions retain exactly six phases and their existing timing.
 
+The accepted H4.2 C INDUSTRIAL capital set keeps CLEAN's stable mass plates but
+adds bounded construction detail: horizontal allied ribs, service seams and
+hatches, plus deeper enemy channels and apertures. Detail must form connected
+ship structure across neighbouring glyphs; checkerboards, dithering, and
+singleton surface noise remain prohibited.
+
 Engine banks have exactly two phases: `dim` and `bright`. Each phase lasts eight
 active PAL frames, producing a 16-frame loop. The phases change only the engine
 pixels while preserving the established hull silhouette and backing behavior.

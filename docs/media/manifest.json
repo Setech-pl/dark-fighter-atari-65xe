@@ -5,16 +5,16 @@
     "xex": {
       "path": "dist/dark-fighter.xex",
       "bytes": 19472,
-      "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+      "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
     },
     "atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "55a429b8a90ffc1e2dffba81b0a43bb3909c3bd52fdac2eea1ed5123ab15f1e7"
+      "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "277b122756f481737c6f1a7e8942bb2a411835083f001dbed2b0daefbd6a1c49"
+      "sha256": "dd1a57bcdf756214e737c1f1a2bc56985101e5b4250d9073156159fdc07148f9"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
@@ -174,8 +174,8 @@
     },
     {
       "path": "docs/media/assets/capital-ship-modules.png",
-      "bytes": 11333,
-      "sha256": "12b29d7d76ba5e8d34ac06295509e3363ec09e8f037fa077d1387d0be995588c",
+      "bytes": 11468,
+      "sha256": "fee1a6af3adc7198ad7bc66fc5f0810cd1e2d07b011f6595b0e44a435d3ed3c7",
       "width": 960,
       "height": 680,
       "sources": [

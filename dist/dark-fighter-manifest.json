@@ -10,7 +10,7 @@
   "bootSectors": 100,
   "payloadBytes": 18560,
   "bootPayloadTrailer": {
-    "address": 20874,
+    "address": 20902,
     "bytes": 4,
     "ascii": "DFB1",
     "hex": "44464231",
@@ -54,7 +54,7 @@
       "baselineReserveBytes": 1097,
       "reserveBytes": 73,
       "recoveredReserveBytes": 1097,
-      "residentSuffixGrossSavingsBytes": 1216,
+      "residentSuffixGrossSavingsBytes": 1188,
       "relocatedColdInitBytes": 2464,
       "relocatedColdInitPackedCostBytes": 1892,
       "reserveAddress": 24499,
@@ -80,8 +80,8 @@
   "transportCapacity": {
     "format": "DFMC-v1 multi-chunk",
     "initialBootBytes": 12800,
-    "initialBootContentBytes": 12686,
-    "initialBootEnvelopeBytes": 114,
+    "initialBootContentBytes": 12714,
+    "initialBootEnvelopeBytes": 86,
     "initialBootSectors": 100,
     "extensionBytes": 5760,
     "extensionSectors": 45,
@@ -140,10 +140,10 @@
     "prefixEndAddress": 8640,
     "suffixAddress": 8641,
     "suffixRawBytes": 7743,
-    "suffixPackedBytes": 6527,
+    "suffixPackedBytes": 6555,
     "packedSourceAddress": 9826,
     "stagingAddress": 33024,
-    "stagedEndAddress": 39550,
+    "stagedEndAddress": 39578,
     "compression": "LZ-10/5"
   },
   "broadsideRuntime": {
@@ -172,7 +172,7 @@
     "bytes": 2232,
     "reservedBytes": 2278,
     "packedBytes": 1771,
-    "packedSourceAddress": 16353,
+    "packedSourceAddress": 16381,
     "stagingAddress": 30736,
     "stagingBytes": 1792,
     "compression": "LZ-10/5"
@@ -180,7 +180,7 @@
   "a2Kernel": {
     "loadAddress": 27136,
     "runAddress": 36864,
-    "sourceAddress": 18124,
+    "sourceAddress": 18152,
     "stagingAddress": 32528,
     "bytes": 207,
     "reservedBytes": 256,
@@ -241,13 +241,13 @@
       }
     },
     "packedBytes": 2543,
-    "packedSourceAddress": 18331,
-    "initialPackedSourcesEndExclusive": 20874,
-    "initialPackedSourcesLastAddress": 20873,
+    "packedSourceAddress": 18359,
+    "initialPackedSourcesEndExclusive": 20902,
+    "initialPackedSourcesLastAddress": 20901,
     "stagedSourceAddress": 21248,
     "stagedEndAddress": 23790,
     "stagedEndExclusive": 23791,
-    "sourceToStagingMarginBytes": 374,
+    "sourceToStagingMarginBytes": 346,
     "stagingToBroadsideMarginBytes": 289,
     "stagingLifecycle": {
       "starfieldDestinationAddress": 21802,
@@ -456,7 +456,7 @@
   },
   "capitalHulls": {
     "source": "assets/graphics/capital-hulls.json",
-    "sourceSha256": "c8c17d2e5ac3b9dd1a361330faa2d733aa60059c471a6e33bf00eaa0d86f147d",
+    "sourceSha256": "e216216d2fe733c2efdf2e3a8203064b3dde9d4d1660da9d4d27e6146c745d21",
     "displayMode": "ANTIC 4",
     "segmentRows": 32,
     "glyphCount": 31,
@@ -25007,11 +25007,11 @@
     "estimated_additive_cycles": 32924,
     "wallTrace": {
       "reportPath": "docs/runtime-wall-trace.json",
-      "reportSha256": "277b122756f481737c6f1a7e8942bb2a411835083f001dbed2b0daefbd6a1c49",
+      "reportSha256": "dd1a57bcdf756214e737c1f1a2bc56985101e5b4250d9073156159fdc07148f9",
       "artifact": {
         "path": "dist/dark-fighter.xex",
         "bytes": 19472,
-        "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+        "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
       },
       "emulator": {
         "name": "Atari800",
@@ -25550,7 +25550,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-xex-a5-0-delayed",
@@ -25618,7 +25618,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-xex-a5-1-immediate",
@@ -25686,7 +25686,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-xex-a5-1-delayed",
@@ -25754,7 +25754,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-xex-a5-2-immediate",
@@ -25822,7 +25822,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-xex-a5-2-delayed",
@@ -25890,7 +25890,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-xex-5a-0-immediate",
@@ -25958,7 +25958,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-xex-5a-0-delayed",
@@ -26026,7 +26026,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-xex-5a-1-immediate",
@@ -26094,7 +26094,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-xex-5a-1-delayed",
@@ -26162,7 +26162,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-xex-5a-2-immediate",
@@ -26230,7 +26230,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-xex-5a-2-delayed",
@@ -26298,7 +26298,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-atr-a5-0-immediate",
@@ -26366,7 +26366,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-atr-a5-0-delayed",
@@ -26434,7 +26434,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-atr-a5-1-immediate",
@@ -26502,7 +26502,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-atr-a5-1-delayed",
@@ -26570,7 +26570,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-atr-a5-2-immediate",
@@ -26638,7 +26638,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-atr-a5-2-delayed",
@@ -26706,7 +26706,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-atr-5a-0-immediate",
@@ -26774,7 +26774,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-atr-5a-0-delayed",
@@ -26842,7 +26842,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+              "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
             },
             {
               "id": "engine-atr-5a-1-immediate",
@@ -26910,7 +26910,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-atr-5a-1-delayed",
@@ -26978,7 +26978,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+              "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
             },
             {
               "id": "engine-atr-5a-2-immediate",
@@ -27046,7 +27046,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-atr-5a-2-delayed",
@@ -27114,7 +27114,7 @@
                 "address": 17311
               },
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             }
           ],
           "restart_sessions": [
@@ -27153,7 +27153,7 @@
                 143
               ],
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             },
             {
               "id": "engine-restart-atr-a5",
@@ -27190,7 +27190,7 @@
                 143
               ],
               "screenshots": 150,
-              "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+              "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
             }
           ],
           "evidence": {
@@ -27201,8 +27201,8 @@
               "columns": 8,
               "width": 2688,
               "height": 960,
-              "bytes": 19989,
-              "sha256": "43952c3a231ab1f43611cebaaa4be41fb6fd8eff7d89a2a4e9475c9be9e6ae59"
+              "bytes": 21189,
+              "sha256": "2bdfadc3c04c4fba346083e0ac74608aeea1b885e3008eac512501cf3c16a22f"
             },
             "two_cycles_contact": {
               "path": "build/runtime-wall-trace/capital-engines-two-cycles-contact.png",
@@ -27210,8 +27210,8 @@
               "columns": 8,
               "width": 2688,
               "height": 960,
-              "bytes": 31245,
-              "sha256": "e1c971d9a9e8c37519a7b11ce70887efafde8b4e2e76d6f7c6286bd9a239ff5c"
+              "bytes": 36113,
+              "sha256": "4d123b1920b967a46b0be4901b3d30eb9dc9acf5492d5f479c3755450956a9b4"
             },
             "compact_trace": {
               "path": "build/runtime-wall-trace/capital-engines-first-150.csv",
@@ -27290,34 +27290,34 @@
       "dark-fighter-boot.bin": {
         "path": "dist/dark-fighter-boot.bin",
         "bytes": 18560,
-        "sha256": "653f4bf5a734bf873b701e733db19fa81c6d06eea04c5ae52265622ae9f8c9ca"
+        "sha256": "7ffcb1a2f39c14e3ee0f4723b6ac9e6ef4796702631745b6fcf6bdde8e3b9142"
       },
       "dark-fighter.xex": {
         "path": "dist/dark-fighter.xex",
         "bytes": 19472,
-        "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+        "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
       },
       "dark-fighter.atr": {
         "path": "dist/dark-fighter.atr",
         "bytes": 92176,
-        "sha256": "55a429b8a90ffc1e2dffba81b0a43bb3909c3bd52fdac2eea1ed5123ab15f1e7"
+        "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
       }
     },
     "reportPath": "docs/runtime-wall-trace.json",
-    "reportSha256": "277b122756f481737c6f1a7e8942bb2a411835083f001dbed2b0daefbd6a1c49"
+    "reportSha256": "dd1a57bcdf756214e737c1f1a2bc56985101e5b4250d9073156159fdc07148f9"
   },
   "artifacts": {
     "dark-fighter-boot.bin": {
       "bytes": 18560,
-      "sha256": "653f4bf5a734bf873b701e733db19fa81c6d06eea04c5ae52265622ae9f8c9ca"
+      "sha256": "7ffcb1a2f39c14e3ee0f4723b6ac9e6ef4796702631745b6fcf6bdde8e3b9142"
     },
     "dark-fighter.xex": {
       "bytes": 19472,
-      "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+      "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "55a429b8a90ffc1e2dffba81b0a43bb3909c3bd52fdac2eea1ed5123ab15f1e7"
+      "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
     }
   }
 }

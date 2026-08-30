@@ -31,7 +31,8 @@ The first production migration moves the 5,661-byte packed BROADSIDE stream to
 sectors 101-145. ATR stages its 5,760-byte sector image at `$8100-$977F`, checks
 CRC `$05D8`, and expands 6,656 bytes to `$5E10-$780F`. The last BROADSIDE source
 read makes `$8100` reusable; only then does startup copy the packed resident
-suffix and stages it at `$8100-$9AAF`. The 7,743-byte suffix is stored as a 6,576-byte LZ-10/5 stream
+suffix and stages it at `$8100-$9A9A`. The 7,743-byte suffix is stored as a
+6,555-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. No loader byte remains resident or enters gameplay.
 
@@ -78,10 +79,10 @@ Cold staging also copies:
 - the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
 - packed entity/effect/frontend code through boot-only staging at `$5300-$5CEE`
   to the resident `$9100-$9FFF` range. The staging write begins only after the
-  initial packed source ending at `$5189` has been consumed. Its end-exclusive
+  initial packed source ending at `$51A5` has been consumed. Its end-exclusive
   `$5CEF` remains 289 bytes below the BROADSIDE destination at `$5E10`.
 
-The initial packed sources end exclusively at `$518A`, leaving 374 bytes before
+The initial packed sources end exclusively at `$51A6`, leaving 346 bytes before
 the `$5300` staging start. Startup copies ENTITY_CODE there, expands the stream
 to its current live `$9100-$9D74` range, and immediately releases the staging
 range. `unpack_loader_bitmap` may then overwrite it while preparing the loader;

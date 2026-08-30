@@ -389,16 +389,16 @@ test("turret metadata points to complete multi-cell emplacements and real muzzle
   }
 });
 
-test("accepted H4 armour remains steel-led allied and dark-red enemy", () => {
+test("accepted H4.2 C INDUSTRIAL armour remains steel-led allied and dark-red enemy", () => {
   const allied = colorCounts("allied");
   const enemy = colorCounts("enemy");
   const alliedTotal = allied.reduce((sum, count) => sum + count, 0);
   const enemyTotal = enemy.reduce((sum, count) => sum + count, 0);
   assert.ok(allied[2] / alliedTotal >= 0.65 && allied[2] / alliedTotal <= 0.83);
-  assert.ok(enemy[3] / enemyTotal >= 0.55 && enemy[3] / enemyTotal <= 0.70);
+  assert.ok(enemy[3] / enemyTotal >= 0.70 && enemy[3] / enemyTotal <= 0.75);
   assert.ok(enemy[2] / enemyTotal >= 0.08 && enemy[2] / enemyTotal <= 0.12);
   assert.ok(enemy[1] / enemyTotal <= 0.05);
-  assert.ok(enemy[0] > allied[0] * 1.5);
+  assert.ok(enemy[0] > allied[0] * 1.25);
   assert.ok(allied[1] > enemy[1] * 10);
   assert.ok(enemy[0] / enemyTotal >= 0.15);
   assert.ok(allied[3] / alliedTotal < 0.01);

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -164,6 +165,11 @@ test("capital-hulls strip preview is deterministic and shows all 32 rows", () =>
   const first = createCapitalHullsStripPreview(source, capitalHullsDefinition);
   const second = createCapitalHullsStripPreview(source, capitalHullsDefinition);
   assert.deepEqual(first, second);
+  assert.equal(
+    crypto.createHash("sha256").update(first).digest("hex"),
+    "70ad17d14e5b71c27dcdf53a789c902902d7ac78d6fc3114428096dcb16eec33",
+    "production capital-hull render must remain pixel-identical to accepted C INDUSTRIAL",
+  );
   const info = inspectPng(first);
   assert.deepEqual([info.width, info.height], [640, 512]);
 });

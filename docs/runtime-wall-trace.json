@@ -17,23 +17,23 @@
     "dark-fighter-boot.bin": {
       "path": "dist/dark-fighter-boot.bin",
       "bytes": 18560,
-      "sha256": "653f4bf5a734bf873b701e733db19fa81c6d06eea04c5ae52265622ae9f8c9ca"
+      "sha256": "7ffcb1a2f39c14e3ee0f4723b6ac9e6ef4796702631745b6fcf6bdde8e3b9142"
     },
     "dark-fighter.xex": {
       "path": "dist/dark-fighter.xex",
       "bytes": 19472,
-      "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+      "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
     },
     "dark-fighter.atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "55a429b8a90ffc1e2dffba81b0a43bb3909c3bd52fdac2eea1ed5123ab15f1e7"
+      "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
     }
   },
   "artifact": {
     "path": "dist/dark-fighter.xex",
     "bytes": 19472,
-    "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+    "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
   },
   "emulator": {
     "name": "Atari800",
@@ -78,7 +78,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 19472,
-          "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+          "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
         },
         "snapshots": [
           {
@@ -98,7 +98,8 @@
             "initad": 0,
             "dosvec": 0,
             "screen_checksum": 0,
-            "frontend_dlist_checksum": 1325167379
+            "frontend_dlist_checksum": 1325167379,
+            "loader_dli_count": 0
           },
           {
             "frame": 250,
@@ -116,8 +117,9 @@
             "runad": 8936,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 264
           },
           {
             "frame": 300,
@@ -135,8 +137,9 @@
             "runad": 8936,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 364
           },
           {
             "frame": 500,
@@ -155,7 +158,8 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           },
           {
             "frame": 750,
@@ -174,7 +178,8 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 3690724465,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           }
         ],
         "milestones": {
@@ -213,8 +218,8 @@
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/xex-a5-frame750.png",
-            "bytes": 2439,
-            "sha256": "cb19b33ee964bf5b9fabb898b0656370b910bf82ec36410bdff42795e16ab7f5"
+            "bytes": 3177,
+            "sha256": "c32bc08f9a4547c44a24a00c1f851e96e2d4d9a28ee88ac9c8ec4af3422d6851"
           }
         ],
         "passed": true
@@ -226,7 +231,7 @@
         "artifact": {
           "path": "dist/dark-fighter.xex",
           "bytes": 19472,
-          "sha256": "f3c8aeb9cd168945cc83288163063d453f6ee47566043b7220cbdaba2aa59f74"
+          "sha256": "dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647"
         },
         "snapshots": [
           {
@@ -246,7 +251,8 @@
             "initad": 0,
             "dosvec": 0,
             "screen_checksum": 0,
-            "frontend_dlist_checksum": 332366998
+            "frontend_dlist_checksum": 332366998,
+            "loader_dli_count": 0
           },
           {
             "frame": 250,
@@ -264,8 +270,9 @@
             "runad": 8936,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 264
           },
           {
             "frame": 300,
@@ -283,8 +290,9 @@
             "runad": 8936,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 364
           },
           {
             "frame": 500,
@@ -303,7 +311,8 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           },
           {
             "frame": 750,
@@ -322,7 +331,8 @@
             "initad": 55040,
             "dosvec": 61987,
             "screen_checksum": 3690724465,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           }
         ],
         "milestones": {
@@ -361,8 +371,8 @@
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/xex-5a-frame750.png",
-            "bytes": 2439,
-            "sha256": "cb19b33ee964bf5b9fabb898b0656370b910bf82ec36410bdff42795e16ab7f5"
+            "bytes": 3177,
+            "sha256": "c32bc08f9a4547c44a24a00c1f851e96e2d4d9a28ee88ac9c8ec4af3422d6851"
           }
         ],
         "passed": true
@@ -374,7 +384,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "55a429b8a90ffc1e2dffba81b0a43bb3909c3bd52fdac2eea1ed5123ab15f1e7"
+          "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
         },
         "snapshots": [
           {
@@ -394,7 +404,8 @@
             "initad": 0,
             "dosvec": 0,
             "screen_checksum": 0,
-            "frontend_dlist_checksum": 1325167379
+            "frontend_dlist_checksum": 1325167379,
+            "loader_dli_count": 0
           },
           {
             "frame": 250,
@@ -412,8 +423,9 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 68
           },
           {
             "frame": 300,
@@ -431,8 +443,9 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 168
           },
           {
             "frame": 500,
@@ -451,7 +464,8 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           },
           {
             "frame": 750,
@@ -470,7 +484,8 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 3690724465,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           }
         ],
         "milestones": {
@@ -509,8 +524,8 @@
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/atr-a5-frame750.png",
-            "bytes": 2439,
-            "sha256": "cb19b33ee964bf5b9fabb898b0656370b910bf82ec36410bdff42795e16ab7f5"
+            "bytes": 3177,
+            "sha256": "c32bc08f9a4547c44a24a00c1f851e96e2d4d9a28ee88ac9c8ec4af3422d6851"
           }
         ],
         "passed": true
@@ -522,7 +537,7 @@
         "artifact": {
           "path": "dist/dark-fighter.atr",
           "bytes": 92176,
-          "sha256": "55a429b8a90ffc1e2dffba81b0a43bb3909c3bd52fdac2eea1ed5123ab15f1e7"
+          "sha256": "2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab"
         },
         "snapshots": [
           {
@@ -542,7 +557,8 @@
             "initad": 0,
             "dosvec": 0,
             "screen_checksum": 0,
-            "frontend_dlist_checksum": 332366998
+            "frontend_dlist_checksum": 332366998,
+            "loader_dli_count": 0
           },
           {
             "frame": 250,
@@ -560,8 +576,9 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 68
           },
           {
             "frame": 300,
@@ -579,8 +596,9 @@
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 928720673,
-            "frontend_dlist_checksum": 3409770857
+            "screen_checksum": 2973818002,
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 168
           },
           {
             "frame": 500,
@@ -599,7 +617,8 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           },
           {
             "frame": 750,
@@ -618,7 +637,8 @@
             "initad": 0,
             "dosvec": 8222,
             "screen_checksum": 3690724465,
-            "frontend_dlist_checksum": 3409770857
+            "frontend_dlist_checksum": 3409770857,
+            "loader_dli_count": 500
           }
         ],
         "milestones": {
@@ -657,15 +677,15 @@
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/atr-5a-frame750.png",
-            "bytes": 2439,
-            "sha256": "cb19b33ee964bf5b9fabb898b0656370b910bf82ec36410bdff42795e16ab7f5"
+            "bytes": 3177,
+            "sha256": "c32bc08f9a4547c44a24a00c1f851e96e2d4d9a28ee88ac9c8ec4af3422d6851"
           }
         ],
         "passed": true
       }
     ],
     "xex_atr_frame_500_parity_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04",
-    "xex_atr_frame_750_parity_sha256": "cb19b33ee964bf5b9fabb898b0656370b910bf82ec36410bdff42795e16ab7f5",
+    "xex_atr_frame_750_parity_sha256": "c32bc08f9a4547c44a24a00c1f851e96e2d4d9a28ee88ac9c8ec4af3422d6851",
     "passed": true
   },
   "semantics": {
@@ -1381,7 +1401,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-xex-a5-0-delayed",
@@ -1449,7 +1469,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-xex-a5-1-immediate",
@@ -1517,7 +1537,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-xex-a5-1-delayed",
@@ -1585,7 +1605,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-xex-a5-2-immediate",
@@ -1653,7 +1673,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-xex-a5-2-delayed",
@@ -1721,7 +1741,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-xex-5a-0-immediate",
@@ -1789,7 +1809,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-xex-5a-0-delayed",
@@ -1857,7 +1877,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-xex-5a-1-immediate",
@@ -1925,7 +1945,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-xex-5a-1-delayed",
@@ -1993,7 +2013,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-xex-5a-2-immediate",
@@ -2061,7 +2081,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-xex-5a-2-delayed",
@@ -2129,7 +2149,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-atr-a5-0-immediate",
@@ -2197,7 +2217,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-atr-a5-0-delayed",
@@ -2265,7 +2285,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-atr-a5-1-immediate",
@@ -2333,7 +2353,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-atr-a5-1-delayed",
@@ -2401,7 +2421,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-atr-a5-2-immediate",
@@ -2469,7 +2489,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-atr-a5-2-delayed",
@@ -2537,7 +2557,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-atr-5a-0-immediate",
@@ -2605,7 +2625,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-atr-5a-0-delayed",
@@ -2673,7 +2693,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "d24ab02c31aa2e632b9b57d7fd02dc5e1c335990b779ae21cabfc94c331f0355"
+          "screenshot_sequence_sha256": "cf62e4cf0ad6b7cf26f9e1dcf958ddf9181048454d7bdcc87b0c770f17f1c78e"
         },
         {
           "id": "engine-atr-5a-1-immediate",
@@ -2741,7 +2761,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-atr-5a-1-delayed",
@@ -2809,7 +2829,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "b873306f2b761aed719a5cb5def8fb5292fcf49cb0a0f486d83acdbc7ed6725a"
+          "screenshot_sequence_sha256": "e28a71ad366916454b35f59687263beee44a218ec745769755515bcb54e73fdf"
         },
         {
           "id": "engine-atr-5a-2-immediate",
@@ -2877,7 +2897,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-atr-5a-2-delayed",
@@ -2945,7 +2965,7 @@
             "address": 17311
           },
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         }
       ],
       "restart_sessions": [
@@ -2984,7 +3004,7 @@
             143
           ],
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         },
         {
           "id": "engine-restart-atr-a5",
@@ -3021,7 +3041,7 @@
             143
           ],
           "screenshots": 150,
-          "screenshot_sequence_sha256": "5e258d882fe429f7faf67d6b93cab32759100ccc7d33358b5310945d0cc70918"
+          "screenshot_sequence_sha256": "83d3cfa2c166834a0c3611115530b6123cce504987bd712f7926af7d21d9f094"
         }
       ],
       "evidence": {
@@ -3032,8 +3052,8 @@
           "columns": 8,
           "width": 2688,
           "height": 960,
-          "bytes": 19989,
-          "sha256": "43952c3a231ab1f43611cebaaa4be41fb6fd8eff7d89a2a4e9475c9be9e6ae59"
+          "bytes": 21189,
+          "sha256": "2bdfadc3c04c4fba346083e0ac74608aeea1b885e3008eac512501cf3c16a22f"
         },
         "two_cycles_contact": {
           "path": "build/runtime-wall-trace/capital-engines-two-cycles-contact.png",
@@ -3041,8 +3061,8 @@
           "columns": 8,
           "width": 2688,
           "height": 960,
-          "bytes": 31245,
-          "sha256": "e1c971d9a9e8c37519a7b11ce70887efafde8b4e2e76d6f7c6286bd9a239ff5c"
+          "bytes": 36113,
+          "sha256": "4d123b1920b967a46b0be4901b3d30eb9dc9acf5492d5f479c3755450956a9b4"
         },
         "compact_trace": {
           "path": "build/runtime-wall-trace/capital-engines-first-150.csv",
@@ -10367,8 +10387,8 @@
       },
       "screenshot": {
         "path": "build/runtime-wall-trace/weapon-pickup-static-atari800.png",
-        "bytes": 2254,
-        "sha256": "70d13567dcc3bef8c90f64b27eb0698fe4e6319e6f32f69f947c688b13cfd176",
+        "bytes": 2961,
+        "sha256": "4671b228d52ee2688d774f435cb81dd3f1fe647aabbe59fae6a8f14771719167",
         "capture_frame": 205,
         "capture_host_frame": 602,
         "capture_state": {
@@ -10859,8 +10879,8 @@
       },
       "screenshot": {
         "path": "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png",
-        "bytes": 2369,
-        "sha256": "abb3ec0a024f918d3a29f7c915d09b39873947c453930f75d5de0701bf8faee5",
+        "bytes": 3123,
+        "sha256": "5284f87bc652773d421cf97465e8d275b48cbcdfbee5d9f8827ef043ee4e715b",
         "capture_frame": 454,
         "capture_host_frame": 850,
         "capture_state": {

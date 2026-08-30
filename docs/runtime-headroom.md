@@ -2,7 +2,7 @@
 
 This is the current performance summary after the accepted PAL headroom
 recovery pass, the completed Spread Shot rebuild, Shield Booster, the H3.1
-frontend, and the data-only H4.1 gameplay art update. The local runtime includes
+frontend, and the data-only H4.2 C INDUSTRIAL gameplay art update. The local runtime includes
 distinct HULL plates, the full BOOST HUD field, and the multi-position TOP
 SCORES fix, plus fixed 2/5/7 difficulty-scaled player/debris damage.
 The machine-readable source is
@@ -14,6 +14,7 @@ the packed boot BIN, XEX, and ATR.
 | Measure | Current result | Current gate |
 | --- | ---: | ---: |
 | Initial boot block | 12,800 B / 100 sectors | dynamic BRCNT 1..255 |
+| Initial boot content | 12,714 B | 86 B sector-alignment envelope below `$5300` staging |
 | Extension chunks | 5,760 B / 45 sectors | dynamic, manifest-owned |
 | Total occupied transport | 18,560 B / 145 sectors | no preallocated empty sectors |
 | Additional loader capacity | 44,800 B | at least 8 KiB |
@@ -77,9 +78,9 @@ must not be added to the wall total.
 
 ## Artifact and cold-start evidence
 
-- Boot BIN: `c66375575ed3ab52a12f8cd7d6abb5c75f372b6df723e9ca72af050163f2aa1d`.
-- XEX: `baa6a691a6c08125dede8141afaf24e49759f5ecd7e7ed2f8bca485e6bf0ab13`.
-- ATR: `3eb3cc838626ea21376091e8d8b4a2a9661fda3143014c4133c318a50fe734b1`.
+- Boot BIN: `7ffcb1a2f39c14e3ee0f4723b6ac9e6ef4796702631745b6fcf6bdde8e3b9142`.
+- XEX: `dc24853d5be69c16d7e64666bab5cbbf76175fc8d4d931430bd1a5e6fb085647`.
+- ATR: `2521286c938d0284794bc4401053c3d473de0aa518c8ae6cb9f21ed495d35dab`.
 - XEX and ATR cold boots pass with `$A5` and `$5A` fills across
   `$8000-$9FFF`.
 - XEX and ATR each run two 3,000-frame integrity sessions, for 6,000 frames
@@ -147,9 +148,9 @@ difficulty: 91 frames on EASY, 82 on MEDIUM, and 74 on HARD. Combat coverage is
 kept in separate firing sessions. `five_heaviest_frames` is sorted across all
 legal replays and begins with the global maximum.
 
-The DMA-off CPU comparison is 20,063 cycles and the additive estimate is
-32,955 cycles; both remain diagnostics only. Physical acceptance uses the
-measured 32,072-cycle wall.
+The DMA-off CPU comparison is 20,032 cycles and the additive estimate is
+32,924 cycles; both remain diagnostics only. Physical acceptance uses the
+measured 32,040-cycle wall.
 
 The measurement is exact for the stated Atari800 version, not an electrical
 measurement of a physical Atari. Real-hardware validation remains required by

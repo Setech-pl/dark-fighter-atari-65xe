@@ -35,18 +35,18 @@ const streams = Object.freeze({
   viperEngine: [graphics.playerEngineShape, "26a5d7d4ba9160cf990bb447624e967ffbc25d0886033975f7d8ee1f32b8ad2b"],
   raiderBody: [raider.bodyRows, "4e279527cc4ced23b1448dfb113f519d104face22c32ceebc02065b13eb027b7"],
   raiderAccent: [raider.accentFrameBytes, "caa106f0badbe2daf954f467bf00ca4c293fb3a31da8a0b52dc80fba7be6d713"],
-  capitalGlyphs: [capital.glyphBytes, "b40be27f33320d00c25e6ccadf20efe2839c67e1cac5cc93a8362565e092bc51"],
+  capitalGlyphs: [capital.glyphBytes, "6327eae4b71454c9c6aa6e6c800db24b95cc6e107c5e9f75b580d229c6c83ce8"],
   fighterExplosionOuter: [weapons.sharedFighterExplosion.outerBytes, "92d51c739606133505205a5f43f984a6d81f6af59c8eb37d48727ec413e18dc9"],
   fighterExplosionCore: [weapons.sharedFighterExplosion.coreMasks, "61d520aa9d14c10342ec0c64c1066ea9f723ff07c3787130df59f3ccc7ecc888"],
 });
 
-test("production H4/H4.1 graphic streams match the owner-approved raw bytes", () => {
+test("production H4/H4.1/H4.2 graphic streams match the owner-approved raw bytes", () => {
   for (const [name, [bytes, expected]] of Object.entries(streams)) {
     assert.equal(sha256(bytes), expected, `${name} raw SHA-256 changed`);
   }
 });
 
-test("H4/H4.1 remains a 460-byte data-only replacement with fixed ownership", () => {
+test("H4/H4.1/H4.2 remains a 460-byte data-only replacement with fixed ownership", () => {
   assert.deepEqual(Object.fromEntries(Object.entries(streams).map(([name, [bytes]]) =>
     [name, bytes.length])), {
     debris: 64,
