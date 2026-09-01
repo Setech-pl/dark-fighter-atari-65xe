@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { readRuntimeBytes } from "../scripts/runtime-image.mjs";
+import { LOADER_DISPLAY_LIST_ADDRESS } from "../scripts/loader-assets.mjs";
 import {
   readFrontendGraphicsSource,
   readStartMenuRuntimeState,
@@ -386,6 +387,31 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
   assert.equal(constants.get("CAPITAL_HULL_RUNTIME_ENEMY"), 0x4d20);
   assert.equal(constants.get("CAPITAL_HULL_RUNTIME_END"), 0x4e40);
   assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_frontend_charset/);
+});
+
+test("OPTIONS persistent tables stay outside the loader display-list destination", () => {
+  const optionsStart = labels.get("options_persistent_tables_start");
+  const optionsEnd = labels.get("options_persistent_tables_end");
+  const difficultyStart = labels.get("difficulty_value_table");
+  const difficultyEnd = labels.get("difficulty_value_table_end");
+  const labelSources = labels.get("options_label_sources");
+  const loaderStart = LOADER_DISPLAY_LIST_ADDRESS;
+  const loaderEnd = loaderStart + 202;
+  const entityCode = /ENTITY_CODE\s+([0-9A-F]+)\s+([0-9A-F]+)\s+([0-9A-F]+)/i.exec(map);
+
+  assert.ok(entityCode, "missing persistent ENTITY_CODE linker range");
+  const entityCodeStart = Number.parseInt(entityCode[1], 16);
+  const entityCodeEnd = Number.parseInt(entityCode[2], 16) + 1;
+  assert.ok(optionsStart >= entityCodeStart && optionsEnd <= entityCodeEnd,
+    "OPTIONS tables must remain in resident read-only memory");
+  assert.equal(difficultyStart, optionsStart);
+  assert.equal(difficultyEnd - difficultyStart, 18);
+  assert.ok(labelSources >= difficultyEnd && labelSources < optionsEnd);
+  assert.ok(optionsStart >= labels.get("main_menu_display_list_end"));
+  assert.ok(optionsEnd <= labels.get("options_display_list"));
+  assert.equal(optionsEnd <= loaderStart || optionsStart >= loaderEnd, true,
+    `OPTIONS tables $${optionsStart.toString(16)}-$${(optionsEnd - 1).toString(16)} ` +
+    `overlap loader DLIST $${loaderStart.toString(16)}-$${(loaderEnd - 1).toString(16)}`);
 });
 
 test("mixed display list, screen offsets, title, menu, and hint are bounded", () => {

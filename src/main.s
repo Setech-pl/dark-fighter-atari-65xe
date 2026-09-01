@@ -6584,6 +6584,37 @@ main_menu_display_list_jvb:
     .word main_menu_display_list
 main_menu_display_list_end:
 
+; OPTIONS reads these sources after the loader has permanently expanded its
+; display list at $3800-$38C9. The existing read-only alignment gap before the
+; OPTIONS display list keeps this complete overwritten subset resident without
+; moving any frontend entry point or consuming another runtime reservation.
+    .byte $00                    ; retain the reviewed packed transport size
+options_persistent_tables_start:
+difficulty_value_table:
+    .byte CH_FRONT_SPACE,CH_FRONT_SPACE,CH_FRONT_A+4|ANTIC67_COLOR_PF1
+    .byte CH_FRONT_A|ANTIC67_COLOR_PF1,CH_FRONT_A+18|ANTIC67_COLOR_PF1,CH_FRONT_A+24|ANTIC67_COLOR_PF1
+    .byte CH_FRONT_A+12|ANTIC67_COLOR_PF1,CH_FRONT_A+4|ANTIC67_COLOR_PF1
+    .byte CH_FRONT_A+3|ANTIC67_COLOR_PF1,CH_FRONT_A+8|ANTIC67_COLOR_PF1
+    .byte CH_FRONT_A+20|ANTIC67_COLOR_PF1,CH_FRONT_A+12|ANTIC67_COLOR_PF1
+    .byte CH_FRONT_SPACE,CH_FRONT_SPACE,CH_FRONT_A+7|ANTIC67_COLOR_PF1
+    .byte CH_FRONT_A|ANTIC67_COLOR_PF1,CH_FRONT_A+17|ANTIC67_COLOR_PF1,CH_FRONT_A+3|ANTIC67_COLOR_PF1
+difficulty_value_table_end:
+
+options_label_sources:
+    .word option_label_sound,option_label_music,option_label_difficulty,option_label_back
+
+option_label_sound:
+    .byte CH_FRONT_A+18,CH_FRONT_A+14,CH_FRONT_A+20,CH_FRONT_A+13,CH_FRONT_A+3,0
+option_label_music:
+    .byte CH_FRONT_A+6,CH_FRONT_A,CH_FRONT_A+12,CH_FRONT_A+4,CH_FRONT_GAP
+    .byte CH_FRONT_A+12,CH_FRONT_A+20,CH_FRONT_A+18,CH_FRONT_A+8,CH_FRONT_A+2,0
+option_label_difficulty:
+    .byte CH_FRONT_A+3,CH_FRONT_A+8,CH_FRONT_A+5,CH_FRONT_A+5,CH_FRONT_A+8
+    .byte CH_FRONT_A+2,CH_FRONT_A+20,CH_FRONT_A+11,CH_FRONT_A+19,CH_FRONT_A+24,0
+options_persistent_tables_end:
+
+    .assert options_persistent_tables_end <= $9500, error, "OPTIONS tables exceed persistent frontend RODATA gap"
+
 .align $100
 options_display_list:
     .byte $70,$70,$70,$47,<SCREEN,>SCREEN,$70
@@ -6909,15 +6940,6 @@ top_score_row_template:
     .byte CH_FRONT_ZERO,CH_FRONT_ZERO,CH_FRONT_ZERO
     .byte CH_FRONT_SPACE,CH_FRONT_SPACE,CH_FRONT_SPACE
 
-difficulty_value_table:
-    .byte CH_FRONT_SPACE,CH_FRONT_SPACE,CH_FRONT_A+4|ANTIC67_COLOR_PF1
-    .byte CH_FRONT_A|ANTIC67_COLOR_PF1,CH_FRONT_A+18|ANTIC67_COLOR_PF1,CH_FRONT_A+24|ANTIC67_COLOR_PF1
-    .byte CH_FRONT_A+12|ANTIC67_COLOR_PF1,CH_FRONT_A+4|ANTIC67_COLOR_PF1
-    .byte CH_FRONT_A+3|ANTIC67_COLOR_PF1,CH_FRONT_A+8|ANTIC67_COLOR_PF1
-    .byte CH_FRONT_A+20|ANTIC67_COLOR_PF1,CH_FRONT_A+12|ANTIC67_COLOR_PF1
-    .byte CH_FRONT_SPACE,CH_FRONT_SPACE,CH_FRONT_A+7|ANTIC67_COLOR_PF1
-    .byte CH_FRONT_A|ANTIC67_COLOR_PF1,CH_FRONT_A+17|ANTIC67_COLOR_PF1,CH_FRONT_A+3|ANTIC67_COLOR_PF1
-
 ; Fixed HULL units derived from MAX HULL=10. Player/debris contact indexes
 ; this table once; no runtime percentage calculation or persistent state exists.
 debris_contact_damage_by_difficulty:
@@ -6928,20 +6950,6 @@ debris_contact_damage_by_difficulty:
 options_label_destinations:
     .word SCREEN+OPTIONS_SOUND_OFFSET+1,SCREEN+OPTIONS_MUSIC_OFFSET+1
     .word SCREEN+OPTIONS_DIFFICULTY_OFFSET+1,SCREEN+OPTIONS_BACK_OFFSET+1
-
-.segment "RODATA"
-
-options_label_sources:
-    .word option_label_sound,option_label_music,option_label_difficulty,option_label_back
-
-option_label_sound:
-    .byte CH_FRONT_A+18,CH_FRONT_A+14,CH_FRONT_A+20,CH_FRONT_A+13,CH_FRONT_A+3,0
-option_label_music:
-    .byte CH_FRONT_A+6,CH_FRONT_A,CH_FRONT_A+12,CH_FRONT_A+4,CH_FRONT_GAP
-    .byte CH_FRONT_A+12,CH_FRONT_A+20,CH_FRONT_A+18,CH_FRONT_A+8,CH_FRONT_A+2,0
-option_label_difficulty:
-    .byte CH_FRONT_A+3,CH_FRONT_A+8,CH_FRONT_A+5,CH_FRONT_A+5,CH_FRONT_A+8
-    .byte CH_FRONT_A+2,CH_FRONT_A+20,CH_FRONT_A+11,CH_FRONT_A+19,CH_FRONT_A+24,0
 
 .segment "BROADSIDE"
 
