@@ -87,15 +87,18 @@ and bright phases, each lasting eight active frames.
 
 Difficulty changes the measured vertical rates:
 
-| Difficulty | World and hull | Near stars | Far stars | Debris |
-| --- | ---: | ---: | ---: | ---: |
-| Easy | 20 rows/s | 10 rows/s | 5 rows/s | 12 rows/s |
-| Medium | 22.5 rows/s | 11.25 rows/s | 5.625 rows/s | 13.5 rows/s |
-| Hard | 25 rows/s | 12.5 rows/s | 6.25 rows/s | 15 rows/s |
+| Difficulty | World/scene and hull | Far stars | Debris |
+| --- | ---: | ---: | ---: |
+| Easy | 20 rows/s | 5 rows/s | 12 rows/s |
+| Medium | 22.5 rows/s | 5.625 rows/s | 13.5 rows/s |
+| Hard | 25 rows/s | 6.25 rows/s | 15 rows/s |
 
 Broadside warnings, launch flashes, heavy projectiles, hull contact, and
 capital explosions are implemented. World, stars, debris, and both hulls keep
-their relative rates through sector transitions.
+their relative rates through sector transitions. Once the last capital row has
+left the screen, the ordinary full-width background still advances at the
+listed world rate. Far-star overlays retain their 25% logical parallax step;
+no capital lifecycle state changes the physical scene cadence.
 
 ## Implemented boosters
 
@@ -162,6 +165,37 @@ SFX. The steel-blue/white capsule has a black shield symbol. Its continuous HUD
 bar uses a dense cross-core pattern and exact thresholds 188, 126, and 63; the
 last segment uses the shared timer's 8+8 blink phase. A solid steel/white Viper
 colour pulse is derived from the same timer and never makes the craft disappear.
+
+## Encounter Director Level 1
+
+The production Hybrid Encounter Director advances from world rows rather than
+wall-clock time. Level 1 is exactly 3,712 rows with contiguous, end-exclusive
+phase boundaries:
+
+| Phase | World rows | EASY time | MEDIUM time | HARD time |
+| --- | ---: | ---: | ---: | ---: |
+| Intro | 0-128 | 0.0-6.4 s | 0.0-5.7 s | 0.0-5.1 s |
+| Raider training | 128-576 | 6.4-28.8 s | 5.7-25.6 s | 5.1-23.0 s |
+| Debris field | 576-1056 | 28.8-52.8 s | 25.6-46.9 s | 23.0-42.2 s |
+| Mixed pressure | 1056-1664 | 52.8-83.2 s | 46.9-74.0 s | 42.2-66.6 s |
+| Recovery | 1664-1856 | 83.2-92.8 s | 74.0-82.5 s | 66.6-74.2 s |
+| Capital/broadside escalation | 1856-2752 | 92.8-137.6 s | 82.5-122.3 s | 74.2-110.1 s |
+| Recovery | 2752-2944 | 137.6-147.2 s | 122.3-130.8 s | 110.1-117.8 s |
+| Final approach | 2944-3712 | 147.2-185.6 s | 130.8-165.0 s | 117.8-148.5 s |
+
+The intensity budgets are 3/4/5 for EASY/MEDIUM/HARD. The Director has a
+private deterministic RNG and does not consume the game's existing random
+state. It owns admission policy and budgets while the existing Raider, debris,
+broadside, pickup, object-pool, and destruction lifecycles retain object
+ownership. With no boss consumer, `BOSS_HANDOFF` closes admissions and pickup
+state, enters DRAIN, lets active objects expire, and emits exactly one
+`LEVEL COMPLETE`; it never creates a boss.
+
+The Layout D.2 behavioral correction makes BROADSIDE admission transactional:
+failed pool or muzzle attempts leave intensity unchanged, a committed projectile
+charges exactly two units, and its lifecycle releases exactly two. Natural
+final-approach handoff from post-capital OPEN enters DRAIN, preserves active
+objects until their normal cleanup, and leaves the single COMPLETE state terminal.
 
 ## Planned
 

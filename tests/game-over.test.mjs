@@ -118,7 +118,7 @@ test("LIFE saturates at zero and dead-state damage cannot consume it again", () 
 test("GAME OVER leaves the gameplay loop before control, combat, spawn, and scoring", () => {
   const mainLoop = block("main_loop", "wait_frame");
   assert.match(mainLoop,
-    /jsr update_player_death\s+bcc main_loop_lifecycle_ready\s+jsr clear_pmg\s+jsr silence_audio\s+jsr enter_game_over\s+jmp frontend_loop/);
+    /jsr integration_update_player_death\s+bcc main_loop_lifecycle_ready\s+jsr clear_pmg\s+jsr silence_audio\s+jsr enter_game_over\s+jmp frontend_loop/);
   assert.ok(mainLoop.indexOf("jmp frontend_loop") <
     mainLoop.indexOf("main_loop_lifecycle_ready = *"));
 

@@ -104,10 +104,19 @@ function initialiseRuntime(root, artifact, coldFill = 0) {
   if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   for (const routine of [
     "stage_boot_streams", "unpack_resident_runtime",
-    "unpack_entity_runtime", "init_entity_effects", "stage_a2_kernel",
+    "unpack_entity_runtime", "stage_a2_kernel", "init_entity_effects",
     "unpack_starfield_runtime", "copy_charset", "copy_hud_charset", "init_fighter_projectiles",
     "install_entity_effects_glyph",
   ]) runRoutine(memory, labels, routine);
+  const glue = fs.readFileSync(path.join(root, "build", "integration-glue.bin"));
+  memory.set(glue, manifest.integrationGlue.finalAddress);
+  memory.fill(0, 0x80f4, 0x8100);
+  memory[0x80fb] = 0x6d;
+  memory[0x80fc] = 0xff;
+  memory[0x80f6] = 3; // mixed-pressure policy admits all existing hazard types
+  memory[0x80f9] = 0;
+  memory[0x80fa] = 0;
+  memory[0x80ff] = 0xff;
   initialiseRows(memory, labels);
   memory.fill(0, 0x3800, 0x4400);
   memory[requiredLabel(labels, "ENTITY_SPAWN_TIMER_LO")] = 0xff;
@@ -1148,7 +1157,15 @@ function viperProjectileSnapshot(memory, labels, fields = {}) {
 }
 
 function advanceWeaponPickupToActive(memory, labels, frames = []) {
+  // This focused pickup harness begins at a scheduler-approved reveal window.
+  // The production director owns these gates; leaving the reaction window from
+  // the preceding admission live would test policy cadence instead of the
+  // capsule lifecycle asserted by the legacy trace.
+  memory[0x80f9] = 0;
+  memory[0x80fa] = 0;
+  memory[0x80ff] = (memory[requiredLabel(labels, "frame_counter")] - 1) & 0xff;
   for (let frame = 0; frame <= 30; frame += 1) {
+    memory[requiredLabel(labels, "frame_counter")] += 1;
     runRoutine(memory, labels, "entity_effects_erase");
     memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = 0;
     runRoutine(memory, labels, "entity_effects_update");
@@ -1164,6 +1181,7 @@ function collectVisibleWeaponPickup(memory, labels) {
   memory[requiredLabel(labels, "player_y")] =
     memory[requiredLabel(labels, "ENTITY_Y") + slot];
   memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = 0;
+  memory[requiredLabel(labels, "frame_counter")] += 1;
   runRoutine(memory, labels, "entity_effects_update");
   memory[requiredLabel(labels, "player_x")] = 196;
   memory[requiredLabel(labels, "player_y")] = 184;
@@ -1180,6 +1198,7 @@ export function executeSpreadShotTrace({
   const triggerDrop = (cycle) => {
     for (let kill = 1; kill <= 3; kill += 1) {
       const result = killRaiderWithViper(memory, labels);
+      memory[requiredLabel(labels, "frame_counter")] += 1;
       memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = 0;
       runRoutine(memory, labels, "entity_effects_update");
       killRecords.push(pickupSnapshot(memory, labels, manifest, {
@@ -1208,6 +1227,7 @@ export function executeSpreadShotTrace({
   const spreadCapsuleFrames = [];
   let capsuleHead = head;
   for (let frame = 0; frame < 8; frame += 1) {
+    memory[requiredLabel(labels, "frame_counter")] += 1;
     runRoutine(memory, labels, "entity_effects_erase");
     const nearRowAdvanced = frame % 2;
     if (nearRowAdvanced) {

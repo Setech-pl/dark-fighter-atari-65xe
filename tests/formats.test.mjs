@@ -30,14 +30,16 @@ test("XEX contains a payload segment and RUNAD", () => {
   const { manifest } = validateBuildDirectory(rootDirectory);
   const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
   const { segments } = parseXex(xex);
-  assert.equal(segments.length, 3);
+  assert.equal(segments.length, 5);
   assert.equal(segments[0].start, 0x2000);
   assert.equal(segments[0].data.length, manifest.transportCapacity.initialBootBytes);
   assert.deepEqual([segments[1].start, segments[1].end],
     [manifest.broadsideRuntime.runAddress,
       manifest.broadsideRuntime.runAddress + manifest.broadsideRuntime.bytes - 1]);
-  assert.deepEqual([segments[2].start, segments[2].end], [0x02e0, 0x02e1]);
-  assert.equal(segments[2].data.readUInt16LE(0),
+  assert.deepEqual([segments[2].start, segments[2].end], [0x5259, 0x527f]);
+  assert.deepEqual([segments[3].start, segments[3].end], [0x9d75, 0x9ff9]);
+  assert.deepEqual([segments[4].start, segments[4].end], [0x02e0, 0x02e1]);
+  assert.equal(segments[4].data.readUInt16LE(0),
     manifest.transportCapacity.stage2.xexEntryAddress);
 });
 
@@ -53,9 +55,9 @@ test("ATR uses standard single-density geometry", () => {
   assert.equal(parsed.body.subarray(
     manifest.bootPayloadTrailer.address - manifest.loadAddress,
     manifest.bootPayloadTrailer.address - manifest.loadAddress + 4).toString("ascii"), "DFB1");
-  const chunk = manifest.broadsideRuntime.externalChunk;
-  assert.equal(chunk.startSector, parsed.boot.sectorCount + 1);
-  assert.equal(chunk.startSector + chunk.sectors - 1,
+  const chunks = manifest.transportCapacity.manifest.parsed.records;
+  assert.equal(chunks[0].startSector, parsed.boot.sectorCount + 1);
+  assert.equal(chunks.at(-1).startSector + chunks.at(-1).sectorCount - 1,
     manifest.transportCapacity.totalTransportSectors);
 });
 
@@ -79,7 +81,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     layout.suffixRawBytes - layout.suffixPackedBytes,
   ], [8192, 449, layout.suffixRawBytes, layout.suffixPackedBytes,
     layout.suffixRawBytes - layout.suffixPackedBytes]);
-  assert.ok(layout.suffixRawBytes - layout.suffixPackedBytes >= 1100);
+  assert.equal(layout.suffixRawBytes - layout.suffixPackedBytes, 1085);
   assert.deepEqual(unpackBroadsideLzss(packed), suffix);
   assert.deepEqual(resident.subarray(layout.prefixBytes), suffix);
   assert.deepEqual(
@@ -88,6 +90,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     packed,
   );
   assert.equal(reserve.recoveredReserveBytes, 1097);
+  assert.equal(reserve.residentSuffixGrossSavingsBytes, 1085);
   assert.equal(reserve.minimumRecoveredReserveBytes, 1024);
   assert.ok(reserve.reserveBytes >= 64);
   assert.deepEqual(manifest.payloadBudget.weaponPickupRapidFire, {
@@ -127,7 +130,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     manifest.broadsideRuntime.runAddress,
     manifest.entityEffects.sourceToStagingMarginBytes,
     manifest.entityEffects.stagingToBroadsideMarginBytes,
-  ], [0x51a6, 0x5300, 0x5cef, 0x5e10, 346, 289]);
+  ], [0x5255, 0x5300, 0x5cf1, 0x5e10, 171, 287]);
 
   const lifecycle = manifest.entityEffects.stagingLifecycle;
   assert.equal(lifecycle.stagingReleasedBeforeStarfieldExpansion, true);
@@ -137,7 +140,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     lifecycle.starfieldDestinationOverlapStartAddress,
     lifecycle.starfieldDestinationOverlapEndExclusive,
     lifecycle.starfieldDestinationOverlapBytes,
-  ], [0x552a, 0x5de2, 0x552a, 0x5cef, 1989]);
+  ], [0x552a, 0x5df1, 0x552a, 0x5cf1, 1991]);
   assert.match(source,
     /jsr stage_boot_streams[\s\S]+jsr unpack_resident_runtime\s+jsr unpack_entity_runtime[\s\S]+jsr unpack_loader_bitmap\s+jsr show_loader\s+jsr unpack_starfield_runtime/,
     "ENTITY_CODE staging must be consumed before loader/starfield destinations overwrite it");

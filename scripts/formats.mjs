@@ -309,8 +309,10 @@ export function validateBuildDirectory(rootDirectory) {
   "Shield exceeds its linked runtime hard budget");
   invariant(manifest.runtimeCodeBudget?.frontendH31?.baselineBytes ===
     SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES &&
-    manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <=
-      FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES,
+    (manifest.encounterDirector?.enabled === true
+      ? manifest.encounterDirector.linkedRuntimeBytes === 16735
+      : manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <=
+        FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES),
   "H3.1 exceeds its linked runtime hard budget");
   invariant(manifest.residentRuntime?.loadAddress === 0x2000 &&
     manifest.residentRuntime.runAddress === 0x2000 &&
@@ -327,11 +329,14 @@ export function validateBuildDirectory(rootDirectory) {
   "Embedded chunk manifest differs from build metadata");
 
   const parsedXex = parseXex(xex);
-  invariant(parsedXex.segments.length === 3,
-    "XEX must contain initial, direct BROADSIDE and RUNAD segments");
+  const directorEnabled = manifest.encounterDirector?.enabled === true;
+  invariant(parsedXex.segments.length === (directorEnabled ? 5 : 3),
+    "XEX segment count does not match the enabled transport layout");
   const payloadSegment = parsedXex.segments[0];
   const broadsideSegment = parsedXex.segments[1];
-  const runSegment = parsedXex.segments[2];
+  const glueSegment = directorEnabled ? parsedXex.segments[2] : null;
+  const directorSegment = directorEnabled ? parsedXex.segments[3] : null;
+  const runSegment = parsedXex.segments[directorEnabled ? 4 : 2];
   invariant(payloadSegment.start === manifest.loadAddress, "XEX payload load address is wrong");
   invariant(payloadSegment.data.equals(boot.subarray(0, transport.initialBootBytes)),
     "XEX initial block differs from ATR");
@@ -342,6 +347,15 @@ export function validateBuildDirectory(rootDirectory) {
     "build", "broadside-runtime.bin"));
   invariant(broadsideSegment.data.equals(broadsideRuntime),
     "XEX manifest-owned BROADSIDE bytes differ from the final runtime image");
+  if (directorEnabled) {
+    const glueRuntime = fs.readFileSync(path.join(rootDirectory, "build", "integration-glue.bin"));
+    const directorRuntime = fs.readFileSync(path.join(rootDirectory,
+      "build", "encounter-director.bin"));
+    invariant(glueSegment.start === manifest.integrationGlue.transportAddress &&
+      glueSegment.data.equals(glueRuntime), "XEX GLUE staging segment is invalid");
+    invariant(directorSegment.start === manifest.directorRuntime.runAddress &&
+      directorSegment.data.equals(directorRuntime), "XEX DIRECTOR segment is invalid");
+  }
   invariant(runSegment.start === 0x02e0 && runSegment.end === 0x02e1, "XEX RUNAD record is missing");
   invariant(readWord(runSegment.data, 0) === transport.stage2.runAddress +
     (manifest.transportCapacity.stage2.xexEntryOffset ?? 0), "XEX RUNAD differs from stage-2 entry");

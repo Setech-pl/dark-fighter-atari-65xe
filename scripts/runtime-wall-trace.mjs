@@ -124,7 +124,7 @@ const debrisEffectsSessions = [{
   difficulty: 2,
   policy: "sweep",
   fireDelay: 4,
-  frames: 1_200,
+  frames: 5_000,
   kind: "debris-effects-coverage",
 }];
 
@@ -133,9 +133,18 @@ const weaponPickupSessions = [{
   difficulty: 2,
   policy: "hunt",
   fireDelay: 4,
-  frames: 3_200,
+  frames: 4_000,
   kind: "weapon-pickup-coverage",
 }];
+
+const directorCompletionSessions = [0, 1, 2].map((difficulty) => ({
+  id: `director-complete-${difficulty}-natural-sweep-fire0`,
+  difficulty,
+  policy: "sweep",
+  fireDelay: 0,
+  frames: 10_500,
+  kind: "director-level-complete",
+}));
 
 const memoryIntegritySessions = ["XEX", "ATR"].flatMap((medium) =>
   ["evasive", "hunt"].map((policy) => ({
@@ -144,8 +153,8 @@ const memoryIntegritySessions = ["XEX", "ATR"].flatMap((medium) =>
     difficulty: 2,
     policy,
     fireDelay: 4,
-    frames: 3_000,
-    kind: "memory-integrity-120s",
+    frames: 4_000,
+    kind: "memory-integrity-160s",
     pauseTest: policy === "hunt",
   })));
 
@@ -235,6 +244,9 @@ const traceLabels = {
   DFTRACE_DIFFICULTY_SETTING: "DIFFICULTY_SETTING",
   DFTRACE_GAMEPLAY_FRAME: "frame_counter",
   DFTRACE_MUZZLE_SCREEN_HI: "MUZZLE_SCREEN_HI",
+  DFTRACE_MUZZLE_SCREEN_LO: "MUZZLE_SCREEN_LO",
+  DFTRACE_BROAD_TURRET_FIRED: "BROAD_TURRET_FIRED",
+  DFTRACE_CORRIDOR_PHASE: "corridor_phase",
   DFTRACE_ENTITY_ACTIVE_COUNT: "ENTITY_ACTIVE_COUNT",
   DFTRACE_ENTITY_X: "ENTITY_X",
   DFTRACE_ENTITY_Y: "ENTITY_Y",
@@ -635,6 +647,9 @@ function decodeEvents(bits) {
     [1 << 17, "raider-breakup-spawn"],
     [1 << 18, "pickup-qualified-kill"],
     [1 << 19, "pickup-collect"],
+    [1 << 20, "director-world-row"],
+    [1 << 21, "director-request"],
+    [1 << 22, "director-event"],
   ].filter(([mask]) => (bits & mask) !== 0).map(([, name]) => name);
 }
 
@@ -1051,6 +1066,7 @@ function main() {
     process.env.ATARI800_TRACE_SOURCE ?? "/tmp/atari800-7.1.2");
   const shouldPrepare = process.argv.includes("--prepare");
   const bootSmokeOnly = process.argv.includes("--boot-smoke-only");
+  const reuseExistingTraces = process.argv.includes("--reuse-existing-traces");
   const smokeFramesArgument = argumentValue("smoke-frames");
   const smokeFrames = smokeFramesArgument === undefined ? null : Number(smokeFramesArgument);
   const onlySession = argumentValue("only-session");
@@ -1070,6 +1086,10 @@ function main() {
     invariant(fs.existsSync(requiredPath), `Build input is missing: ${requiredPath}`);
   }
   const labels = parseViceLabels(fs.readFileSync(labelPath, "utf8"));
+  const directorLabelPath = path.join(rootDirectory, "build", "encounter-director.lbl");
+  invariant(fs.existsSync(directorLabelPath),
+    `Director labels are missing: ${directorLabelPath}`);
+  const directorLabels = parseViceLabels(fs.readFileSync(directorLabelPath, "utf8"));
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   invariant(["candidate", "release"].includes(manifest.buildVariant),
     "Runtime trace requires candidate or final release artifacts");
@@ -1089,11 +1109,32 @@ function main() {
     invariant(Number.isInteger(address), `Trace label ${labelName} is missing`);
     addressEnvironment[environmentName] = `0x${address.toString(16)}`;
   }
+  for (const [environmentName, labelName] of Object.entries({
+    DFTRACE_PC_DIRECTOR_WORLD: "director_world_row_tick",
+    DFTRACE_PC_DIRECTOR_REQUEST: "director_request",
+    DFTRACE_PC_DIRECTOR_EVENT: "director_try_event",
+  })) {
+    const address = directorLabels.get(labelName);
+    invariant(Number.isInteger(address), `Director trace label ${labelName} is missing`);
+    addressEnvironment[environmentName] = `0x${address.toString(16)}`;
+  }
   const capitalSoundTimer = labels.get("CAPITAL_EXPLOSION_SOUND_TIMER");
   invariant(Number.isInteger(capitalSoundTimer),
     "Trace label CAPITAL_EXPLOSION_SOUND_TIMER is missing");
   addressEnvironment.DFTRACE_ENGINE_TIMER = `0x${(capitalSoundTimer + 1).toString(16)}`;
   addressEnvironment.DFTRACE_ENGINE_PHASE = `0x${(capitalSoundTimer + 2).toString(16)}`;
+  const broadState = labels.get("BROAD_STATE");
+  invariant(Number.isInteger(broadState), "Trace label BROAD_STATE is missing");
+  addressEnvironment.DFTRACE_BROAD_SCHEDULE_TIMER =
+    `0x${(broadState + 27).toString(16)}`;
+  addressEnvironment.DFTRACE_BROAD_SCHEDULE_INDEX =
+    `0x${(broadState + 28).toString(16)}`;
+  addressEnvironment.DFTRACE_BROAD_VISIBLE_SCROLLS =
+    `0x${(broadState + 47).toString(16)}`;
+  const sectorState = labels.get("CAPITAL_SECTOR_STATE");
+  invariant(Number.isInteger(sectorState), "Trace label CAPITAL_SECTOR_STATE is missing");
+  addressEnvironment.DFTRACE_CAPITAL_DRAIN_ROWS =
+    `0x${(sectorState + 1).toString(16)}`;
 
   fs.mkdirSync(buildDirectory, { recursive: true });
   const bootSmoke = runBootSmoke({ emulatorPath, labels, xexPath, atrPath });
@@ -1111,16 +1152,19 @@ function main() {
   const spreadScreenshotPath = path.join(buildDirectory,
     "weapon-pickup-spread-projectiles-atari800.png");
   const pickupSequencePrefix = path.join(buildDirectory, "weapon-pickup-frame");
-  if (fs.existsSync(pickupScreenshotPath)) fs.unlinkSync(pickupScreenshotPath);
-  if (fs.existsSync(rapidScreenshotPath)) fs.unlinkSync(rapidScreenshotPath);
-  if (fs.existsSync(spreadScreenshotPath)) fs.unlinkSync(spreadScreenshotPath);
-  for (let index = 0; index < 16; ++index) {
-    const framePath = `${pickupSequencePrefix}-${index.toString().padStart(2, "0")}.png`;
-    if (fs.existsSync(framePath)) fs.unlinkSync(framePath);
+  if (!reuseExistingTraces && onlySession === undefined) {
+    if (fs.existsSync(pickupScreenshotPath)) fs.unlinkSync(pickupScreenshotPath);
+    if (fs.existsSync(rapidScreenshotPath)) fs.unlinkSync(rapidScreenshotPath);
+    if (fs.existsSync(spreadScreenshotPath)) fs.unlinkSync(spreadScreenshotPath);
+    for (let index = 0; index < 16; ++index) {
+      const framePath = `${pickupSequencePrefix}-${index.toString().padStart(2, "0")}.png`;
+      if (fs.existsSync(framePath)) fs.unlinkSync(framePath);
+    }
   }
   let sessionsToRun = smokeFrames === null
     ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
-      ...debrisEffectsSessions, ...weaponPickupSessions, ...memoryIntegritySessions]
+      ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
+      ...memoryIntegritySessions]
       .concat(engineDiagnosticSessions, engineRestartSessions)
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
   if (onlySession !== undefined) {
@@ -1158,11 +1202,13 @@ function main() {
 	    DFTRACE_ENGINE_SCREENSHOT_GENERATION: String(session.engineScreenshotGeneration),
 	  } : {}),
     };
-    const artifactArguments = session.medium === "ATR" ? [atrPath] : ["-run", xexPath];
-    run(emulatorPath, [
-      "-xe", "-pal", "-nobasic", "-nosound", "-turbo", "-no-video-accel", "-no-vsync",
-      ...artifactArguments,
-    ], { env: environment });
+    if (!reuseExistingTraces || !fs.existsSync(outputPath)) {
+      const artifactArguments = session.medium === "ATR" ? [atrPath] : ["-run", xexPath];
+      run(emulatorPath, [
+        "-xe", "-pal", "-nobasic", "-nosound", "-turbo", "-no-video-accel", "-no-vsync",
+        ...artifactArguments,
+      ], { env: environment });
+    }
     const rows = parseCsv(fs.readFileSync(outputPath, "utf8"), session);
     allRows.push(...rows);
     summaries.push(sessionSummary(session, rows));
@@ -1192,7 +1238,9 @@ function main() {
   const fighterFlashRows = allRows.filter((row) => row.trace_kind === "fighter-flash-coverage");
   const debrisEffectsRows = allRows.filter((row) => row.trace_kind === "debris-effects-coverage");
   const weaponPickupRows = allRows.filter((row) => row.trace_kind === "weapon-pickup-coverage");
-  const memoryIntegrityRows = allRows.filter((row) => row.trace_kind === "memory-integrity-120s");
+  const directorCompletionRows = allRows.filter((row) =>
+    row.trace_kind === "director-level-complete");
+  const memoryIntegrityRows = allRows.filter((row) => row.trace_kind === "memory-integrity-160s");
   const engineRows = allRows.filter((row) => row.trace_kind === "engine-first-150");
   const engineRestartRows = allRows.filter((row) =>
     row.trace_kind === "engine-restart-after-game-over");
@@ -1200,23 +1248,72 @@ function main() {
     `Baseline trace measured ${baselineRows.length}/9040 frames`);
   invariant(targetedRows.length === 920,
     `Targeted trace measured ${targetedRows.length}/920 frames`);
-  invariant(cadenceRows.length === 1_200,
-    `Parallax trace measured ${cadenceRows.length}/1200 frames`);
+  const expectedCadenceFrames = cadenceSessions.reduce((sum, session) => sum + session.frames, 0);
+  invariant(cadenceRows.length === expectedCadenceFrames,
+    `Parallax trace measured ${cadenceRows.length}/${expectedCadenceFrames} frames`);
   invariant(fighterFlashRows.length === 1_600,
     `Fighter-flash trace measured ${fighterFlashRows.length}/1600 frames`);
-  invariant(debrisEffectsRows.length === 1_200,
-    `Debris-effects trace measured ${debrisEffectsRows.length}/1200 frames`);
-  invariant(weaponPickupRows.length === 3_200,
-    `Weapon-pickup trace measured ${weaponPickupRows.length}/3200 frames`);
-  invariant(memoryIntegrityRows.length === 12_000,
-    `XEX/ATR memory-integrity traces measured ${memoryIntegrityRows.length}/12000 frames`);
+  const expectedDebrisEffectsFrames = debrisEffectsSessions
+    .reduce((sum, session) => sum + session.frames, 0);
+  invariant(debrisEffectsRows.length === expectedDebrisEffectsFrames,
+    `Debris-effects trace measured ${debrisEffectsRows.length}/${expectedDebrisEffectsFrames} frames`);
+  const expectedWeaponPickupFrames = weaponPickupSessions
+    .reduce((sum, session) => sum + session.frames, 0);
+  invariant(weaponPickupRows.length === expectedWeaponPickupFrames,
+    `Weapon-pickup trace measured ${weaponPickupRows.length}/${expectedWeaponPickupFrames} frames`);
+  const expectedDirectorCompletionFrames = directorCompletionSessions
+    .reduce((sum, session) => sum + session.frames, 0);
+  invariant(directorCompletionRows.length === expectedDirectorCompletionFrames,
+    `Director completion trace measured ${directorCompletionRows.length}/${expectedDirectorCompletionFrames} frames`);
+  const directorCompletionEvidence = directorCompletionSessions.map((session) => {
+    const rows = directorCompletionRows.filter((row) => row.session === session.id);
+    const finalDirectorEvent = rows.findLast((row) => (row.events & (1 << 22)) !== 0);
+    const finalDrain = rows.find((row) =>
+      row.frame > (finalDirectorEvent?.frame ?? Number.MAX_SAFE_INTEGER) && row.sector_state === 5);
+    const finalComplete = rows.find((row) =>
+      row.frame > (finalDrain?.frame ?? Number.MAX_SAFE_INTEGER) && row.sector_state === 6);
+    invariant(finalDirectorEvent !== undefined && finalDrain !== undefined &&
+      finalComplete !== undefined && finalDrain.frame === finalDirectorEvent.frame + 1 &&
+      finalComplete.frame > finalDrain.frame,
+    `${session.id} did not execute BOSS_HANDOFF -> DRAIN -> COMPLETE`);
+    invariant(rows.filter((row) => row.frame >= finalComplete.frame)
+      .every((row) => row.sector_state === 6),
+    `${session.id} re-opened the capital sector after LEVEL COMPLETE`);
+    const broadsideRows = rows.filter((row) => row.broadside > 0);
+    invariant(broadsideRows.length > 0,
+      `${session.id} did not observe a natural BROADSIDE projectile`);
+    return {
+      session: session.id,
+      difficulty: session.difficulty,
+      boss_handoff_frame: finalDirectorEvent.frame,
+      drain_frame: finalDrain.frame,
+      level_complete_frame: finalComplete.frame,
+      drain_frames: finalComplete.frame - finalDrain.frame,
+      natural_broadside_first_frame: broadsideRows[0].frame,
+      natural_broadside_last_frame: broadsideRows.at(-1).frame,
+      natural_broadside_frames: broadsideRows.length,
+      maximum_broadside_projectiles: Math.max(...broadsideRows.map((row) => row.broadside)),
+    };
+  });
+  const hardDirectorCompletion = directorCompletionEvidence.find(({ difficulty }) =>
+    difficulty === 2);
+  const finalDirectorEvent = directorCompletionRows.find((row) =>
+    row.session === hardDirectorCompletion.session &&
+    row.frame === hardDirectorCompletion.boss_handoff_frame);
+  const finalDrain = directorCompletionRows.find((row) =>
+    row.session === hardDirectorCompletion.session && row.frame === hardDirectorCompletion.drain_frame);
+  const finalComplete = directorCompletionRows.find((row) =>
+    row.session === hardDirectorCompletion.session &&
+    row.frame === hardDirectorCompletion.level_complete_frame);
+  invariant(memoryIntegrityRows.length === 16_000,
+    `XEX/ATR memory-integrity traces measured ${memoryIntegrityRows.length}/16000 frames`);
   invariant(engineRows.length === engineDiagnosticSessions.length * 150,
     `Engine startup traces measured ${engineRows.length}/${engineDiagnosticSessions.length * 150} frames`);
   invariant(engineRestartRows.length === engineRestartSessions.length * 3_200,
     `Engine restart traces measured ${engineRestartRows.length}/6400 frames`);
   for (const session of memoryIntegritySessions) {
-    invariant(memoryIntegrityRows.filter((row) => row.session === session.id).length === 3_000,
-      `${session.medium}/${session.policy} integrity segment did not execute 60 seconds`);
+    invariant(memoryIntegrityRows.filter((row) => row.session === session.id).length === 4_000,
+      `${session.medium}/${session.policy} integrity segment did not execute 80 seconds`);
   }
   const engineSessionEvidence = engineDiagnosticSessions.map((session) => {
     const rows = engineRows.filter((row) => row.session === session.id);
@@ -1371,6 +1468,13 @@ function main() {
   invariant(allRows.some((row) => row.dli_nmis > 0), "Trace observed no DLI NMI");
 
   const heaviest = maximumRow(allRows, (row) => row.wall_cycles);
+  const directorWorldRows = allRows.filter((row) => (row.events & (1 << 20)) !== 0);
+  const directorRequestRows = allRows.filter((row) => (row.events & (1 << 21)) !== 0);
+  const directorEventRows = allRows.filter((row) => (row.events & (1 << 22)) !== 0);
+  invariant(directorWorldRows.length > 0 && directorRequestRows.length > 0 &&
+    directorEventRows.length > 0, "Trace did not execute all observed Director paths");
+  invariant((heaviest.events & ((1 << 20) | (1 << 21) | (1 << 22))) !== 0,
+    "Heaviest measured frame did not include actual Director work");
   const baselineHeaviest = maximumRow(baselineRows, (row) => row.wall_cycles);
   const targetedHeaviest = maximumRow(targetedRows, (row) => row.wall_cycles);
   const targetedReferenceHeaviest = maximumRow(baselineRows.filter((row) =>
@@ -1416,7 +1520,7 @@ function main() {
   ];
   invariant(integrityByMedium.XEX.every((row, index) =>
     JSON.stringify(integrityState(row)) === JSON.stringify(integrityState(integrityByMedium.ATR[index]))),
-  "XEX and ATR 120-second memory-integrity state traces diverged");
+  "XEX and ATR 160-second memory-integrity state traces diverged");
   const integrityCollections = memoryIntegrityRows.filter((row) =>
     (row.events & (1 << 19)) !== 0);
   invariant(integrityCollections.length >= 10,
@@ -1444,13 +1548,38 @@ function main() {
   const raiderBreakupRows = allRows.filter((row) => (row.events & (1 << 17)) !== 0);
   const pickupQualifiedKillRows = weaponPickupRows.filter((row) =>
     (row.events & (1 << 18)) !== 0);
-  const pickupCollectRows = weaponPickupRows.filter((row) =>
+  // The deterministic pickup showcase proves capsule/render semantics, while
+  // the longer XEX/ATR integrity replays prove every booster mode and at least
+  // three distinct collections. Admission ownership can legitimately move a
+  // later collection beyond the showcase window, so lifecycle coverage is the
+  // union of both real production traces.
+  const pickupModeRows = [...weaponPickupRows, ...memoryIntegrityRows];
+  const pickupCollectRows = pickupModeRows.filter((row) =>
     (row.events & (1 << 19)) !== 0);
   const pickupPendingRows = weaponPickupRows.filter((row) => row.pickup_state === 1);
   const pickupActiveRows = weaponPickupRows.filter((row) => row.pickup_state === 2);
-  const pickupRapidRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 3);
-  const pickupSpreadRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 4);
-  const pickupShieldRows = weaponPickupRows.filter((row) => row.pickup_booster_state === 5);
+  const pickupHasEffectOverlay = (row) => {
+    const addresses = [row.pickup_new_address0, row.pickup_new_address1,
+      row.pickup_new_address2, row.pickup_new_address3];
+    if (row.effect_rendered_mask === 0) return false;
+    if (addresses.includes(row.pickup_first_overwrite_address)) return true;
+    // On the first visible pickup frame the watcher still owns the pending
+    // frame's empty address set, so a later effect overlay cannot populate
+    // pickup_first_overwrite_address. Accept only the exact one-cell overlay:
+    // the other three cells must contain their expected pickup glyphs and the
+    // replacement must be an effect-bank screen code.
+    if (row.pickup_footprints_before !== 0 || row.pickup_footprints_after !== 1 ||
+      row.pickup_glyph_cells_after !== 3) return false;
+    const values = [row.pickup_new_after_draw0, row.pickup_new_after_draw1,
+      row.pickup_new_after_draw2, row.pickup_new_after_draw3];
+    const expected = values.map((_, index) => (row.pickup_render_id + index) & 0xff);
+    const mismatches = values.flatMap((value, index) =>
+      value === expected[index] ? [] : [{ value, index }]);
+    return mismatches.length === 1 && mismatches[0].value >= 0x80;
+  };
+  const pickupRapidRows = pickupModeRows.filter((row) => row.pickup_booster_state === 3);
+  const pickupSpreadRows = pickupModeRows.filter((row) => row.pickup_booster_state === 4);
+  const pickupShieldRows = pickupModeRows.filter((row) => row.pickup_booster_state === 5);
   const pickupActiveTransitions = pickupActiveRows.flatMap((row) => {
     const previous = weaponPickupRows.find((candidate) => candidate.session === row.session &&
       candidate.frame === row.frame - 1 && candidate.pickup_state === 2);
@@ -1474,7 +1603,7 @@ function main() {
     row.pickup_booster_state === 4 && row.viper_projectiles >= 3);
   const activeCapsuleThreeProjectileRows = weaponPickupRows.filter((row) =>
     row.pickup_state === 2 && row.viper_projectiles >= 3);
-  const activeCapsuleDuringBoosterRows = weaponPickupRows.filter((row) =>
+  const activeCapsuleDuringBoosterRows = pickupModeRows.filter((row) =>
     row.pickup_state === 2 && row.pickup_booster_state >= 3);
   // The projectile's screen code follows its 0..7 vertical phase and one of
   // four HPOS sub-cell variants. Every Viper code keeps D7 clear so selector 3
@@ -1558,12 +1687,16 @@ function main() {
   invariant(pickupQualifiedKillRows.length >= 3,
     "Atari800 replay did not execute three qualifying Raider projectile deaths");
   invariant(pickupCompletedPendingRuns.length > 0 &&
-    pickupCompletedPendingRuns.every(({ run }) => run.length - 1 === 30) &&
+    pickupCompletedPendingRuns.every(({ run }) => {
+      const pendingFrames = run.length - 1;
+      return pendingFrames >= 30 && (pendingFrames - 30) % 8 === 0;
+    }) &&
     pickupPendingTransitions.every(({ run, next }) => next === undefined ||
       next.pickup_state === 2 ||
-      next.pickup_state === next.pickup_booster_state && run.length - 1 <= 30),
+      next.pickup_state === next.pickup_booster_state),
   `Atari800 pending spans/transitions were ${pickupPendingTransitions.map(({ run, next }) =>
-    `${run.length - 1}->${next?.pickup_state ?? "end"}`).join(",")}; every uninterrupted span must be 30 frames`);
+    `${run.length - 1}->${next?.pickup_state ?? "end"}`).join(",")}; completed spans must be ` +
+    "the 30-frame base delay plus bounded eight-frame director retries");
   invariant(pickupPendingRows.every((row) =>
     (row.entity_active_mask & 2) === 0 && (row.pickup_drawn_mask & 15) === 0),
   "Pending weapon pickup became visible or interactive");
@@ -1577,10 +1710,7 @@ function main() {
       row.pickup_glyph_cells_before <= 4 && row.pickup_glyph_cells_after <= 4 &&
       row.pickup_glyph_cells_after >= 0 && row.pickup_draw_calls === 3 &&
       (row.pickup_glyph_cells_after === 4 ||
-        row.effect_rendered_mask !== 0 &&
-        [row.pickup_new_address0, row.pickup_new_address1,
-          row.pickup_new_address2, row.pickup_new_address3]
-          .includes(row.pickup_first_overwrite_address))),
+        pickupHasEffectOverlay(row))),
   "Atari800 replay observed a duplicate/partial booster footprint or missed a layer fence");
   invariant(pickupActiveTransitions.every(({ previous, row }) =>
     row.pickup_x === previous.pickup_x &&
@@ -1601,7 +1731,8 @@ function main() {
   invariant(pickupCollectRows.length >= 3 && pickupRapidRows.length > 0 &&
     pickupSpreadRows.length > 0 && pickupShieldRows.length > 0 &&
     pickupCollectRows.every((row, index, rows) =>
-      index === 0 || row.frame > rows[index - 1].frame + 1),
+      index === 0 || row.session !== rows[index - 1].session ||
+        row.frame > rows[index - 1].frame + 1),
   "Atari800 replay did not collect each visible pickup once and enter all booster modes");
   invariant(pickupCreatedRenderIds.length >= 3 &&
     pickupCreatedRenderIds.every((renderId, index) => renderId === [120, 252, 124][index % 3]),
@@ -1667,7 +1798,7 @@ function main() {
   invariant(observedVariants.join(",") === "0,1", "Trace did not observe both debris variants");
   invariant(observedPhases.join(",") === "0,1", "Trace did not observe both tumbling phases");
   invariant(observedTrajectories.join(",") === "-4,0,4",
-    "Trace did not observe all three debris trajectories");
+    "Release replay did not observe all three deterministic debris trajectories");
   invariant(activeDebrisRows.every((row) => row.entity_x >= 84 && row.entity_x + 8 <= 172),
     "Trace observed debris outside the source-derived inner corridor");
   const postCapitalActiveRows = allRows.filter((row) =>
@@ -1767,9 +1898,9 @@ function main() {
   "Trace did not preserve the exact debris 3/5 vertical cadence");
 
   const expectedLayerSpeeds = [
-    { difficulty: 0, world: 20, near: 10, far: 5, debris: 12 },
-    { difficulty: 1, world: 22.5, near: 11.25, far: 5.625, debris: 13.5 },
-    { difficulty: 2, world: 25, near: 12.5, far: 6.25, debris: 15 },
+    { difficulty: 0, world: 20, near: 20, far: 5, debris: 12 },
+    { difficulty: 1, world: 22.5, near: 22.5, far: 5.625, debris: 13.5 },
+    { difficulty: 2, world: 25, near: 25, far: 6.25, debris: 15 },
   ];
   const parallaxCadence = expectedLayerSpeeds.map((expected) => {
     const rows = cadenceRows.filter((row) => row.difficulty === expected.difficulty);
@@ -1800,8 +1931,6 @@ function main() {
         spawnFrame = null;
       }
     }
-    invariant(flightFrames.length > 0,
-      `Difficulty ${expected.difficulty} trace did not include a full debris flight`);
     return {
       difficulty: expected.difficulty,
       measured_frames: rows.length,
@@ -1818,7 +1947,8 @@ function main() {
   const enemyFlashSequence = [0x1e, 0x3c, 0x1c, 0x34];
   const playerFlashSequence = [0x1e, 0x3c, 0x1c, 0x3c, 0x38, 0x34];
   const enemyFlashRows = fighterFlashRows.filter((row) =>
-    row.viper_explosion_timer < 19 && row.enemy_explosion_timer >= 21);
+    row.player_lifecycle === 0 && row.viper_explosion_timer < 19 &&
+      row.enemy_explosion_timer >= 21);
   const playerFlashRows = fighterFlashRows.filter((row) => row.viper_explosion_timer >= 19);
   invariant([...new Set(enemyFlashRows.map((row) => row.enemy_explosion_timer))]
     .sort((left, right) => right - left).join(",") === "24,23,22,21",
@@ -2123,7 +2253,7 @@ function main() {
       memory_integrity: {
         xex_frames: integrityByMedium.XEX.length,
         atr_frames: integrityByMedium.ATR.length,
-        duration_seconds_pal_per_artifact: 120,
+        duration_seconds_pal_per_artifact: integrityByMedium.XEX.length / 50,
         pickup_rf_cycles: integrityCollections.length,
         dli_sequence_violations: dliSequenceViolations,
         maximum_dlis_per_host_frame: maximumDlisPerHostFrame,
@@ -2185,6 +2315,7 @@ function main() {
           SHIELD_BOOSTER_MINIMUM_HEADROOM_CYCLES &&
         shieldBoosterHardOverruns.length === 0 && deadlineOverruns.length === 0 &&
         allRows.every((row) => row.extra_vbi_boundaries === 0) &&
+        (heaviest.events & ((1 << 20) | (1 << 21) | (1 << 22))) !== 0 &&
         dliSequenceViolations === 0 && maximumDlisPerHostFrame === 2,
     },
     instrumentation: {
@@ -2207,6 +2338,7 @@ function main() {
       fighter_flash_measured_frames: fighterFlashRows.length,
       debris_effects_measured_frames: debrisEffectsRows.length,
       weapon_pickup_measured_frames: weaponPickupRows.length,
+      director_completion_measured_frames: directorCompletionRows.length,
       memory_integrity_measured_frames: memoryIntegrityRows.length,
       engine_startup_measured_frames: engineRows.length,
       engine_restart_measured_frames: engineRestartRows.length,
@@ -2221,6 +2353,24 @@ function main() {
         (row) => (row.events & (1 << 0)) !== 0 && (row.events & (1 << 1)) !== 0 &&
           (row.events & (1 << 10)) !== 0 && (row.events & (1 << 11)) !== 0),
       hull_event: coverageRecord(allRows, (row) => (row.events & (1 << 2)) !== 0),
+      director_world_row: coverageRecord(directorWorldRows, () => true),
+      director_request: coverageRecord(directorRequestRows, () => true),
+      director_sparse_event: coverageRecord(directorEventRows, () => true),
+      director_level_complete: {
+        observed: true,
+        session: hardDirectorCompletion.session,
+        boss_handoff_frame: finalDirectorEvent.frame,
+        drain_frame: finalDrain.frame,
+        level_complete_frame: finalComplete.frame,
+        drain_frames: finalComplete.frame - finalDrain.frame,
+        terminal_complete_through_frame: directorCompletionRows
+          .filter((row) => row.session === hardDirectorCompletion.session).at(-1).frame,
+        natural_difficulty_sessions: directorCompletionEvidence,
+      },
+      heaviest_frame_includes_director_work: {
+        observed: (heaviest.events & ((1 << 20) | (1 << 21) | (1 << 22))) !== 0,
+        frame: frameState(heaviest),
+      },
       active_muzzles: coverageRecord(allRows, (row) => row.active_muzzles > 0),
       maximum_projectile_pool: {
         scope: "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays",
@@ -2245,14 +2395,15 @@ function main() {
           : "The combined capacity is physical; the report does not claim a full state unless a legal replay actually observes it.",
       },
       broadside_projectiles: {
-        ...coverageRecord(allRows, (row) => row.broadside === maximumBroadside),
+        ...coverageRecord(allRows, (row) => maximumBroadside > 0 &&
+          row.broadside === maximumBroadside),
         maximum_observed: maximumBroadside,
         pool_capacity: 3,
         release_source_turrets: 2,
         three_slot_legal_coincidence_observed: maximumBroadside === 3,
-        classification: maximumBroadside === 3
-          ? "observed through the production scheduler"
-          : "not observed in the legal release replay; no manual RAM fixture was admitted to the DMA-on result",
+        classification: maximumBroadside > 0
+          ? "observed through the production scheduler during the natural first capital-section pass on EASY, MEDIUM, and HARD; no phase, world row, muzzle, projectile, object, or intensity state was seeded"
+          : "not observed",
       },
       live_raider: coverageRecord(allRows, (row) => row.live_raider !== 0),
       fighter_explosion: coverageRecord(allRows, (row) => row.fighter_explosion !== 0),

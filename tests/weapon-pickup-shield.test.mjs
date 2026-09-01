@@ -148,7 +148,7 @@ test("collision callers retain their consume and impact contracts", () => {
   assert.deepEqual(shield.damage.broadsideImpact, { state: 3, health: 10, applied: 1 });
   assert.match(source, /raider_projectile_hits_player[\s\S]+lda #FIGHTER_PROJECTILE_FREE[\s\S]+jsr apply_player_damage/);
   assert.match(source, /begin_broadside_impact[\s\S]+apply_broadside_player_damage/);
-  assert.match(source, /jsr apply_player_damage\s+lda BROAD_DAMAGE_APPLIED\s+beq entity_collision_miss[\s\S]+jmp entity_despawn_debris/);
+  assert.match(source, /jsr apply_player_damage\s+lda BROAD_DAMAGE_APPLIED\s+beq entity_collision_miss[\s\S]+jmp integration_debris_release/);
   assert.match(source,
     /jsr player_contacts_enemy[\s\S]+jsr queue_enemy_damage\s+lda #PLAYER_HEALTH_UNITS\s+jsr apply_player_damage/);
   assert.match(source, /@clamp:[\s\S]+sta player_x[\s\S]+jmp apply_broadside_player_damage/);

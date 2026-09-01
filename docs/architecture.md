@@ -19,27 +19,29 @@ verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
 
 ## Cold startup and loader
 
-The 100-sector initial block enters at `$201E` with a 449-byte raw bootstrap
-prefix. A 1,185-byte stage-2 overlay runs at `$21C1-$2661`; after it validates
+The Encounter Director configuration uses a 101-sector initial block at
+`$2000-$527F` and enters at `$201E` with a 449-byte raw bootstrap prefix. A
+1,191-byte stage-2 overlay runs at `$21C1-$2667`; after it validates
 the complete manifest, it reads extension sectors through standard OS SIOV
 while OS IRQ/NMI and disk services are still available. Each chunk is fully
 read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
 controlled destination. Any failure blanks DMA, selects a fixed red error
 background, and halts before partially loaded code can execute.
 
-The first production migration moves the 5,661-byte packed BROADSIDE stream to
-sectors 101-145. ATR stages its 5,760-byte sector image at `$8100-$977F`, checks
-CRC `$05D8`, and expands 6,656 bytes to `$5E10-$780F`. The last BROADSIDE source
-read makes `$8100` reusable; only then does startup copy the packed resident
-suffix and stages it at `$8100-$9A9A`. The 7,743-byte suffix is stored as a
-6,555-byte LZ-10/5 stream
+The three ordered DFMC records are BROADSIDE in sectors 102-146, 39-byte
+integration glue in sector 147, and the Encounter Director in sectors 148-152.
+ATR stages each record at `$8100`; BROADSIDE expands 6,656 bytes to
+`$5E10-$780F`, glue expands first to `$5259-$527F`, and the 645-byte Director
+expands to `$9D75-$9FF9`. The last BROADSIDE source read makes `$8100` reusable;
+only then does startup copy the packed resident suffix and stage it at
+`$8100-$9AFA`. The 7,743-byte suffix is stored as a 6,650-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. No loader byte remains resident or enters gameplay.
 
 The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
-accepts RAW or LZ records. The current 100-sector initial block plus one 45-sector
-extension use 145 sectors. Seven additional 50-sector chunks provide 44,800 B
-of format/loader growth without padding; the ATR itself has 73,600 B free.
+accepts RAW or LZ records. The current initial block and three records use 152
+sectors (19,456 B). The ATR itself has 568 unused sectors (72,704 B); runtime
+residency remains a separate constraint.
 
 ### DFMC v1 byte format
 
@@ -59,7 +61,11 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production record 0 is `{101,45,5661,6656,$5E10,$05D8,1,1,$8100}`.
+Production records begin at sectors 102, 147, and 148. Their packed/raw lengths
+are respectively 5,674/6,656 B, 41/39 B, and 585/645 B. Glue is transported to
+`$5259`, held at `$7F16-$7F3C` while ENTITY_CODE is unpacked, and late-published
+to `$4EFE-$4F24`. The Director ends at `$9FF9`; `$9FFA-$9FFF` is a six-byte
+untouched guard.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
 mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to
@@ -75,19 +81,20 @@ footer palette zones. The loader remains visible for 250 complete PAL frames
 Cold staging also copies:
 
 - validated external broadside/runtime data to `$5E10-$780F` before takeover;
-- packed starfield/music data through `$7810-$7EFA` to `$552A-$5DE1`;
-- the 207-byte A2 kernel through `$7F10-$7FDE` to `$9000-$90CE`;
-- packed entity/effect/frontend code through boot-only staging at `$5300-$5CEE`
-  to the resident `$9100-$9FFF` range. The staging write begins only after the
-  initial packed source ending at `$51A5` has been consumed. Its end-exclusive
-  `$5CEF` remains 289 bytes below the BROADSIDE destination at `$5E10`.
+- packed starfield/music data through `$7810-$7F13` to `$552A-$5DFC`;
+- the 255-byte A2 kernel through `$7F16-$8014` to `$9000-$90FE`, before the
+  `$8000-$80FF` entity/effects clear destroys the consumed source;
+- packed entity/effect/frontend code through boot-only staging at `$5300-$5CEF`
+  to the resident `$9100-$9D74` range. The staging write begins only after the
+  initial packed source ending at `$5254` has been consumed. Its end-exclusive
+  `$5CF0` remains 288 bytes below the BROADSIDE destination at `$5E10`.
 
-The initial packed sources end exclusively at `$51A6`, leaving 346 bytes before
+The initial packed sources end exclusively at `$5255`, leaving 171 bytes before
 the `$5300` staging start. Startup copies ENTITY_CODE there, expands the stream
 to its current live `$9100-$9D74` range, and immediately releases the staging
 range. `unpack_loader_bitmap` may then overwrite it while preparing the loader;
 after the loader display completes, `unpack_starfield_runtime` expands to
-`$552A-$5DE1`, overlapping 1,989 bytes of the already inactive ENTITY_CODE
+`$552A-$5DFC`, overlapping 1,990 bytes of the already inactive ENTITY_CODE
 staging range. This ordering is mandatory; the overlap is temporal, not
 simultaneous residency.
 
@@ -135,6 +142,13 @@ Logical rows map to a 23-row physical ring. World and hull scroll operations
 write the recycled physical row before the new list becomes visible. All A2
 heads, row wrap, and the fixed HUD boundary are therefore handled without a
 visible partial list.
+
+Every authoritative world-row event publishes exactly one full-width ring
+recycle in `ENGINES` through `OPEN`. The capital side-band path then advances
+its hull/muzzle lifecycle against that already-published row and never consumes
+the scroll latch a second time. Far stars retain their independent 1/4 logical
+step. This keeps the centre, side bands, objects and ordinary open-space scene
+at one physical cadence through the entire capital exit.
 
 Capital hulls are two independent 32x9 expanded maps assembled from engines,
 aft, combat, forward, and prow modules. The broadside system owns warnings,

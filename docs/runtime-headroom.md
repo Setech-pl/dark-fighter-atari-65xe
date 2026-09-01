@@ -13,79 +13,70 @@ the packed boot BIN, XEX, and ATR.
 
 | Measure | Current result | Current gate |
 | --- | ---: | ---: |
-| Initial boot block | 12,800 B / 100 sectors | dynamic BRCNT 1..255 |
-| Initial boot content | 12,714 B | 86 B sector-alignment envelope below `$5300` staging |
-| Extension chunks | 5,760 B / 45 sectors | dynamic, manifest-owned |
-| Total occupied transport | 18,560 B / 145 sectors | no preallocated empty sectors |
-| Additional loader capacity | 44,800 B | at least 8 KiB |
-| Free ATR transport | 73,600 B / 575 sectors | reported separately from residency |
-| Remaining safe residency | 5,631 B fragmented | 1,210 B cumulative charge from the 15,346-byte capacity reference |
-| XEX size | 19,472 B | artifact format result |
+| Initial boot block | 12,928 B / 101 sectors | Director configuration only; hard ceiling 101 sectors |
+| Initial boot content | 12,889 B | final 39 B are GLUE staging `$5259-$527F` |
+| Extension chunks | 6,528 B / 51 sectors | BROADSIDE, GLUE and DIRECTOR records |
+| Total occupied transport | 19,456 B / 152 sectors | DFMC v1, no preallocated empty sectors |
+| Free ATR transport | 72,704 B / 568 sectors | reported separately from residency |
+| Remaining safe residency | 4,766 B fragmented | simultaneous residency is 17,421 B |
+| XEX size | 20,292 B | artifact format result |
 | ATR size | 92,176 B | standard 90 KB single-density image |
 | PAL frame | 35,568 cycles | fixed PAL frame |
-| Worst measured wall | 32,040 cycles | no gameplay regression; Shield hard 32,568 |
-| Physical headroom | 3,528 cycles | hard minimum 3,000 |
+| Worst measured wall | 24,264 cycles | Director gate maximum 32,584 |
+| Physical headroom | 11,304 cycles | Director gate minimum 2,984 |
 | Spread delta from accepted 32,040 baseline | 32 cycles | preferred at most 200; hard 500 |
-| Shield delta from accepted 32,072 baseline | -32 cycles | preferred at most 350; hard 496 |
-| H3.1 delta from accepted 32,108 Shield checkpoint | -68 cycles | no gameplay hot-path cost |
+| Shield delta from accepted 32,072 baseline | -7,808 cycles | preferred at most 350; hard 496 |
+| H3.1 delta from accepted 32,108 Shield checkpoint | -7,844 cycles | no gameplay hot-path cost |
 | Missed synchronization | 0 | 0 |
 | Deadline overruns | 0 | 0 |
 | Additional VBI boundaries | 0 | 0 |
 
-The recovery pass started from the artifact-matched 33,020-cycle local worktree
-and established the accepted 32,040-cycle / 3,528-cycle Spread baseline. The
-completed Spread rebuild adds 32 cycles. Shield's accepted checkpoint is
-32,108 cycles; the H3.1-linked layout measures 32,040 without adding frontend
-work to the gameplay loop. The 32,956-cycle value remains the historical
-Rapid-only checkpoint; the 32,025-cycle value remains the historical
-entity/debris foundation.
+The 32,040/3,528 result remains the pre-Director comparison baseline. The exact
+D.2 artifact measures 24,264/11,304 in the current replay set; its heaviest
+frame executes `director_world_row_tick`. Separate trace counters observe
+37,581 Director world rows, 36,460 requests, and 55 sparse-event paths.
 
-The residency accounting reference is 15,346 linked runtime bytes. The
-accepted `e63cbf2` image occupied 15,624 B, a 278-byte charge against that
-reference, and therefore left `6,841 - 278 = 6,563 B`. The current image occupies
-16,556 linked runtime bytes. This is a 932-byte net increase over `e63cbf2`, while
-its cumulative charge against the same reference is 1,210 B. The current safe
-remainder is consequently `6,841 - 1,210 = 5,631 B`. The manifest attributes
-the earlier 278-byte feature delta to the Shield checkpoint; it does not prove
-that value to be a separable legacy-frontend footprint.
+The current linked runtime is exactly 16,735 B. GLUE and DIRECTOR raise
+simultaneous residency to 17,421 B, leaving 4,766 B of the architectural safe
+residency allowance. Raw residency, packed transport, staging and the six-byte
+guard are accounted separately.
 
 ## Heaviest legal frame
 
-The global maximum is HARD session `2-sweep-fire5`, frame 333. It combines
-eight Viper projectiles, seven Raider projectiles, one broadside shell, a live
-Raider, one interactive entity, a capital explosion, world/hull work, one
-gameplay DLI, music, fire SFX, and capital-explosion SFX. The host-only profile
-adds no guest instructions or cycles.
+The global maximum is HARD session `weapon-pickup-2-hunt-fire4`, frame 3,183.
+It measures 24,264 cycles, includes actual Director world-row work, and retains
+11,304 cycles of physical headroom. The host-only profile adds no guest
+instructions or cycles.
 
 | Exclusive subsystem group | Cycles |
 | --- | ---: |
-| Gameplay DLI service and VBI/synchronization; wait is outside the interval | 242 |
-| World, ring playfield, hull, and starfield | 11,849 |
-| Broadside update and render | 735 |
-| Viper projectile erase, update, weapon control, and render | 5,340 |
-| Raider projectile erase, update, weapon control, and render | 5,006 |
-| Enemy update and collision resolution | 2,092 |
-| Entity/debris | 610 |
-| Effects | 3,212 |
-| Capsule/interactive controller | 219 |
-| Music and sound | 431 |
-| Remaining player, lifecycle, hull-contact, sector, and loop work | 2,304 |
-| **Measured wall** | **32,040** |
+| Gameplay DLI service and VBI/synchronization; wait is outside the interval | 246 |
+| World, ring playfield, hull, starfield and Director tick | 11,117 |
+| Broadside update and render | 318 |
+| Viper projectile erase, update, weapon control, and render | 4,968 |
+| Raider projectile erase, update, weapon control, and render | 806 |
+| Enemy update and collision resolution | 2,781 |
+| Entity/debris | 103 |
+| Effects | 1,513 |
+| Capsule/interactive controller | 187 |
+| Music and sound | 311 |
+| Remaining player, lifecycle, hull-contact, sector, and loop work | 1,914 |
+| **Measured wall** | **24,264** |
 
-Cross-cutting totals in the JSON record 10,249 mainline render cycles and 1,328
+Cross-cutting totals in the JSON record 4,907 mainline render cycles and 1,000
 mainline erase/backing cycles. They overlap the exclusive subsystem groups and
 must not be added to the wall total.
 
 ## Artifact and cold-start evidence
 
-- Boot BIN: `60c4e63ab68144b93ddc544b7db75e083a739b8fba6675aa5f4b4f46409f68f7`.
-- XEX: `48b67214a9abfe2c378336fcaa9c0e277a1451a680549c02ae5968bb4f9b4c9b`.
-- ATR: `0ce1e54e6de3b8a1fb9a1382aebb4934df6a651c5d024be5359680068cb1e921`.
+- Boot BIN: `8e963c78361f9cef41c4984d7380dd03715c53ff4684496a344da7598516efd3`.
+- XEX: `7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5`.
+- ATR: `55a3f11225f02c2c00499a88ffa00a7865034a6296ec8b362ba27a1f43d2d1ce`.
 - XEX and ATR cold boots pass with `$A5` and `$5A` fills across
   `$8000-$9FFF`.
-- XEX and ATR each run two 3,000-frame integrity sessions, for 6,000 frames
-  (120 PAL seconds) per medium; legal hunt maxima are identical at 30,728
-  cycles.
+- XEX and ATR each run two 4,000-frame integrity sessions, for 8,000 frames
+  (160 PAL seconds) per medium; the legal hunt maximum is 24,264 cycles for
+  both media.
 - Gameplay state parity is required between XEX and ATR. DLI order violations,
   missed synchronization, deadline overruns, and extra VBI boundaries are zero.
 
@@ -94,16 +85,17 @@ must not be added to the wall total.
 | Pool | Physical capacity | Maximum evidenced state |
 | --- | ---: | --- |
 | Viper projectiles | 10 | Rapid 10/10; Spread steady state 9/10 |
-| Raider projectiles | 9 | 9/9 within a legal combined 19/19 state |
-| Combined fighter projectiles | 19 | 19/19 in 11 legal replay frames |
-| Broadside projectiles | 3 | production scheduler evidence, no RAM fixture |
+| Raider projectiles | 9 | exercised by lifecycle tests; legal replay contributes to a 13-projectile combined maximum |
+| Combined fighter projectiles | 19 | 13 observed in the legal D.2 replay; forced-pool behavior is tested separately |
+| Broadside projectiles | 3 | 1 observed through the natural first capital-section pass on every difficulty |
 | Interactive entities | 4 physical / 2 active | active limit exercised |
 | Transient effects | 6 physical / 5 active | 5/5 active envelope exercised |
 
-The 19/19 result is observed in ordinary replay state rather than RAM-seeded.
-The Viper tests separately prove that continuous Spread holds at 9/10 with no
-rejected full salvo, always admits the centre when possible, and creates the
-side pair atomically.
+The D.2 behavioral correction rolls back the two-unit reservation whenever
+`schedule_broadside` discovers a full pool or the absence of an eligible muzzle.
+Committed projectiles charge exactly two units and their normal lifecycle
+releases exactly two. Natural OPEN-to-handoff now enters DRAIN, and final
+COMPLETE remains terminal.
 
 ## Weapon-mode balance and isolated cost
 
@@ -143,14 +135,15 @@ the first instruction of the next `wait_frame` call. Production DMA and DLI
 behavior remain enabled; guest instrumentation adds zero instructions and zero
 cycles.
 
-The three no-fire cadence sessions retain full legal debris flights at every
-difficulty: 91 frames on EASY, 82 on MEDIUM, and 74 on HARD. Combat coverage is
-kept in separate firing sessions. `five_heaviest_frames` is sorted across all
-legal replays and begins with the global maximum.
+The three short no-fire cadence sessions measure the exact 20/22.5/25
+world-row rates during the Director intro, before debris admission is legal.
+Complete debris lifecycle behavior remains covered by the extended combat and
+component harnesses. `five_heaviest_frames` is sorted across all legal replays
+and begins with the global maximum.
 
-The DMA-off CPU comparison is 20,032 cycles and the additive estimate is
-32,924 cycles; both remain diagnostics only. Physical acceptance uses the
-measured 32,040-cycle wall.
+The DMA-off CPU comparison and additive estimate remain diagnostics only.
+Physical timing acceptance uses the measured 24,264-cycle wall. The automated
+behavior and PAL release gates now pass; physical smoke remains the next gate.
 
 The measurement is exact for the stated Atari800 version, not an electrical
 measurement of a physical Atari. Real-hardware validation remains required by

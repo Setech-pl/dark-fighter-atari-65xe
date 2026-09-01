@@ -241,9 +241,9 @@ test("packed resident broadside image round-trips before the loader and stays wi
   const starPacked = fs.readFileSync(path.join(rootDirectory, "build", "starfield-runtime-packed.bin"));
   assert.deepEqual(unpackBroadsideLzss(starPacked), starRuntime);
   assert.equal(starPacked.length, manifest.starfieldRuntime.packedBytes);
-  assert.ok(starPacked.length <= 0x700);
+  assert.ok(starPacked.length <= 0x706);
   assert.match(routine("start", "broadside_unpack_command"),
-    /jsr stage_boot_streams[\s\S]+boot_chunk_ready[\s\S]+jsr unpack_resident_runtime[\s\S]+jsr unpack_entity_runtime[\s\S]+jsr init_entity_effects[\s\S]+jsr stage_a2_kernel[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
+    /jsr stage_boot_streams[\s\S]+boot_chunk_ready[\s\S]+jsr unpack_resident_runtime[\s\S]+jsr unpack_entity_runtime[\s\S]+jsr stage_a2_kernel[\s\S]+jsr init_entity_effects[\s\S]+jsr unpack_loader_bitmap[\s\S]+jsr show_loader[\s\S]+jsr unpack_starfield_runtime/);
   assert.match(routine("boot_stage2_atr_entry", "boot_stage2_xex_entry"),
     /jsr boot_stage2_validate_manifest[\s\S]+jsr SIOV[\s\S]+jsr boot_stage2_crc16[\s\S]+jsr broadside_unpack_command/);
 });
@@ -473,7 +473,7 @@ test("tracked muzzle records replace the 23-row redraw scan without changing scr
   const worldRing = routine("scroll_world_columns", "init_playfield_display_lists");
   const hullCopy = routine("scroll_hull_columns", "update_sector_state");
   assert.match(update,
-    /lda scroll_accumulator[\s\S]+cmp world_scroll_rates,x[\s\S]+bcc @finalize_world[\s\S]+jmp scroll_hull_columns/);
+    /jsr scroll_hull_columns[\s\S]+lsr PLAYFIELD_RING_FLAGS[\s\S]+rts/);
   assert.match(worldRing,
     /sta PLAYFIELD_RING_FLAGS\s+jsr rotate_playfield_rows[\s\S]+sta CORRIDOR_BOUNDARY_LEFT[\s\S]+sta CORRIDOR_BOUNDARY_RIGHT/,
     "a world step must rotate LMS rows and shift the two backing streams");
@@ -487,6 +487,18 @@ test("tracked muzzle records replace the 23-row redraw scan without changing scr
   assert.match(routine("reset_exited_turret_lifecycles", "generate_corridor_row"),
     /lda MUZZLE_SCREEN_HI,x[\s\S]+sta BROAD_TURRET_FIRED,x/,
     "turret lifecycle release must use the same tracked visibility record");
+});
+
+test("capital exit preserves one full-scene recycle per production world event", () => {
+  const update = routine("update_starfield", "generate_corridor_row");
+  const hullCopy = routine("scroll_hull_columns", "update_sector_state");
+
+  assert.match(update,
+    /@hull_scroll:[\s\S]+jsr scroll_hull_columns[\s\S]+lsr PLAYFIELD_RING_FLAGS[\s\S]+rts/,
+    "the production dispatcher must consume the row-rotation latch after every hull-rate event");
+  assert.match(hullCopy,
+    /cmp #CAPITAL_HULL_STATE_COMPLETE[\s\S]+bcc scroll_hull_active[\s\S]+lsr PLAYFIELD_RING_FLAGS[\s\S]+bcc scroll_hull_complete_scroll[\s\S]+rts[\s\S]+scroll_hull_complete_scroll:[\s\S]+jmp scroll_world_columns/,
+    "COMPLETE must recycle an ordinary full-width row unless the same world event already did so");
 });
 
 test("assembled muzzle records preserve backing and complete the full visible lifecycle", () => {
@@ -605,6 +617,34 @@ test("hybrid world ring and hull-only copy preserve every logical row and both h
         completeBefore[(row - 1) * 40 + column], `complete ${row},${column}`);
     }
   }
+
+  const completeDispatchMemory = createLinkedRuntimeMemory();
+  const completeDispatchBefore = fillScreen(completeDispatchMemory);
+  completeDispatchMemory[labels.get("CAPITAL_SECTOR_STATE")] = 6;
+  completeDispatchMemory[labels.get("PLAYFIELD_RING_FLAGS")] = 0;
+  runAssembledRoutine(completeDispatchMemory, "scroll_hull_columns");
+  for (let row = 1; row < 23; row += 1) {
+    const address = logicalAddress(completeDispatchMemory, row);
+    for (let column = 0; column < 40; column += 1) {
+      assert.equal(completeDispatchMemory[address + column],
+        completeDispatchBefore[(row - 1) * 40 + column],
+        `complete dispatch ${row},${column}`);
+    }
+  }
+  assert.equal(completeDispatchMemory[labels.get("PLAYFIELD_RING_FLAGS")], 1,
+    "the direct complete-state dispatch must report its single row rotation");
+
+  const alreadyRotatedMemory = createLinkedRuntimeMemory();
+  const alreadyRotatedBefore = fillScreen(alreadyRotatedMemory);
+  alreadyRotatedMemory[labels.get("CAPITAL_SECTOR_STATE")] = 6;
+  alreadyRotatedMemory[labels.get("PLAYFIELD_RING_FLAGS")] = 1;
+  runAssembledRoutine(alreadyRotatedMemory, "scroll_hull_columns");
+  assert.deepEqual(
+    alreadyRotatedMemory.subarray(gameplayScreen, gameplayScreen + 23 * 40),
+    alreadyRotatedBefore,
+    "a near-layer world step must not rotate the complete-state ring twice",
+  );
+  assert.equal(alreadyRotatedMemory[labels.get("PLAYFIELD_RING_FLAGS")], 0);
 
   const hullMemory = createLinkedRuntimeMemory();
   const hullBefore = fillScreen(hullMemory);
@@ -1105,7 +1145,7 @@ test("impact and offscreen paths erase a slot, while zero health enters guarded 
   assert.match(routine("apply_broadside_player_damage", "update_hud_status"),
     /PLAYER_DYING[\s\S]+dec PLAYER_LIVES[\s\S]+SHARED_FIGHTER_EXPLOSION_TOTAL[\s\S]+jsr erase_bullet/);
   assert.match(routine("main_loop", "wait_frame"),
-    /jsr update_player_death[\s\S]+jsr clear_pmg[\s\S]+jsr silence_audio[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop/);
+    /jsr integration_update_player_death[\s\S]+jsr clear_pmg[\s\S]+jsr silence_audio[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop/);
 });
 
 test("death decrements one life and respawns atomically at canonical corridor center", () => {

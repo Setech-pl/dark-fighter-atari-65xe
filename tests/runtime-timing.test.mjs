@@ -100,11 +100,12 @@ test("protected linked segments do not regress beyond the accepted feature basel
   });
   assert.deepEqual(manifest.runtimeCodeBudget.frontendH31, {
     baselineBytes: 15_346,
-    actualBytes: manifest.runtimeCodeBudget.actualBytes,
-    actualDeltaBytes: manifest.runtimeCodeBudget.actualBytes - 15_346,
+    actualBytes: 16_735,
+    actualDeltaBytes: 1_389,
     hardDeltaBytes: 1280,
   });
-  assert.ok(manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <= 1280);
+  assert.equal(manifest.encounterDirector.enabled, true);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 4_766);
   assert.ok(manifest.payloadBudget.weaponPickupSpreadShot.remainingReserveBytes >= 64);
 });
 

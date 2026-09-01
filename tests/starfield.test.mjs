@@ -231,7 +231,7 @@ test("hulls keep the legacy world rate while stars hold exact 50% and 25% ratios
   ], [1, 2, 1, 4]);
 });
 
-test("assembled 6502 phases execute one complete 100/50/25 rate period", () => {
+test("assembled 6502 keeps physical scene recycle at 100% and far stars at 25%", () => {
   const memory = new Uint8Array(0x10000);
   memory.set(starRuntime, manifest.starfieldRuntime.runAddress);
   const addresses = {
@@ -251,6 +251,7 @@ test("assembled 6502 phases execute one complete 100/50/25 rate period", () => {
     [addresses.erase, 0],
     [addresses.nearStep, 0],
     [addresses.farStep, 0],
+    [0x4efe, 0],
   ]);
   const gcd = (left, right) => right === 0 ? left : gcd(right, left % right);
   const period = asset.nearLayer.rateDenominator * asset.farLayer.rateDenominator /
@@ -264,9 +265,9 @@ test("assembled 6502 phases execute one complete 100/50/25 rate period", () => {
   const hullSteps = period;
   const nearSteps = calls.get(addresses.nearStep);
   const farSteps = calls.get(addresses.farStep);
-  assert.deepEqual([hullSteps, nearSteps, farSteps], [4, 2, 1]);
+  assert.deepEqual([hullSteps, nearSteps, farSteps], [4, 4, 1]);
   assert.deepEqual([hullSteps * 100 / hullSteps, nearSteps * 100 / hullSteps,
-    farSteps * 100 / hullSteps], [100, 50, 25]);
+    farSteps * 100 / hullSteps], [100, 100, 25]);
   assert.deepEqual(phaseTrace.at(-1), [0, 0],
     "both assembled accumulators close exactly over the common period");
   assert.ok(phaseTrace.every(([near, far]) =>
@@ -398,7 +399,7 @@ test("assembly erases overlays before scroll and renders them in stacking order"
 test("starfield relocation preserves broadside and protected finale memory", () => {
   assert.equal(manifest.starfieldRuntime.runAddress, 0x552a);
   assert.ok(manifest.starfieldRuntime.bytes <= manifest.starfieldRuntime.reservedBytes);
-  assert.ok(manifest.starfieldRuntime.packedBytes <= 0x700);
+  assert.ok(manifest.starfieldRuntime.packedBytes <= 0x706);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
   assert.ok(manifest.broadsideRuntime.bytes <= manifest.broadsideRuntime.reservedBytes);
   assert.ok(manifest.broadsideRuntime.runAddress + manifest.broadsideRuntime.bytes <= 0x7810);
@@ -425,7 +426,7 @@ test("starfield staging is disjoint from the packed loader and loader bitmap", (
   assert.ok(loaderEnd < manifest.broadsideRuntime.loadAddress);
   assert.equal(stagingStart, 0x7810);
   assert.ok(stagingEnd < stagingStart + manifest.starfieldRuntime.stagingBytes);
-  assert.equal(stagingStart + manifest.starfieldRuntime.stagingBytes - 1, 0x7f0f);
+  assert.equal(stagingStart + manifest.starfieldRuntime.stagingBytes - 1, 0x7f15);
   assert.equal(overlaps(stagingStart, stagingEnd, loaderStart, loaderEnd), false);
   assert.equal(overlaps(stagingStart, stagingEnd, bitmapStart, bitmapEnd), false);
   assert.ok(stagingStart >= manifest.broadsideRuntime.runAddress +

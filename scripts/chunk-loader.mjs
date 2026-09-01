@@ -12,7 +12,7 @@ const CHUNK_TYPE_LZ = 1;
 const STAGING_BROADSIDE = 1;
 const STAGING_EXTENSION = 2;
 const SAFE_EXTENSION_RANGES = Object.freeze([
-  [0x4efe, 0x5000], [0x5de2, 0x5e06], [0x77b9, 0x7810], [0x7bd0, 0x7f10],
+  [0x4efe, 0x5000], [0x5259, 0x5280], [0x5de2, 0x5e06], [0x77b9, 0x7810], [0x7bd0, 0x7f10],
   [0x7fdb, 0x8000], [0x8130, 0x9000], [0x90cf, 0x9100], [0x992a, 0xa000],
 ]);
 
@@ -235,7 +235,120 @@ export function deterministicCapacityBytes(length, seed = 0x6d2b79f5) {
   return bytes;
 }
 
-export function verifyChunkTransport({ atrBody, manifest, onChunk }) {
+export function validateInitialBlockCapacity(byteLength, { allowExtendedInitialBlock = false } = {}) {
+  invariant(Number.isInteger(byteLength) && byteLength >= ATR_SECTOR_BYTES,
+    "initial block length is invalid");
+  const maximumSectors = allowExtendedInitialBlock ? 101 : 100;
+  const maximumBytes = maximumSectors * ATR_SECTOR_BYTES;
+  invariant(byteLength <= maximumBytes,
+    `initial block exceeds ${maximumBytes} bytes / ${maximumSectors} sectors`);
+  invariant(byteLength % ATR_SECTOR_BYTES === 0, "initial block is not sector aligned");
+  return { byteLength, sectors: byteLength / ATR_SECTOR_BYTES, maximumBytes, maximumSectors };
+}
+
+function validateChunkInput(chunk, unpackLz) {
+  invariant(chunk && typeof chunk === "object", "chunk input is missing");
+  invariant(Buffer.isBuffer(chunk.packed) && chunk.packed.length > 0,
+    "chunk packed payload is empty");
+  invariant(Buffer.isBuffer(chunk.raw) && chunk.raw.length > 0, "chunk raw payload is empty");
+  invariant(Buffer.isBuffer(chunk.buildTag) && chunk.buildTag.length === 5,
+    "chunk build tag must be five bytes");
+  invariant(chunk.type === CHUNK_TYPE_RAW || chunk.type === CHUNK_TYPE_LZ,
+    `unknown chunk type ${chunk.type}`);
+  if (chunk.type === CHUNK_TYPE_RAW) {
+    invariant(chunk.packed.equals(chunk.raw), "RAW packed payload differs from raw input");
+  } else {
+    invariant(typeof unpackLz === "function", "LZ chunk validation requires an unpacker");
+    const decoded = unpackLz(chunk.packed);
+    invariant(Buffer.isBuffer(decoded), "LZ unpacker did not return a Buffer");
+    invariant(decoded.length === chunk.raw.length, "LZ decoded length differs from raw input");
+    invariant(decoded.equals(chunk.raw), "LZ decoded payload differs from raw input");
+  }
+}
+
+function assembleDfmcV1Transport({ initialContent, manifestOffset, chunks,
+  allowExtendedInitialBlock, unpackLz }) {
+  invariant(Buffer.isBuffer(initialContent) && initialContent.length >= 6,
+    "initial content is invalid");
+  invariant(Number.isInteger(manifestOffset) && manifestOffset >= 0,
+    "manifest offset is invalid");
+  invariant(Array.isArray(chunks) && chunks.length >= 1 && chunks.length <= MAX_CHUNKS,
+    `chunk count must be 1..${MAX_CHUNKS}`);
+  chunks.forEach((chunk) => validateChunkInput(chunk, unpackLz));
+
+  const provisionalInitial = wrapInitialBootContent(initialContent);
+  validateInitialBlockCapacity(provisionalInitial.bytes.length, { allowExtendedInitialBlock });
+  const sectorCounts = chunks.map(({ packed }) =>
+    Math.ceil((packed.length + CHUNK_FOOTER_BYTES) / ATR_SECTOR_BYTES));
+  const totalOccupiedSectors = provisionalInitial.sectors +
+    sectorCounts.reduce((sum, sectors) => sum + sectors, 0);
+  invariant(totalOccupiedSectors <= ATR_SECTORS, "DFMC transport exceeds the ATR image");
+
+  const chunkImages = chunks.map((chunk) => makeChunkSectorImage({
+    packed: chunk.packed,
+    rawLength: chunk.raw.length,
+    totalOccupiedSectors,
+    buildTag: chunk.buildTag,
+  }));
+  let startSector = provisionalInitial.sectors + 1;
+  const records = chunks.map((chunk, index) => {
+    const image = chunkImages[index];
+    invariant(image.sectors === sectorCounts[index], "chunk sector count changed during generation");
+    const result = {
+      startSector,
+      sectorCount: image.sectors,
+      packedLength: chunk.packed.length,
+      rawLength: chunk.raw.length,
+      finalDestination: chunk.finalDestination,
+      crc16: image.storageCrc16,
+      type: chunk.type,
+      stagingId: chunk.stagingId,
+      destination: chunk.destination,
+    };
+    startSector += image.sectors;
+    return result;
+  });
+  const manifest = encodeChunkManifest({ records, totalOccupiedSectors });
+  invariant(manifestOffset + manifest.length <= initialContent.length,
+    "chunk manifest does not fit in initial content");
+  const patchedInitialContent = Buffer.from(initialContent);
+  manifest.copy(patchedInitialContent, manifestOffset);
+  patchedInitialContent[1] = provisionalInitial.sectors;
+  const initialBoot = wrapInitialBootContent(patchedInitialContent);
+  invariant(initialBoot.sectors === provisionalInitial.sectors,
+    "patching the fixed-size chunk manifest changed BRCNT");
+  validateInitialBlockCapacity(initialBoot.bytes.length, { allowExtendedInitialBlock });
+  const transportPayload = Buffer.concat([initialBoot.bytes,
+    ...chunkImages.map(({ bytes }) => bytes)]);
+  invariant(transportPayload.length === totalOccupiedSectors * ATR_SECTOR_BYTES,
+    "DFMC transport length is inconsistent");
+  const parsedManifest = parseChunkManifest(manifest);
+  return {
+    initialBoot,
+    patchedInitialContent,
+    manifest,
+    parsedManifest,
+    chunkImages,
+    records,
+    totalOccupiedSectors,
+    transportPayload,
+  };
+}
+
+export function buildDfmcV1Transport({ initialContent, manifestOffset, chunks,
+  allowExtendedInitialBlock = false, unpackLz, verifyDeterminism = true }) {
+  const first = assembleDfmcV1Transport({ initialContent, manifestOffset, chunks,
+    allowExtendedInitialBlock, unpackLz });
+  if (verifyDeterminism) {
+    const second = assembleDfmcV1Transport({ initialContent, manifestOffset, chunks,
+      allowExtendedInitialBlock, unpackLz });
+    invariant(first.transportPayload.equals(second.transportPayload) &&
+      first.manifest.equals(second.manifest), "DFMC transport generation is nondeterministic");
+  }
+  return first;
+}
+
+export function verifyChunkTransport({ atrBody, manifest, unpackLz, onChunk }) {
   invariant(Buffer.isBuffer(atrBody), "fixture ATR body is missing");
   const parsed = Buffer.isBuffer(manifest) ? parseChunkManifest(manifest) : manifest;
   validateChunkRecords(parsed.records, { totalOccupiedSectors: parsed.totalOccupiedSectors });
@@ -251,9 +364,9 @@ export function verifyChunkTransport({ atrBody, manifest, onChunk }) {
       invariant(record.packedLength === record.rawLength, "RAW lengths differ");
       raw = packed;
     } else {
-      // Imported lazily by callers for production LZ fixtures; the capacity
-      // fixture intentionally uses incompressible RAW data.
-      throw new Error("fixture LZ decode requires a caller-owned decoder");
+      invariant(typeof unpackLz === "function", "LZ decode requires a caller-owned decoder");
+      raw = unpackLz(packed);
+      invariant(Buffer.isBuffer(raw), "LZ unpacker did not return a Buffer");
     }
     invariant(raw.length === record.rawLength, "chunk raw length is invalid");
     onChunk?.(record, Buffer.from(raw));
@@ -261,10 +374,10 @@ export function verifyChunkTransport({ atrBody, manifest, onChunk }) {
   return parsed;
 }
 
-export function loadChunkFixture({ atrBody, manifest, memory, onPublish }) {
+export function loadChunkFixture({ atrBody, manifest, memory, unpackLz, onPublish }) {
   invariant(memory instanceof Uint8Array && memory.length >= 0x10000,
     "fixture memory must cover 64 KiB");
-  return verifyChunkTransport({ atrBody, manifest, onChunk(record, raw) {
+  return verifyChunkTransport({ atrBody, manifest, unpackLz, onChunk(record, raw) {
     memory.set(raw, record.finalDestination);
     onPublish?.(record, raw);
   } });

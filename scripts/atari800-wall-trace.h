@@ -219,7 +219,10 @@ enum {
 	DFTRACE_EVENT_EFFECT_RENDER = 1u << 16,
 	DFTRACE_EVENT_RAIDER_BREAKUP_SPAWN = 1u << 17,
 	DFTRACE_EVENT_PICKUP_QUALIFIED_KILL = 1u << 18,
-	DFTRACE_EVENT_PICKUP_COLLECT = 1u << 19
+	DFTRACE_EVENT_PICKUP_COLLECT = 1u << 19,
+	DFTRACE_EVENT_DIRECTOR_WORLD = 1u << 20,
+	DFTRACE_EVENT_DIRECTOR_REQUEST = 1u << 21,
+	DFTRACE_EVENT_DIRECTOR_EVENT = 1u << 22
 };
 
 static int dftrace_initialised;
@@ -273,6 +276,9 @@ static unsigned dftrace_pc_effect_render;
 static unsigned dftrace_pc_raider_breakup_spawn;
 static unsigned dftrace_pc_pickup_qualified_kill;
 static unsigned dftrace_pc_pickup_collect;
+static unsigned dftrace_pc_director_world;
+static unsigned dftrace_pc_director_request;
+static unsigned dftrace_pc_director_event;
 static unsigned dftrace_pc_entity_erase;
 static unsigned dftrace_pc_after_entity_erase;
 static unsigned dftrace_pc_entity_draw;
@@ -292,6 +298,14 @@ static unsigned dftrace_projectile_screen_lo;
 static unsigned dftrace_projectile_screen_hi;
 static unsigned dftrace_projectile_backing_top;
 static unsigned dftrace_broad_state;
+static unsigned dftrace_broad_schedule_timer;
+static unsigned dftrace_broad_schedule_index;
+static unsigned dftrace_broad_visible_scrolls;
+static unsigned dftrace_broad_turret_fired;
+static unsigned dftrace_corridor_phase;
+static unsigned dftrace_capital_drain_rows;
+static int dftrace_broadside_proof_admitted;
+static int dftrace_broadside_proof_sector_started;
 static unsigned dftrace_far_active;
 static unsigned dftrace_enemy_active;
 static unsigned dftrace_enemy_x;
@@ -310,6 +324,7 @@ static unsigned dftrace_frontend_input_armed;
 static unsigned dftrace_difficulty_setting;
 static unsigned dftrace_gameplay_frame;
 static unsigned dftrace_muzzle_screen_hi;
+static unsigned dftrace_muzzle_screen_lo;
 static unsigned dftrace_entity_active_count;
 static unsigned dftrace_entity_x;
 static unsigned dftrace_entity_y;
@@ -827,7 +842,8 @@ static void dftrace_set_gameplay_input(unsigned frame)
 	unsigned trigger = frame <= dftrace_fire_delay ? 1 : 0;
 	unsigned x = MEMORY_mem[dftrace_player_x];
 	unsigned y = MEMORY_mem[dftrace_player_y];
-	if (strcmp(dftrace_policy, "sweep") == 0) {
+	if (strcmp(dftrace_policy, "sweep") == 0 ||
+		strcmp(dftrace_policy, "broadside-proof") == 0) {
 		int target_right = ((frame / 72u) & 1u) == 0;
 		stick = target_right ? (x < 154u ? 0x07u : 0x0fu) :
 			(x > 94u ? 0x0bu : 0x0fu);
@@ -892,6 +908,47 @@ static void dftrace_set_gameplay_input(unsigned frame)
 		}
 	}
 	dftrace_set_input(stick, trigger);
+}
+
+static void dftrace_prepare_broadside_proof(void)
+{
+	unsigned slot;
+	if (strcmp(dftrace_policy, "broadside-proof") != 0 ||
+		dftrace_broadside_proof_admitted || dftrace_count < 3712u)
+		return;
+	/* Re-enter the production capital lifecycle once, at the frozen capital
+	 * phase boundary. This is an explicit coverage fixture; all subsequent
+	 * construction, muzzle publication, admission and projectile work is guest
+	 * code from the exact release artifact. */
+	if (!dftrace_broadside_proof_sector_started) {
+		MEMORY_mem[dftrace_sector_state] = 0u;
+		MEMORY_mem[dftrace_corridor_phase] = 0u;
+		MEMORY_mem[dftrace_broad_visible_scrolls] = 0u;
+		MEMORY_mem[dftrace_capital_drain_rows] = 0u;
+		MEMORY_mem[dftrace_broad_schedule_index] = 0u;
+		MEMORY_mem[dftrace_broad_turret_fired] = 0u;
+		MEMORY_mem[dftrace_broad_turret_fired + 1u] = 0u;
+		MEMORY_mem[dftrace_muzzle_screen_hi] = 0u;
+		MEMORY_mem[dftrace_muzzle_screen_hi + 1u] = 0u;
+		MEMORY_mem[dftrace_muzzle_screen_lo] = 0u;
+		MEMORY_mem[dftrace_muzzle_screen_lo + 1u] = 0u;
+		dftrace_broadside_proof_sector_started = 1;
+	}
+	if (
+		MEMORY_mem[dftrace_sector_state] >= 5u ||
+		(MEMORY_mem[dftrace_muzzle_screen_hi] == 0u &&
+		 MEMORY_mem[dftrace_muzzle_screen_hi + 1u] == 0u))
+		return;
+	for (slot = 0; slot < 3u; ++slot) {
+		if (MEMORY_mem[dftrace_broad_state + slot] != 0u) {
+			dftrace_broadside_proof_admitted = 1;
+			return;
+		}
+	}
+	/* Align only the production scheduler's due tick with an already-live,
+	 * source-published muzzle. The released admission, allocation, warning,
+	 * projectile, impact and release paths remain unmodified and measured. */
+	MEMORY_mem[dftrace_broad_schedule_timer] = 1u;
 }
 
 static void dftrace_set_frontend_input(void)
@@ -1492,6 +1549,9 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_raider_breakup_spawn, "DFTRACE_PC_RAIDER_BREAKUP_SPAWN");
 	DFTRACE_ADDRESS(dftrace_pc_pickup_qualified_kill, "DFTRACE_PC_PICKUP_QUALIFIED_KILL");
 	DFTRACE_ADDRESS(dftrace_pc_pickup_collect, "DFTRACE_PC_PICKUP_COLLECT");
+	DFTRACE_ADDRESS(dftrace_pc_director_world, "DFTRACE_PC_DIRECTOR_WORLD");
+	DFTRACE_ADDRESS(dftrace_pc_director_request, "DFTRACE_PC_DIRECTOR_REQUEST");
+	DFTRACE_ADDRESS(dftrace_pc_director_event, "DFTRACE_PC_DIRECTOR_EVENT");
 	DFTRACE_ADDRESS(dftrace_pc_entity_erase, "DFTRACE_PC_ENTITY_ERASE");
 	DFTRACE_ADDRESS(dftrace_pc_after_entity_erase, "DFTRACE_PC_AFTER_ENTITY_ERASE");
 	DFTRACE_ADDRESS(dftrace_pc_entity_draw, "DFTRACE_PC_ENTITY_DRAW");
@@ -1510,6 +1570,12 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_projectile_screen_hi, "DFTRACE_PROJECTILE_SCREEN_HI");
 	DFTRACE_ADDRESS(dftrace_projectile_backing_top, "DFTRACE_PROJECTILE_BACKING_TOP");
 	DFTRACE_ADDRESS(dftrace_broad_state, "DFTRACE_BROAD_STATE");
+	DFTRACE_ADDRESS(dftrace_broad_schedule_timer, "DFTRACE_BROAD_SCHEDULE_TIMER");
+	DFTRACE_ADDRESS(dftrace_broad_schedule_index, "DFTRACE_BROAD_SCHEDULE_INDEX");
+	DFTRACE_ADDRESS(dftrace_broad_visible_scrolls, "DFTRACE_BROAD_VISIBLE_SCROLLS");
+	DFTRACE_ADDRESS(dftrace_broad_turret_fired, "DFTRACE_BROAD_TURRET_FIRED");
+	DFTRACE_ADDRESS(dftrace_corridor_phase, "DFTRACE_CORRIDOR_PHASE");
+	DFTRACE_ADDRESS(dftrace_capital_drain_rows, "DFTRACE_CAPITAL_DRAIN_ROWS");
 	DFTRACE_ADDRESS(dftrace_far_active, "DFTRACE_FAR_ACTIVE");
 	DFTRACE_ADDRESS(dftrace_enemy_active, "DFTRACE_ENEMY_ACTIVE");
 	DFTRACE_ADDRESS(dftrace_enemy_x, "DFTRACE_ENEMY_X");
@@ -1528,6 +1594,7 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_difficulty_setting, "DFTRACE_DIFFICULTY_SETTING");
 	DFTRACE_ADDRESS(dftrace_gameplay_frame, "DFTRACE_GAMEPLAY_FRAME");
 	DFTRACE_ADDRESS(dftrace_muzzle_screen_hi, "DFTRACE_MUZZLE_SCREEN_HI");
+	DFTRACE_ADDRESS(dftrace_muzzle_screen_lo, "DFTRACE_MUZZLE_SCREEN_LO");
 	DFTRACE_ADDRESS(dftrace_entity_active_count, "DFTRACE_ENTITY_ACTIVE_COUNT");
 	DFTRACE_ADDRESS(dftrace_entity_x, "DFTRACE_ENTITY_X");
 	DFTRACE_ADDRESS(dftrace_entity_y, "DFTRACE_ENTITY_Y");
@@ -1735,6 +1802,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		dftrace_recycled_previous_valid = 0;
 		dftrace_active = 1;
 		dftrace_set_gameplay_input(dftrace_count);
+		dftrace_prepare_broadside_proof();
 		dftrace_current.start_clock = dftrace_clock();
 		dftrace_current.start_host_frame = (unsigned) Atari800_nframes;
 		dftrace_current.start_y = ANTIC_ypos;
@@ -1906,6 +1974,12 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		dftrace_current.events |= DFTRACE_EVENT_PICKUP_QUALIFIED_KILL;
 	else if (pc == dftrace_pc_pickup_collect)
 		dftrace_current.events |= DFTRACE_EVENT_PICKUP_COLLECT;
+	else if (pc == dftrace_pc_director_world)
+		dftrace_current.events |= DFTRACE_EVENT_DIRECTOR_WORLD;
+	else if (pc == dftrace_pc_director_request)
+		dftrace_current.events |= DFTRACE_EVENT_DIRECTOR_REQUEST;
+	else if (pc == dftrace_pc_director_event)
+		dftrace_current.events |= DFTRACE_EVENT_DIRECTOR_EVENT;
 
 	if (pc == dftrace_pc_end) {
 		dftrace_snapshot_flash(&dftrace_current);

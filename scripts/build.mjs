@@ -6,11 +6,9 @@ import { fileURLToPath } from "node:url";
 import { toolchain } from "romdev-toolchain-cc65";
 import { makeAtr, makeXexSegments, validateBuildDirectory } from "./formats.mjs";
 import {
+  buildDfmcV1Transport,
   chunkLoaderConstants,
-  encodeChunkManifest,
-  makeChunkSectorImage,
   parseChunkManifest,
-  wrapInitialBootContent,
 } from "./chunk-loader.mjs";
 import {
   compileLoaderBitmap,
@@ -102,7 +100,7 @@ const minimumWeaponPickupReserveBytes = 512;
 const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
 const entityPackedStagingAddress = 0x5300;
-const bootA2StagingAddress = 0x7f10;
+const bootA2StagingAddress = 0x7f16;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
 const runtimeHeadroomHistoricalWallGate = 31568;
@@ -165,7 +163,18 @@ const frontendH31BaselineEntityFeatureBytes = shieldBoosterBaselineEntityFeature
 const frontendH31HardRuntimeDeltaBytes = 1280;
 const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
-const starfieldStagingBytes = 0x700;
+const starfieldStagingBytes = 0x706;
+const encounterDirectorEnabled = true;
+const glueStagingAddress = 0x5259;
+const glueFinalAddress = 0x4efe;
+const directorRunAddress = 0x9d75;
+const directorGuardAddress = 0x9ffa;
+const expectedInitialContentBytes = 12889;
+const expectedLinkedRuntimeBytes = 16735;
+const expectedDirectorRawBytes = 645;
+const expectedDirectorPackedBytes = 587;
+const expectedGlueRawBytes = 39;
+const expectedGluePackedBytes = 41;
 
 function ensureDirectory(fsApi, directory) {
   const parts = directory.split("/").filter(Boolean);
@@ -248,6 +257,38 @@ function parseLinkSegmentSize(mapText, name) {
 function writeFile(targetPath, bytes) {
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   fs.writeFileSync(targetPath, bytes);
+}
+
+async function buildResidentModule({ sourcePath, configPath, stem }) {
+  const source = fs.readFileSync(sourcePath);
+  const config = fs.readFileSync(configPath);
+  const base = `/project/build/${stem}`;
+  const assembled = await runWasmTool(
+    "ca65",
+    { [`${base}.s`]: source },
+    ["--cpu", "6502", "-g", "-l", `${base}.lst`, "-o", `${base}.o`, `${base}.s`],
+    [`${base}.o`, `${base}.lst`],
+  );
+  const linked = await runWasmTool(
+    "ld65",
+    { [`${base}.o`]: assembled.outputs[`${base}.o`], [`${base}.cfg`]: config },
+    ["-C", `${base}.cfg`, "-o", `${base}.bin`, "-m", `${base}.map`,
+      "-Ln", `${base}.lbl`, `${base}.o`],
+    [`${base}.bin`, `${base}.map`, `${base}.lbl`],
+  );
+  const raw = Buffer.from(linked.outputs[`${base}.bin`]);
+  const packed = packBroadsideLzss(raw);
+  if (!unpackBroadsideLzss(packed).equals(raw)) {
+    throw new Error(`${stem} LZSS round trip failed`);
+  }
+  return {
+    raw,
+    packed,
+    object: assembled.outputs[`${base}.o`],
+    listing: assembled.outputs[`${base}.lst`],
+    map: linked.outputs[`${base}.map`],
+    labels: linked.outputs[`${base}.lbl`],
+  };
 }
 
 async function build() {
@@ -370,15 +411,18 @@ async function build() {
         ? ["-D", `ENEMY_BODY_COLOR_OVERRIDE=${paletteCandidate.value}`] : []),
       "-I",
       "/project/build",
+      "-l",
+      "/project/build/main.lst",
       "-o",
       "/project/build/main.o",
       "/project/src/main.s",
     ],
-    ["/project/build/main.o"],
+    ["/project/build/main.o", "/project/build/main.lst"],
   );
 
   const objectFile = assembled.outputs["/project/build/main.o"];
   writeFile(path.join(buildDirectory, "main.o"), objectFile);
+  writeFile(path.join(buildDirectory, "main.lst"), assembled.outputs["/project/build/main.lst"]);
 
   const linked = await runWasmTool(
     "ld65",
@@ -519,7 +563,7 @@ async function build() {
     relocatedHullEnd > entityCodeRunAddress + entityCodeBytes) {
     throw new Error("Relocated pixel-exact hull scroll does not lie wholly in ENTITY_CODE");
   }
-  if (!isReviewVariant && entityFeatureCodeBytes >
+  if (!isReviewVariant && !encounterDirectorEnabled && entityFeatureCodeBytes >
     frontendH31BaselineEntityFeatureBytes + frontendH31HardRuntimeDeltaBytes) {
     throw new Error(`H3.1 ENTITY_CODE feature body is ${entityFeatureCodeBytes} B; ` +
       `limit is ${frontendH31BaselineEntityFeatureBytes + frontendH31HardRuntimeDeltaBytes} B`);
@@ -561,6 +605,26 @@ async function build() {
   const packedEntityCodeRuntime = packBroadsideLzss(entityCodeRuntime);
   if (!unpackBroadsideLzss(packedEntityCodeRuntime).equals(entityCodeRuntime)) {
     throw new Error("ENTITY_CODE LZSS round trip failed");
+  }
+  const directorModule = await buildResidentModule({
+    sourcePath: path.join(rootDirectory, "src", "encounter-director.s"),
+    configPath: path.join(rootDirectory, "cfg", "encounter-director.cfg"),
+    stem: "encounter-director",
+  });
+  const glueModule = await buildResidentModule({
+    sourcePath: path.join(rootDirectory, "src", "integration-glue.s"),
+    configPath: path.join(rootDirectory, "cfg", "integration-glue.cfg"),
+    stem: "integration-glue",
+  });
+  if (directorModule.raw.length !== expectedDirectorRawBytes ||
+    directorModule.packed.length !== expectedDirectorPackedBytes) {
+    throw new Error(`Encounter Director size changed: ${directorModule.raw.length} raw / ` +
+      `${directorModule.packed.length} packed`);
+  }
+  if (glueModule.raw.length !== expectedGlueRawBytes ||
+    glueModule.packed.length !== expectedGluePackedBytes) {
+    throw new Error(`Integration glue size changed: ${glueModule.raw.length} raw / ` +
+      `${glueModule.packed.length} packed`);
   }
   if (packedStarfieldRuntime.length > starfieldStagingBytes) {
     throw new Error(`Packed starfield ${packedStarfieldRuntime.length} B exceeds the reviewed ` +
@@ -670,52 +734,69 @@ async function build() {
     a2KernelRuntime, packedEntityCodeRuntime, bootPayloadTrailer,
   ];
   const placeholderInitial = Buffer.concat(initialContentParts(bootStage2Runtime));
-  const provisionalInitial = wrapInitialBootContent(placeholderInitial);
-  const extensionSectors = Math.ceil(
-    (packedBroadsideRuntime.length + chunkLoaderConstants.chunkFooterBytes) /
-      chunkLoaderConstants.atrSectorBytes,
-  );
-  const totalTransportSectors = provisionalInitial.sectors + extensionSectors;
-  const buildTag = crypto.createHash("sha256").update(packedBroadsideRuntime).digest().subarray(0, 5);
-  const broadsideChunk = makeChunkSectorImage({
-    packed: packedBroadsideRuntime,
-    rawLength: broadsideRuntime.length,
-    totalOccupiedSectors: totalTransportSectors,
-    buildTag,
-  });
-  if (broadsideChunk.sectors !== extensionSectors) {
-    throw new Error("Broadside extension sector count changed during envelope generation");
+  if (placeholderInitial.length !== expectedInitialContentBytes) {
+    throw new Error(`Layout D.2 initial content changed: ${placeholderInitial.length} B; ` +
+      `expected ${expectedInitialContentBytes} B`);
   }
-  const extensionStartSector = provisionalInitial.sectors + 1;
-  const chunkManifest = encodeChunkManifest({
-    totalOccupiedSectors: totalTransportSectors,
-    records: [{
-      startSector: extensionStartSector,
-      sectorCount: broadsideChunk.sectors,
-      packedLength: packedBroadsideRuntime.length,
-      rawLength: broadsideRuntime.length,
+  const buildTag = (bytes) => crypto.createHash("sha256").update(bytes).digest().subarray(0, 5);
+  const transport = buildDfmcV1Transport({
+    initialContent: placeholderInitial,
+    manifestOffset: residentPrefix.length + manifestOffsetInStage2,
+    allowExtendedInitialBlock: encounterDirectorEnabled,
+    chunks: [{
+      packed: packedBroadsideRuntime,
+      raw: broadsideRuntime,
       finalDestination: broadsideRunAddress,
-      crc16: broadsideChunk.storageCrc16,
       type: chunkLoaderConstants.chunkTypeLz,
       stagingId: chunkLoaderConstants.stagingBroadside,
       destination: packedResidentStagingAddress,
+      buildTag: buildTag(packedBroadsideRuntime),
+    }, {
+      packed: glueModule.packed,
+      raw: glueModule.raw,
+      finalDestination: glueStagingAddress,
+      type: chunkLoaderConstants.chunkTypeLz,
+      stagingId: chunkLoaderConstants.stagingExtension,
+      destination: packedResidentStagingAddress,
+      buildTag: buildTag(glueModule.packed),
+    }, {
+      packed: directorModule.packed,
+      raw: directorModule.raw,
+      finalDestination: directorRunAddress,
+      type: chunkLoaderConstants.chunkTypeLz,
+      stagingId: chunkLoaderConstants.stagingExtension,
+      destination: packedResidentStagingAddress,
+      buildTag: buildTag(directorModule.packed),
     }],
+    unpackLz: unpackBroadsideLzss,
   });
-  parseChunkManifest(chunkManifest);
-  const patchedBootStage2 = Buffer.from(bootStage2Runtime);
-  chunkManifest.copy(patchedBootStage2, manifestOffsetInStage2);
-  residentPrefix[1] = provisionalInitial.sectors;
-  residentMain[1] = provisionalInitial.sectors;
-  const initialContent = Buffer.concat(initialContentParts(patchedBootStage2));
-  const initialBoot = wrapInitialBootContent(initialContent);
-  if (initialBoot.sectors !== provisionalInitial.sectors) {
-    throw new Error("Patching the fixed-size chunk manifest changed BRCNT");
-  }
-  const transportPayload = Buffer.concat([initialBoot.bytes, broadsideChunk.bytes]);
+  const { initialBoot, manifest: chunkManifest, transportPayload,
+    totalOccupiedSectors: totalTransportSectors } = transport;
+  const [broadsideChunk, glueChunk, directorChunk] = transport.chunkImages;
+  const [broadsideRecord, glueRecord, directorRecord] = transport.records;
+  const extensionSectors = transport.chunkImages.reduce((sum, chunk) => sum + chunk.sectors, 0);
+  const extensionStartSector = broadsideRecord.startSector;
+  const initialContent = transport.patchedInitialContent;
+  const patchedBootStage2 = Buffer.from(initialContent.subarray(
+    residentPrefix.length, residentPrefix.length + bootStage2Runtime.length));
   const bootSectors = initialBoot.sectors;
+  residentPrefix[1] = bootSectors;
+  residentMain[1] = bootSectors;
   if (bootSectors < 1 || bootSectors > 255 || transportPayload.length !==
     totalTransportSectors * chunkLoaderConstants.atrSectorBytes) {
     throw new Error("Dynamic initial/extension sector layout is inconsistent");
+  }
+  const frozenRecordShape = transport.records.map((record) => [
+    record.startSector, record.sectorCount, record.packedLength,
+    record.rawLength, record.finalDestination,
+  ]);
+  if (bootSectors !== 101 || totalTransportSectors !== 152 ||
+    transportPayload.length !== 19456 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
+      [102, 45, 5671, 6656, 0x5e10],
+      [147, 1, 41, 39, glueStagingAddress],
+      [148, 5, 587, 645, directorRunAddress],
+    ])) {
+    throw new Error(`Layout D.2 transport topology changed: ${JSON.stringify(frozenRecordShape)}`);
   }
   if (initialBoot.bytes.readUInt16LE(2) !== loadAddress) {
     throw new Error("Assembled boot header has an unexpected load address");
@@ -727,6 +808,8 @@ async function build() {
   const xex = makeXexSegments([
     { start: loadAddress, data: initialBoot.bytes },
     { start: broadsideRunAddress, data: broadsideRuntime },
+    { start: glueStagingAddress, data: glueModule.raw },
+    { start: directorRunAddress, data: directorModule.raw },
   ], bootStage2XexEntry);
   const atr = makeAtr(transportPayload);
   const runtimeArtifacts = runtimeArtifactSet({ boot: transportPayload, xex, atr });
@@ -741,6 +824,10 @@ async function build() {
     a2KernelRunAddress,
     entityCodeRuntime,
     entityCodeRunAddress,
+    integrationGlueRuntime: glueModule.raw,
+    integrationGlueRunAddress: glueFinalAddress,
+    directorRuntime: directorModule.raw,
+    directorRunAddress,
     labels,
     segmentSizes: {
       code: codeBytes,
@@ -791,7 +878,11 @@ async function build() {
   };
   const destructibleDebrisRuntimeCodeBytes = codeBytes + starfieldRuntimeBytes +
     broadsideRuntimeBytes + a2KernelBytes + entityCodeBytes;
-  if (!isReviewVariant && destructibleDebrisRuntimeCodeBytes >
+  if (encounterDirectorEnabled && destructibleDebrisRuntimeCodeBytes !== expectedLinkedRuntimeBytes) {
+    throw new Error(`Layout D.2 linked runtime changed: ${destructibleDebrisRuntimeCodeBytes} B; ` +
+      `expected ${expectedLinkedRuntimeBytes} B`);
+  }
+  if (!isReviewVariant && !encounterDirectorEnabled && destructibleDebrisRuntimeCodeBytes >
     frontendH31BaselineRuntimeCodeBytes + frontendH31HardRuntimeDeltaBytes) {
     throw new Error(`H3.1 linked runtime is ${destructibleDebrisRuntimeCodeBytes} B; ` +
       `limit is ${frontendH31BaselineRuntimeCodeBytes + frontendH31HardRuntimeDeltaBytes} B`);
@@ -806,6 +897,30 @@ async function build() {
     gameVersion,
     target: "Atari 65XE PAL / 64 KB",
     toolchain: "romdev-toolchain-cc65@0.1.3",
+    encounterDirector: {
+      enabled: encounterDirectorEnabled,
+      layout: "Layout D.2 — post-clear director init + intensity-preserving admission ABI",
+      levelWorldRows: 3712,
+      phaseCount: 8,
+      initialContentBytes: expectedInitialContentBytes,
+      linkedRuntimeBytes: expectedLinkedRuntimeBytes,
+      simultaneousResidencyBytes: 17421,
+      safeResidencyBytes: 4766,
+      glue: {
+        stagingAddress: glueStagingAddress,
+        holdingAddress: 0x7f16,
+        finalAddress: glueFinalAddress,
+        rawBytes: glueModule.raw.length,
+        packedBytes: glueModule.packed.length,
+      },
+      director: {
+        address: directorRunAddress,
+        endExclusive: directorGuardAddress,
+        rawBytes: directorModule.raw.length,
+        packedBytes: directorModule.packed.length,
+      },
+      guard: { address: directorGuardAddress, bytes: 6 },
+    },
     buildVariant: enemyReviewHarness
       ? "enemy-review"
       : enemyCombatReviewHarness
@@ -898,8 +1013,8 @@ async function build() {
       initialBootContentBytes: initialContent.length,
       initialBootEnvelopeBytes: initialBoot.envelopeBytes,
       initialBootSectors: bootSectors,
-      extensionBytes: broadsideChunk.bytes.length,
-      extensionSectors: broadsideChunk.sectors,
+      extensionBytes: transportPayload.length - initialBoot.bytes.length,
+      extensionSectors,
       totalTransportBytes: transportPayload.length,
       totalTransportSectors,
       remainingAtrSectors: chunkLoaderConstants.atrSectors - totalTransportSectors,
@@ -908,7 +1023,8 @@ async function build() {
       architecturalAdditionalCapacityBytes:
         Math.min(
           (chunkLoaderConstants.atrSectors - totalTransportSectors) * chunkLoaderConstants.atrSectorBytes,
-          (chunkLoaderConstants.maxChunks - 1) * 50 * chunkLoaderConstants.atrSectorBytes,
+          (chunkLoaderConstants.maxChunks - transport.records.length) *
+            50 * chunkLoaderConstants.atrSectorBytes,
         ),
       maximumExtensionChunkBytes: 50 * chunkLoaderConstants.atrSectorBytes,
       maximumChunkCount: chunkLoaderConstants.maxChunks,
@@ -964,6 +1080,31 @@ async function build() {
         stagingAddress: packedResidentStagingAddress,
         stagingEndAddress: packedResidentStagingAddress + broadsideChunk.bytes.length - 1,
         finalAddress: broadsideRunAddress,
+      },
+    },
+    integrationGlue: {
+      transportAddress: glueStagingAddress,
+      holdingAddress: 0x7f16,
+      finalAddress: glueFinalAddress,
+      bytes: glueModule.raw.length,
+      packedBytes: glueModule.packed.length,
+      externalChunk: {
+        startSector: glueRecord.startSector,
+        sectors: glueChunk.sectors,
+        transportBytes: glueChunk.bytes.length,
+        crc16: glueChunk.storageCrc16,
+      },
+    },
+    directorRuntime: {
+      runAddress: directorRunAddress,
+      endExclusive: directorGuardAddress,
+      bytes: directorModule.raw.length,
+      packedBytes: directorModule.packed.length,
+      externalChunk: {
+        startSector: directorRecord.startSector,
+        sectors: directorChunk.sectors,
+        transportBytes: directorChunk.bytes.length,
+        crc16: directorChunk.storageCrc16,
       },
     },
     starfieldRuntime: {
@@ -1519,6 +1660,18 @@ async function build() {
   writeFile(path.join(buildDirectory, "resident-runtime-suffix-packed.bin"), packedResidentRuntime);
   writeFile(path.join(buildDirectory, "broadside-runtime.bin"), broadsideRuntime);
   writeFile(path.join(buildDirectory, "broadside-runtime-packed.bin"), packedBroadsideRuntime);
+  writeFile(path.join(buildDirectory, "integration-glue.o"), glueModule.object);
+  writeFile(path.join(buildDirectory, "integration-glue.lst"), glueModule.listing);
+  writeFile(path.join(buildDirectory, "integration-glue.map"), glueModule.map);
+  writeFile(path.join(buildDirectory, "integration-glue.lbl"), glueModule.labels);
+  writeFile(path.join(buildDirectory, "integration-glue.bin"), glueModule.raw);
+  writeFile(path.join(buildDirectory, "integration-glue-packed.bin"), glueModule.packed);
+  writeFile(path.join(buildDirectory, "encounter-director.o"), directorModule.object);
+  writeFile(path.join(buildDirectory, "encounter-director.lst"), directorModule.listing);
+  writeFile(path.join(buildDirectory, "encounter-director.map"), directorModule.map);
+  writeFile(path.join(buildDirectory, "encounter-director.lbl"), directorModule.labels);
+  writeFile(path.join(buildDirectory, "encounter-director.bin"), directorModule.raw);
+  writeFile(path.join(buildDirectory, "encounter-director-packed.bin"), directorModule.packed);
   writeFile(path.join(buildDirectory, "starfield-runtime.bin"), starfieldRuntime);
   writeFile(path.join(buildDirectory, "starfield-runtime-packed.bin"), packedStarfieldRuntime);
   writeFile(path.join(buildDirectory, "a2-kernel-runtime.bin"), a2KernelRuntime);

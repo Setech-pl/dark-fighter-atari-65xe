@@ -154,6 +154,17 @@ function createBootedArtifactRuntimeMemory(artifact, fill = 0) {
   return memory;
 }
 
+// Direct entity harnesses bypass start_gameplay. Put the admission policy in
+// the same live mixed-pressure state that production reaches before exercising
+// the debris scheduler; init_entity_effects deliberately clears this page.
+function armDirectorDebrisAdmission(memory) {
+  memory.fill(0, 0x80f4, 0x8100);
+  memory[0x80f6] = 3;
+  memory[0x80fb] = 0x6d;
+  memory[0x80fc] = 0xff;
+  memory[0x80ff] = (memory[addresses.frameCounter] - 1) & 0xff;
+}
+
 function runRoutine(memory, name, { accumulator = 0, beforeExecute } = {}) {
   const cpu = new Nmos6502(memory);
   const stop = 0x7fff;
@@ -547,6 +558,7 @@ test("spawn deterministically selects two variants, two phases and three traject
     for (const memory of [first, second]) {
       initialiseRows(memory);
       runRoutine(memory, "init_entity_effects");
+      armDirectorDebrisAdmission(memory);
       memory[addresses.rng] = seed;
       memory[addresses.spawnTimer] = 1;
       memory[addresses.sectorState] = 0;
@@ -582,6 +594,7 @@ test("X, Y and tumbling phase change only on WORLD_ROW_ADVANCED", () => {
   const memory = createRuntimeMemory();
   initialiseRows(memory);
   runRoutine(memory, "init_entity_effects");
+  armDirectorDebrisAdmission(memory);
   memory[addresses.spawnTimer] = 1;
   memory[addresses.sectorState] = 0;
   memory[addresses.playerX] = 196;
@@ -806,12 +819,13 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
   const mainLoop = source.slice(source.indexOf("main_loop:"),
     source.indexOf("main_loop_option_poll"));
   assert.match(mainLoop,
-    /jsr update_player_death[\s\S]+bcc main_loop_lifecycle_ready[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop[\s\S]+main_loop_lifecycle_ready\s*=\s*\*[\s\S]+jsr entity_effects_update/,
+    /jsr integration_update_player_death[\s\S]+bcc main_loop_lifecycle_ready[\s\S]+jsr enter_game_over[\s\S]+jmp frontend_loop[\s\S]+main_loop_lifecycle_ready\s*=\s*\*[\s\S]+jsr entity_effects_update/,
     "terminal Game Over must leave gameplay before the entity update");
 
   const emptyDuringDrain = createRuntimeMemory();
   initialiseRows(emptyDuringDrain);
   runRoutine(emptyDuringDrain, "init_entity_effects");
+  armDirectorDebrisAdmission(emptyDuringDrain);
   emptyDuringDrain[addresses.spawnTimer] = 1;
   emptyDuringDrain[addresses.sectorState] = 5;
   runRoutine(emptyDuringDrain, "entity_effects_update");
@@ -823,6 +837,7 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
   const transition = createRuntimeMemory();
   initialiseRows(transition);
   runRoutine(transition, "init_entity_effects");
+  armDirectorDebrisAdmission(transition);
   const protectedState = new Map([
     [addresses.raiderRng, 0x37],
     [addresses.viperBurstTimer, 0x07],

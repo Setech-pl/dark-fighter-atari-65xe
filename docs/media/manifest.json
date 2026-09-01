@@ -4,17 +4,17 @@
   "runtimeEvidence": {
     "xex": {
       "path": "dist/dark-fighter.xex",
-      "bytes": 19472,
-      "sha256": "48b67214a9abfe2c378336fcaa9c0e277a1451a680549c02ae5968bb4f9b4c9b"
+      "bytes": 20292,
+      "sha256": "7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5"
     },
     "atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "0ce1e54e6de3b8a1fb9a1382aebb4934df6a651c5d024be5359680068cb1e921"
+      "sha256": "55a3f11225f02c2c00499a88ffa00a7865034a6296ec8b362ba27a1f43d2d1ce"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "6ee34c7d77dc0d1d445b5f033fead369407620164343165209e1aa335dc92202"
+      "sha256": "c565121e31a1d18b96b9cb92f87ebea14bf18c1f4bb56790e77bef7f5a09092c"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
@@ -41,9 +41,9 @@
       "frame": 25,
       "width": 320,
       "height": 240,
-      "source_sha256": "8c9e87166d94f6a087ca86c686bf6b783a1e6fcd317fc1bf6d66fc26f1aa14c1",
-      "sha256": "2d209f26f9e3cfaf4c6ba5bea825b47c085db35be498c65c9dca420620cf9603",
-      "bytes": 1296
+      "source_sha256": "752141e9e659ae90322b309cc804be86ea1cacf221c2e35a93f8febb867e33ec",
+      "sha256": "42f4c2dcea5592ca4efcd3579a3c375c00d15cd96113ee044e28f7a80d6e17c2",
+      "bytes": 979
     },
     {
       "path": "docs/media/gameplay/03-raider-breakup.png",
@@ -54,9 +54,9 @@
       "frame": 31,
       "width": 320,
       "height": 240,
-      "source_sha256": "1f561b9a4e91058d66a6f801297c235173f151a6a5ad4953f091c6c94adae630",
-      "sha256": "567a1acebe35cac8f205a5889eb9d784295d2e83c780c7edd8a85bc584004e8d",
-      "bytes": 1506
+      "source_sha256": "0cbe4883a11a7b2d68d133e312cc63ab5e9e53ea6694385909cdc984e32f9a78",
+      "sha256": "3b28f853ef660f963ac4ad7faa5d21a042e6e6fa7ae4a9b0f48a4a70b2dd7478",
+      "bytes": 972
     },
     {
       "path": "docs/media/gameplay/04-debris-breakup.png",
@@ -67,9 +67,9 @@
       "frame": 113,
       "width": 320,
       "height": 240,
-      "source_sha256": "51110dd42bec175a1e6d73da41d68e3657764f0bd04d5868496b18c172e838c4",
-      "sha256": "7994b9dd99e9be6f09adfc95843ea1b460e9e972146f68be723344663b2c3837",
-      "bytes": 1696
+      "source_sha256": "e0f98cc54edebb19c2e8e68ece6672891820d8ccbea63e518e7c21b6ae89a0ff",
+      "sha256": "176d0b7d4bd96294705f85437f22ac1bee059e45d9e49159870ae89dfbba0b0f",
+      "bytes": 975
     },
     {
       "path": "docs/media/gameplay/05-rapid-fire-pickup.png",
@@ -80,9 +80,9 @@
       "frame": 385,
       "width": 320,
       "height": 240,
-      "source_sha256": "ad4d531617bbf554f639a2f7b588889d90458eb310e01ac7ecc2b555dc8af861",
-      "sha256": "9f93d08dde16a92939008dc8c0b6f8ecb1ceb7bc3e0f7d2ba470aef332670318",
-      "bytes": 1759
+      "source_sha256": "77d2a70a794dc4900907f089caeefdb609ccbfd92cbff6770f1af0a201dd15d6",
+      "sha256": "bd7e30025e844335506e3ed80a757ef6ce15d1b9648a04e7e644e05b667ade76",
+      "bytes": 1081
     },
     {
       "path": "docs/media/gameplay/06-rapid-fire-active.png",
@@ -93,9 +93,9 @@
       "frame": 449,
       "width": 320,
       "height": 240,
-      "source_sha256": "de9af9fc6bf10752330f260c036c1845f3ea9e8ab2dd1d96581c6da468cc79ef",
-      "sha256": "ed8cd7b05d02b0bed5b051b542a62823dc116647a517ad28aa966522053fe902",
-      "bytes": 1101
+      "source_sha256": "8318e1f79dacb132d8b8f71cde998cf1675786ef5ee176854ded8d5ab8a26db2",
+      "sha256": "680ef8ec339b0bcf4fbe76ff9cf239155d126789fff327c2f929089df887f25a",
+      "bytes": 1033
     },
     {
       "path": "docs/media/gameplay/07-capital-broadside.png",
@@ -106,9 +106,9 @@
       "frame": 100,
       "width": 320,
       "height": 240,
-      "source_sha256": "4276b41fe3d8cff1ab0f3e738cf7460401f323e4d086c3805165d46e821670ae",
-      "sha256": "f1e36842257ba32a5b282a7f11652e369829b29a81d1841abfb4128d0fd72011",
-      "bytes": 1620
+      "source_sha256": "d999a31060a8a29b7caacd3c0d910b4840b13d991fae34576e2e32f94ff37142",
+      "sha256": "19fd78547276a781b447540817de21b56c5736efc8dc342601bbc3b35c4f75d9",
+      "bytes": 961
     },
     {
       "path": "docs/media/gameplay/08-capital-engines.png",
@@ -119,9 +119,9 @@
       "frame": 96,
       "width": 320,
       "height": 240,
-      "source_sha256": "84fb5a12c2906bb1ecfb71938f50e4e17e08e7088e99f1be3954f4c9c8b5c1d6",
-      "sha256": "9e8492353f7ebfe594ec2217e1a2b0572166bfa7fbe8dbb3538bf98beb0afc8a",
-      "bytes": 1647
+      "source_sha256": "8d2e1902efc41b5511d358fb054510bc182ebf67080b85fba8b253191a81e982",
+      "sha256": "2f3be9f43f2cf0ead1504b7f98dd961f5b3cca3767db1f184803787d150f8c0b",
+      "bytes": 925
     },
     {
       "path": "docs/media/gameplay/09-spread-shot-active.png",
@@ -129,12 +129,12 @@
       "source": "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
-      "frame": 454,
+      "frame": 3351,
       "width": 320,
       "height": 240,
-      "source_sha256": "48bca00eb15d0600a07260d8c9b8d99b383b8fa001662d10bca04370e6796ed7",
-      "sha256": "ecae6bdd1b1b180a7f2889caf8d59107d28056c93f257d8f34f8ca7a5fab4a21",
-      "bytes": 1820
+      "source_sha256": "a47de5d3a00a3178dbcc1e92f7a8066119f02500ac07f6334010c3016c3e9096",
+      "sha256": "d95345cb2c72add88a1d862c1bce76f01aed236f8f75c20840bb1c68e46ee5c8",
+      "bytes": 1057
     }
   ],
   "assetSheets": [

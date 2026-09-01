@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseAtr, parseXex } from "./formats.mjs";
+import { loadChunkFixture } from "./chunk-loader.mjs";
+import { unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -21,6 +23,12 @@ export function loadRuntimeSegments(rootDirectory) {
       manifest.a2Kernel.bytes],
     ["entityCode", "entity-code-runtime.bin", manifest.entityEffects.codeRunAddress,
       manifest.entityEffects.codeBytes],
+    ...(manifest.encounterDirector?.enabled === true ? [
+      ["integrationGlue", "integration-glue.bin", manifest.integrationGlue.finalAddress,
+        manifest.integrationGlue.bytes],
+      ["encounterDirector", "encounter-director.bin", manifest.directorRuntime.runAddress,
+        manifest.directorRuntime.bytes],
+    ] : []),
   ];
   const segments = definitions.map(([name, fileName, start, expectedBytes]) => {
     const data = fs.readFileSync(path.join(rootDirectory, "build", fileName));
@@ -63,6 +71,15 @@ export function installBootArtifact(memory, rootDirectory, artifact) {
   ));
   const initialBytes = manifest.transportCapacity.initialBootBytes;
   memory.set(body.subarray(0, initialBytes), manifest.loadAddress);
+  if (manifest.encounterDirector?.enabled === true) {
+    loadChunkFixture({
+      atrBody: body,
+      manifest: manifest.transportCapacity.manifest.parsed,
+      memory,
+      unpackLz: unpackBroadsideLzss,
+    });
+    return { manifest, requiresBroadsideUnpack: false };
+  }
   const chunk = manifest.broadsideRuntime.externalChunk;
   const sectorOffset = (chunk.startSector - 1) * 128;
   memory.set(body.subarray(sectorOffset, sectorOffset + chunk.transportBytes),

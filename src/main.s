@@ -17,6 +17,24 @@
 .include "loader-display-list.inc"
 .include "frontend-h31.inc"
 
+DIRECTOR_INIT = $9D75
+DIRECTOR_WORLD_ROW_TICK = $9D9B
+DIRECTOR_REQUEST = $9EA7
+DIRECTOR_RELEASE = $9F23
+DIRECTOR_STATE_REACTION = $80F9
+DIRECTOR_STATE_RECOVERY = $80FA
+DIRECTOR_STATE_FLAGS = $80FE
+DIRECTOR_STATE_ADMISSION_FRAME = $80FF
+DIRECTOR_FLAG_COMPLETE = $01
+DIRECTOR_HAZARD_RAIDER = 0
+DIRECTOR_HAZARD_DEBRIS = 1
+DIRECTOR_HAZARD_BROADSIDE = 2
+DIRECTOR_HAZARD_PICKUP = 3
+DIRECTOR_RETRY_FRAMES = 8
+integration_director_world_row = $4EFE
+integration_debris_spawn = $4F0D
+integration_debris_release = $4F1D
+
 .import __A2_KERNEL_RUN__, __A2_KERNEL_SIZE__
 .import __BOOT_STAGE2_LOAD__, __BOOT_STAGE2_RUN__, __BOOT_STAGE2_SIZE__
 
@@ -108,7 +126,7 @@ NMIEN       = $D40E
 PMG_BASE    = $3800
 STARFIELD_STAGING = $7810
 STARFIELD_STAGING_BYTES = $0700
-BOOT_A2_STAGING = $7F10
+BOOT_A2_STAGING = $7F16
 PACKED_RESIDENT_STAGING = $8100
 PAUSE_SCREEN_BACKUP = STARFIELD_STAGING
 PAUSE_SCREEN_BYTES = $03C0
@@ -881,6 +899,7 @@ start:
     ; every source that later expansion can overwrite, expand BROADSIDE, then
     ; restore the byte-exact resident suffix at its linked address.
     jsr stage_boot_streams
+layout_d_stage_boot_streams_complete:
     lda boot_chunk_ready
     cmp #$02
     beq :+
@@ -888,15 +907,17 @@ start:
 :
     jsr unpack_resident_runtime
     jsr unpack_entity_runtime
-    jsr init_entity_effects
+layout_d_entity_unpack_complete:
     jsr stage_a2_kernel
+    jsr init_entity_effects
+layout_d_glue_holding_complete:
 
     lda #STATE_LOADER
     sta game_state
     jsr unpack_loader_bitmap
     jsr show_loader
     jsr unpack_starfield_runtime
-    jmp finish_startup_after_loader
+    jmp layout_d_publish_glue
 
 broadside_unpack_command:
     jsr broadside_read_source
@@ -1099,6 +1120,14 @@ stage_a2_kernel:
     iny
     cpy #<__A2_KERNEL_SIZE__
     bne @copy
+layout_d_hold_glue:
+    ldy #(LAYOUT_D_GLUE_BYTES-1)
+@hold:
+    lda LAYOUT_D_GLUE_STAGING,y
+    sta LAYOUT_D_GLUE_HOLDING,y
+    dey
+    bpl @hold
+layout_d_hold_glue_end:
     rts
 
 .assert __A2_KERNEL_SIZE__ > 0, error, "A2 kernel must not be empty"
@@ -1130,11 +1159,6 @@ broadside_destination:
 ; Runtime HUD tables occupy bytes that were already zero-filled inside the
 ; fixed raw bootstrap prefix. Keeping them here avoids consuming compressed
 ; payload while leaving the prefix size and every startup address unchanged.
-hud_booster_label:
-    .byte CH_HUD_A+1,CH_HUD_A+14,CH_HUD_A+14
-    .byte CH_HUD_A+18,CH_HUD_A+19,CH_SPACE
-hud_hull_segment_thresholds:
-    .byte 3,5,8,10
 boot_chunk_ready:
     .byte $00
 
@@ -2108,6 +2132,9 @@ start_gameplay:
     jsr init_playfield_display_lists
     jsr init_state
     jsr init_entity_effects
+    lda DIFFICULTY_SETTING
+    eor #$6D
+    jsr DIRECTOR_INIT
     jsr install_entity_effects_glyph
     jsr unpack_capital_hull_maps
     jsr init_broadside
@@ -2191,7 +2218,7 @@ profile_after_capsule = *
     jsr update_engine_animation
 profile_after_frame_visuals = *
 
-    jsr update_player_death
+    jsr integration_update_player_death
     bcc main_loop_lifecycle_ready
     jsr clear_pmg
     jsr silence_audio
@@ -2204,7 +2231,7 @@ main_loop_lifecycle_ready = *
     jsr read_input
 main_loop_simulation = *
 profile_after_player = *
-    jsr update_enemy
+    jsr integration_update_enemy
 profile_after_enemy = *
     lda #$00
     sta BROAD_DAMAGE_APPLIED
@@ -2212,7 +2239,7 @@ profile_after_enemy = *
 profile_after_collisions = *
     jsr update_viper_weapon
 profile_after_viper_weapon = *
-    jsr update_enemy_weapon
+    jsr integration_update_enemy_weapon
 profile_after_raider_weapon = *
     jsr update_starfield
     jsr tick_star_twinkle
@@ -2232,7 +2259,7 @@ profile_after_broadside_render = *
 profile_after_projectile_render = *
     jsr entity_effects_render
 profile_after_entity_render = *
-    jsr update_sector_completion
+    jsr integration_update_sector_completion
 profile_after_sector = *
     jsr update_sound
     lda MUSIC_ACTIVE
@@ -2751,7 +2778,7 @@ init_state:
     ldx #ENEMY_RELEASE_ARCHETYPE
     lda #(GAMEPLAY_TOP-ENEMY_RELEASE_FRAME_HEIGHT) ; progressive entry below HUD
     sta enemy_y
-    lda #ENEMY_ACTIVE_STATE
+    lda #ENEMY_INACTIVE
     sta ENEMY_ACTIVE
     lda enemy_hit_points,x
     sta ENEMY_HP
@@ -4235,7 +4262,7 @@ update_enemy:
     beq @reset
     rts
 @reset:
-    jmp reset_enemy
+    jmp integration_raider_recycle
 @active:
     cmp #ENEMY_ACTIVE_STATE
     beq @live
@@ -4247,7 +4274,7 @@ update_enemy:
     lda enemy_y
     cmp #GAMEPLAY_BOTTOM
     bcc @horizontal
-    jmp reset_enemy
+    jmp integration_raider_recycle
 
 @horizontal:
     jsr update_raider_soft_pursuit
@@ -4875,20 +4902,22 @@ update_starfield:
     cmp #HULL_SCROLL_RATE_DENOMINATOR
     bcs @hull_scroll
     sta HULL_SCROLL_ACCUMULATOR
-    ; A legacy-world clock event leaves boundary/muzzle finalization pending so
-    ; that the coincident hull step can perform it once after both copies. With the
-    ; fixed-point accumulator, a post-subtraction world value is always less
-    ; than the active numerator; a non-step value is always at least it.
+    ; Preserve the legacy accumulator postcondition; both comparison outcomes
+    ; returned through this same bounded no-hull path.
     lda scroll_accumulator
-    cmp world_scroll_rates,x
-    bcc @finalize_world
-    rts
-@finalize_world:
     rts
 @hull_scroll:
     sbc #HULL_SCROLL_RATE_DENOMINATOR
     sta HULL_SCROLL_ACCUMULATOR
-    jmp scroll_hull_columns
+    jsr scroll_hull_columns
+    lsr PLAYFIELD_RING_FLAGS
+    rts
+
+; Preserve every following STARFIELD entry point used by other relocated
+; segments. These bytes replace the removed duplicate-return dispatch and are
+; unreachable after update_starfield returns.
+starfield_layout_d2_cadence_pad:
+    .byte $00,$60
 
 ; The legacy world clock is now the 100% hull reference. Near and far layers
 ; use independent exact fixed-point ratios against each hull/world event:
@@ -4896,6 +4925,7 @@ update_starfield:
 advance_starfield_layers:
     lda #ENTITY_EVENT_WORLD_ROW_ADVANCED
     sta ENTITY_FRAME_EVENTS
+    jsr integration_director_world_row
     lda #$00
     sta STAR_GENERATION_FLAGS
     lda STAR_NEAR_PHASE
@@ -4925,14 +4955,12 @@ advance_starfield_layers:
     ora #STAR_GENERATE_FAR
     sta STAR_GENERATION_FLAGS
 @dispatch:
-    lda STAR_GENERATION_FLAGS
-    beq @done
+    ; Advance the physical scene exactly once per authoritative world row.
+    ; Far stars are erased before row publication and redrawn at their own
+    ; logical 1/4 cadence, so the capital exit cannot expose a half-rate centre
+    ; while the side bands drain at the full world rate.
     jsr erase_far_star_overlays
-    lda STAR_GENERATION_FLAGS
-    and #STAR_GENERATE_NEAR
-    beq @far_dispatch
     jsr scroll_world_columns
-@far_dispatch:
     lda STAR_GENERATION_FLAGS
     and #STAR_GENERATE_FAR
     beq @mark_dirty
@@ -5712,12 +5740,14 @@ EMIT_GAMEPLAY_MUSIC_DATA
 scroll_hull_columns:
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_COMPLETE
-    bcc :+
+    bcc scroll_hull_active
 scroll_hull_complete_done:
-    lda #$00
-    sta PLAYFIELD_RING_FLAGS
+    lsr PLAYFIELD_RING_FLAGS
+    bcc scroll_hull_complete_scroll
     rts
-:
+scroll_hull_complete_scroll:
+    jmp scroll_world_columns
+scroll_hull_active:
     lda PLAYFIELD_RING_FLAGS
     beq :+
     jmp scroll_hull_columns_advance_scene
@@ -5827,8 +5857,6 @@ scroll_hull_columns_advance_scene:
 @redraw:
     jsr redraw_tracked_muzzles
     jsr reset_exited_turret_lifecycles
-    lda #$00
-    sta PLAYFIELD_RING_FLAGS
     rts
 
 scroll_hull_divider_source:
@@ -5838,6 +5866,10 @@ scroll_hull_divider_source:
     sta src_ptr+1
     jmp scroll_hull_copy_source_ready
 scroll_hull_columns_end:
+    ; Keep every following ENTITY_CODE entry point stable for the 39-byte
+    ; integration glue ABI. These bytes replace the two removed tail bytes and
+    ; are unreachable because the divider source jumps back into the copier.
+    .byte $00,$00
 
 .segment "BROADSIDE"
 clear_top_hull_row:
@@ -6989,7 +7021,7 @@ init_broadside:
     sta PLAYER_LIFECYCLE
     lda #PLAYER_STARTING_LIVES
     sta PLAYER_LIVES
-    lda #CAPITAL_HULL_STATE_ENGINES
+    lda #CAPITAL_HULL_STATE_OPEN
     sta CAPITAL_SECTOR_STATE
     lda #PLAYER_HEALTH_UNITS    ; ten 10-point units, directly deriving 100%
     sta BROAD_PLAYER_HEALTH
@@ -7176,7 +7208,7 @@ update_broadside:
     bcs @free
     jmp @next
 @free:
-    jsr free_broadside_slot
+    jsr integration_broadside_release
     jmp @next
 
 @impact:
@@ -7203,10 +7235,6 @@ schedule_broadside:
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
     bcc :+
-    rts
-:
-    dec BROAD_SCHEDULE_TIMER
-    beq :+
     rts
 :
     ldx #$00
@@ -7262,7 +7290,6 @@ schedule_broadside:
     clc
     adc #GAMEPLAY_FIRST_SCREEN_ROW
     sta row_counter
-    lda row_counter
     ldx BROAD_WORK_SLOT
     cmp BROAD_TIMER,x
     bcc :+
@@ -7273,7 +7300,7 @@ schedule_broadside:
     asl
     asl
     asl
-    clc
+    ; Visible rows are below 32, so the third ASL leaves carry clear.
     adc #BROADSIDE_SCREEN_TOP
     ldx BROAD_WORK_SLOT
     ldy BROAD_WORK_VALUE
@@ -7334,6 +7361,13 @@ schedule_broadside:
     lda BROAD_TURRET,x
     cmp #$FF
     beq @retry
+    ; Admission is the commit point: pool capacity and an actually visible,
+    ; legal muzzle are proven first. A failed preflight cannot consume
+    ; intensity, reaction, RNG, or a turret lifecycle.
+    jsr integration_broadside_due
+    bcc @done
+    ldx BROAD_WORK_SLOT
+    lda BROAD_TURRET,x
     tay
     lda turret_record_offsets,y
     sta BROAD_WORK_VALUE
@@ -7342,7 +7376,7 @@ schedule_broadside:
     asl
     asl
     asl
-    clc
+    ; Candidate rows are below 32; carry is clear after the third ASL.
     adc #BROADSIDE_SCREEN_TOP
     adc capital_hull_turrets+CAPITAL_TURRET_SCANLINE_OFFSET,y
     sta BROAD_Y,x
@@ -7352,7 +7386,7 @@ schedule_broadside:
     lda capital_hull_turrets+CAPITAL_TURRET_MUZZLE_COLUMN_OFFSET,y
     asl
     asl
-    clc
+    ; A source column times four plus 48 cannot overflow.
     adc #48
     ldy BROAD_OWNER,x
     bne :+
@@ -7446,7 +7480,7 @@ scroll_broadside_scene:
     sta BROAD_Y,x
     cmp #(BROADSIDE_WARNING_Y_MAX+1)
     bcc :+
-    jsr free_broadside_slot
+    jsr integration_broadside_release
     jmp @next
 :
     jsr advance_broadside_row
@@ -8487,6 +8521,7 @@ handle_player_hull_contact:
     jmp apply_broadside_player_damage
 
 free_broadside_slot:
+    ldx BROAD_WORK_SLOT           ; Director release uses X for the hazard id
     jsr erase_broadside_slot
     lda #BROAD_FREE
     sta BROAD_STATE,x
@@ -8514,9 +8549,7 @@ erase_broadside_slot:
     iny
     lda BROAD_COLLISION,x
     sta (dst_ptr),y
-    lda #$00
-    sta BROAD_PREV_H,x
-    rts
+    jmp @clear_previous
 @missile_span:
     lda BROAD_PREV_H,x
     sta BROAD_WORK_COUNT
@@ -8529,6 +8562,7 @@ erase_broadside_slot:
     iny
     dec BROAD_WORK_COUNT
     bne @line
+@clear_previous:
     lda #$00
     sta BROAD_PREV_H,x
 @done:
@@ -8600,7 +8634,6 @@ draw_broadside_span:
     sta HPOSM1,x
     pla
 draw_broadside_span_at_hpos:
-    stx BROAD_WORK_SLOT
     sta BROAD_WORK_COUNT
     sta BROAD_PREV_H,x
     lsr
@@ -8619,7 +8652,6 @@ draw_broadside_span_at_hpos:
     iny
     dec BROAD_WORK_COUNT
     bne @line
-    ldx BROAD_WORK_SLOT
     rts
 
 .segment "ENTITY_CODE"
@@ -8830,7 +8862,7 @@ profile_after_pickup_booster_update = *
     cmp #CAPITAL_HULL_STATE_OPEN
     bne @defer_spawn
 @spawn:
-    jmp entity_spawn_debris
+    jmp integration_debris_spawn
 @defer_spawn:
     lda #ENTITY_REPEAT_SPAWN_DELAY
     sta ENTITY_SPAWN_TIMER_LO
@@ -8865,7 +8897,7 @@ profile_after_pickup_booster_update = *
     adc ENTITY_VY
     cmp #ENTITY_GAMEPLAY_BOTTOM
     bcc :+
-    jmp entity_despawn_debris
+    jmp integration_debris_release
 :
     sta ENTITY_Y
 @tumble:
@@ -8917,7 +8949,7 @@ update_weapon_pickup_active:
 @after_motion:
     cpx #WEAPON_PICKUP_STATE_PENDING
     bne :+
-    jmp weapon_pickup_pending_tick
+    jmp integration_pickup_pending_tick
 :
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
     cmp #(ENTITY_GAMEPLAY_BOTTOM-(WEAPON_PICKUP_HEIGHT_SCANLINES-8))
@@ -9006,6 +9038,7 @@ weapon_pickup_rapid_tick:
 weapon_pickup_pending_tick:
     dec ENTITY_TIMER+WEAPON_PICKUP_SLOT
     bne weapon_pickup_collision_done
+integration_pickup_reveal_body:
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
     cmp #WEAPON_PICKUP_SAFE_TOP
     bcs :+
@@ -9237,6 +9270,9 @@ entity_begin_sector_complete:
 ; remaining BROADSIDE reservation rather than expanding packed ENTITY_CODE.
 .segment "BROADSIDE"
 entity_complete_scroll_tick:
+    lda DIRECTOR_STATE_FLAGS
+    lsr
+    bcs @done                    ; final Director COMPLETE is terminal
     dec ENTITY_SPAWN_TIMER_HI
     bne @done
     inc CAPITAL_SECTOR_STATE
@@ -9301,7 +9337,7 @@ entity_debris_hit:
     rts
 entity_debris_destroyed:
     jsr spawn_debris_destruction_effects
-    jsr entity_despawn_debris
+    jsr integration_debris_release
     ; The empty-pool update later in this frame consumes the extra count. The
     ; transient +1 also identifies the destroyed snapshot to higher shot slots.
     inc ENTITY_SPAWN_TIMER_LO
@@ -9369,7 +9405,7 @@ entity_player_debris_overlap = *
     lda BROAD_DAMAGE_APPLIED
     beq entity_collision_miss
 entity_damage_applied:
-    jmp entity_despawn_debris
+    jmp integration_debris_release
 entity_collision_miss:
     rts
 
@@ -9962,6 +9998,24 @@ entity_raider_fragment_render_ids:
 ; The bootstrap restores the packed resident suffix before the loader display
 ; starts. Finish the byte-exact cold initialisation from ENTITY_CODE afterwards
 ; so the verbatim boot prefix stays small and stable.
+.segment "STARFIELD"
+hud_booster_label:
+    .byte CH_HUD_A+1,CH_HUD_A+14,CH_HUD_A+14
+    .byte CH_HUD_A+18,CH_HUD_A+19,CH_SPACE
+hud_hull_segment_thresholds:
+    .byte 3,5,8,10
+layout_d_publish_glue:
+    ldy #(LAYOUT_D_GLUE_BYTES-1)
+@copy:
+    lda LAYOUT_D_GLUE_HOLDING,y
+    sta LAYOUT_D_GLUE_FINAL,y
+    dey
+    bpl @copy
+layout_d_publish_glue_end:
+layout_d_glue_publish_complete:
+    jmp finish_startup_after_loader
+
+.segment "ENTITY_CODE"
 finish_startup_after_loader:
     jsr clear_pmg
     jsr copy_charset
@@ -10134,6 +10188,120 @@ entity_slot_bit_masks:
 entity_trajectory_vx:
     EMIT_ENTITY_TRAJECTORY_VX
 
+
+; Encounter Director adapters own admission and policy only. Object lifecycle
+; remains in the existing production routines reached by these gates.
+.segment "CODE"
+integration_update_enemy:
+    lda ENEMY_ACTIVE
+    beq integration_raider_retry
+    jmp update_enemy
+
+integration_raider_recycle:
+    ldx #DIRECTOR_HAZARD_RAIDER
+    jsr DIRECTOR_RELEASE
+    ; DIRECTOR_RELEASE preserves X. Hazard Raider is zero, so make the ended
+    ; lifecycle explicitly inactive before a retry may be deferred by capital
+    ; ownership or by the Director budget.
+    stx ENEMY_ACTIVE
+integration_raider_retry:
+    ; The finite capital corridor owns new admissions while its hull is live.
+    ; An already active Raider keeps its ordinary lifecycle, but an inactive
+    ; slot cannot reserve the small EASY/MEDIUM budget ahead of ship-to-ship
+    ; fire and starve every naturally visible muzzle.
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_DRAIN
+    bcc @blocked
+    lda RAIDER_BURST_TIMER
+    beq @request
+    dec RAIDER_BURST_TIMER
+@blocked:
+    rts
+@request:
+    ldx #DIRECTOR_HAZARD_RAIDER
+    jsr DIRECTOR_REQUEST
+    bcs @admitted
+    lda #DIRECTOR_RETRY_FRAMES
+    sta RAIDER_BURST_TIMER
+    rts
+@admitted:
+    jmp reset_enemy
+
+integration_update_enemy_weapon:
+    lda RAIDER_BURST_STATE
+    cmp #WEAPON_BURST_FIRING
+    beq @continue
+    lda DIRECTOR_STATE_REACTION
+    ora DIRECTOR_STATE_RECOVERY
+    bne @blocked
+@continue:
+    jmp update_enemy_weapon
+@blocked:
+    rts
+
+integration_update_player_death:
+    jsr update_player_death
+    php
+    lda PLAYER_LIFECYCLE
+    beq @restore
+    lda frame_counter
+    sta DIRECTOR_STATE_ADMISSION_FRAME
+@restore:
+    plp
+    rts
+
+integration_update_sector_completion:
+    jsr update_sector_completion
+    lda DIRECTOR_STATE_FLAGS
+    lsr
+    bcc @done
+    jsr weapon_pickup_clear_sector
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_COMPLETE
+    beq @done
+    lda #CAPITAL_HULL_STATE_DRAIN
+    sta CAPITAL_SECTOR_STATE
+@done:
+    rts
+
+.segment "A2_KERNEL"
+integration_broadside_due:
+    dec BROAD_SCHEDULE_TIMER
+    bne @not_due
+    ldx #DIRECTOR_HAZARD_BROADSIDE
+    jsr DIRECTOR_REQUEST
+    bcs @done
+    lda #BROADSIDE_RETRY_DELAY
+    sta BROAD_SCHEDULE_TIMER
+@not_due:
+    clc
+@done:
+    rts
+
+integration_broadside_release:
+    ldx #DIRECTOR_HAZARD_BROADSIDE
+    jsr DIRECTOR_RELEASE
+    jmp free_broadside_slot
+
+integration_pickup_pending_tick:
+    dec ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    bne @done
+    ldx #DIRECTOR_HAZARD_PICKUP
+    jsr DIRECTOR_REQUEST
+    bcs @reveal
+    lda #DIRECTOR_RETRY_FRAMES
+    sta ENTITY_TIMER+WEAPON_PICKUP_SLOT
+@done:
+    rts
+@reveal:
+    jmp integration_pickup_reveal_body
+
+.export integration_update_enemy, integration_raider_recycle, integration_raider_retry
+.export integration_update_enemy_weapon, integration_update_player_death
+.export integration_update_sector_completion
+.export integration_broadside_due, integration_broadside_release
+.export integration_pickup_pending_tick, integration_pickup_reveal_body
+
 .assert entity_archetype_descriptors_end-entity_archetype_descriptors = ENTITY_ARCHETYPE_DESCRIPTOR_BYTES, error, "entity descriptor size changed"
 .assert entity_debris_glyph_end-entity_debris_glyph = ENTITY_DEBRIS_GLYPH_BYTES, error, "debris glyph bank size changed"
 .assert effect_fragment_glyph_end-effect_fragment_glyph = EFFECT_FRAGMENT_GLYPH_BYTES, error, "fragment glyph bank size changed"
@@ -10183,6 +10351,10 @@ CHUNK_STAGING_BROAD   = 1
 CHUNK_STAGING_ADDRESS = $8100
 CHUNK_FINAL_ADDRESS   = $5E10
 CHUNK_STAGING_SECTORS_MAX = 50
+LAYOUT_D_GLUE_STAGING = $5259
+LAYOUT_D_GLUE_FINAL = $4EFE
+LAYOUT_D_GLUE_HOLDING = $7F16
+LAYOUT_D_GLUE_BYTES = 39
 
 .macro STAGE2_FAIL_NE
     .local ok
@@ -10217,6 +10389,7 @@ ok:
 
 boot_stage2_atr_entry:
     jsr boot_stage2_validate_manifest
+layout_d_manifest_validation_complete:
     lda #<(boot_chunk_manifest+CHUNK_RECORD)
     sta frontend_data_ptr
     lda #>(boot_chunk_manifest+CHUNK_RECORD)
@@ -10303,19 +10476,25 @@ stage2_read_sector:
     ldy #$0C
     lda (frontend_data_ptr),y
     beq stage2_publish_raw
-    ; A valid LZ stream must finish exactly at finalDestination+rawLength.
-    ; The shared decoder advances this self-modified store operand after every
-    ; output byte, so the postcondition costs no runtime-resident state.
-    lda stage2_final_end_lo
-    sta stage2_expected_output_lo
-    lda stage2_final_end_hi
-    sta stage2_expected_output_hi
+    ; Recompute the expected end from this record. Manifest validation may have
+    ; already visited later records whose destinations are unordered.
+layout_d_expected_end_path:
+    ldy #$06
+    clc
+    lda (frontend_data_ptr),y
+    adc broadside_destination+1
+    sta stage2_final_end_lo
+    iny
+    lda (frontend_data_ptr),y
+    adc broadside_destination+2
+    sta stage2_final_end_hi
+layout_d_expected_end_path_end:
     jsr broadside_unpack_command
     lda broadside_destination+1
-    cmp stage2_expected_output_lo
+    cmp stage2_final_end_lo
     STAGE2_FAIL_NE
     lda broadside_destination+2
-    cmp stage2_expected_output_hi
+    cmp stage2_final_end_hi
     STAGE2_FAIL_NE
     jmp stage2_chunk_published
 stage2_publish_raw:
@@ -10677,8 +10856,6 @@ stage2_final_end_lo:      .byte $00
 stage2_final_end_hi:      .byte $00
 stage2_staging_end_lo:    .byte $00
 stage2_staging_end_hi:    .byte $00
-stage2_expected_output_lo:.byte $00
-stage2_expected_output_hi:.byte $00
 
 boot_chunk_manifest:
     .res CHUNK_MANIFEST_MAX_BYTES,$FF
@@ -10688,4 +10865,11 @@ boot_chunk_manifest_end:
 .assert *-__BOOT_STAGE2_RUN__ <= $0800, error, "stage-2 loader exceeds transient overlay"
 
 .export boot_stage2_atr_entry, boot_stage2_xex_entry, boot_stage2_error
-.export boot_chunk_manifest, boot_chunk_manifest_end
+.export boot_chunk_manifest, boot_chunk_manifest_end, stage2_chunk_published
+.export layout_d_manifest_validation_complete
+.export layout_d_expected_end_path, layout_d_expected_end_path_end
+.export layout_d_stage_boot_streams_complete, layout_d_glue_holding_complete
+.export layout_d_glue_publish_complete
+.export layout_d_hold_glue, layout_d_hold_glue_end
+.export layout_d_publish_glue, layout_d_publish_glue_end
+.export layout_d_entity_unpack_complete

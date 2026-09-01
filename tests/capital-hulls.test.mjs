@@ -577,7 +577,7 @@ test("loader remains unchanged and the accepted H3.1 menu preview is source-deri
 });
 
 test("joystick, FIRE, projectile, enemy, and scoring routines remain connected", () => {
-  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_viper_weapon[\s\S]+jsr update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
+  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr integration_update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_viper_weapon[\s\S]+jsr integration_update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
   assert.match(source, /read_input:[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
   assert.match(source,
     /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #VIPER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #RAIDER_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
