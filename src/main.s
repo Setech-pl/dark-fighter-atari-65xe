@@ -8377,41 +8377,40 @@ broadside_hits_opposite_hull:
     rts
 
 ; Converts a visible gameplay row to the shared finite left-ship sector row.
-; Carry is set for the initial approach or final drained blank rows.
+; Carry is set for the initial approach, final drained blank rows, or terminal
+; COMPLETE/OPEN states where no capital hull is visible.
 visible_hull_sector_row:
     sec
     sbc #GAMEPLAY_FIRST_SCREEN_ROW
     sta loader_repeat_value
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
-    bcs @draining
+    beq @draining
+    bcs @invalid
     lda loader_repeat_value
     cmp BROAD_VISIBLE_SCROLLS
     bcs @invalid
     lda corridor_phase
     sec
-    sbc #$01
-    sec
     sbc loader_repeat_value
     tay
+    dey
     clc
     rts
 @draining:
     lda loader_repeat_value
     cmp CAPITAL_SECTOR_DRAIN_ROWS
     bcc @invalid
-    sec
-    sbc CAPITAL_SECTOR_DRAIN_ROWS
-    sta loader_repeat_value
     lda #(CAPITAL_HULL_STREAM_ROWS-1)
-    sec
     sbc loader_repeat_value
-    tay
     clc
+    adc CAPITAL_SECTOR_DRAIN_ROWS
+    tay
     rts
 @invalid:
     sec
     rts
+    .byte $18,$60,$AD,$CD        ; retain the fixed BROADSIDE transport extent
 
 ; P0 and P3 share player_x. At most three visible finite-sector rows are
 ; resolved through their reusable modules. Stars are ignored because only the

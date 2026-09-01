@@ -139,6 +139,18 @@ function runAssembledRoutine(memory, name) {
   return cpu.cycles;
 }
 
+function runVisibleHullSectorRow(memory, screenRow) {
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.a = screenRow;
+  cpu.pc = labels.get("visible_hull_sector_row");
+  for (let steps = 0; steps < 100 && cpu.pc !== stop; steps += 1) cpu.step();
+  assert.equal(cpu.pc, stop, "visible_hull_sector_row did not return");
+  return { carry: cpu.getFlag(0x01), sectorRow: cpu.y, cycles: cpu.cycles };
+}
+
 function containsBytes(haystack, needle) {
   return haystack.indexOf(Buffer.from(needle)) !== -1;
 }
@@ -1003,6 +1015,54 @@ test("centered player survives every finite hull row while runtime contact state
   assert.match(contactRoutine,
     /sta PLAYER_CONTACT_ROWS[\s\S]+sta PLAYER_CONTACT_LEFT[\s\S]+sta PLAYER_CONTACT_RIGHT/);
   assert.doesNotMatch(contactRoutine, /sta BROAD_WORK_COUNT\s*;.*rows|dec BROAD_WORK_COUNT/);
+});
+
+test("assembled hull visibility maps states 0-5 and rejects terminal COMPLETE/OPEN", () => {
+  const constants = readGameGraphicsSource(source, definition).constants;
+  const expectedSectorRows = [13, 13, 13, 13, 13, 239, null, null];
+  const expectedCycles = [46, 46, 46, 46, 46, 44, 26, 26];
+
+  for (let state = 0; state < 8; state += 1) {
+    const memory = createLinkedRuntimeMemory();
+    memory[labels.get("CAPITAL_SECTOR_STATE")] = state;
+    memory[labels.get("corridor_phase")] = 22;
+    memory[constants.get("BROAD_VISIBLE_SCROLLS")] = 23;
+    memory[constants.get("CAPITAL_SECTOR_DRAIN_ROWS")] = 0;
+    const result = runVisibleHullSectorRow(memory, 9);
+    assert.equal(result.carry, expectedSectorRows[state] === null,
+      `capital state ${state} visibility`);
+    assert.equal(result.cycles, expectedCycles[state], `capital state ${state} bounded cycles`);
+    if (expectedSectorRows[state] !== null) {
+      assert.equal(result.sectorRow, expectedSectorRows[state],
+        `capital state ${state} collision sector row`);
+    }
+  }
+});
+
+test("terminal COMPLETE and early OPEN cannot apply invisible capital contact damage", () => {
+  const constants = readGameGraphicsSource(source, definition).constants;
+
+  for (const state of [CAPITAL_SECTOR_STATES.COMPLETE, CAPITAL_SECTOR_STATES.OPEN]) {
+    const memory = createLinkedRuntimeMemory();
+    memory[labels.get("CAPITAL_SECTOR_STATE")] = state;
+    memory[constants.get("CAPITAL_SECTOR_DRAIN_ROWS")] = 0;
+    memory[labels.get("player_x")] = 48;
+    memory[labels.get("player_y")] = 80;
+    memory[labels.get("PLAYER_LIFECYCLE")] = PLAYER_LIFECYCLE_STATES.ALIVE;
+    memory[constants.get("PLAYER_LIVES")] = 3;
+    memory[constants.get("BROAD_PLAYER_HEALTH")] = 10;
+    memory[constants.get("BROAD_DAMAGE_COOLDOWN")] = 0;
+    memory[constants.get("BROAD_DAMAGE_APPLIED")] = 0;
+
+    runAssembledRoutine(memory, "handle_player_hull_contact");
+
+    assert.equal(memory[labels.get("player_x")], 48,
+      `capital state ${state} must not clamp against an invisible hull`);
+    assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], 10,
+      `capital state ${state} must not apply invisible hull damage`);
+    assert.equal(memory[constants.get("BROAD_DAMAGE_APPLIED")], 0,
+      `capital state ${state} must not claim the frame damage gate`);
+  }
 });
 
 test("assembled hull contact uses dedicated boundaries instead of resolver scratch", () => {
