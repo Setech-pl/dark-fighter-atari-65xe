@@ -63,10 +63,10 @@ test("Rapid Fire owns fixed slot one without extending BSS or physical pools", (
     widthHpos: 8,
     heightScanlines: 16,
     glyphs: [
-      [42, 191, 131, 140, 140, 131, 140, 140],
-      [168, 254, 194, 206, 206, 194, 206, 206],
-      [131, 140, 140, 140, 140, 140, 191, 42],
-      [194, 206, 206, 206, 206, 206, 254, 168],
+      [42, 191, 191, 190, 188, 188, 188, 188],
+      [168, 254, 254, 190, 62, 62, 62, 62],
+      [188, 188, 188, 188, 190, 191, 191, 42],
+      [62, 62, 62, 62, 190, 254, 254, 168],
     ],
     palette: {
       outlineRegister: "COLPF1", outlineValue: 0x84,
@@ -83,7 +83,7 @@ test("Rapid Fire owns fixed slot one without extending BSS or physical pools", (
   assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 0);
 });
 
-test("four dense R/F glyphs cut tall black letters from a static 2x2 capsule", () => {
+test("four glyphs form one tapered 8x16 capsule with a single continuous black channel", () => {
   const { entities } = assets();
   assert.equal(entities.pickupGlyphs.length, 32);
   const glyphRows = [...entities.pickupGlyphs].map((row) =>
@@ -94,16 +94,16 @@ test("four dense R/F glyphs cut tall black letters from a static 2x2 capsule", (
   assert.equal(selectors.includes(1), false, "pickup must contain no white COLPF0 pixels");
   const symbols = glyphRows.map((row) => row.map((selector) => "#?sy"[selector]).join(""));
   assert.deepEqual(symbols.slice(0, 8), [
-    "#sss", "syyy", "s##y", "s#y#", "s#y#", "s##y", "s#y#", "s#y#",
+    "#sss", "syyy", "syyy", "syys", "syy#", "syy#", "syy#", "syy#",
   ]);
   assert.deepEqual(symbols.slice(8, 16), [
-    "sss#", "yyys", "y##s", "y#ys", "y#ys", "y##s", "y#ys", "y#ys",
+    "sss#", "yyys", "yyys", "syys", "#yys", "#yys", "#yys", "#yys",
   ]);
   assert.deepEqual(symbols.slice(16, 24), [
-    "s##y", "s#y#", "s#y#", "s#y#", "s#y#", "s#y#", "syyy", "#sss",
+    "syy#", "syy#", "syy#", "syy#", "syys", "syyy", "syyy", "#sss",
   ]);
   assert.deepEqual(symbols.slice(24), [
-    "y##s", "y#ys", "y#ys", "y#ys", "y#ys", "y#ys", "yyys", "sss#",
+    "#yys", "#yys", "#yys", "#yys", "syys", "yyys", "yyys", "sss#",
   ]);
   const include = renderEntityEffectsCa65Include(entities);
   assert.match(include, /WEAPON_PICKUP_GLYPH_COUNT = 4/);

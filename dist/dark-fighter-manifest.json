@@ -262,7 +262,7 @@
   },
   "entityEffects": {
     "source": "assets/graphics/entity-effects.json",
-    "sourceSha256": "5e5da0a3ab51571dad3b944228b23c3e6bd7baa5a6bcae3bade319804128fb11",
+    "sourceSha256": "3ea4d22dc5775d1c35b3d096f54dcd8e6dedeea381dc4ba5609279cc95c93500",
     "stateAddress": 32768,
     "stateBytes": 256,
     "initializedBytes": 256,
@@ -22240,17 +22240,17 @@
       "dark-fighter-boot.bin": {
         "path": "dist/dark-fighter-boot.bin",
         "bytes": 19456,
-        "sha256": "6b7383ad4aa3e07bb144bfbb316a5de37e4fbd3b847b10c53f9f991fb38f8dc7"
+        "sha256": "8ab78fd95dfc53e1bbe61f3ae6cef2bad0ec0a382a8d402729c1697380494395"
       },
       "dark-fighter.xex": {
         "path": "dist/dark-fighter.xex",
         "bytes": 20292,
-        "sha256": "2d7e5cf9a3856bb7ee77995db9c63ce54574ab746a3083a1e5d1c09baeb9a59f"
+        "sha256": "b841b4ed543f601ed98a3cb2bd8c7ecada46cc3c15c8fb7eae54a9a1ca02981b"
       },
       "dark-fighter.atr": {
         "path": "dist/dark-fighter.atr",
         "bytes": 92176,
-        "sha256": "5f07e649538ecbacb23939ee183d326116c3aa2ec7cb5db6d4e52824aceb7797"
+        "sha256": "406bc6c3790866726f28b5ad1516c255c733e262a6a3a8ba49dcf52f92fb6eb2"
       }
     },
     "reportPath": null,
@@ -22259,15 +22259,15 @@
   "artifacts": {
     "dark-fighter-boot.bin": {
       "bytes": 19456,
-      "sha256": "6b7383ad4aa3e07bb144bfbb316a5de37e4fbd3b847b10c53f9f991fb38f8dc7"
+      "sha256": "8ab78fd95dfc53e1bbe61f3ae6cef2bad0ec0a382a8d402729c1697380494395"
     },
     "dark-fighter.xex": {
       "bytes": 20292,
-      "sha256": "2d7e5cf9a3856bb7ee77995db9c63ce54574ab746a3083a1e5d1c09baeb9a59f"
+      "sha256": "b841b4ed543f601ed98a3cb2bd8c7ecada46cc3c15c8fb7eae54a9a1ca02981b"
     },
     "dark-fighter.atr": {
       "bytes": 92176,
-      "sha256": "5f07e649538ecbacb23939ee183d326116c3aa2ec7cb5db6d4e52824aceb7797"
+      "sha256": "406bc6c3790866726f28b5ad1516c255c733e262a6a3a8ba49dcf52f92fb6eb2"
     }
   }
 }
