@@ -88,6 +88,10 @@ the previous frame, never a pointer recalculated from the new ring phase.
 Capsule glyph codes must not enter backing or wrap-copy sources. Visual review
 therefore covers empty space, both hulls, module boundaries, prow, engine banks,
 and display-list wrap.
+When the P0/P3 Viper overlaps a capsule, set hull or engine bits remain in the
+foreground. Zero bits in the Viper PMG masks are transparent and must leave the
+capsule visible; a restored black playfield rectangle or clipped capsule edge
+is never an acceptable substitute for pixel-level overlap.
 
 ## Motion and effects
 

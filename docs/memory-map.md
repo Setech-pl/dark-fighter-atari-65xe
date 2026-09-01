@@ -12,8 +12,8 @@ lifetime phases and are not additive free memory.
 | `$0080-$009F` | 32 B | zero-page runtime variables |
 | `$0100-$01FF` | 256 B | 6502 stack |
 | `$0200-$03FF` | 512 B | OS workspace and vectors |
-| `$2000-$3116` | 4,375 B | resident `CODE` |
-| `$3117-$3F98` | 3,714 B | resident `RODATA` |
+| `$2000-$3122` | 4,387 B | resident `CODE` |
+| `$3123-$3FA4` | 3,714 B | resident `RODATA` |
 | `$5400-$54C9` | 202 B | `PROJECTILES`: 19 fighter slots, burst controllers, and two shared fighter explosions |
 | `$552A-$5DF0` | 2,247 B | relocated `STARFIELD` runtime; 2,278 B reserved through `$5E0F` |
 | `$5E10-$77CF` | 6,592 B | relocated `BROADSIDE`/frontend/enemy/weapon runtime |
@@ -27,29 +27,29 @@ lifetime phases and are not additive free memory.
 | `$21C1-$2667` | 1,191 B | boot-only `BOOT_STAGE2` overlay; replaced by the resident suffix before runtime |
 
 The linked production runtime metric is `CODE + STARFIELD + BROADSIDE +
-A2_KERNEL + ENTITY_CODE + PICKUP_CODE = 16,805 B`. With the 1,152-byte pickup
+A2_KERNEL + ENTITY_CODE + PICKUP_CODE = 16,817 B`. With the 1,152-byte pickup
 phase bank, late-published GLUE, DIRECTOR, and their frozen integration
-accounting, simultaneous feature residency is 18,643 B and safe residency is
-3,544 B. Relative to the pre-compositor checkpoint, linked code/data grows by
-70 B, persistent BSS grows by 0 B, and immutable runtime phase data grows by
+accounting, simultaneous feature residency is 18,655 B and safe residency is
+3,532 B. Relative to the pre-compositor checkpoint, linked code/data grows by
+82 B, persistent BSS grows by 0 B, and immutable runtime phase data grows by
 1,152 B.
 
 ## Boot transport layout
 
 The production Encounter Director transport is 19,968 bytes in 156 occupied
 sectors. BRCNT loads the 12,800-byte/100-sector initial block at `$2000-$51FF`;
-the entry point remains `$201E`. Initial content is exactly 12,755 B and ends
-at `$51D2`; the rest of the last sector is transport padding.
+the entry point remains `$201E`. Initial content is exactly 12,765 B and ends
+at `$51DC`; the rest of the last sector is transport padding.
 
 | Initial address / ATR sectors | Size | Stored form and startup destination |
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
 | `$21C1-$2667` | 1,191 B | stage-2 SIO/CRC/per-record-end/manifest overlay |
-| `$2668-$400D` | 6,566 B | packed resident suffix; staged at `$8100` |
-| `$400E-$4708` | 1,787 B | packed 2,247-byte starfield/music runtime; stages at `$7810` and expands to `$552A-$5DF0` |
-| `$4709-$4807` | 255 B | A2 source; staged at `$7F16-$8014`, copied to `$9000-$90FE` before entity/effects clear |
-| `$4808-$51CE` | 2,503 B | packed 3,069-byte ENTITY_CODE; staged at `$5300-$5CC6`, expands to `$9100-$9CFC` |
-| `$51CF-$51D2` | 4 B | source-owned `DFB1` trailer; end of 12,755-byte content |
+| `$2668-$4017` | 6,576 B | packed resident suffix; staged at `$8100` |
+| `$4018-$4712` | 1,787 B | packed 2,247-byte starfield/music runtime; stages at `$7810` and expands to `$552A-$5DF0` |
+| `$4713-$4811` | 255 B | A2 source; staged at `$7F16-$8014`, copied to `$9000-$90FE` before entity/effects clear |
+| `$4812-$51D8` | 2,503 B | packed 3,069-byte ENTITY_CODE; staged at `$5300-$5CC6`, expands to `$9100-$9CFC` |
+| `$51D9-$51DC` | 4 B | source-owned `DFB1` trailer; end of 12,765-byte content |
 | ATR sectors 101-144 | 5,632 B | external BROADSIDE record: 5,611 B packed / 6,592 B raw to `$5E10-$77CF` |
 | ATR sectors 145-150 | 768 B | pickup phase/code record: 700 B packed / 1,419 B raw, transported to `$7BD0` then preserved at `$4801` and expanded to `$8800` |
 | ATR sector 151 | 128 B | GLUE record: 41 B packed / 39 B raw to staging `$5259` |
@@ -58,8 +58,8 @@ at `$51D2`; the rest of the last sector is transport padding.
 The `DFMC` v1 manifest is 78 B for the current four records and reserves space
 inside stage-2 for at most eight records. The ATR has 564 free sectors
 (72,192 B). Runtime and transport budgets remain separate; current safe
-residency is 3,544 B. The older 15,346-byte capacity reference remains useful
-only as history; the production gate is the exact 16,805-byte linked runtime
+residency is 3,532 B. The older 15,346-byte capacity reference remains useful
+only as history; the production gate is the exact 16,817-byte linked runtime
 and its explicit simultaneous-residency accounting.
 
 ## Loader-time ownership

@@ -47,6 +47,33 @@ function assets() {
   };
 }
 
+function sourceBytes(startLabel, endLabel) {
+  const start = source.indexOf(`${startLabel}:`);
+  const end = endLabel.startsWith(".") ? source.indexOf(endLabel, start) :
+    source.indexOf(`${endLabel}:`, start);
+  return source.slice(start, end)
+    .split(/\r?\n/)
+    .flatMap((line) => line.match(/^\s*\.byte\s+(.+)$/)?.[1].split(",") ?? [])
+    .map((token) => token.trim())
+    .map((token) => token.startsWith("%") ? Number.parseInt(token.slice(1), 2) :
+      token.startsWith("$") ? Number.parseInt(token.slice(1), 16) : Number(token));
+}
+
+function pickupPhasePixels(bank, phase) {
+  const pixels = Array.from({ length: 24 }, () => Array(16).fill(0));
+  for (let glyph = 0; glyph < 6; glyph += 1) for (let row = 0; row < 8; row += 1) {
+    const value = bank[phase * 48 + glyph * 8 + row];
+    const cellRow = Math.floor(glyph / 2);
+    const cellColumn = glyph & 1;
+    for (let pixel = 0; pixel < 4; pixel += 1) {
+      const selector = value >> (6 - pixel * 2) & 3;
+      pixels[cellRow * 8 + row][cellColumn * 8 + pixel * 2] = selector;
+      pixels[cellRow * 8 + row][cellColumn * 8 + pixel * 2 + 1] = selector;
+    }
+  }
+  return pixels;
+}
+
 test("Rapid Fire owns fixed slot one without extending BSS or physical pools", () => {
   const { entities } = assets();
   assert.deepEqual([
@@ -330,11 +357,49 @@ test("the main frame has one guarded late pickup publication", () => {
   assert.equal((source.match(/jsr render_weapon_pickup_overlay/g) ?? []).length, 0);
   assert.equal((source.match(/jmp render_weapon_pickup_overlay/g) ?? []).length, 1);
   assert.match(source,
-    /main_loop:\n\s+jsr wait_gameplay_frame[\s\S]+wait_gameplay_frame:\n\s+lda ENTITY_STATE\+WEAPON_PICKUP_SLOT[\s\S]+lda #\$50[\s\S]+wait_frame:\n\s+lda #\$70/);
+    /main_loop:\n\s+jsr wait_gameplay_frame[\s\S]+wait_gameplay_frame:\n\s+lda ENTITY_STATE\+WEAPON_PICKUP_SLOT\n\s+beq wait_frame\n\s+cmp #WEAPON_PICKUP_STATE_ACTIVE\n\s+beq @visible\n\s+ldx #\$50[\s\S]+@visible:\n\s+lda ENTITY_Y\+WEAPON_PICKUP_SLOT\n\s+clc\n\s+adc #WEAPON_PICKUP_HEIGHT_SCANLINES\n\s+lsr[\s\S]+wait_frame:\n\s+ldx #\$70[\s\S]+cpx VCOUNT/);
   assert.match(source,
     /render_weapon_pickup_overlay:[\s\S]+lda ENTITY_DRAWN_MASK\+WEAPON_PICKUP_SLOT[\s\S]+beq :\+[\s\S]+rts/);
   assert.match(source,
     /erase_weapon_pickup_overlay_restore:[\s\S]+ENTITY_SCREEN_HI\+3[\s\S]+ENTITY_VY\+WEAPON_PICKUP_SLOT[\s\S]+ENTITY_SCREEN_LO\+WEAPON_PICKUP_SLOT/);
+});
+
+test("player PMG transparency preserves every pickup phase at nose side and rear overlap", () => {
+  const { entities } = assets();
+  const body = sourceBytes("player_shape", "player_engine_shape");
+  const engine = sourceBytes("player_engine_shape", ".segment \"ENTITY_CODE\"");
+  assert.deepEqual([body.length, engine.length], [16, 16]);
+  assert.match(source, /finish_startup_after_loader:[\s\S]+lda #\$00[\s\S]{0,160}sta PRIOR/);
+  const contacts = new Map([["nose", 14], ["side", 4], ["rear", -6]]);
+  for (const phase of [0, 2, 4, 6]) {
+    const capsule = pickupPhasePixels(entities.pickupPhaseBank, phase);
+    for (const [contact, playerTop] of contacts) {
+      let transparentCapsulePixels = 0;
+      let opaquePlayerPixels = 0;
+      for (let capsuleY = 0; capsuleY < 24; capsuleY += 1) {
+        const playerRow = capsuleY - playerTop;
+        for (let x = 0; x < 16; x += 1) {
+          const capsulePixel = capsule[capsuleY][x];
+          const bit = 7 - Math.floor(x / 2);
+          const bodyPixel = playerRow >= 0 && playerRow < 16 && (body[playerRow] >> bit & 1);
+          const enginePixel = playerRow >= 0 && playerRow < 16 && (engine[playerRow] >> bit & 1);
+          const composed = bodyPixel ? "body" : enginePixel ? "engine" : capsulePixel;
+          if (capsulePixel !== 0 && !bodyPixel && !enginePixel) {
+            transparentCapsulePixels += 1;
+            assert.equal(composed, capsulePixel,
+              `${contact} phase ${phase}: transparent PMG background obscured capsule`);
+          }
+          if (capsulePixel !== 0 && (bodyPixel || enginePixel)) {
+            opaquePlayerPixels += 1;
+            assert.equal(typeof composed, "string",
+              `${contact} phase ${phase}: opaque Viper pixel lost foreground priority`);
+          }
+        }
+      }
+      assert.ok(transparentCapsulePixels > 0 && opaquePlayerPixels > 0,
+        `${contact} phase ${phase} must exercise both transparent and opaque overlap`);
+    }
+  }
 });
 
 test("one logical footprint survives repeated ring wraps and cannot return after release", () => {
@@ -388,6 +453,12 @@ test("release collision covers the complete half-open 8-HPOS by 16-scanline caps
   const atr = executeWeaponPickupCollisionTrace({ root, artifact: "atr" });
   assert.deepEqual({ artifact: "release", cases: xex }, { artifact: "release", cases: atr });
   assert.equal(xex.every(({ expectedHit, collected }) => expectedHit === collected), true);
+  for (const phase of Array.from({ length: 8 }, (_, index) => index)) {
+    for (const contact of ["nose", "side", "rear"]) {
+      const sample = xex.find(({ name }) => name === `phase_${phase}_${contact}`);
+      assert.equal(sample?.collected, true, `${contact} contact failed at phase ${phase}`);
+    }
+  }
   assert.match(source,
     /cmp #WEAPON_PICKUP_RELEASE_TOP/);
 });

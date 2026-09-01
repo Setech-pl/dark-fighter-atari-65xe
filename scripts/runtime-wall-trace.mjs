@@ -146,6 +146,22 @@ const weaponPickupTraversalSessions = [{
   kind: "weapon-pickup-traversal",
 }];
 
+const weaponPickupContactSessions = [{
+  id: "weapon-pickup-contact-2-hunt-fire4",
+  difficulty: 2,
+  policy: "pickup-contact",
+  fireDelay: 4,
+  frames: 1_300,
+  kind: "weapon-pickup-contact",
+}, {
+  id: "weapon-pickup-overlap-2-hunt-fire4",
+  difficulty: 2,
+  policy: "pickup-overlap",
+  fireDelay: 4,
+  frames: 1_300,
+  kind: "weapon-pickup-overlap",
+}];
+
 const directorCompletionSessions = [0, 1, 2].map((difficulty) => ({
   id: `director-complete-${difficulty}-natural-sweep-fire0`,
   difficulty,
@@ -221,6 +237,8 @@ const traceLabels = {
   DFTRACE_PC_ENTITY_ERASE: "erase_weapon_pickup_overlay_restore",
   DFTRACE_PC_AFTER_ENTITY_ERASE: "weapon_pickup_erase_done",
   DFTRACE_PC_ENTITY_DRAW: "render_weapon_pickup_overlay",
+  DFTRACE_PC_PLAYER_ERASE: "erase_player",
+  DFTRACE_PC_PLAYER_DRAW: "draw_player",
   DFTRACE_PC_ENGINE_UPDATE: "update_engine_animation",
   DFTRACE_PC_ENGINE_COPY: "copy_engine_animation_phase",
   DFTRACE_PC_GAMEPLAY_INIT: "start_gameplay",
@@ -360,6 +378,8 @@ const numericCsvFields = new Set([
   "pickup_timer_lo", "pickup_timer_hi", "pickup_animation", "pickup_render_id",
   "pickup_drawn_mask", "score_lo", "score_hi", "rapid_projectiles",
   "viper_projectiles",
+  "player_x", "player_y", "prior", "player_erase_calls", "player_draw_calls",
+  "player_erase_scanline", "player_draw_scanline",
   "rapid_projectile_slot", "rapid_projectile_address", "rapid_projectile_screen_code",
   "rapid_projectile_backing", "dli_sequence_violations",
   "maximum_dlis_per_host_frame", "pause_test_completed", "pause_timer_before",
@@ -566,6 +586,16 @@ function rgbTemplate(image, left, top, width, height) {
       ((top + y) * image.width + left + width) * 3);
   }
   return { width, height, rgb };
+}
+
+function countRgb(image, [red, green, blue], { left, top, right, bottom }) {
+  let count = 0;
+  for (let y = top; y < bottom; y += 1) for (let x = left; x < right; x += 1) {
+    const offset = (y * image.width + x) * 3;
+    if (image.rgb[offset] === red && image.rgb[offset + 1] === green &&
+      image.rgb[offset + 2] === blue) count += 1;
+  }
+  return count;
 }
 
 function findRgbTemplate(image, template) {
@@ -1216,7 +1246,7 @@ function main() {
   let sessionsToRun = smokeFrames === null
     ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
       ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
-      ...weaponPickupTraversalSessions,
+      ...weaponPickupTraversalSessions, ...weaponPickupContactSessions,
       ...memoryIntegritySessions]
       .concat(engineDiagnosticSessions, engineRestartSessions)
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
@@ -1226,6 +1256,17 @@ function main() {
   }
   for (const session of sessionsToRun) {
     const outputPath = path.join(buildDirectory, `${session.id}.csv`);
+    const pickupContactPrefix = session.kind === "weapon-pickup-contact"
+      ? path.join(buildDirectory, "weapon-pickup-contact-nose")
+      : session.kind === "weapon-pickup-overlap"
+        ? path.join(buildDirectory, "weapon-pickup-contact-edge") : undefined;
+    if (pickupContactPrefix !== undefined && !reuseExistingTraces) {
+      const basename = path.basename(pickupContactPrefix);
+      for (const name of fs.readdirSync(buildDirectory)) {
+        if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
+          fs.unlinkSync(path.join(buildDirectory, name));
+      }
+    }
     const environment = {
       ...process.env,
       SDL_VIDEODRIVER: process.env.SDL_VIDEODRIVER ?? "dummy",
@@ -1250,6 +1291,9 @@ function main() {
       ...(session.kind === "weapon-pickup-traversal" ? {
         DFTRACE_PICKUP_TRAVERSAL_PREFIX: pickupTraversalPrefix,
       } : {}),
+	  ...(pickupContactPrefix === undefined ? {} : {
+	    DFTRACE_PICKUP_CONTACT_PREFIX: pickupContactPrefix,
+	  }),
 	  ...(session.kind === "engine-first-150" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
 	  } : {}),
@@ -1266,6 +1310,74 @@ function main() {
       ], { env: environment });
     }
     const rows = parseCsv(fs.readFileSync(outputPath, "utf8"), session);
+    if (pickupContactPrefix !== undefined) {
+      const basename = path.basename(pickupContactPrefix);
+      const paths = fs.readdirSync(buildDirectory)
+        .filter((name) => name.startsWith(`${basename}-`) && name.endsWith(".png"))
+        .sort()
+        .map((name) => path.join(buildDirectory, name));
+      invariant(paths.length >= 8,
+        `${session.id} did not capture the complete pickup/player contact window`);
+      const contactRows = rows.filter((row) => row.pickup_state === 2 &&
+        row.player_y >= row.pickup_y && row.player_y - row.pickup_y <= 40);
+      invariant(JSON.stringify([...new Set(contactRows.map((row) =>
+        row.pickup_render_phase))].sort()) === JSON.stringify([0, 2, 4, 6]),
+      `${session.id} did not cover all four Hard pickup phases at player contact`);
+      invariant(contactRows.every((row) => row.prior === 0 &&
+        row.pickup_erase_calls === 1 && row.pickup_draw_calls === 1 &&
+        row.pickup_erase_scanline > row.pickup_prev_y &&
+        row.pickup_draw_scanline !== 0),
+      `${session.id} changed GTIA priority or the single erase/draw lifecycle`);
+      const collectionRows = rows.filter((row) => (row.events & (1 << 19)) !== 0);
+      invariant(collectionRows.length === 1 && collectionRows[0].pickup_booster_state === 3 &&
+        collectionRows[0].entity_active_mask === 0 && collectionRows[0].pickup_draw_calls === 0,
+      `${session.id} did not collect and activate exactly once`);
+      const images = paths.map((framePath) =>
+        decodeAtari800Screenshot(fs.readFileSync(framePath)));
+      const steelCounts = images.map((image) => countRgb(image, [13, 58, 115], {
+        left: 140, top: 8, right: 164, bottom: 216,
+      }));
+      invariant(steelCounts.slice(0, -3).every((count) => count >= 40) &&
+        steelCounts.slice(-3).every((count) => count < 40),
+      `${session.id} final raster contains a cut capsule or stale post-collection footprint`);
+      const sheetPath = path.join(buildDirectory,
+        session.kind === "weapon-pickup-contact"
+          ? "weapon-pickup-player-nose-contact.png"
+          : "weapon-pickup-player-phase-overlap.png");
+      const sheet = writeScreenshotContact(paths, sheetPath, Math.min(5, paths.length));
+      const evidence = {
+        session: session.id,
+        emulator: "Atari800 7.1.2 PAL/XL",
+        production_artifact: path.relative(rootDirectory, xexPath),
+        frames: rows.length,
+        maximum_wall_cycles: Math.max(...rows.map((row) => row.wall_cycles)),
+        contact_phases: [...new Set(contactRows.map((row) => row.pickup_render_phase))].sort(),
+        gtia_prior_values: [...new Set(contactRows.map((row) => row.prior))],
+        collection_events: collectionRows.length,
+        effect_state_after_collection: collectionRows[0].pickup_booster_state,
+        missed_frames: rows.reduce((sum, row) => sum + row.missed_frames, 0),
+        contact_frames: contactRows.map((row) => ({
+          frame: row.frame,
+          player: { x: row.player_x, y: row.player_y },
+          pickup: { x: row.pickup_x, y: row.pickup_y, phase: row.pickup_render_phase },
+          order: {
+            pickup_erase_scanline: row.pickup_erase_scanline,
+            player_erase_scanline: row.player_erase_scanline,
+            player_draw_scanline: row.player_draw_scanline,
+            pickup_draw_scanline: row.pickup_draw_scanline,
+          },
+          addresses: Array.from({ length: 6 }, (_, index) =>
+            row[`pickup_new_address${index}`]),
+          glyph_codes: Array.from({ length: 6 }, (_, index) =>
+            row[`pickup_new_after_draw${index}`]),
+        })),
+        raster_steel_pixels: steelCounts,
+        screenshot_contact: sheet,
+        passed: true,
+      };
+      fs.writeFileSync(path.join(buildDirectory, `${session.id}-evidence.json`),
+        `${JSON.stringify(evidence, null, 2)}\n`);
+    }
     allRows.push(...rows);
     summaries.push(sessionSummary(session, rows));
     console.log(`${session.id}: ${rows.length} frames, max ` +

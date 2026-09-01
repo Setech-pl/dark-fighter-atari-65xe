@@ -2653,25 +2653,35 @@ copy_pause_screen:
 ; -----------------------------------------------------------------------------
 ; Frame and initialization
 
-; A pending or visible capsule needs the complete pre-display interval for its
-; one final overlay pass. Starting the same 50 Hz simulation frame 64 scanlines
-; earlier changes no logical cadence or ring operation; it only guarantees the
-; backed erase/update/render chain completes before ANTIC reaches the capsule.
+; A pending or visible capsule starts its one update immediately after ANTIC
+; has scanned the preceding footprint's bottom edge. This preserves the old
+; backed footprint for the complete current raster, then leaves almost one PAL
+; frame for erase/update/ring rotation and the sole late redraw before ANTIC
+; reaches the new position. The moving wait phase still admits exactly one
+; simulation update per host frame and changes neither scroll nor pickup rate.
 wait_gameplay_frame:
     lda ENTITY_STATE+WEAPON_PICKUP_SLOT
     beq wait_frame
-    lda #$50
+    cmp #WEAPON_PICKUP_STATE_ACTIVE
+    beq @visible
+    ldx #$50                    ; hidden PENDING keeps the transition within one PAL frame
+    bne wait_frame_at_line
+@visible:
+    lda ENTITY_Y+WEAPON_PICKUP_SLOT
+    clc
+    adc #WEAPON_PICKUP_HEIGHT_SCANLINES
+    lsr                         ; VCOUNT advances once per two PAL scanlines
+    tax
     bne wait_frame_at_line
 
 wait_frame:
-    lda #$70
+    ldx #$70
 wait_frame_at_line:
 @wait_for_line:
-    cmp VCOUNT
+    cpx VCOUNT
     bne @wait_for_line
 @leave_line:
-    lda VCOUNT
-    cmp #$70
+    cpx VCOUNT
     beq @leave_line
     rts
 

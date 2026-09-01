@@ -51,6 +51,13 @@ typedef struct {
 	unsigned capital_sfx;
 	unsigned sound_enabled;
 	unsigned player_lifecycle;
+	unsigned player_x;
+	unsigned player_y;
+	unsigned prior;
+	unsigned player_erase_calls;
+	unsigned player_draw_calls;
+	unsigned player_erase_scanline;
+	unsigned player_draw_scanline;
 	unsigned sector_state;
 	unsigned gameplay_frame;
 	unsigned difficulty;
@@ -282,6 +289,8 @@ static unsigned dftrace_pc_director_event;
 static unsigned dftrace_pc_entity_erase;
 static unsigned dftrace_pc_after_entity_erase;
 static unsigned dftrace_pc_entity_draw;
+static unsigned dftrace_pc_player_erase;
+static unsigned dftrace_pc_player_draw;
 static unsigned dftrace_pc_engine_update;
 static unsigned dftrace_pc_engine_copy;
 static unsigned dftrace_pc_gameplay_init;
@@ -384,6 +393,9 @@ static const char *dftrace_pickup_traversal_prefix;
 static unsigned dftrace_pickup_traversal_count;
 static unsigned dftrace_pickup_traversal_last_y = 0xffffffffu;
 static unsigned dftrace_pickup_hunt_active_frames;
+static const char *dftrace_pickup_contact_prefix;
+static unsigned dftrace_pickup_contact_count;
+static unsigned dftrace_pickup_contact_after_collect;
 static const char *dftrace_rapid_screenshot;
 static unsigned dftrace_rapid_screenshot_frame = 0xffffffffu;
 static const char *dftrace_spread_screenshot;
@@ -922,6 +934,56 @@ static void dftrace_set_gameplay_input(unsigned frame)
 				stick = 0x0bu;
 		}
 	}
+	else if (strcmp(dftrace_policy, "pickup-overlap") == 0) {
+		/* Earn one production drop. Keep the Viper's visible double-width PMG
+		 * edge over the capsule while its narrower collision envelope remains
+		 * one HPOS beyond contact for four fine phases, then align and collect
+		 * through the ordinary joystick/collision path. */
+		if (MEMORY_mem[dftrace_entity_state + 1u] == 2u) {
+			unsigned pickup_x = MEMORY_mem[dftrace_entity_x + 1u];
+			unsigned target_y = MEMORY_mem[dftrace_entity_y + 1u];
+			unsigned target_x = pickup_x - 8u;
+			if (target_y + 16u >= y)
+				++dftrace_pickup_hunt_active_frames;
+			if (dftrace_pickup_hunt_active_frames > 5u)
+				target_x = pickup_x;
+			if (x + 3u < target_x)
+				stick = 0x07u;
+			else if (x > target_x + 3u)
+				stick = 0x0bu;
+		}
+		else if (MEMORY_mem[dftrace_enemy_active] != 0u) {
+			dftrace_pickup_hunt_active_frames = 0u;
+			unsigned target = MEMORY_mem[dftrace_enemy_x];
+			if (x + 3u < target)
+				stick = 0x07u;
+			else if (x > target + 3u)
+				stick = 0x0bu;
+		}
+	}
+	else if (strcmp(dftrace_policy, "pickup-contact") == 0) {
+		/* Follow the complete production collision path into a nose-first
+		 * collection. No guest state is seeded or held by this policy. */
+		if (MEMORY_mem[dftrace_entity_state + 1u] == 2u) {
+			unsigned target_x = MEMORY_mem[dftrace_entity_x + 1u];
+			unsigned target_y = MEMORY_mem[dftrace_entity_y + 1u];
+			if (x + 3u < target_x)
+				stick = 0x07u;
+			else if (x > target_x + 3u)
+				stick = 0x0bu;
+			if (y > target_y + 4u)
+				stick &= 0x0eu;
+			else if (y + 4u < target_y)
+				stick &= 0x0du;
+		}
+		else if (MEMORY_mem[dftrace_enemy_active] != 0u) {
+			unsigned target = MEMORY_mem[dftrace_enemy_x];
+			if (x + 3u < target)
+				stick = 0x07u;
+			else if (x > target + 3u)
+				stick = 0x0bu;
+		}
+	}
 	else if (strcmp(dftrace_policy, "restart") == 0 &&
 		dftrace_gameplay_generation == 1u) {
 		/* The engine regression gate needs a same-process New Game, not another
@@ -1254,6 +1316,9 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->capital_sfx = MEMORY_mem[dftrace_capital_sound_timer] != 0;
 	frame->sound_enabled = MEMORY_mem[dftrace_sound_enabled] != 0;
 	frame->player_lifecycle = MEMORY_mem[dftrace_player_lifecycle];
+	frame->player_x = MEMORY_mem[dftrace_player_x];
+	frame->player_y = MEMORY_mem[dftrace_player_y];
+	frame->prior = GTIA_PRIOR;
 	frame->sector_state = MEMORY_mem[dftrace_sector_state];
 	frame->gameplay_frame = MEMORY_mem[dftrace_gameplay_frame];
 	frame->difficulty = MEMORY_mem[dftrace_difficulty_setting];
@@ -1359,7 +1424,9 @@ static void dftrace_write(void)
 		",profile_erase_viper_start,profile_raider_update_start"
 		",profile_raider_render_start,profile_entity_erase_start"
 		",profile_effect_update_end,profile_pickup_update_end"
-		",profile_pickup_render_start,profile_effect_render_start\n");
+		",profile_pickup_render_start,profile_effect_render_start"
+		",player_x,player_y,prior,player_erase_calls,player_draw_calls"
+		",player_erase_scanline,player_draw_scanline\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -1486,7 +1553,8 @@ static void dftrace_write(void)
 				(unsigned long long) frame->profile_dli_start[dli],
 				(unsigned long long) frame->profile_dli_end[dli],
 				frame->profile_dli_segment[dli]);
-		fprintf(file, ",%u,%u,%u,%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",
+		fprintf(file, ",%u,%u,%u,%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu"
+			",%u,%u,%u,%u,%u,%u,%u\n",
 			frame->profile_compose_calls, frame->profile_compose_cycles,
 			frame->profile_pointer_calls, frame->profile_pointer_cycles,
 			(unsigned long long) frame->profile_erase_viper_start,
@@ -1496,7 +1564,10 @@ static void dftrace_write(void)
 			(unsigned long long) frame->profile_effect_update_end,
 			(unsigned long long) frame->profile_pickup_update_end,
 			(unsigned long long) frame->profile_pickup_render_start,
-			(unsigned long long) frame->profile_effect_render_start);
+			(unsigned long long) frame->profile_effect_render_start,
+			frame->player_x, frame->player_y, frame->prior,
+			frame->player_erase_calls, frame->player_draw_calls,
+			frame->player_erase_scanline, frame->player_draw_scanline);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -1593,6 +1664,8 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_entity_erase, "DFTRACE_PC_ENTITY_ERASE");
 	DFTRACE_ADDRESS(dftrace_pc_after_entity_erase, "DFTRACE_PC_AFTER_ENTITY_ERASE");
 	DFTRACE_ADDRESS(dftrace_pc_entity_draw, "DFTRACE_PC_ENTITY_DRAW");
+	DFTRACE_ADDRESS(dftrace_pc_player_erase, "DFTRACE_PC_PLAYER_ERASE");
+	DFTRACE_ADDRESS(dftrace_pc_player_draw, "DFTRACE_PC_PLAYER_DRAW");
 	DFTRACE_ADDRESS(dftrace_pc_engine_update, "DFTRACE_PC_ENGINE_UPDATE");
 	DFTRACE_ADDRESS(dftrace_pc_engine_copy, "DFTRACE_PC_ENGINE_COPY");
 	DFTRACE_ADDRESS(dftrace_pc_gameplay_init, "DFTRACE_PC_GAMEPLAY_INIT");
@@ -1670,6 +1743,7 @@ static void dftrace_init(void)
 	dftrace_pickup_screenshot = getenv("DFTRACE_PICKUP_SCREENSHOT");
 	dftrace_pickup_sequence_prefix = getenv("DFTRACE_PICKUP_SEQUENCE_PREFIX");
 	dftrace_pickup_traversal_prefix = getenv("DFTRACE_PICKUP_TRAVERSAL_PREFIX");
+	dftrace_pickup_contact_prefix = getenv("DFTRACE_PICKUP_CONTACT_PREFIX");
 	dftrace_rapid_screenshot = getenv("DFTRACE_RAPID_SCREENSHOT");
 	dftrace_spread_screenshot = getenv("DFTRACE_SPREAD_SCREENSHOT");
 	dftrace_pause_test_enabled = getenv("DFTRACE_PAUSE_TEST") != NULL;
@@ -1858,6 +1932,32 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 			dftrace_pickup_traversal_last_y = MEMORY_mem[dftrace_entity_y + 1u];
 			++dftrace_pickup_traversal_count;
 		}
+		if (dftrace_pickup_contact_prefix != NULL &&
+			*dftrace_pickup_contact_prefix != '\0' &&
+			dftrace_pickup_contact_count < 24u) {
+			unsigned pickup_state = MEMORY_mem[dftrace_entity_state + 1u];
+			unsigned player_y = MEMORY_mem[dftrace_player_y];
+			unsigned pickup_y = MEMORY_mem[dftrace_entity_y + 1u];
+			unsigned player_x = MEMORY_mem[dftrace_player_x];
+			unsigned pickup_x = MEMORY_mem[dftrace_entity_x + 1u];
+			int near_contact = pickup_state == 2u && player_y >= pickup_y &&
+				player_y - pickup_y <= 40u &&
+				player_x + 12u >= pickup_x && pickup_x + 12u >= player_x;
+			if (near_contact || (dftrace_pickup_contact_count != 0u &&
+				dftrace_pickup_contact_after_collect < 3u)) {
+				char path[1024];
+				snprintf(path, sizeof(path), "%s-%02u.png",
+					dftrace_pickup_contact_prefix, dftrace_pickup_contact_count);
+				if (!Screen_SaveScreenshot(path, 0)) {
+					fprintf(stderr, "darkfighter trace: pickup contact screenshot failed: %s\n",
+						path);
+					exit(2);
+				}
+				++dftrace_pickup_contact_count;
+				if (pickup_state != 2u)
+					++dftrace_pickup_contact_after_collect;
+			}
+		}
 		if (dftrace_count != 0 &&
 			dftrace_frames[dftrace_count - 1].next_start_clock == 0u) {
 			DFTraceFrame *previous = &dftrace_frames[dftrace_count - 1];
@@ -1910,6 +2010,14 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 	dftrace_watch_display_list_write(&dftrace_current);
 	dftrace_watch_recycled_write(&dftrace_current);
 	dftrace_pickup_watch(&dftrace_current, pc);
+	if (pc == dftrace_pc_player_erase) {
+		++dftrace_current.player_erase_calls;
+		dftrace_current.player_erase_scanline = ANTIC_ypos;
+	}
+	if (pc == dftrace_pc_player_draw) {
+		++dftrace_current.player_draw_calls;
+		dftrace_current.player_draw_scanline = ANTIC_ypos;
+	}
 
 	if (dftrace_current.profile_next < DFTRACE_PROFILE_COUNT &&
 		pc == dftrace_pc_profile[dftrace_current.profile_next]) {

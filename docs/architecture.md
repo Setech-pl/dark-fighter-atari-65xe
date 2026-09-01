@@ -250,10 +250,15 @@ row order. Capsule codes are never committed to ring backing, tail repair, or
 wrap-copy sources, so an old footprint cannot return after a ring wrap. The
 logical Y is also the collection hitbox Y. EASY/MEDIUM/HARD accumulate 8/9/10
 scanlines per five PAL frames; HARD therefore renders +2 scanlines every frame
-instead of holding and jumping by one character row. While slot 1 is PENDING or
-ACTIVE, the same 50 Hz main-loop work starts 64 scanlines earlier, giving the
-single topmost draw a complete pre-display interval. Simulation order, world
-rates, ring rotation, and global scrolling are unchanged.
+instead of holding and jumping by one character row. PENDING retains the early
+fixed wait needed for its ACTIVE transition. Once ACTIVE, each update begins
+immediately after ANTIC has scanned the preceding footprint's bottom edge. The
+saved character cells therefore remain intact for that complete raster; reverse
+erase, ring rotation, and the single late redraw then finish before ANTIC returns
+to the new position on the next PAL frame. The Viper remains the P0/P3 foreground
+at `PRIOR=0`: only set PMG bits cover capsule pixels, while zero PMG bits remain
+transparent. Simulation order, world rates, ring rotation, and global scrolling
+are unchanged.
 
 The fixed ANTIC 2 HUD uses cells `$4019-$401C` for four permanent HULL plates.
 Glyph 5 is a low intact plate and glyph 12 a low cracked plate; the stored

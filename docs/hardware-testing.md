@@ -52,6 +52,10 @@ For both XEX and ATR:
       every successive frame; no 0,0,0,+8 character-row jump is visible.
 - [ ] Rapid Fire capsule remains one coherent 8x16 object (one phased 2x2/2x3
       footprint) through several ring wraps; no ghost or second pass returns.
+      Fly the Viper nose, side, and rear across phases 0/2/4/6: opaque PMG pixels
+      may cover the capsule, but transparent PMG pixels must reveal it with no
+      dark rectangle or clipped edge. Collection occurs once and restores the
+      lower layer on the following raster.
       Collection displays
       the full `BOOST` label and four tall energy segments, emits ten yellow shots at two-frame
       intervals with the existing 12-frame post-burst pause, and expires after

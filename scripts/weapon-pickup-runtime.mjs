@@ -1067,9 +1067,9 @@ export function executeWeaponPickupCollisionTrace({ root = defaultRoot, artifact
   const cases = Array.from({ length: 8 }, (_, phase) => {
     const pickupY = 104 + phase;
     return [
-      [`phase_${phase}_top_left`, 112, pickupY, true, pickupY],
-      [`phase_${phase}_bottom_right_inside`, 119, pickupY + 15, true, pickupY],
-      [`phase_${phase}_player_left_overlap`, 105, pickupY, true, pickupY],
+      [`phase_${phase}_side`, 112, pickupY, true, pickupY],
+      [`phase_${phase}_nose`, 119, pickupY + 15, true, pickupY],
+      [`phase_${phase}_rear`, 105, pickupY - 14, true, pickupY],
       [`phase_${phase}_left_outside`, 104, pickupY, false, pickupY],
       [`phase_${phase}_right_outside`, 120, pickupY, false, pickupY],
       [`phase_${phase}_above_overlap`, 112, pickupY - 14, true, pickupY],

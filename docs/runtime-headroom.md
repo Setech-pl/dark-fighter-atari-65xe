@@ -43,22 +43,27 @@ guard are accounted separately.
 
 ## Focused booster-compositor candidate evidence
 
-The pending booster-compositor candidate is intentionally measured without the
+The focused booster-compositor baseline was measured without the
 full gauntlet and does not replace the accepted global report below. Its native
-Atari800 focused sessions cover 5,800 PAL frames: a 1,800-frame complete
-traversal and a 4,000-frame three-drop Rapid/Spread/Shield replay. The larger
-measured wall interval is 21,202 cycles, leaving 14,366 cycles in a 35,568-cycle
-PAL frame; the traversal maximum is 20,030 cycles. Both sessions report one
-draw and one 2x2/2x3 footprint per active slot, exact reverse erase, zero
-capsule codes in saved backing, 132 total A2 wraps (five while a capsule is
-active), and no returned footprint after release. The candidate linked metric
-is 16,805 B, simultaneous residency is 18,643 B, and safe residency is 3,544 B.
-Persistent BSS is unchanged.
+Atari800 focused sessions cover 8,400 PAL frames: a 1,800-frame complete
+traversal, a 4,000-frame three-drop Rapid/Spread/Shield replay, and two
+1,300-frame player-contact replays. The largest measured interval is 25,118
+cycles, leaving 10,450 cycles in a 35,568-cycle PAL frame; the traversal maximum
+is 24,088 cycles. All sessions report one draw and one 2x2/2x3 footprint per
+active slot, exact reverse erase, zero capsule codes in saved backing, 192 total
+A2 wraps (eight while a capsule is active), no missed PAL frame, and no returned
+footprint after release. The player-overlap
+synchronization adds twelve linked bytes: the current linked metric is 16,817 B,
+simultaneous residency is 18,655 B, and safe residency is 3,532 B. Persistent
+BSS and glyph allocation are unchanged.
 
-During PENDING/ACTIVE only, the 50 Hz main loop begins 64 scanlines earlier so
-the unchanged final overlay order completes before ANTIC reaches the capsule.
-This is a raster-phase shift, not extra simulation work: world rates, ring
-rotation, movement cadence, and global scrolling retain their prior values.
+PENDING retains its early fixed wait so the ACTIVE transition cannot miss a PAL
+frame. While ACTIVE, the 50 Hz main loop begins immediately after ANTIC has
+scanned the previous capsule bottom. This moving raster fence retains the old
+footprint for the whole displayed pass and gives the unchanged final overlay
+order the remainder of the PAL frame before the next pass reaches the new
+position. It adds no simulation work: world rates, ring rotation, movement
+cadence, and global scrolling retain their prior values.
 
 ## Heaviest legal frame
 

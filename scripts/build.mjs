@@ -171,8 +171,8 @@ const glueStagingAddress = 0x5259;
 const glueFinalAddress = 0x4efe;
 const directorRunAddress = 0x9d75;
 const directorGuardAddress = 0x9ffa;
-const expectedInitialContentBytes = 12755;
-const expectedLinkedRuntimeBytes = 16805;
+const expectedInitialContentBytes = 12765;
+const expectedLinkedRuntimeBytes = 16817;
 const expectedDirectorRawBytes = 645;
 const expectedDirectorPackedBytes = 587;
 const expectedGlueRawBytes = 39;
@@ -947,8 +947,8 @@ async function build() {
       phaseCount: 8,
       initialContentBytes: expectedInitialContentBytes,
       linkedRuntimeBytes: expectedLinkedRuntimeBytes,
-      simultaneousResidencyBytes: 18643,
-      safeResidencyBytes: 3544,
+      simultaneousResidencyBytes: 18655,
+      safeResidencyBytes: 3532,
       glue: {
         stagingAddress: glueStagingAddress,
         holdingAddress: 0x7f16,

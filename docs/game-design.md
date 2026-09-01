@@ -123,7 +123,9 @@ Its shifted 8x16 source occupies a 2x2 footprint at phase zero and a 2x3
 footprint between character rows. HARD moves it exactly two scanlines per PAL
 frame; EASY and MEDIUM retain their slower fractional rates without an
 eight-scanline jump. The collection hitbox follows the same effective visual
-Y. Picking up the same active type
+Y. During contact the Viper's opaque hull/engine pixels remain in front, while
+transparent PMG pixels reveal the capsule until the single accepted collection
+removes it. Picking up the same active type
 refreshes it. Picking up another type
 replaces it, so Rapid Fire, Spread Shot, and Shield are mutually exclusive.
 Pause freezes

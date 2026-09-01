@@ -78,7 +78,7 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
 });
 
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
-  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12755);
+  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12765);
   assert.equal(manifest.transportCapacity.initialBootBytes, 12800);
   assert.equal(manifest.transportCapacity.totalTransportSectors, 156);
   assert.equal(manifest.transportCapacity.totalTransportBytes, 19968);
@@ -91,9 +91,9 @@ test("Layout D.2 exact memory and transport budgets remain frozen", () => {
     [151, 1, 41, 39, 0x5259],
     [152, 5, 587, 645, 0x9d75],
   ]);
-  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16805);
-  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18643);
-  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3544);
+  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16817);
+  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18655);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3532);
 });
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {
