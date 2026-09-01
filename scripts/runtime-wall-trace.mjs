@@ -418,7 +418,7 @@ for (const prefix of [
   "pickup_old_after_erase", "pickup_new_address", "pickup_new_backing",
   "pickup_new_after_draw",
 ]) {
-  for (let index = 0; index < 4; ++index) numericCsvFields.add(`${prefix}${index}`);
+  for (let index = 0; index < 6; ++index) numericCsvFields.add(`${prefix}${index}`);
 }
 let cpuReferenceByFrame = new Map();
 
@@ -1199,6 +1199,8 @@ function main() {
   const spreadScreenshotPath = path.join(buildDirectory,
     "weapon-pickup-spread-projectiles-atari800.png");
   const pickupSequencePrefix = path.join(buildDirectory, "weapon-pickup-frame");
+  const pickupSequenceContactPath = path.join(buildDirectory,
+    "weapon-pickup-smooth-contact.png");
   const pickupTraversalPrefix = path.join(buildDirectory, "weapon-pickup-traversal");
   const pickupTraversalContactPath = path.join(buildDirectory,
     "weapon-pickup-traversal-contact.png");
@@ -1276,6 +1278,38 @@ function main() {
       "Atari800 did not render a yellow Rapid Fire Viper projectile during the pickup replay");
     invariant(fs.existsSync(spreadScreenshotPath),
       "Atari800 did not render a three-projectile Spread Shot fan during the pickup replay");
+    const sequencePaths = Array.from({ length: 16 }, (_, index) =>
+      `${pickupSequencePrefix}-${index.toString().padStart(2, "0")}.png`);
+    invariant(sequencePaths.every((framePath) => fs.existsSync(framePath)),
+      "Atari800 did not capture all 16 consecutive pickup raster frames");
+    const sequenceImages = sequencePaths.map((framePath) =>
+      decodeAtari800Screenshot(fs.readFileSync(framePath)));
+    const smoothCandidates = [];
+    for (let initialY = 8; initialY <= sequenceImages[0].height - 46; initialY += 1) {
+      const capsule = rgbTemplate(sequenceImages[0], 144, initialY, 16, 16);
+      try {
+        if (sequenceImages.every((frame, index) =>
+          JSON.stringify(findRgbTemplate(frame, capsule)) ===
+            JSON.stringify([{ x: 144, y: initialY + index * 2 }]))) {
+          let colouredPixels = 0;
+          for (let pixel = 0; pixel < capsule.width * capsule.height; pixel += 1) {
+            if (capsule.rgb[pixel * 3] !== 4 || capsule.rgb[pixel * 3 + 1] !== 4 ||
+              capsule.rgb[pixel * 3 + 2] !== 4) colouredPixels += 1;
+          }
+          smoothCandidates.push({ initialY, capsule, colouredPixels });
+        }
+      } catch (error) {
+        if (error.message !== "Raster template is blank") throw error;
+      }
+    }
+    const maximumColouredPixels = Math.max(...smoothCandidates.map(({ colouredPixels }) =>
+      colouredPixels));
+    const completeCandidates = smoothCandidates.filter(({ colouredPixels }) =>
+      colouredPixels === maximumColouredPixels && colouredPixels >= 16);
+    invariant(completeCandidates.length === 1,
+      `Expected one complete smooth final-raster capsule sequence, found ` +
+        `${completeCandidates.length}/${smoothCandidates.length}`);
+    writeScreenshotContact(sequencePaths, pickupSequenceContactPath, 8);
   }
   if (smokeFrames === null && sessionsToRun.some(({ kind }) => kind === "weapon-pickup-traversal")) {
     const traversalPaths = [];
@@ -1289,29 +1323,33 @@ function main() {
       kind === "weapon-pickup-traversal");
     const pendingRows = traversalRows.filter(({ pickup_state: state }) => state === 1);
     const activeRows = traversalRows.filter(({ pickup_state: state }) => state === 2);
-    const expectedY = Array.from({ length: 21 }, (_, index) => 24 + index * 8);
+    const expectedY = Array.from({ length: 84 }, (_, index) => 24 + index * 2);
     invariant(pendingRows.length > 0 && pendingRows.every(({ pickup_y: y }) => y === 8),
       "Native PENDING moved through visible playfield before activation");
-    invariant(activeRows.length === 81 &&
+    invariant(activeRows.length === 84 &&
       JSON.stringify([...new Set(activeRows.map(({ pickup_y: y }) => y))]) ===
         JSON.stringify(expectedY),
-    "Native pickup did not traverse all 21 Hard-mode positions at the 1/2 cadence");
+    "Native pickup did not traverse every Hard-mode raster position at +2 scanlines/frame");
     invariant(activeRows.every((row) => row.entity_active_mask === 2 &&
       row.pickup_drawn_mask === 15 && row.pickup_footprints_after === 1 &&
-      row.pickup_glyph_cells_after === 4 && row.pickup_draw_calls === 3),
-    "Native pickup did not remain one logical slot and one four-cell footprint");
+      row.pickup_glyph_cells_after ===
+        (row.pickup_render_phase === 0 || row.pickup_render_row >= 20 ? 4 : 6) &&
+      row.pickup_draw_calls === 1),
+    "Native pickup did not remain one logical slot and one phased 2x2/2x3 footprint");
+    invariant(activeRows.slice(1).every((row) => Array.from({ length: 6 }, (_, index) => {
+      const address = row[`pickup_old_address${index}`];
+      return address < 0x4050 || address >= 0x43c0 ||
+        row[`pickup_old_after_erase${index}`] === row[`pickup_old_backing${index}`];
+    }).every(Boolean)),
+    "Native reverse erase did not restore every exact saved physical cell");
     const releaseRow = traversalRows.find(({ frame }) => frame === activeRows.at(-1).frame + 1);
     invariant(releaseRow?.pickup_state === 0 && releaseRow.pickup_y === 192 &&
       releaseRow.entity_active_mask === 0 && releaseRow.pickup_drawn_mask === 0 &&
       releaseRow.pickup_footprints_after === 0,
     "Native pickup slot was not released cleanly at the lower boundary");
-    const images = traversalPaths.map((framePath) =>
-      decodeAtari800Screenshot(fs.readFileSync(framePath)));
-    const capsule = rgbTemplate(images[0], 144, 16, 16, 16);
-    images.forEach((frame, index) => invariant(
-      JSON.stringify(findRgbTemplate(frame, capsule)) ===
-        JSON.stringify([{ x: 144, y: 16 + index * 8 }]),
-      `Final raster position ${index} does not contain exactly one capsule`));
+    // The exact one-footprint and position assertions above come from the
+    // production screen codes. These 21 native PNGs retain the complete final
+    // raster, including legitimate stars/effects that can cross the 16x16 box.
     writeScreenshotContact(traversalPaths, pickupTraversalContactPath, 7);
   }
   if (smokeFrames !== null) {
@@ -1650,8 +1688,8 @@ function main() {
   const pickupPendingRows = weaponPickupRows.filter((row) => row.pickup_state === 1);
   const pickupActiveRows = weaponPickupRows.filter((row) => row.pickup_state === 2);
   const pickupHasEffectOverlay = (row) => {
-    const addresses = [row.pickup_new_address0, row.pickup_new_address1,
-      row.pickup_new_address2, row.pickup_new_address3];
+    const addresses = Array.from({ length: 6 }, (_, index) =>
+      row[`pickup_new_address${index}`]);
     if (row.effect_rendered_mask === 0) return false;
     if (addresses.includes(row.pickup_first_overwrite_address)) return true;
     // On the first visible pickup frame the watcher still owns the pending
@@ -1659,14 +1697,14 @@ function main() {
     // pickup_first_overwrite_address. Accept only the exact one-cell overlay:
     // the other three cells must contain their expected pickup glyphs and the
     // replacement must be an effect-bank screen code.
-    if (row.pickup_footprints_before !== 0 || row.pickup_footprints_after !== 1 ||
-      row.pickup_glyph_cells_after !== 3) return false;
-    const values = [row.pickup_new_after_draw0, row.pickup_new_after_draw1,
-      row.pickup_new_after_draw2, row.pickup_new_after_draw3];
-    const expected = values.map((_, index) => (row.pickup_render_id + index) & 0xff);
-    const mismatches = values.flatMap((value, index) =>
-      value === expected[index] ? [] : [{ value, index }]);
-    return mismatches.length === 1 && mismatches[0].value >= 0x80;
+    const validIndexes = addresses.flatMap((address, index) =>
+      address >= 0x4050 && address < 0x43c0 ? [index] : []);
+    const mismatches = validIndexes.flatMap((index) => {
+      const value = row[`pickup_new_after_draw${index}`];
+      const expected = (row.pickup_render_id + index) & 0xff;
+      return value === expected ? [] : [{ value, index }];
+    });
+    return mismatches.length > 0 && mismatches.every(({ value }) => value >= 0x80);
   };
   const pickupRapidRows = pickupModeRows.filter((row) => row.pickup_booster_state === 3);
   const pickupSpreadRows = pickupModeRows.filter((row) => row.pickup_booster_state === 4);
@@ -1737,6 +1775,9 @@ function main() {
   ]));
   const pickupReleaseRows = weaponPickupRows.filter((row) => row.pickup_state !== 2 &&
     rowsBySessionFrame.get(`${row.session}:${row.frame - 1}`)?.pickup_state === 2);
+  const pickupPhysicalAddressChanges = pickupActiveTransitions.filter(({ previous, row }) =>
+    Array.from({ length: 6 }, (_, index) => row[`pickup_new_address${index}`] !==
+      previous[`pickup_new_address${index}`]).some(Boolean)).length;
   const raiderFlashPairs = raiderBreakupRows.filter((row) => {
     const deathFrame = rowsBySessionFrame.get(`${row.session}:${row.frame - 1}`);
     return deathFrame?.colbk === 0x1e && row.colbk === 0x3c;
@@ -1793,26 +1834,22 @@ function main() {
   "Pending weapon pickup became visible or interactive");
   invariant(pickupActiveRows.length > 0 && pickupActiveRows.every((row) =>
       (row.entity_active_mask & 2) !== 0 && (row.pickup_drawn_mask & 15) === 15 &&
-      (row.pickup_render_id === 120 || row.pickup_render_id === 252 ||
-        row.pickup_render_id === 124)),
-  "Atari800 replay did not continuously draw one static Rapid/Spread/Shield render ID");
+      (row.pickup_render_id === 120 || row.pickup_render_id === 248)),
+  "Atari800 replay did not continuously draw one phased Rapid/Spread/Shield render ID");
   invariant(pickupActiveRows.every((row) =>
     row.pickup_footprints_before <= 1 && row.pickup_footprints_after === 1 &&
-      row.pickup_glyph_cells_before <= 4 && row.pickup_glyph_cells_after <= 4 &&
-      row.pickup_glyph_cells_after >= 0 && row.pickup_draw_calls === 3 &&
-      (row.pickup_glyph_cells_after === 4 ||
+      row.pickup_glyph_cells_before <= 6 && row.pickup_glyph_cells_after <= 6 &&
+      row.pickup_glyph_cells_after >= 0 && row.pickup_draw_calls === 1 &&
+      (row.pickup_glyph_cells_after ===
+        (row.pickup_render_phase === 0 || row.pickup_render_row >= 20 ? 4 : 6) ||
         pickupHasEffectOverlay(row))),
-  "Atari800 replay observed a duplicate/partial booster footprint or missed a layer fence");
+  "Atari800 replay observed a duplicate/partial phased footprint or missed the final draw");
   invariant(pickupActiveTransitions.every(({ previous, row }) =>
     row.pickup_x === previous.pickup_x &&
-      (row.pickup_y === previous.pickup_y || row.pickup_y === previous.pickup_y + 8) &&
-      row.pickup_new_address0 === previous.pickup_new_address0 &&
-      row.pickup_new_address1 === previous.pickup_new_address1 &&
-      row.pickup_new_address2 === previous.pickup_new_address2 &&
-      row.pickup_new_address3 === previous.pickup_new_address3),
-  "Booster native-ring motion changed X, caught up, or allocated a second physical footprint");
-  invariant(pickupMaximumStationaryRun <= 3,
-    `Booster native-ring motion held for ${pickupMaximumStationaryRun + 1} active frames`);
+      row.pickup_y === previous.pickup_y + 2),
+  "Hard booster raster motion changed X or deviated from +2 scanlines/frame");
+  invariant(pickupMaximumStationaryRun === 0,
+    `Booster native-ring motion held for ${pickupMaximumStationaryRun} active frames`);
   invariant(pickupReleaseRows.length > 0 && pickupReleaseRows.every((row) =>
     row.pickup_erase_calls === 1 && row.pickup_footprints_after === 0 &&
       row.pickup_glyph_cells_after === 0),
@@ -1826,8 +1863,8 @@ function main() {
         row.frame > rows[index - 1].frame + 1),
   "Atari800 replay did not collect each visible pickup once and enter all booster modes");
   invariant(pickupCreatedRenderIds.length >= 3 &&
-    pickupCreatedRenderIds.every((renderId, index) => renderId === [120, 252, 124][index % 3]),
-  `Atari800 created capsule cycle was ${pickupCreatedRenderIds.join("→")}, expected 120→252→124 rotation`);
+    pickupCreatedRenderIds.every((renderId, index) => renderId === [120, 248, 120][index % 3]),
+  `Atari800 created capsule cycle was ${pickupCreatedRenderIds.join("→")}, expected 120→248→120 rotation`);
   invariant(pickupRapidRows[0].pickup_timer_lo === 0xf4 &&
     pickupRapidRows[0].pickup_timer_hi === 1,
   "Atari800 replay did not load the exact 500-frame Rapid Fire timer");
@@ -2272,10 +2309,10 @@ function main() {
           Math.max(row.pickup_footprints_before, row.pickup_footprints_after))),
         maximum_pickup_glyph_cells: Math.max(...pickupActiveRows.map((row) =>
           Math.max(row.pickup_glyph_cells_before, row.pickup_glyph_cells_after))),
-        layer_fences_per_active_frame: 3,
-        maximum_stationary_active_frames: pickupMaximumStationaryRun + 1,
-        logical_step_scanlines: 8,
-        physical_address_changes_during_native_motion: 0,
+        layer_fences_per_active_frame: 1,
+        maximum_stationary_active_frames: pickupMaximumStationaryRun,
+        logical_step_scanlines: 2,
+        physical_address_changes_during_native_motion: pickupPhysicalAddressChanges,
         release_frames: pickupReleaseRows.length,
         rapid_frames: pickupRapidRows.length,
         pickup_events: pickupCollectRows.length,

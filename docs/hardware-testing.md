@@ -47,11 +47,16 @@ For both XEX and ATR:
       immediately at every HULL value; Shield, respawn invulnerability, the
       post-hit cooldown, and the same-frame damage latch retain their gates,
       while the Raider enters its normal scored breakup exactly once.
-- [ ] Rapid Fire capsule moves as one stable 2x2 footprint; collection displays
+- [ ] Every pickup begins off-screen at Y=8, becomes active at Y=24, advances
+      smoothly to Y=190, and releases at Y=192. HARD advances two scanlines on
+      every successive frame; no 0,0,0,+8 character-row jump is visible.
+- [ ] Rapid Fire capsule remains one coherent 8x16 object (one phased 2x2/2x3
+      footprint) through several ring wraps; no ghost or second pass returns.
+      Collection displays
       the full `BOOST` label and four tall energy segments, emits ten yellow shots at two-frame
       intervals with the existing 12-frame post-burst pause, and expires after
       ten active seconds.
-- [ ] Spread Shot capsule is a stable red 2x2 footprint with a black fan symbol.
+- [ ] Spread Shot capsule is one stable red phased footprint with a black fan symbol.
 - [ ] Collecting Spread immediately displays the full `BOOST` label and four
       full energy segments and
       produces three yellow Viper projectiles: one vertical and two smoothly
@@ -65,7 +70,7 @@ For both XEX and ATR:
       timer nor the current blink phase advances during pause.
 - [ ] Expiry, life loss, Game Over, and New Game remove `BOOST` and leave all ten
       booster HUD cells empty; a live sector transition preserves the active field.
-- [ ] Shield is a steel-blue/white 2x2 capsule with a black shield symbol. Its
+- [ ] Shield is one steel-blue/white phased capsule with a black shield symbol. Its
       250-frame timer survives sector transitions, freezes during pause, and is
       cleared by life loss, Game Over, and New Game.
 - [ ] Shield absorbs Raider shots, broadside impacts, debris, Raider contact,

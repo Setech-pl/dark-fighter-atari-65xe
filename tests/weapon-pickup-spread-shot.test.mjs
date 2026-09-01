@@ -44,7 +44,7 @@ function assets() {
   };
 }
 
-test("Spread Shot owns four final glyphs and a static red 2x2 fan capsule", () => {
+test("Spread Shot owns one phased red fan in the shared six-glyph bank", () => {
   const { entities } = assets();
   assert.deepEqual(entities.weaponPickupSpreadShot, {
     glyphs: [
@@ -63,7 +63,7 @@ test("Spread Shot owns four final glyphs and a static red 2x2 fan capsule", () =
     manifest.entityEffects.spreadPickupGlyphIndex,
     manifest.entityEffects.spreadPickupGlyphCount,
     manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount,
-  ], [124, 4, 128]);
+  ], [120, 4, 126]);
   const selectors = [...entities.spreadPickupGlyphs].flatMap((row) =>
     [6, 4, 2, 0].map((shift) => row >> shift & 3));
   assert.deepEqual([...new Set(selectors)].sort(), [0, 2, 3]);
@@ -75,8 +75,8 @@ test("Spread Shot owns four final glyphs and a static red 2x2 fan capsule", () =
   const include = renderEntityEffectsCa65Include(entities);
   assert.match(include, /WEAPON_PICKUP_SPREAD_GLYPH_COUNT = 4/);
   assert.match(include, /WEAPON_PICKUP_TYPE_SPREAD = 1/);
-  assert.doesNotMatch(source.slice(source.indexOf("render_weapon_pickup_overlay:"),
-    source.indexOf("; Effects render after")), /animation|phase/i);
+  assert.match(source.slice(source.indexOf("render_weapon_pickup_overlay:"),
+    source.indexOf("; Effects render after")), /compose_weapon_pickup_phase/);
 });
 
 test("release XEX and ATR execute the deterministic Rapid Spread Shield drop cycle", () => {
@@ -85,7 +85,7 @@ test("release XEX and ATR execute the deterministic Rapid Spread Shield drop cyc
   const cycle = (trace) => trace.drops.map((drop) => [
     drop.pickupType, drop.nextPickupType, drop.renderId, drop.state,
   ]);
-  assert.deepEqual(cycle(xex), [[0, 1, 120, 1], [1, 2, 252, 1], [2, 0, 124, 1]]);
+  assert.deepEqual(cycle(xex), [[0, 1, 120, 1], [1, 2, 248, 1], [2, 0, 120, 1]]);
   assert.deepEqual(cycle(atr), cycle(xex));
   assert.equal(xex.drops[1].boosterState, 3,
     "Spread capsule must be earned naturally while Rapid Fire is still active");
@@ -114,15 +114,18 @@ test("both capsule types spawn and Spread moves through every A2 step without gh
   assert.deepEqual(trace.spreadCapsuleFrames.map((frame) => [
     frame.state, frame.drawnMask, frame.leftCode, frame.rightCode,
     frame.bottomLeftCode, frame.bottomRightCode,
-  ]), Array.from({ length: 8 }, () => [2, 15, 252, 253, 254, 255]));
+  ]), Array.from({ length: 8 }, () => [2, 15, 248, 249, 250, 251]));
   assert.deepEqual(trace.spreadCapsuleFrames.map(({ y }) => y),
-    [24, 32, 32, 40, 40, 48, 48, 56]);
+    [26, 28, 30, 32, 34, 36, 38, 40]);
   assert.deepEqual(trace.spreadCapsuleFrames.map(({ a2Head }) => a2Head),
     [0, 21, 21, 20, 20, 19, 19, 18]);
   for (const frame of trace.spreadCapsuleFrames) {
-    assert.equal([...frame.screen].filter((code) => code >= 252).length, 4,
+    const capsuleCells = [...frame.screen].filter((code) =>
+      (code & 0x7f) >= 120 && (code & 0x7f) <= 125);
+    assert.equal(capsuleCells.length, frame.rasterPhase === 0 ? 4 : 6,
       `frame ${frame.frame} retained a second capsule position`);
     assert.deepEqual(frame.backing, [0, 0, 0, 0]);
+    if (frame.rasterPhase !== 0) assert.deepEqual(frame.thirdBacking, [0, 0]);
   }
 });
 
@@ -139,7 +142,7 @@ test("Spread four-cell reverse erase restores byte-exact backing at every A2 hea
       xex.rendered.leftCode, xex.rendered.rightCode,
       xex.rendered.bottomLeftCode, xex.rendered.bottomRightCode,
       xex.rendered.drawnMask,
-    ], [252, 253, 254, 255, 15]);
+    ], [248, 249, 250, 251, 15]);
     assert.deepEqual(xex.rendered.backing, xex.original);
     assert.deepEqual(xex.restored, xex.original);
     assert.deepEqual([
@@ -298,15 +301,15 @@ test("all three projectiles leave the screen cleanly without HUD or charset corr
     active === 0 && rendered === 0), true);
   assert.equal([...trace.projectilesAfterCleanup.screen].every((code) => code === 0), true,
     "reverse erase must remove every final projectile cell");
-  const dynamicStart = 124 * 8;
-  const dynamicEnd = 128 * 8;
+  const dynamicStart = 120 * 8;
+  const dynamicEnd = 126 * 8;
   assert.deepEqual(trace.charset.subarray(0, dynamicStart),
     trace.initialCharset.subarray(0, dynamicStart));
   assert.deepEqual(trace.charset.subarray(dynamicEnd),
     trace.initialCharset.subarray(dynamicEnd));
   assert.deepEqual(Array.from(trace.charset.subarray(dynamicStart, dynamicEnd)),
-    Array.from(assets().entities.shieldPickupGlyphs),
-  "the only charset mutation must be the erased capsule's shared dynamic bank");
+    Array.from(assets().entities.pickupPhaseBank.subarray(0x180, 0x1b0)),
+  "the only charset mutation must be the last rendered Spread phase");
   const hudBefore = trace.spreadPickup.display.subarray(0, 40);
   for (const frame of trace.spreadTimerFrames.slice(0, 51)) {
     const changed = Array.from({ length: 40 }, (_, offset) => offset)
@@ -427,6 +430,6 @@ test("Spread stays inside the fixed BSS, payload, glyph and runtime-code budgets
   assert.equal(manifest.payloadBytes, manifest.transportCapacity.totalTransportBytes);
   assert.equal(manifest.bootSectors, manifest.transportCapacity.initialBootSectors);
   assert.ok(manifest.transportCapacity.remainingAtrTransportBytes >= 8192);
-  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 128);
+  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 126);
   assert.doesNotMatch(source.slice(source.indexOf('.segment "ENTITY_CODE"')), /\$A000|\$BFFF/);
 });

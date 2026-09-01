@@ -40,7 +40,10 @@ function runRoutine(memory, labels, name, { a = 0, x = 0, y = 0 } = {}) {
   cpu.x = x;
   cpu.y = y;
   for (let steps = 0; steps < 400_000 && cpu.pc !== stop; steps += 1) cpu.step();
-  if (cpu.pc !== stop) throw new Error(`${name} did not return`);
+  if (cpu.pc !== stop) {
+    throw new Error(`${name} did not return (pc=$${cpu.pc.toString(16).padStart(4, "0")}, ` +
+      `opcode=$${memory[cpu.pc].toString(16).padStart(2, "0")})`);
+  }
   return cpu.cycles;
 }
 
@@ -76,6 +79,10 @@ function initialiseRows(memory, labels, head = 0) {
   }
 }
 
+function renderEntityEffects(memory, labels) {
+  runRoutine(memory, labels, "entity_effects_render");
+}
+
 function logicalScreen(memory, labels) {
   const lo = requiredLabel(labels, "PLAYFIELD_ROW_LO");
   const hi = requiredLabel(labels, "PLAYFIELD_ROW_HI");
@@ -102,12 +109,44 @@ function initialiseRuntime(root, artifact, coldFill = 0) {
   memory.fill(coldFill);
   const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
   if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
+  const pickupRuntime = fs.readFileSync(path.join(root, "build", "pickup-code-runtime.bin"));
+  const completePickupRuntime = fs.readFileSync(path.join(root, "build", "weapon-pickup-phase-runtime.bin"));
+  const packedPickupRuntime = fs.readFileSync(
+    path.join(root, "build", "weapon-pickup-phase-runtime-packed.bin"));
+  const pickupRunAddress = requiredLabel(labels, "__PICKUP_CODE_RUN__");
   for (const routine of [
     "stage_boot_streams", "unpack_resident_runtime",
     "unpack_entity_runtime", "stage_a2_kernel", "init_entity_effects",
-    "unpack_starfield_runtime", "copy_charset", "copy_hud_charset", "init_fighter_projectiles",
+    "unpack_weapon_pickup_phase_runtime", "unpack_starfield_runtime",
+    "copy_charset", "copy_hud_charset", "init_fighter_projectiles",
     "install_entity_effects_glyph",
-  ]) runRoutine(memory, labels, routine);
+  ]) {
+    try {
+      runRoutine(memory, labels, routine);
+    } catch (error) {
+      throw new Error(`${routine}: ${error.message}`);
+    }
+    if (routine === "stage_boot_streams") {
+      const mismatch = memory.subarray(0x4801, 0x4801 + packedPickupRuntime.length)
+        .findIndex((value, index) => value !== packedPickupRuntime[index]);
+      if (mismatch !== -1) {
+        throw new Error(`stage_boot_streams did not preserve pickup runtime at +$${mismatch.toString(16)}`);
+      }
+    }
+    if (routine === "unpack_weapon_pickup_phase_runtime") {
+      const completeMismatch = memory.subarray(manifest.entityEffects.pickupPhaseBankAddress,
+        manifest.entityEffects.pickupPhaseBankAddress + completePickupRuntime.length)
+        .findIndex((value, index) => value !== completePickupRuntime[index]);
+      if (completeMismatch !== -1) {
+        throw new Error(`pickup phase runtime unpack mismatch at +$${completeMismatch.toString(16)}`);
+      }
+    }
+  }
+  const pickupMismatch = memory.subarray(pickupRunAddress, pickupRunAddress + pickupRuntime.length)
+    .findIndex((value, index) => value !== pickupRuntime[index]);
+  if (pickupMismatch !== -1) {
+    throw new Error(`cold startup changed pickup compositor at +$${pickupMismatch.toString(16)}`);
+  }
   const glue = fs.readFileSync(path.join(root, "build", "integration-glue.bin"));
   memory.set(glue, manifest.integrationGlue.finalAddress);
   memory.fill(0, 0x80f4, 0x8100);
@@ -120,6 +159,7 @@ function initialiseRuntime(root, artifact, coldFill = 0) {
   initialiseRows(memory, labels);
   memory.fill(0, 0x3800, 0x4400);
   memory[requiredLabel(labels, "ENTITY_SPAWN_TIMER_LO")] = 0xff;
+  memory[requiredLabel(labels, "DIFFICULTY_SETTING")] = 2;
   memory[requiredLabel(labels, "player_x")] = 196;
   memory[requiredLabel(labels, "player_y")] = 184;
   memory[requiredLabel(labels, "PLAYER_LIFECYCLE")] = 0;
@@ -150,6 +190,9 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
   const bottomScreenAddress = screenAddress === 0 ? 0 :
     memory[requiredLabel(labels, "ENTITY_VX") + slot] |
     memory[requiredLabel(labels, "ENTITY_VY") + slot] << 8;
+  const thirdHigh = memory[requiredLabel(labels, "ENTITY_SCREEN_HI") + 3];
+  const thirdScreenAddress = thirdHigh === 0 ? 0 :
+    memory[requiredLabel(labels, "ENTITY_SCREEN_LO") + 3] | thirdHigh << 8;
   const timerLow = memory[requiredLabel(labels, "ENTITY_TIMER") +
     (boosterState === 0 ? slot : 2)];
   const timerHigh = memory[requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2];
@@ -202,12 +245,20 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
       memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - 0x4050) / 40,
     screenAddress,
     bottomScreenAddress,
+    thirdScreenAddress,
+    rasterPhase: (memory[requiredLabel(labels, "ENTITY_Y") + slot] - 24) & 7,
     leftCode: screenAddress === 0 ? 0 : memory[screenAddress],
     rightCode: screenAddress === 0 ? 0 : memory[screenAddress + 1],
     bottomLeftCode: bottomScreenAddress === 0 ? 0 : memory[bottomScreenAddress],
     bottomRightCode: bottomScreenAddress === 0 ? 0 : memory[bottomScreenAddress + 1],
+    thirdLeftCode: thirdScreenAddress === 0 ? 0 : memory[thirdScreenAddress],
+    thirdRightCode: thirdScreenAddress === 0 ? 0 : memory[thirdScreenAddress + 1],
     backing: [0, 1, 2, 3].map((index) =>
       memory[requiredLabel(labels, `ENTITY_BACKING${index}`) + slot]),
+    thirdBacking: [
+      memory[requiredLabel(labels, "ENTITY_BACKING0") + 3],
+      memory[requiredLabel(labels, "ENTITY_BACKING1") + 3],
+    ],
     drawnMask: memory[requiredLabel(labels, "ENTITY_DRAWN_MASK") + slot],
     effectActiveMask: memory[requiredLabel(labels, "EFFECT_ACTIVE_MASK")],
     effectActiveCount: memory[requiredLabel(labels, "EFFECT_ACTIVE_COUNT")],
@@ -254,7 +305,12 @@ function killRaiderWithViper(memory, labels) {
 function runBurst(memory, labels, { rapid, expectedCount, onFrame = () => {} }) {
   runRoutine(memory, labels, "clear_viper_projectiles");
   const boosterState = memory[requiredLabel(labels, "ENTITY_STATE") + 2];
-  if (rapid && boosterState !== 3) throw new Error("Rapid burst requires collected runtime state");
+  if (rapid && boosterState !== 3) {
+    throw new Error(`Rapid burst requires collected runtime state (state=${boosterState}, ` +
+      `pickup=${memory[requiredLabel(labels, "ENTITY_STATE") + 1]}, ` +
+      `pickupY=${memory[requiredLabel(labels, "ENTITY_Y") + 1]}, ` +
+      `playerY=${memory[requiredLabel(labels, "player_y")]})`);
+  }
   if (!rapid) memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 0;
   memory[0xd010] = 0;
   const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
@@ -312,7 +368,7 @@ export function executeWeaponPickupTrace({
     runRoutine(memory, labels, "entity_effects_erase");
     publishWorldStep(stepWorld());
     runRoutine(memory, labels, "entity_effects_update");
-    runRoutine(memory, labels, "entity_effects_render");
+    renderEntityEffects(memory, labels);
     records.push(pickupSnapshot(memory, labels, manifest, { phase: "PENDING", frame }));
   }
 
@@ -323,7 +379,7 @@ export function executeWeaponPickupTrace({
     runRoutine(memory, labels, "entity_effects_erase");
     publishWorldStep(stepWorld());
     runRoutine(memory, labels, "entity_effects_update");
-    runRoutine(memory, labels, "entity_effects_render");
+    renderEntityEffects(memory, labels);
     records.push(pickupSnapshot(memory, labels, manifest, { phase: "ACTIVE", frame }));
   }
 
@@ -343,7 +399,7 @@ export function executeWeaponPickupTrace({
   memory[requiredLabel(labels, "player_y")] = pickupY;
   memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = 0;
   runRoutine(memory, labels, "entity_effects_update");
-  runRoutine(memory, labels, "entity_effects_render");
+  renderEntityEffects(memory, labels);
   records.push(pickupSnapshot(memory, labels, manifest, { phase: "PICKUP", frame: 0 }));
 
   const rapidTimerFrames = [];
@@ -445,7 +501,7 @@ export function executeWeaponPickupTraversalTrace({
       memory[frameEvents] = event;
       runRoutine(memory, labels, "update_weapon_pickup_active", { x: 2 });
       if (memory[state] === 2) {
-        runRoutine(memory, labels, "entity_effects_render");
+        renderEntityEffects(memory, labels);
         visible.push(pickupSnapshot(memory, labels, manifest, { phase: "ACTIVE", frame }));
       }
     }
@@ -469,6 +525,80 @@ export function executeWeaponPickupTraversalTrace({
     };
   });
   return { artifact, traces };
+}
+
+export function executeWeaponPickupRingWrapTrace({
+  root = defaultRoot, artifact = "xex", difficulty = 2, wrapFramesAfterRelease = 66,
+} = {}) {
+  const { memory, labels, manifest } = initialiseRuntime(root, artifact);
+  initialiseRows(memory, labels, 0);
+  for (let address = 0x4028; address < 0x43c0; address += 1) {
+    memory[address] = 1 + address % 100;
+  }
+  const slot = 1;
+  const state = requiredLabel(labels, "ENTITY_STATE") + slot;
+  memory[state] = 2;
+  memory[requiredLabel(labels, "ENTITY_ACTIVE_MASK")] = 2;
+  memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")] = 1;
+  memory[requiredLabel(labels, "ENTITY_TYPE") + slot] = 0;
+  memory[requiredLabel(labels, "ENTITY_X") + slot] = 112;
+  memory[requiredLabel(labels, "ENTITY_Y") + slot] = 24;
+  memory[requiredLabel(labels, "ENTITY_RENDER_ID") + slot] = 120;
+  memory[requiredLabel(labels, "DIFFICULTY_SETTING")] = difficulty;
+  memory[requiredLabel(labels, "player_x")] = 196;
+  memory[requiredLabel(labels, "player_y")] = 184;
+
+  const capsuleCells = () => Array.from(memory.subarray(0x4028, 0x43c0))
+    .filter((code) => (code & 0x7f) >= 120 && (code & 0x7f) <= 125).length;
+  const capsuleFootprints = () => Array.from(memory.subarray(0x4028, 0x43c0))
+    .filter((code) => code === 120).length;
+  const records = [];
+  let previous = null;
+  for (let frame = 0; frame < 128 && memory[state] === 2; frame += 1) {
+    let exactReverseErase = true;
+    if (frame !== 0) {
+      runRoutine(memory, labels, "entity_effects_erase");
+      exactReverseErase = memory[previous.screenAddress] === previous.backing[0] &&
+        memory[previous.screenAddress + 1] === previous.backing[1] &&
+        memory[previous.bottomScreenAddress] === previous.backing[2] &&
+        memory[previous.bottomScreenAddress + 1] === previous.backing[3] &&
+        (previous.thirdScreenAddress === 0 ||
+          (memory[previous.thirdScreenAddress] === previous.thirdBacking[0] &&
+            memory[previous.thirdScreenAddress + 1] === previous.thirdBacking[1]));
+      if (capsuleCells() !== 0) exactReverseErase = false;
+      runRoutine(memory, labels, "rotate_playfield_rows");
+      runRoutine(memory, labels, "update_weapon_pickup_active", { x: 2 });
+    }
+    if (memory[state] === 2) {
+      renderEntityEffects(memory, labels);
+      previous = pickupSnapshot(memory, labels, manifest,
+        { phase: "WRAP_ACTIVE", frame });
+      records.push({
+        ...previous,
+        exactReverseErase,
+        capsuleCells: capsuleCells(),
+        capsuleFootprints: capsuleFootprints(),
+        logicalSlots: memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")],
+        finalDrawCalls: 1,
+      });
+    }
+  }
+  const releasedY = memory[requiredLabel(labels, "ENTITY_Y") + slot];
+  const cellsAtRelease = capsuleCells();
+  for (let frame = 0; frame < wrapFramesAfterRelease; frame += 1) {
+    runRoutine(memory, labels, "rotate_playfield_rows");
+  }
+  return {
+    artifact,
+    records,
+    releasedState: memory[state],
+    releasedY,
+    activeMask: memory[requiredLabel(labels, "ENTITY_ACTIVE_MASK")],
+    activeCount: memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")],
+    cellsAtRelease,
+    cellsAfterAdditionalWraps: capsuleCells(),
+    wrapCount: Math.floor((records.length - 1 + wrapFramesAfterRelease) / 22),
+  };
 }
 
 export function executeViperBurstBalanceTrace({
@@ -869,7 +999,7 @@ export function executeViperProjectileColourLifecycleTrace({
 }
 
 export function executeWeaponPickupBackingTrace({
-  root = defaultRoot, artifact = "xex", head = 0, pickupType = "rapid",
+  root = defaultRoot, artifact = "xex", head = 0, pickupType = "rapid", y = 104,
 } = {}) {
   const { memory, labels, manifest } = initialiseRuntime(root, artifact);
   initialiseRows(memory, labels, head);
@@ -877,11 +1007,7 @@ export function executeWeaponPickupBackingTrace({
   if (!new Set(["rapid", "spread", "shield"]).has(pickupType)) {
     throw new Error(`Unknown weapon pickup type ${pickupType}`);
   }
-  if (pickupType === "spread") {
-    runRoutine(memory, labels, "install_weapon_pickup_spread_glyph");
-  } else if (pickupType === "shield") {
-    runRoutine(memory, labels, "install_weapon_pickup_shield_glyph");
-  }
+  const pickupTypeId = { rapid: 0, spread: 1, shield: 2 }[pickupType];
   const renderId = pickupType === "rapid" ?
     manifest.entityEffects.weaponPickupGlyphIndex :
     manifest.entityEffects.spreadPickupGlyphIndex |
@@ -890,24 +1016,32 @@ export function executeWeaponPickupBackingTrace({
   memory[requiredLabel(labels, "ENTITY_ACTIVE_MASK")] = 2;
   memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")] = 1;
   memory[requiredLabel(labels, "ENTITY_X") + slot] = 112;
-  memory[requiredLabel(labels, "ENTITY_Y") + slot] = 104;
+  memory[requiredLabel(labels, "ENTITY_Y") + slot] = y;
+  memory[requiredLabel(labels, "ENTITY_TYPE") + slot] = pickupTypeId;
   memory[requiredLabel(labels, "ENTITY_RENDER_ID") + slot] = renderId;
 
   const rowLow = requiredLabel(labels, "PLAYFIELD_ROW_LO");
   const rowHigh = requiredLabel(labels, "PLAYFIELD_ROW_HI");
-  const logicalTopRow = Math.floor((104 - 24 + 4) / 8);
+  const logicalTopRow = Math.floor((y - 24) / 8);
   const column = Math.floor((112 - 48 + 2) / 4);
   const addressForRow = (logicalRow) =>
     (memory[rowLow + logicalRow] | memory[rowHigh + logicalRow] << 8) + column;
   const top = addressForRow(logicalTopRow);
   const bottom = addressForRow(logicalTopRow + 1);
-  const original = [0x0a, 0x1b, 0x2c, 0x3d];
+  const hasThirdRow = ((y - 24) & 7) !== 0 && logicalTopRow < 20;
+  const third = hasThirdRow ? addressForRow(logicalTopRow + 2) : 0;
+  const original = hasThirdRow ? [0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f] :
+    [0x0a, 0x1b, 0x2c, 0x3d];
   memory[top] = original[0];
   memory[top + 1] = original[1];
   memory[bottom] = original[2];
   memory[bottom + 1] = original[3];
+  if (hasThirdRow) {
+    memory[third] = original[4];
+    memory[third + 1] = original[5];
+  }
 
-  runRoutine(memory, labels, "render_interactive_entity_overlays");
+  renderEntityEffects(memory, labels);
   const rendered = pickupSnapshot(memory, labels, manifest, { phase: "BACKED", frame: 0 });
   runRoutine(memory, labels, "weapon_pickup_release_active_mask");
   return {
@@ -915,9 +1049,12 @@ export function executeWeaponPickupBackingTrace({
     head,
     top,
     bottom,
+    third,
+    hasThirdRow,
     original,
     rendered,
-    restored: [memory[top], memory[top + 1], memory[bottom], memory[bottom + 1]],
+    restored: [memory[top], memory[top + 1], memory[bottom], memory[bottom + 1],
+      ...(hasThirdRow ? [memory[third], memory[third + 1]] : [])],
     drawnMaskAfterErase: memory[requiredLabel(labels, "ENTITY_DRAWN_MASK") + slot],
     renderedMaskAfterErase: memory[requiredLabel(labels, "ENTITY_RENDERED_MASK")],
     topLatchAfterErase: memory[requiredLabel(labels, "ENTITY_SCREEN_HI") + slot],
@@ -927,29 +1064,33 @@ export function executeWeaponPickupBackingTrace({
 }
 
 export function executeWeaponPickupCollisionTrace({ root = defaultRoot, artifact = "xex" } = {}) {
-  const cases = [
-    ["top_left", 112, 104, true],
-    ["bottom_right_inside", 119, 119, true],
-    ["player_left_overlap", 105, 104, true],
-    ["left_outside", 104, 104, false],
-    ["right_outside", 120, 104, false],
-    ["above_overlap", 112, 90, true],
-    ["above_outside", 112, 89, false],
-    ["below_outside", 112, 120, false],
-  ];
-  return cases.map(([name, playerX, playerY, hit]) => {
+  const cases = Array.from({ length: 8 }, (_, phase) => {
+    const pickupY = 104 + phase;
+    return [
+      [`phase_${phase}_top_left`, 112, pickupY, true, pickupY],
+      [`phase_${phase}_bottom_right_inside`, 119, pickupY + 15, true, pickupY],
+      [`phase_${phase}_player_left_overlap`, 105, pickupY, true, pickupY],
+      [`phase_${phase}_left_outside`, 104, pickupY, false, pickupY],
+      [`phase_${phase}_right_outside`, 120, pickupY, false, pickupY],
+      [`phase_${phase}_above_overlap`, 112, pickupY - 14, true, pickupY],
+      [`phase_${phase}_above_outside`, 112, pickupY - 15, false, pickupY],
+      [`phase_${phase}_below_outside`, 112, pickupY + 16, false, pickupY],
+    ];
+  }).flat();
+  return cases.map(([name, playerX, playerY, hit, pickupY]) => {
     const { memory, labels, manifest } = initialiseRuntime(root, artifact);
     const slot = 1;
     memory[requiredLabel(labels, "ENTITY_STATE") + slot] = 2;
     memory[requiredLabel(labels, "ENTITY_ACTIVE_MASK")] = 2;
     memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")] = 1;
     memory[requiredLabel(labels, "ENTITY_X") + slot] = 112;
-    memory[requiredLabel(labels, "ENTITY_Y") + slot] = 104;
+    memory[requiredLabel(labels, "ENTITY_Y") + slot] = pickupY;
     memory[requiredLabel(labels, "player_x")] = playerX;
     memory[requiredLabel(labels, "player_y")] = playerY;
     runRoutine(memory, labels, "weapon_pickup_collide_player");
     const snapshot = pickupSnapshot(memory, labels, manifest, { phase: name, frame: 0 });
-    return { name, playerX, playerY, expectedHit: hit, collected: snapshot.state >= 3, snapshot };
+    return { name, playerX, playerY, pickupY, expectedHit: hit,
+      collected: snapshot.state >= 3, snapshot };
   });
 }
 
@@ -1246,7 +1387,7 @@ function advanceWeaponPickupToActive(memory, labels, frames = []) {
     runRoutine(memory, labels, "entity_effects_erase");
     memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = 0;
     runRoutine(memory, labels, "entity_effects_update");
-    runRoutine(memory, labels, "entity_effects_render");
+    renderEntityEffects(memory, labels);
     frames.push(frame);
   }
 }
@@ -1291,7 +1432,7 @@ export function executeSpreadShotTrace({
 
   triggerDrop(1);
   advanceWeaponPickupToActive(memory, labels);
-  runRoutine(memory, labels, "entity_effects_render");
+  renderEntityEffects(memory, labels);
   const rapidCapsule = pickupSnapshot(memory, labels, manifest,
     { phase: "RAPID_CAPSULE", frame: 0 });
   collectVisibleWeaponPickup(memory, labels);
@@ -1314,7 +1455,7 @@ export function executeSpreadShotTrace({
     memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = nearRowAdvanced;
     memory[requiredLabel(labels, "ENEMY_PENDING_SOURCE") + 2] = nearRowAdvanced ? 0 : 1;
     runRoutine(memory, labels, "entity_effects_update");
-    runRoutine(memory, labels, "entity_effects_render");
+    renderEntityEffects(memory, labels);
     spreadCapsuleFrames.push(pickupSnapshot(memory, labels, manifest,
       { phase: "SPREAD_CAPSULE", frame }));
   }

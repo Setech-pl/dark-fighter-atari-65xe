@@ -145,8 +145,8 @@ function createBootedArtifactRuntimeMemory(artifact, fill = 0) {
     "unpack_resident_runtime",
     "unpack_entity_runtime",
     "stage_a2_kernel",
+    "init_entity_effects", "unpack_weapon_pickup_phase_runtime",
     "unpack_starfield_runtime",
-    "init_entity_effects",
     "init_fighter_projectiles",
     "init_broadside",
   ]) runRoutine(memory, name);
@@ -430,11 +430,11 @@ test("entity memory and code reservations are exact and do not use BASIC ROM", (
   assert.equal(manifest.entityEffects.interactiveActiveLimit, 2);
   assert.equal(manifest.entityEffects.effectSlots, 6);
   assert.equal(manifest.entityEffects.effectActiveLimit, 5);
-  assert.equal(manifest.entityEffects.glyphCount, 18);
-  assert.equal(manifest.entityEffects.glyphBytes, 144);
+  assert.equal(manifest.entityEffects.glyphCount, 16);
+  assert.equal(manifest.entityEffects.glyphBytes, 128);
   assert.equal(manifest.entityEffects.newGlyphsFromFoundation, 7);
-  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 128);
-  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 0);
+  assert.equal(manifest.entityEffects.glyphIndex + manifest.entityEffects.glyphCount, 126);
+  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 2);
   assert.equal(manifest.entityEffects.codeBudget.baselineBytes, 564);
   assert.equal(manifest.entityEffects.codeBudget.approvedDeltaBytes, 512);
   assert.ok(manifest.entityEffects.codeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448);
@@ -482,6 +482,7 @@ test("$A5 and $5A cold RAM are fully and identically initialised for XEX and ATR
           manifest.a2Kernel.runAddress + a2KernelRuntime.length)],
         [...a2KernelRuntime],
       );
+      runRoutine(memory, "unpack_weapon_pickup_phase_runtime");
       runRoutine(memory, "unpack_starfield_runtime");
       assert.deepEqual(
         [...memory.slice(manifest.starfieldRuntime.runAddress,

@@ -41,6 +41,25 @@ simultaneous residency to 17,421 B, leaving 4,766 B of the architectural safe
 residency allowance. Raw residency, packed transport, staging and the six-byte
 guard are accounted separately.
 
+## Focused booster-compositor candidate evidence
+
+The pending booster-compositor candidate is intentionally measured without the
+full gauntlet and does not replace the accepted global report below. Its native
+Atari800 focused sessions cover 5,800 PAL frames: a 1,800-frame complete
+traversal and a 4,000-frame three-drop Rapid/Spread/Shield replay. The larger
+measured wall interval is 21,202 cycles, leaving 14,366 cycles in a 35,568-cycle
+PAL frame; the traversal maximum is 20,030 cycles. Both sessions report one
+draw and one 2x2/2x3 footprint per active slot, exact reverse erase, zero
+capsule codes in saved backing, 132 total A2 wraps (five while a capsule is
+active), and no returned footprint after release. The candidate linked metric
+is 16,805 B, simultaneous residency is 18,643 B, and safe residency is 3,544 B.
+Persistent BSS is unchanged.
+
+During PENDING/ACTIVE only, the 50 Hz main loop begins 64 scanlines earlier so
+the unchanged final overlay order completes before ANTIC reaches the capsule.
+This is a raster-phase shift, not extra simulation work: world rates, ring
+rotation, movement cadence, and global scrolling retain their prior values.
+
 ## Heaviest legal frame
 
 The global maximum is HARD session `weapon-pickup-2-hunt-fire4`, frame 3,183.

@@ -137,6 +137,10 @@ function makeMachine({
   a2KernelRunAddress,
   entityCodeRuntime,
   entityCodeRunAddress,
+  weaponPickupPhaseBank,
+  weaponPickupPhaseBankAddress,
+  pickupCodeRuntime,
+  pickupCodeRunAddress,
   integrationGlueRuntime,
   integrationGlueRunAddress,
   directorRuntime,
@@ -150,6 +154,8 @@ function makeMachine({
   memory.set(starfieldRuntime, starfieldRunAddress);
   memory.set(a2KernelRuntime, a2KernelRunAddress);
   memory.set(entityCodeRuntime, entityCodeRunAddress);
+  if (weaponPickupPhaseBank) memory.set(weaponPickupPhaseBank, weaponPickupPhaseBankAddress);
+  if (pickupCodeRuntime) memory.set(pickupCodeRuntime, pickupCodeRunAddress);
   if (integrationGlueRuntime) memory.set(integrationGlueRuntime, integrationGlueRunAddress);
   if (directorRuntime) memory.set(directorRuntime, directorRunAddress);
 
@@ -264,7 +270,7 @@ function execute(cpu, {
   throw new Error(
     `Runtime timing execution did not reach ${[...stopSet]
       .map((address) => `$${address.toString(16)}`).join(" or ")}; ` +
-      `stopped at $${cpu.pc.toString(16)} after ${maximumSteps} steps`,
+    `stopped at $${cpu.pc.toString(16)} after ${maximumSteps} steps`,
   );
 }
 
@@ -504,6 +510,7 @@ function protectedSegments(segmentSizes) {
     ["A2_KERNEL", segmentSizes.a2Kernel, 0x0000, 0x0100, 0x0100],
     ["ENTITY_STATE", segmentSizes.entityState, 0x0100, 0x0100, 0x0100],
     ["ENTITY_CODE", segmentSizes.entityCode, 0x02ca, 0x05ca, 0x0f00],
+    ["PICKUP_CODE", segmentSizes.pickupCode, 0x0000, 0x0380, 0x0380],
   ];
   return definitions.map(([
     name, bytes, featureStartBytes, acceptedMaximumBytes, reservedMaximumBytes,
@@ -535,7 +542,9 @@ function runtimeRanges() {
     ["hybrid-ring-display-state", 0x7f10, 0x7fda, "after-loader"],
     ["entity-effects-state", 0x8000, 0x80ff, "unconditional"],
     ["far-star-screen-cache", 0x8100, 0x812f, "after-loader"],
-    ["future-entity-effects-state", 0x8130, 0x8fff, "unconditional"],
+    ["future-entity-effects-state", 0x8130, 0x87ff, "unconditional"],
+    ["pickup-phase-runtime", 0x8800, 0x8d8a, "unconditional"],
+    ["future-entity-effects-tail", 0x8d8b, 0x8fff, "unconditional"],
     ["a2-kernel-code", 0x9000, 0x90ff, "unconditional"],
     ["entity-effects-code", 0x9100, 0x9d74, "unconditional"],
     ["encounter-director", 0x9d75, 0x9ff9, "unconditional"],
@@ -1065,7 +1074,7 @@ function parseSegmentSizes(mapText) {
     ["code", "CODE"], ["rodata", "RODATA"], ["projectiles", "PROJECTILES"],
     ["starfield", "STARFIELD"], ["broadside", "BROADSIDE"],
     ["a2Kernel", "A2_KERNEL"], ["entityState", "ENTITY_STATE"],
-    ["entityCode", "ENTITY_CODE"],
+    ["entityCode", "ENTITY_CODE"], ["pickupCode", "PICKUP_CODE"],
   ]) {
     const match = new RegExp(`^${name}\\s+[0-9A-F]+\\s+[0-9A-F]+\\s+([0-9A-F]+)`, "mi").exec(mapText);
     invariant(match, `Link map is missing ${name}`);
@@ -1088,6 +1097,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     a2KernelRunAddress: requiredLabel(labels, "__A2_KERNEL_RUN__"),
     entityCodeRuntime: fs.readFileSync(path.join(root, "build", "entity-code-runtime.bin")),
     entityCodeRunAddress: requiredLabel(labels, "__ENTITY_CODE_RUN__"),
+    weaponPickupPhaseBank: fs.readFileSync(path.join(root, "build", "weapon-pickup-phases.bin")),
+    weaponPickupPhaseBankAddress: 0x8800,
+    pickupCodeRuntime: fs.readFileSync(path.join(root, "build", "pickup-code-runtime.bin")),
+    pickupCodeRunAddress: requiredLabel(labels, "__PICKUP_CODE_RUN__"),
     labels,
     segmentSizes: parseSegmentSizes(fs.readFileSync(path.join(root, "build", "dark-fighter.map"), "utf8")),
   });

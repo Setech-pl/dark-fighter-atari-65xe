@@ -265,7 +265,7 @@ test("real XEX/ATR startup traces keep one atomic two-phase engine pulse", () =>
   }
 });
 
-test("real Atari800 pickup trace retains one 2x2 footprint through native A2 motion", () => {
+test("real Atari800 pickup trace retains one phased footprint through native A2 motion", () => {
   const pickup = report.gate.weapon_pickup_rapid_fire;
   const colour = report.coverage.weapon_pickup_rapid_fire.yellow_projectiles;
   assert.deepEqual([
@@ -274,8 +274,8 @@ test("real Atari800 pickup trace retains one 2x2 footprint through native A2 mot
     pickup.layer_fences_per_active_frame,
     pickup.maximum_stationary_active_frames,
     pickup.logical_step_scanlines,
-    pickup.physical_address_changes_during_native_motion,
-  ], [1, 4, 3, 4, 8, 0]);
+  ], [1, 6, 1, 0, 2]);
+  assert.ok(pickup.physical_address_changes_during_native_motion > 0);
   assert.ok(pickup.release_frames > 0);
   assert.equal(colour.colour_register, "COLPF2");
   assert.equal(colour.colour_value, 0x1e);

@@ -16,6 +16,8 @@ const labels = new Map(fs.readFileSync(path.join(root, "build/dark-fighter.lbl")
   .filter(Boolean).map((match) => [match[2], Number.parseInt(match[1], 16)]));
 const a2 = fs.readFileSync(path.join(root, "build/a2-kernel-runtime.bin"));
 const entity = fs.readFileSync(path.join(root, "build/entity-code-runtime.bin"));
+const pickupPhaseRuntime = fs.readFileSync(
+  path.join(root, "build/weapon-pickup-phase-runtime.bin"));
 const glue = fs.readFileSync(path.join(root, "build/integration-glue.bin"));
 const director = fs.readFileSync(path.join(root, "build/encounter-director.bin"));
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -55,6 +57,9 @@ function stageArtifact(artifact, fill) {
   assert.deepEqual(Buffer.from(memory.subarray(0x7f16, 0x7f3d)), glue);
   run(memory, "init_entity_effects");
   const finalAfterClear = Buffer.from(memory.subarray(0x9000, 0x90ff));
+  run(memory, "unpack_weapon_pickup_phase_runtime");
+  assert.deepEqual(Buffer.from(memory.subarray(0x8800, 0x8800 + pickupPhaseRuntime.length)),
+    pickupPhaseRuntime);
   run(memory, "unpack_starfield_runtime");
   const finish = labels.get("finish_startup_after_loader");
   const savedFinish = memory[finish];
@@ -69,30 +74,31 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
     /jsr stage_boot_streams[\s\S]+jsr unpack_entity_runtime\nlayout_d_entity_unpack_complete:\n\s+jsr stage_a2_kernel\n\s+jsr init_entity_effects/);
   assert.doesNotMatch(source, /jsr init_entity_effects\n\s+jsr stage_a2_kernel/);
   const resident = fs.readFileSync(path.join(root, "build/resident-runtime.bin"));
-  assert.deepEqual([...resident.subarray(0x40, 0x46)], [0x20, 0x8c, 0x21, 0x20, 0xfe, 0x9a]);
+  assert.deepEqual([...resident.subarray(0x40, 0x46)], [0x20, 0x8f, 0x21, 0x20, 0x9e, 0x9a]);
 });
 
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
-  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12889);
-  assert.equal(manifest.transportCapacity.initialBootBytes, 12928);
-  assert.equal(manifest.transportCapacity.totalTransportSectors, 152);
-  assert.equal(manifest.transportCapacity.totalTransportBytes, 19456);
+  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12755);
+  assert.equal(manifest.transportCapacity.initialBootBytes, 12800);
+  assert.equal(manifest.transportCapacity.totalTransportSectors, 156);
+  assert.equal(manifest.transportCapacity.totalTransportBytes, 19968);
   assert.equal(manifest.transportCapacity.stage2.bytes, 1191);
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [102, 45, 5671, 6656, 0x5e10],
-    [147, 1, 41, 39, 0x5259],
-    [148, 5, 587, 645, 0x9d75],
+    [101, 44, 5611, 6592, 0x5e10],
+    [145, 6, 700, 700, 0x7bd0],
+    [151, 1, 41, 39, 0x5259],
+    [152, 5, 587, 645, 0x9d75],
   ]);
-  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16735);
-  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 17421);
-  assert.equal(manifest.encounterDirector.safeResidencyBytes, 4766);
+  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16805);
+  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18643);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3544);
 });
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {
   assert.equal(a2.length, 255);
-  assert.equal(sha256(a2), "19feb081a09b29b6a8a0103230d8e8a5ac1007d3c19edd44ee82ca1aec64d4ef");
+  assert.equal(sha256(a2), "0caf1d924375f01ba3a7107b53670c1c7b02bced2b9a6f546ed9e53e47cc9ea5");
   for (const artifact of ["xex", "atr"]) for (const fill of [0xa5, 0x5a]) {
     const staged = stageArtifact(artifact, fill);
     assert.equal(sha256(staged.sourceA2), sha256(a2), `${artifact} staged A2`);

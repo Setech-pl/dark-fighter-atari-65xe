@@ -259,17 +259,20 @@ export function validateBuildDirectory(rootDirectory) {
       FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES,
   "H3.1 exceeds its ENTITY_CODE/runtime budget");
   invariant(manifest.entityEffects.debrisGlyphCount === DEBRIS_VISUAL_POLISH_GLYPH_COUNT &&
-    manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 8 &&
+    manifest.entityEffects.glyphCount === DESTRUCTIBLE_DEBRIS_TOTAL_GLYPH_COUNT + 6 &&
     manifest.entityEffects.effectGlyphCount === 2 &&
     manifest.entityEffects.weaponPickupGlyphCount === 4 &&
     manifest.entityEffects.weaponPickupGlyphIndex === 120 &&
     manifest.entityEffects.spreadPickupGlyphCount === 4 &&
-    manifest.entityEffects.spreadPickupGlyphIndex === 124 &&
+    manifest.entityEffects.spreadPickupGlyphIndex === 120 &&
     manifest.entityEffects.shieldPickupGlyphCount === 4 &&
-    manifest.entityEffects.shieldPickupGlyphIndex === 124 &&
+    manifest.entityEffects.shieldPickupGlyphIndex === 120 &&
+    manifest.entityEffects.pickupPhaseGlyphCount === 6 &&
+    manifest.entityEffects.pickupPhaseCount === 8 &&
+    manifest.entityEffects.pickupPhaseBankAddress === 0x8800 &&
     manifest.entityEffects.dynamicPickupGlyphBankShared === true &&
     manifest.entityEffects.newGlyphsFromFoundation === DEBRIS_VISUAL_POLISH_NEW_GLYPHS,
-  "Weapon pickups must retain debris/effects and safely share glyphs 124-127");
+  "Weapon pickups must retain debris/effects and safely share phased glyphs 120-125");
   invariant(manifest.payloadBudget?.destructibleDebris?.limitBytes ===
     DEBRIS_VISUAL_POLISH_PAYLOAD_LIMIT &&
     manifest.runtimeCodeBudget?.baselineBytes ===
@@ -310,7 +313,7 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(manifest.runtimeCodeBudget?.frontendH31?.baselineBytes ===
     SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES &&
     (manifest.encounterDirector?.enabled === true
-      ? manifest.encounterDirector.linkedRuntimeBytes === 16735
+      ? manifest.encounterDirector.linkedRuntimeBytes === 16805
       : manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <=
         FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES),
   "H3.1 exceeds its linked runtime hard budget");
@@ -330,13 +333,14 @@ export function validateBuildDirectory(rootDirectory) {
 
   const parsedXex = parseXex(xex);
   const directorEnabled = manifest.encounterDirector?.enabled === true;
-  invariant(parsedXex.segments.length === (directorEnabled ? 5 : 3),
+  invariant(parsedXex.segments.length === (directorEnabled ? 6 : 3),
     "XEX segment count does not match the enabled transport layout");
   const payloadSegment = parsedXex.segments[0];
   const broadsideSegment = parsedXex.segments[1];
-  const glueSegment = directorEnabled ? parsedXex.segments[2] : null;
-  const directorSegment = directorEnabled ? parsedXex.segments[3] : null;
-  const runSegment = parsedXex.segments[directorEnabled ? 4 : 2];
+  const pickupPhaseSegment = directorEnabled ? parsedXex.segments[2] : null;
+  const glueSegment = directorEnabled ? parsedXex.segments[3] : null;
+  const directorSegment = directorEnabled ? parsedXex.segments[4] : null;
+  const runSegment = parsedXex.segments[directorEnabled ? 5 : 2];
   invariant(payloadSegment.start === manifest.loadAddress, "XEX payload load address is wrong");
   invariant(payloadSegment.data.equals(boot.subarray(0, transport.initialBootBytes)),
     "XEX initial block differs from ATR");
@@ -348,9 +352,15 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(broadsideSegment.data.equals(broadsideRuntime),
     "XEX manifest-owned BROADSIDE bytes differ from the final runtime image");
   if (directorEnabled) {
+    const packedPickupPhaseRuntime = fs.readFileSync(path.join(rootDirectory,
+      "build", "weapon-pickup-phase-runtime-packed.bin"));
     const glueRuntime = fs.readFileSync(path.join(rootDirectory, "build", "integration-glue.bin"));
     const directorRuntime = fs.readFileSync(path.join(rootDirectory,
       "build", "encounter-director.bin"));
+    invariant(pickupPhaseSegment.start ===
+      manifest.entityEffects.pickupPhaseExternalChunk.stagingAddress &&
+      pickupPhaseSegment.data.equals(packedPickupPhaseRuntime),
+    "XEX packed pickup phase-runtime segment is invalid");
     invariant(glueSegment.start === manifest.integrationGlue.transportAddress &&
       glueSegment.data.equals(glueRuntime), "XEX GLUE staging segment is invalid");
     invariant(directorSegment.start === manifest.directorRuntime.runAddress &&

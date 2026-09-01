@@ -70,9 +70,11 @@ pixels while preserving the established hull silhouette and backing behavior.
 
 ## Pickups
 
-Pickup capsules are large, static 2x2-character objects. Their movement comes
-from world scrolling; the four-cell footprint does not flicker or alternate
-between old and new positions.
+Pickup capsules are large 8x16-scanline objects. Eight generated vertical
+phases keep the silhouette coherent while it crosses character rows: phase
+zero occupies 2x2 cells and shifted phases occupy 2x3 cells. Exactly one final
+footprint may be visible for each active logical slot; the image must not hold
+for several frames and then jump by eight scanlines.
 
 - **Rapid Fire:** steel/yellow casing with a black `RF` symbol. It must remain
   readable against space and either capital hull.
@@ -81,7 +83,9 @@ between old and new positions.
   symbol. Its dense cross-core BOOST bar and solid steel/white Viper pulse must
   remain distinguishable from both weapon boosters and respawn blinking.
   The dark symbol is formed by the capsule interior, not white text.
-Pickup and projectile erase must restore the current lower layer. Visual review
+Pickup erase restores the exact physical cells and lower-layer bytes saved by
+the previous frame, never a pointer recalculated from the new ring phase.
+Capsule glyph codes must not enter backing or wrap-copy sources. Visual review
 therefore covers empty space, both hulls, module boundaries, prow, engine banks,
 and display-list wrap.
 

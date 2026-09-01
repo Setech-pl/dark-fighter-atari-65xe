@@ -23,6 +23,9 @@ export function loadRuntimeSegments(rootDirectory) {
       manifest.a2Kernel.bytes],
     ["entityCode", "entity-code-runtime.bin", manifest.entityEffects.codeRunAddress,
       manifest.entityEffects.codeBytes],
+    ["pickupPhaseRuntime", "weapon-pickup-phase-runtime.bin",
+      manifest.entityEffects.pickupPhaseBankAddress,
+      manifest.entityEffects.pickupPhaseRuntimeBytes],
     ...(manifest.encounterDirector?.enabled === true ? [
       ["integrationGlue", "integration-glue.bin", manifest.integrationGlue.finalAddress,
         manifest.integrationGlue.bytes],

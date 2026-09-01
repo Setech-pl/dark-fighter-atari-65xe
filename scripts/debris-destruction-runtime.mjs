@@ -29,7 +29,10 @@ function runRoutine(memory, labels, name) {
   cpu.push((stop - 1) & 0xff);
   cpu.pc = requiredLabel(labels, name);
   for (let steps = 0; steps < 300_000 && cpu.pc !== stop; steps += 1) cpu.step();
-  if (cpu.pc !== stop) throw new Error(`${name} did not return`);
+  if (cpu.pc !== stop) {
+    throw new Error(`${name} did not return (pc=$${cpu.pc.toString(16).padStart(4, "0")}, ` +
+      `opcode=$${memory[cpu.pc].toString(16).padStart(2, "0")})`);
+  }
   return cpu.cycles;
 }
 
@@ -138,6 +141,7 @@ export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "
   runRoutine(memory, labels, "unpack_entity_runtime");
   runRoutine(memory, labels, "stage_a2_kernel");
   runRoutine(memory, labels, "init_entity_effects");
+  runRoutine(memory, labels, "unpack_weapon_pickup_phase_runtime");
   runRoutine(memory, labels, "unpack_starfield_runtime");
   memory.set(fs.readFileSync(path.join(root, "build", "integration-glue.bin")), 0x4efe);
   memory.fill(0, 0x80f4, 0x8100);
@@ -220,6 +224,7 @@ export function executeRaiderBreakupTrace({ root = defaultRoot, artifact = "xex"
   runRoutine(memory, labels, "unpack_entity_runtime");
   runRoutine(memory, labels, "stage_a2_kernel");
   runRoutine(memory, labels, "init_entity_effects");
+  runRoutine(memory, labels, "unpack_weapon_pickup_phase_runtime");
   runRoutine(memory, labels, "unpack_starfield_runtime");
   memory.set(fs.readFileSync(path.join(root, "build", "integration-glue.bin")), 0x4efe);
   memory.fill(0, 0x80f4, 0x8100);

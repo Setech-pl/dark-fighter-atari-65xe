@@ -56,21 +56,21 @@ test("dynamic glyph ownership is explicit and all capsule transitions restore ba
     manifest.entityEffects.spreadPickupGlyphIndex,
     manifest.entityEffects.shieldPickupGlyphIndex,
     manifest.entityEffects.dynamicPickupGlyphBankShared,
-  ], [124, 124, true]);
+  ], [120, 120, true]);
   for (const pickupType of ["rapid", "spread", "shield"]) {
     const trace = executeWeaponPickupBackingTrace({ root, artifact: "xex", pickupType });
     assert.deepEqual(trace.restored, trace.original);
     assert.deepEqual([trace.drawnMaskAfterErase, trace.renderedMaskAfterErase,
       trace.topLatchAfterErase], [0, 0, 0]);
   }
-  assert.match(source, /prior capsule is already absent[\s\S]+install_weapon_pickup_shield_glyph/);
+  assert.match(source, /compose_weapon_pickup_phase:[\s\S]+weapon_pickup_type_base_lo/);
 });
 
 test("pickup rotation is exactly Rapid Spread Shield Rapid without RNG", () => {
   const trace = executeSpreadShotTrace({ root, artifact: "xex" });
   assert.deepEqual(trace.drops.map(({ pickupType, nextPickupType, renderId }) =>
     [pickupType, nextPickupType, renderId]), [
-    [0, 1, 120], [1, 2, 252], [2, 0, 124],
+    [0, 1, 120], [1, 2, 248], [2, 0, 120],
   ]);
   const rotation = source.slice(source.indexOf("weapon_pickup_record_qualified_kill:"),
     source.indexOf('.segment "STARFIELD"', source.indexOf("weapon_pickup_record_qualified_kill:")));

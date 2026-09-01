@@ -22,6 +22,7 @@ import {
   executeWeaponPickupBackingTrace,
   executeWeaponPickupCollisionTrace,
   executeWeaponPickupLifecycleTrace,
+  executeWeaponPickupRingWrapTrace,
   executeWeaponPickupTrace,
   executeWeaponPickupTraversalTrace,
   executeViperBurstBalanceTrace,
@@ -59,6 +60,9 @@ test("Rapid Fire owns fixed slot one without extending BSS or physical pools", (
     pendingFrames: 30,
     movementNumerator: 1,
     movementDenominator: 2,
+    fineMotionDenominator: 5,
+    verticalPhaseCount: 8,
+    maximumFootprintRows: 3,
     spawnTopScanline: 8,
     activationTopScanline: 24,
     releaseTopScanline: 192,
@@ -81,11 +85,11 @@ test("Rapid Fire owns fixed slot one without extending BSS or physical pools", (
   assert.equal(manifest.entityEffects.effectSlots, 6);
   assert.equal(manifest.entityEffects.weaponPickupGlyphIndex, 120);
   assert.equal(manifest.entityEffects.weaponPickupGlyphCount, 4);
-  assert.equal(manifest.entityEffects.glyphCount, 18);
-  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 0);
+  assert.equal(manifest.entityEffects.glyphCount, 16);
+  assert.equal(128 - manifest.entityEffects.glyphIndex - manifest.entityEffects.glyphCount, 2);
 });
 
-test("four glyphs form one tapered 8x16 capsule with a single continuous black channel", () => {
+test("three eight-phase banks preserve one tapered 8x16 capsule through 2x2/2x3 footprints", () => {
   const { entities } = assets();
   assert.equal(entities.pickupGlyphs.length, 32);
   const glyphRows = [...entities.pickupGlyphs].map((row) =>
@@ -109,16 +113,18 @@ test("four glyphs form one tapered 8x16 capsule with a single continuous black c
   ]);
   const include = renderEntityEffectsCa65Include(entities);
   assert.match(include, /WEAPON_PICKUP_GLYPH_COUNT = 4/);
-  assert.doesNotMatch(include, /WEAPON_PICKUP_PHASE_FRAMES/);
+  assert.match(include, /WEAPON_PICKUP_VERTICAL_PHASE_COUNT = 8/);
+  assert.match(include, /WEAPON_PICKUP_PHASE_GLYPH_COUNT = 6/);
+  assert.equal(entities.pickupPhaseBank.length, 3 * 8 * 6 * 8);
+  assert.deepEqual(Array.from(entities.pickupPhaseBank.subarray(0, 32)),
+    Array.from(entities.pickupGlyphs));
+  assert.deepEqual(Array.from(entities.pickupPhaseBank.subarray(32, 48)),
+    Array(16).fill(0));
+  assert.deepEqual(fs.readFileSync(path.join(root, "build", "weapon-pickup-phases.bin")),
+    Buffer.from(entities.pickupPhaseBank));
   assert.match(source, /WEAPON_PICKUP_GLYPH_BASE = EFFECT_FRAGMENT_GLYPH_BASE\+EFFECT_FRAGMENT_GLYPH_COUNT/);
   assert.match(source,
-    /copy_charset:[\s\S]+lda weapon_pickup_glyph,x[\s\S]+sta CHARSET\+WEAPON_PICKUP_GLYPH_BASE\*8,x/);
-  for (const artifact of ["xex", "atr"]) {
-    const runtime = executeWeaponPickupTrace({ root, artifact });
-    assert.deepEqual(Array.from(runtime.charset.subarray(120 * 8, 124 * 8)),
-      Array.from(entities.pickupGlyphs),
-      `${artifact.toUpperCase()} must unpack glyphs 120-123 into the live Atari charset`);
-  }
+    /compose_weapon_pickup_phase:[\s\S]+ldy #\(WEAPON_PICKUP_PHASE_GLYPH_COUNT\*8-1\)[\s\S]+sta CHARSET\+WEAPON_PICKUP_GLYPH_BASE\*8,y/);
   assert.deepEqual(entities.weaponPickupRapidFire.palette, {
     outlineRegister: "COLPF1", outlineValue: 0x84,
     fillRegister: "COLPF2", fillValue: 0x1e,
@@ -126,7 +132,8 @@ test("four glyphs form one tapered 8x16 capsule with a single continuous black c
   });
   const renderer = source.slice(source.indexOf("render_weapon_pickup_overlay:"),
     source.indexOf("; Effects render after"));
-  assert.doesNotMatch(renderer, /ENTITY_OWNER\+WEAPON_PICKUP_SLOT|WEAPON_PICKUP_PHASE/);
+  assert.doesNotMatch(renderer, /ENTITY_OWNER\+WEAPON_PICKUP_SLOT/);
+  assert.match(renderer, /jsr compose_weapon_pickup_phase/);
   assert.match(renderer,
     /lda ENTITY_RENDER_ID\+WEAPON_PICKUP_SLOT[\s\S]+adc #\$01/);
   assert.match(renderer,
@@ -180,7 +187,7 @@ test("pending is hidden and non-colliding for thirty full frames after Raider br
 });
 
 test("every booster type enters at the top, crosses the full playfield once and releases below it", () => {
-  const expectedPositions = Array.from({ length: 21 }, (_, index) => 24 + index * 8);
+  const expectedPositions = Array.from({ length: 84 }, (_, index) => 24 + index * 2);
   const summarize = ({ traces }) => traces.map((trace) => ({
     name: trace.name,
     created: [trace.created.state, trace.created.y, trace.created.activeMask,
@@ -213,18 +220,21 @@ test("every booster type enters at the top, crosses the full playfield once and 
     "all three booster types must retain the same movement cadence");
 });
 
-test("active capsule renders one static 2x2 code block continuously and cannot be shot", () => {
+test("active capsule renders one phased 2x2/2x3 footprint continuously and cannot be shot", () => {
   const trace = executeWeaponPickupTrace({ root, artifact: "xex" });
   const active = trace.records.filter(({ phase }) => phase === "ACTIVE");
   assert.equal(active.length, 40);
-  assert.equal(active.slice(0, 32).every(({
+  assert.equal(active.every(({
     leftCode, rightCode, bottomLeftCode, bottomRightCode, renderId, drawnMask,
   }) => leftCode === 120 && rightCode === 121 && bottomLeftCode === 122 &&
     bottomRightCode === 123 && renderId === 120 && drawnMask === 15), true);
-  assert.equal(active.every(({
-    leftCode, rightCode, bottomLeftCode, bottomRightCode, animationFrame, drawnMask,
-  }) => leftCode === 120 && rightCode === 121 && bottomLeftCode === 122 &&
-    bottomRightCode === 123 && animationFrame === 0 && drawnMask === 15), true);
+  assert.equal(active.every(({ rasterPhase, thirdLeftCode, thirdRightCode }) =>
+    rasterPhase === 0 ? thirdLeftCode === 0 && thirdRightCode === 0 :
+      thirdLeftCode === 124 && thirdRightCode === 125), true);
+  assert.deepEqual([...new Set(active.map(({ rasterPhase }) => rasterPhase))], [0, 2, 4, 6]);
+  assert.equal(active.every(({ backing, thirdBacking, rasterPhase }) =>
+    [...backing, ...(rasterPhase === 0 ? [] : thirdBacking)].every((code) =>
+      (code & 0x7f) < 120 || (code & 0x7f) > 125)), true);
   assert.ok(new Set(active.map(({ y }) => y)).size >= 6,
     "static RF codes must remain continuously drawn while the capsule moves");
   const ignored = trace.records.find(({ phase }) => phase === "PROJECTILE_IGNORED");
@@ -233,7 +243,7 @@ test("active capsule renders one static 2x2 code block continuously and cannot b
   ], [2, 2, 1]);
 });
 
-test("pickup movement inherits the native A2 near-ring cadence without catch-up", () => {
+test("pickup movement resolves half world speed into smooth scanline phases", () => {
   const { entities } = assets();
   assert.deepEqual([
     entities.weaponPickupRapidFire.movementNumerator,
@@ -242,14 +252,11 @@ test("pickup movement inherits the native A2 near-ring cadence without catch-up"
     entities.debrisMotion.verticalStepDenominator,
   ], [1, 2, 3, 5]);
   assert.match(source,
-    /update_weapon_pickup_active:[\s\S]+@motion:[\s\S]+lda STAR_NEAR_PHASE[\s\S]+lda ENTITY_FRAME_EVENTS[\s\S]+adc #ENTITY_DEBRIS_VY/);
-  assert.doesNotMatch(source,
-    /update_weapon_pickup_active:[\s\S]+@motion:[\s\S]+WEAPON_PICKUP_MOVE_NUMERATOR/);
+    /update_weapon_pickup_active:[\s\S]+@motion:[\s\S]+adc world_scroll_rates,x[\s\S]+cmp #WEAPON_PICKUP_FINE_RATE_DENOMINATOR/);
   const active = executeWeaponPickupTrace({ root, artifact: "xex" }).records
     .filter(({ phase }) => phase === "ACTIVE");
-  const changes = active.slice(1).filter((record, index) => record.y !== active[index].y);
-  assert.ok(changes.length >= 2 && changes.every((record) =>
-    record.y - active[0].y > 0 && (record.y - active[0].y) % 8 === 0));
+  assert.deepEqual(active.slice(1).map((record, index) => record.y - active[index].y),
+    Array(active.length - 1).fill(2));
 });
 
 test("debris and the reserved pickup coexist without allocator overwrite for every A2 head", () => {
@@ -286,6 +293,93 @@ test("four-cell backing restores byte-exact data in reverse layer order at every
       xex.drawnMaskAfterErase, xex.renderedMaskAfterErase, xex.topLatchAfterErase,
     ], [0, 0, 0]);
     assert.notEqual(xex.top, xex.bottom);
+  }
+});
+
+test("reverse erase restores every 2x2/2x3 phase across the A2 wrap", () => {
+  for (const head of [0, 21]) {
+    for (let phase = 0; phase < 8; phase += 1) {
+      const trace = executeWeaponPickupBackingTrace({
+        root, artifact: "xex", head, y: 104 + phase,
+      });
+      assert.equal(trace.rendered.rasterPhase, phase);
+      assert.equal(trace.hasThirdRow, phase !== 0);
+      assert.deepEqual(trace.restored, trace.original,
+        `phase ${phase}, head ${head} must restore all physical cells`);
+      assert.deepEqual([
+        trace.rendered.leftCode, trace.rendered.rightCode,
+        trace.rendered.bottomLeftCode, trace.rendered.bottomRightCode,
+      ], [120, 121, 122, 123]);
+      assert.deepEqual([
+        trace.rendered.thirdLeftCode, trace.rendered.thirdRightCode,
+      ], phase === 0 ? [0, 0] : [124, 125]);
+      const savedBacking = [...trace.rendered.backing,
+        ...(phase === 0 ? [] : trace.rendered.thirdBacking)];
+      assert.equal(savedBacking.some((code) => (code & 0x7f) >= 120 &&
+        (code & 0x7f) <= 125), false, "capsule codes cannot enter backing");
+      assert.deepEqual([
+        trace.drawnMaskAfterErase, trace.renderedMaskAfterErase,
+        trace.topLatchAfterErase,
+      ], [0, 0, 0]);
+    }
+  }
+});
+
+test("the main frame has one guarded late pickup publication", () => {
+  assert.equal((source.match(/jsr entity_effects_render/g) ?? []).length, 1);
+  assert.equal((source.match(/jsr render_weapon_pickup_overlay/g) ?? []).length, 0);
+  assert.equal((source.match(/jmp render_weapon_pickup_overlay/g) ?? []).length, 1);
+  assert.match(source,
+    /main_loop:\n\s+jsr wait_gameplay_frame[\s\S]+wait_gameplay_frame:\n\s+lda ENTITY_STATE\+WEAPON_PICKUP_SLOT[\s\S]+lda #\$50[\s\S]+wait_frame:\n\s+lda #\$70/);
+  assert.match(source,
+    /render_weapon_pickup_overlay:[\s\S]+lda ENTITY_DRAWN_MASK\+WEAPON_PICKUP_SLOT[\s\S]+beq :\+[\s\S]+rts/);
+  assert.match(source,
+    /erase_weapon_pickup_overlay_restore:[\s\S]+ENTITY_SCREEN_HI\+3[\s\S]+ENTITY_VY\+WEAPON_PICKUP_SLOT[\s\S]+ENTITY_SCREEN_LO\+WEAPON_PICKUP_SLOT/);
+});
+
+test("one logical footprint survives repeated ring wraps and cannot return after release", () => {
+  const xex = executeWeaponPickupRingWrapTrace({ root, artifact: "xex" });
+  const atr = executeWeaponPickupRingWrapTrace({ root, artifact: "atr" });
+  const summarize = (trace) => ({
+    releasedState: trace.releasedState,
+    releasedY: trace.releasedY,
+    activeMask: trace.activeMask,
+    activeCount: trace.activeCount,
+    cellsAtRelease: trace.cellsAtRelease,
+    cellsAfterAdditionalWraps: trace.cellsAfterAdditionalWraps,
+    wrapCount: trace.wrapCount,
+    frames: trace.records.map((record) => [
+      record.y, record.rasterPhase, record.exactReverseErase,
+      record.capsuleCells, record.capsuleFootprints,
+      record.logicalSlots, record.finalDrawCalls,
+    ]),
+  });
+  assert.deepEqual(summarize(atr), summarize(xex));
+  assert.ok(xex.wrapCount >= 6);
+  assert.equal(xex.records.length, 84);
+  assert.equal(xex.records.every((record) => record.exactReverseErase &&
+    record.capsuleCells === (record.thirdScreenAddress === 0 ? 4 : 6) &&
+    record.capsuleFootprints === record.logicalSlots &&
+    record.logicalSlots === 1 && record.finalDrawCalls === 1), true);
+  assert.deepEqual([
+    xex.releasedState, xex.releasedY, xex.activeMask, xex.activeCount,
+    xex.cellsAtRelease, xex.cellsAfterAdditionalWraps,
+  ], [0, 192, 0, 0, 0, 0]);
+});
+
+test("EASY MEDIUM and HARD preserve their rates without full-row raster jumps", () => {
+  for (const [difficulty, rate] of [[0, 8], [1, 9], [2, 10]]) {
+    const trace = executeWeaponPickupRingWrapTrace({
+      root, artifact: "xex", difficulty, wrapFramesAfterRelease: 0,
+    });
+    const deltas = trace.records.slice(1).map((record, index) =>
+      record.y - trace.records[index].y);
+    assert.equal(deltas.every((delta) => delta === 1 || delta === 2), true);
+    for (let index = 0; index + 5 <= deltas.length; index += 5) {
+      assert.equal(deltas.slice(index, index + 5).reduce((sum, value) => sum + value, 0),
+        rate, `difficulty ${difficulty} changed its five-frame travel`);
+    }
+    assert.deepEqual([trace.records[0].y, trace.releasedY], [24, 192]);
   }
 });
 

@@ -214,7 +214,10 @@ export function loadEntityEffectsDefinition(sourcePath) {
   invariant(pickup.qualifiedKillsPerDrop === 3 && pickup.pendingFrames === 30,
     "Rapid Fire must enter pending after three qualified kills for thirty frames");
   invariant(pickup.movementNumerator === 1 && pickup.movementDenominator === 2,
-    "Rapid Fire pickup must inherit the native near-ring cadence");
+    "Rapid Fire pickup must retain one-half world speed");
+  invariant(pickup.fineMotionDenominator === 5 && pickup.verticalPhaseCount === 8 &&
+    pickup.maximumFootprintRows === 3,
+  "Every pickup must use eight scanline phases in a bounded two-by-three compositor");
   invariant(pickup.spawnTopScanline === 8 &&
     pickup.activationTopScanline === coordinates.gameplayTopScanline &&
     pickup.releaseTopScanline === coordinates.gameplayBottomExclusive -
@@ -340,6 +343,28 @@ export function compileEntityEffects(definition) {
   const pickupGlyphs = Uint8Array.from(definition.weaponPickupRapidFire.glyphs.flat());
   const spreadPickupGlyphs = Uint8Array.from(definition.weaponPickupSpreadShot.glyphs.flat());
   const shieldPickupGlyphs = Uint8Array.from(definition.weaponPickupShield.glyphs.flat());
+  const pickupPhaseBank = Uint8Array.from([
+    pickupGlyphs, spreadPickupGlyphs, shieldPickupGlyphs,
+  ].flatMap((source) => {
+    const phases = [];
+    for (let phase = 0; phase < 8; phase += 1) {
+      const output = new Uint8Array(48);
+      for (let sourceY = 0; sourceY < 16; sourceY += 1) {
+        const destinationY = phase + sourceY;
+        const destinationRow = Math.floor(destinationY / 8);
+        const destinationByte = destinationY & 7;
+        for (let column = 0; column < 2; column += 1) {
+          const sourceGlyph = (sourceY >= 8 ? 2 : 0) + column;
+          output[destinationRow * 16 + column * 8 + destinationByte] =
+            source[sourceGlyph * 8 + (sourceY & 7)];
+        }
+      }
+      phases.push(...output);
+    }
+    return phases;
+  }));
+  invariant(pickupPhaseBank.length === 3 * 8 * 6 * 8,
+    "Pickup phase bank must contain three types, eight phases and six glyphs");
   return Object.freeze({
     ...definition,
     descriptor,
@@ -348,6 +373,7 @@ export function compileEntityEffects(definition) {
     pickupGlyphs,
     spreadPickupGlyphs,
     shieldPickupGlyphs,
+    pickupPhaseBank,
     trajectoryVx,
   });
 }
@@ -457,6 +483,9 @@ export function renderEntityEffectsCa65Include(asset) {
     `WEAPON_PICKUP_PENDING_TIMER_LOAD = ${pickup.pendingFrames + 2}`,
     `WEAPON_PICKUP_MOVE_NUMERATOR = ${pickup.movementNumerator}`,
     `WEAPON_PICKUP_MOVE_DENOMINATOR = ${pickup.movementDenominator}`,
+    `WEAPON_PICKUP_FINE_RATE_DENOMINATOR = ${pickup.fineMotionDenominator}`,
+    `WEAPON_PICKUP_VERTICAL_PHASE_COUNT = ${pickup.verticalPhaseCount}`,
+    `WEAPON_PICKUP_PHASE_GLYPH_COUNT = ${pickup.maximumFootprintRows * 2}`,
     `WEAPON_PICKUP_SPAWN_TOP = ${pickup.spawnTopScanline}`,
     `WEAPON_PICKUP_ACTIVATION_TOP = ${pickup.activationTopScanline}`,
     `WEAPON_PICKUP_RELEASE_TOP = ${pickup.releaseTopScanline}`,

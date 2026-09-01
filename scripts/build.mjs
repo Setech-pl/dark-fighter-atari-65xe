@@ -100,6 +100,8 @@ const minimumWeaponPickupReserveBytes = 512;
 const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
 const entityPackedStagingAddress = 0x5300;
+const weaponPickupPhaseBankAddress = 0x8800;
+const weaponPickupPackedStagingAddress = 0x7bd0;
 const bootA2StagingAddress = 0x7f16;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
@@ -169,8 +171,8 @@ const glueStagingAddress = 0x5259;
 const glueFinalAddress = 0x4efe;
 const directorRunAddress = 0x9d75;
 const directorGuardAddress = 0x9ffa;
-const expectedInitialContentBytes = 12889;
-const expectedLinkedRuntimeBytes = 16735;
+const expectedInitialContentBytes = 12755;
+const expectedLinkedRuntimeBytes = 16805;
 const expectedDirectorRawBytes = 645;
 const expectedDirectorPackedBytes = 587;
 const expectedGlueRawBytes = 39;
@@ -379,6 +381,8 @@ async function build() {
     renderEntityEffectsCa65Include(entityEffectsAsset),
   );
   writeFile(path.join(buildDirectory, "entity-effects.inc"), entityEffectsInclude);
+  const weaponPickupPhaseBank = Buffer.from(entityEffectsAsset.pickupPhaseBank);
+  writeFile(path.join(buildDirectory, "weapon-pickup-phases.bin"), weaponPickupPhaseBank);
   const frontendH31Asset = compileFrontendH31(loadFrontendH31Definition(
     path.join(rootDirectory, "assets", "graphics", "frontend-h31.json"),
   ));
@@ -466,6 +470,9 @@ async function build() {
   const entityCodeLoadAddress = labels.get("__ENTITY_CODE_LOAD__");
   const entityCodeRunAddress = labels.get("__ENTITY_CODE_RUN__");
   const entityCodeBytes = labels.get("__ENTITY_CODE_SIZE__");
+  const pickupCodeRunAddress = labels.get("__PICKUP_CODE_RUN__");
+  const pickupCodeBytes = labels.get("__PICKUP_CODE_SIZE__");
+  const pickupCodeFileOffset = labels.get("__PICKUPFILE_FILEOFFS__");
   const bootStage2LoadAddress = labels.get("__BOOT_STAGE2_LOAD__");
   const bootStage2RunAddress = labels.get("__BOOT_STAGE2_RUN__");
   const bootStage2Bytes = labels.get("__BOOT_STAGE2_SIZE__");
@@ -483,6 +490,7 @@ async function build() {
   const residentRuntimeSuffixAddress = labels.get("resident_runtime_suffix");
   const residentPackedSourceOperand = labels.get("resident_packed_source");
   const residentPackedSizeOperand = labels.get("resident_packed_size");
+  const pickupPackedSizeOperand = labels.get("pickup_packed_size");
   const broadsidePackedSourceOperand = labels.get("broadside_packed_source");
   const starfieldPackedSourceOperand = labels.get("starfield_packed_source");
   const starfieldPackedSizeOperand = labels.get("starfield_packed_size");
@@ -508,7 +516,9 @@ async function build() {
     !Number.isInteger(a2KernelLoadAddress) || !Number.isInteger(a2KernelRunAddress) ||
     !Number.isInteger(a2KernelBytes) ||
     !Number.isInteger(entityCodeLoadAddress) || !Number.isInteger(entityCodeRunAddress) ||
-    !Number.isInteger(entityCodeBytes) || !Number.isInteger(bootStage2LoadAddress) ||
+    !Number.isInteger(entityCodeBytes) || !Number.isInteger(pickupCodeRunAddress) ||
+    !Number.isInteger(pickupCodeBytes) || !Number.isInteger(pickupCodeFileOffset) ||
+    !Number.isInteger(bootStage2LoadAddress) ||
     !Number.isInteger(bootStage2RunAddress) || !Number.isInteger(bootStage2Bytes) ||
     !Number.isInteger(bootStage2FileOffset) ||
     !Number.isInteger(bootStage2XexEntry) || !Number.isInteger(bootChunkManifestAddress) ||
@@ -517,6 +527,7 @@ async function build() {
     !Number.isInteger(residentRuntimeSuffixAddress) ||
     !Number.isInteger(residentPackedSourceOperand) ||
     !Number.isInteger(residentPackedSizeOperand) ||
+    !Number.isInteger(pickupPackedSizeOperand) ||
     !Number.isInteger(broadsidePackedSourceOperand) ||
     !Number.isInteger(starfieldPackedSourceOperand) ||
     !Number.isInteger(starfieldPackedSizeOperand) || !Number.isInteger(a2KernelSourceOperand) ||
@@ -591,6 +602,19 @@ async function build() {
     entityCodeLoadAddress - loadAddress,
     entityCodeLoadAddress - loadAddress + entityCodeBytes,
   );
+  const pickupCodeRuntime = Buffer.from(linkedPayload.subarray(
+    pickupCodeFileOffset,
+    pickupCodeFileOffset + pickupCodeBytes,
+  ));
+  if (pickupCodeRunAddress !== weaponPickupPhaseBankAddress + weaponPickupPhaseBank.length ||
+    pickupCodeRuntime.length !== pickupCodeBytes || pickupCodeBytes > 0x0380) {
+    throw new Error("Pickup compositor code does not fit its reviewed $8C80-$8FFF range");
+  }
+  const weaponPickupPhaseRuntime = Buffer.concat([weaponPickupPhaseBank, pickupCodeRuntime]);
+  const packedWeaponPickupPhaseBank = packBroadsideLzss(weaponPickupPhaseRuntime);
+  if (!unpackBroadsideLzss(packedWeaponPickupPhaseBank).equals(weaponPickupPhaseRuntime)) {
+    throw new Error("Weapon-pickup phase runtime LZSS round trip failed");
+  }
   const bootStage2Runtime = Buffer.from(linkedPayload.subarray(
     bootStage2FileOffset,
     bootStage2FileOffset + bootStage2Bytes,
@@ -695,6 +719,10 @@ async function build() {
     residentPackedSizeOperand - loadAddress,
   );
   residentMain.writeUInt16LE(
+    packedWeaponPickupPhaseBank.length,
+    pickupPackedSizeOperand - loadAddress,
+  );
+  residentMain.writeUInt16LE(
     broadsidePackedSourceAddress,
     broadsidePackedSourceOperand - loadAddress,
   );
@@ -752,6 +780,14 @@ async function build() {
       destination: packedResidentStagingAddress,
       buildTag: buildTag(packedBroadsideRuntime),
     }, {
+      packed: packedWeaponPickupPhaseBank,
+      raw: packedWeaponPickupPhaseBank,
+      finalDestination: weaponPickupPackedStagingAddress,
+      type: chunkLoaderConstants.chunkTypeRaw,
+      stagingId: chunkLoaderConstants.stagingExtension,
+      destination: packedResidentStagingAddress,
+      buildTag: buildTag(packedWeaponPickupPhaseBank),
+    }, {
       packed: glueModule.packed,
       raw: glueModule.raw,
       finalDestination: glueStagingAddress,
@@ -772,8 +808,8 @@ async function build() {
   });
   const { initialBoot, manifest: chunkManifest, transportPayload,
     totalOccupiedSectors: totalTransportSectors } = transport;
-  const [broadsideChunk, glueChunk, directorChunk] = transport.chunkImages;
-  const [broadsideRecord, glueRecord, directorRecord] = transport.records;
+  const [broadsideChunk, pickupPhaseChunk, glueChunk, directorChunk] = transport.chunkImages;
+  const [broadsideRecord, pickupPhaseRecord, glueRecord, directorRecord] = transport.records;
   const extensionSectors = transport.chunkImages.reduce((sum, chunk) => sum + chunk.sectors, 0);
   const extensionStartSector = broadsideRecord.startSector;
   const initialContent = transport.patchedInitialContent;
@@ -790,11 +826,12 @@ async function build() {
     record.startSector, record.sectorCount, record.packedLength,
     record.rawLength, record.finalDestination,
   ]);
-  if (bootSectors !== 101 || totalTransportSectors !== 152 ||
-    transportPayload.length !== 19456 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
-      [102, 45, 5671, 6656, 0x5e10],
-      [147, 1, 41, 39, glueStagingAddress],
-      [148, 5, 587, 645, directorRunAddress],
+  if (bootSectors !== 100 || totalTransportSectors !== 156 ||
+    transportPayload.length !== 19968 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
+      [101, 44, 5611, 6592, 0x5e10],
+      [145, 6, 700, 700, weaponPickupPackedStagingAddress],
+      [151, 1, 41, 39, glueStagingAddress],
+      [152, 5, 587, 645, directorRunAddress],
     ])) {
     throw new Error(`Layout D.2 transport topology changed: ${JSON.stringify(frozenRecordShape)}`);
   }
@@ -808,6 +845,7 @@ async function build() {
   const xex = makeXexSegments([
     { start: loadAddress, data: initialBoot.bytes },
     { start: broadsideRunAddress, data: broadsideRuntime },
+    { start: weaponPickupPackedStagingAddress, data: packedWeaponPickupPhaseBank },
     { start: glueStagingAddress, data: glueModule.raw },
     { start: directorRunAddress, data: directorModule.raw },
   ], bootStage2XexEntry);
@@ -824,6 +862,10 @@ async function build() {
     a2KernelRunAddress,
     entityCodeRuntime,
     entityCodeRunAddress,
+    weaponPickupPhaseBank,
+    weaponPickupPhaseBankAddress,
+    pickupCodeRuntime,
+    pickupCodeRunAddress,
     integrationGlueRuntime: glueModule.raw,
     integrationGlueRunAddress: glueFinalAddress,
     directorRuntime: directorModule.raw,
@@ -837,6 +879,7 @@ async function build() {
       broadside: broadsideRuntimeBytes,
       a2Kernel: a2KernelBytes,
       entityCode: entityCodeBytes,
+      pickupCode: pickupCodeBytes,
       entityState: entityStateBytes,
     },
   });
@@ -877,7 +920,7 @@ async function build() {
     },
   };
   const destructibleDebrisRuntimeCodeBytes = codeBytes + starfieldRuntimeBytes +
-    broadsideRuntimeBytes + a2KernelBytes + entityCodeBytes;
+    broadsideRuntimeBytes + a2KernelBytes + entityCodeBytes + pickupCodeBytes;
   if (encounterDirectorEnabled && destructibleDebrisRuntimeCodeBytes !== expectedLinkedRuntimeBytes) {
     throw new Error(`Layout D.2 linked runtime changed: ${destructibleDebrisRuntimeCodeBytes} B; ` +
       `expected ${expectedLinkedRuntimeBytes} B`);
@@ -904,8 +947,8 @@ async function build() {
       phaseCount: 8,
       initialContentBytes: expectedInitialContentBytes,
       linkedRuntimeBytes: expectedLinkedRuntimeBytes,
-      simultaneousResidencyBytes: 17421,
-      safeResidencyBytes: 4766,
+      simultaneousResidencyBytes: 18643,
+      safeResidencyBytes: 3544,
       glue: {
         stagingAddress: glueStagingAddress,
         holdingAddress: 0x7f16,
@@ -1210,15 +1253,15 @@ async function build() {
       archetypeCount: entityEffectsAsset.archetypes.length,
       descriptorBytes: entityEffectsAsset.descriptor.length,
       glyphBytes: entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length +
-        entityEffectsAsset.pickupGlyphs.length + entityEffectsAsset.spreadPickupGlyphs.length,
+        entityEffectsAsset.weaponPickupRapidFire.maximumFootprintRows * 2 * 8,
       debrisGlyphBytes: entityEffectsAsset.glyphs.length,
       effectGlyphBytes: entityEffectsAsset.effectGlyphs.length,
       weaponPickupGlyphBytes: entityEffectsAsset.pickupGlyphs.length,
       spreadPickupGlyphBytes: entityEffectsAsset.spreadPickupGlyphs.length,
       shieldPickupGlyphBytes: entityEffectsAsset.shieldPickupGlyphs.length,
       glyphIndex: labels.get("ENTITY_DEBRIS_GLYPH_BASE"),
-      glyphCount: (entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length +
-        entityEffectsAsset.pickupGlyphs.length + entityEffectsAsset.spreadPickupGlyphs.length) / 8,
+      glyphCount: (entityEffectsAsset.glyphs.length + entityEffectsAsset.effectGlyphs.length) / 8 +
+        entityEffectsAsset.weaponPickupRapidFire.maximumFootprintRows * 2,
       debrisGlyphCount: entityEffectsAsset.glyphs.length / 8,
       effectGlyphCount: entityEffectsAsset.effectGlyphs.length / 8,
       weaponPickupGlyphCount: entityEffectsAsset.pickupGlyphs.length / 8,
@@ -1228,6 +1271,22 @@ async function build() {
       shieldPickupGlyphCount: entityEffectsAsset.shieldPickupGlyphs.length / 8,
       shieldPickupGlyphIndex: labels.get("WEAPON_PICKUP_SHIELD_GLYPH_BASE"),
       dynamicPickupGlyphBankShared: true,
+      pickupPhaseGlyphCount: entityEffectsAsset.weaponPickupRapidFire.maximumFootprintRows * 2,
+      pickupPhaseCount: entityEffectsAsset.weaponPickupRapidFire.verticalPhaseCount,
+      pickupPhaseBankAddress: weaponPickupPhaseBankAddress,
+      pickupPhaseBankBytes: weaponPickupPhaseBank.length,
+      pickupCodeAddress: pickupCodeRunAddress,
+      pickupCodeBytes,
+      pickupPhaseRuntimeBytes: weaponPickupPhaseRuntime.length,
+      pickupPhasePackedBytes: packedWeaponPickupPhaseBank.length,
+      pickupPhaseExternalChunk: {
+        startSector: pickupPhaseRecord.startSector,
+        sectors: pickupPhaseChunk.sectors,
+        transportBytes: pickupPhaseChunk.bytes.length,
+        crc16: pickupPhaseChunk.storageCrc16,
+        stagingAddress: weaponPickupPackedStagingAddress,
+        finalRuntimeAddress: weaponPickupPhaseBankAddress,
+      },
       newGlyphsFromFoundation: entityEffectsAsset.glyphs.length / 8 - 1,
       runtimeBudget: {
         historicalGateWallCycles: runtimeHeadroomHistoricalWallGate,
@@ -1653,6 +1712,7 @@ async function build() {
   writeFile(path.join(buildDirectory, "dark-fighter.bin"), transportPayload);
   writeFile(path.join(buildDirectory, "initial-boot.bin"), initialBoot.bytes);
   writeFile(path.join(buildDirectory, "broadside-extension.bin"), broadsideChunk.bytes);
+  writeFile(path.join(buildDirectory, "weapon-pickup-extension.bin"), pickupPhaseChunk.bytes);
   writeFile(path.join(buildDirectory, "chunk-manifest.bin"), chunkManifest);
   writeFile(path.join(buildDirectory, "boot-stage2.bin"), patchedBootStage2);
   writeFile(path.join(buildDirectory, "resident-runtime.bin"), residentMain);
@@ -1677,6 +1737,9 @@ async function build() {
   writeFile(path.join(buildDirectory, "a2-kernel-runtime.bin"), a2KernelRuntime);
   writeFile(path.join(buildDirectory, "entity-code-runtime.bin"), entityCodeRuntime);
   writeFile(path.join(buildDirectory, "entity-code-runtime-packed.bin"), packedEntityCodeRuntime);
+  writeFile(path.join(buildDirectory, "pickup-code-runtime.bin"), pickupCodeRuntime);
+  writeFile(path.join(buildDirectory, "weapon-pickup-phase-runtime.bin"), weaponPickupPhaseRuntime);
+  writeFile(path.join(buildDirectory, "weapon-pickup-phase-runtime-packed.bin"), packedWeaponPickupPhaseBank);
   writeFile(path.join(buildDirectory, "dark-fighter.map"), mapFile);
   writeFile(path.join(buildDirectory, "dark-fighter.lbl"), labelFile);
   writeFile(path.join(buildDirectory, "manifest.json"), manifestBytes);

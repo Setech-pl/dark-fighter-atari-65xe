@@ -112,15 +112,18 @@ The sequence is `Rapid Fire -> Spread Shot -> Shield -> Rapid Fire`; a new
 game always starts the sequence with Rapid Fire. A successful kill creates the
 capsule wholly above the playfield at Y=8. Its 30-frame PENDING delay, including
 any admission retry, remains at that off-screen coordinate. Admission publishes
-the capsule at the first fully visible position, Y=24; it then follows the
-existing near-ring cadence through Y=184 and releases its slot at Y=192. Thus
+the capsule at the first fully visible position, Y=24; it then crosses every
+scanline phase through Y=190 and releases its slot at exactly Y=192. Thus
 PENDING cannot consume any collectible screen travel. The current three-kill
 cadence describes shipped behavior, not accepted final balance; a separate
 owner-playtest tuning task is recorded in the roadmap.
 
-Each type is one logical slot and one static, non-flickering 2x2-character
-visual footprint. It traverses every fully visible 8-scanline position from
-the top to the bottom of the playfield. Picking up the same active type
+Each type is one logical slot and exactly one non-flickering visual capsule.
+Its shifted 8x16 source occupies a 2x2 footprint at phase zero and a 2x3
+footprint between character rows. HARD moves it exactly two scanlines per PAL
+frame; EASY and MEDIUM retain their slower fractional rates without an
+eight-scanline jump. The collection hitbox follows the same effective visual
+Y. Picking up the same active type
 refreshes it. Picking up another type
 replaces it, so Rapid Fire, Spread Shot, and Shield are mutually exclusive.
 Pause freezes

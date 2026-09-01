@@ -234,7 +234,7 @@ with `LDX abs` plus `LDA abs,X`: +6 CPU cycles only after a geometric overlap
 passes the earlier latch check, with no cost on inactive or collision-miss
 paths and no persistent-RAM allocation.
 
-Slot 1 owns the sole 2x2 pickup capsule. A qualifying Viper-projectile Raider
+Slot 1 owns the sole pickup capsule. A qualifying Viper-projectile Raider
 kill advances the three-kill drop counter. The next-type selector rotates
 successful capsule creation through Rapid Fire, Spread Shot, and Shield,
 starting with Rapid Fire on New Game. Slot 2 holds the non-rendered timed-
@@ -242,11 +242,18 @@ booster controller and next-type selector. All three states are mutually
 exclusive. Rapid Fire and Spread Shot last 500 active frames; Shield lasts 250.
 The capsule is created at Y=8, wholly above the gameplay display. PENDING and
 Director admission retries cannot change that coordinate. Admission activates
-it at Y=24; the one shared renderer publishes one 2x2 footprint through the
-last fully visible position Y=184, and the slot is released at Y=192. The
-interactive erase pass restores that footprint every frame and the late render
-maps it again from logical Y after A2 rotation; no physical ring address may
-carry the capsule around the display independently of its 1/2 cadence.
+it at Y=24; the one authoritative late renderer runs once after the A2 ring
+update and publishes one phased 2x2/2x3 footprint through Y=190. The slot is
+released at exactly Y=192. At frame start the interactive erase pass restores
+the exact four or six physical cells saved by the preceding draw, in reverse
+row order. Capsule codes are never committed to ring backing, tail repair, or
+wrap-copy sources, so an old footprint cannot return after a ring wrap. The
+logical Y is also the collection hitbox Y. EASY/MEDIUM/HARD accumulate 8/9/10
+scanlines per five PAL frames; HARD therefore renders +2 scanlines every frame
+instead of holding and jumping by one character row. While slot 1 is PENDING or
+ACTIVE, the same 50 Hz main-loop work starts 64 scanlines earlier, giving the
+single topmost draw a complete pre-display interval. Simulation order, world
+rates, ring rotation, and global scrolling are unchanged.
 
 The fixed ANTIC 2 HUD uses cells `$4019-$401C` for four permanent HULL plates.
 Glyph 5 is a low intact plate and glyph 12 a low cracked plate; the stored
@@ -282,10 +289,12 @@ therefore distinct from respawn invulnerability.
 
 ## Character and PMG ownership
 
-The gameplay charset has 128 occupied glyphs. Stars use 1-6, Viper projectile
+The gameplay charset has two free glyphs. Stars use 1-6, Viper projectile
 phases 11-46, Spread Shot composite scratch 47-56, capital hulls 59-89,
-Raider/projectile phases 90-109, debris 110-117, fragments 118-119, Rapid Fire
-capsule 120-123, and a single-owner dynamic Spread/Shield capsule bank 124-127.
+Raider/projectile phases 90-109, debris 110-117, and fragments 118-119. Glyphs
+120-125 are the single-owner dynamic pickup compositor bank; one of the three
+type-specific, eight-phase sources is copied there before the sole late draw.
+Glyphs 126-127 are free.
 
 The separate `$5000-$53FF` HUD charset keeps glyph 0 as the blank/separator,
 uses glyphs 5 and 12 for the two low HULL plate states, glyph 7 for weapon

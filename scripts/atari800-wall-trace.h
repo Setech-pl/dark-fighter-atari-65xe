@@ -119,13 +119,13 @@ typedef struct {
 	unsigned pickup_erase_cycle;
 	unsigned pickup_draw_scanline;
 	unsigned pickup_draw_cycle;
-	unsigned pickup_old_address[4];
-	unsigned pickup_old_backing[4];
-	unsigned pickup_old_before_erase[4];
-	unsigned pickup_old_after_erase[4];
-	unsigned pickup_new_address[4];
-	unsigned pickup_new_backing[4];
-	unsigned pickup_new_after_draw[4];
+	unsigned pickup_old_address[6];
+	unsigned pickup_old_backing[6];
+	unsigned pickup_old_before_erase[6];
+	unsigned pickup_old_after_erase[6];
+	unsigned pickup_new_address[6];
+	unsigned pickup_new_backing[6];
+	unsigned pickup_new_after_draw[6];
 	unsigned pickup_glyph_cells_before;
 	unsigned pickup_glyph_cells_after;
 	unsigned pickup_footprints_before;
@@ -379,6 +379,7 @@ static unsigned dftrace_pickup_screenshot_frame = 0xffffffffu;
 static unsigned dftrace_pickup_visible_passes;
 static const char *dftrace_pickup_sequence_prefix;
 static unsigned dftrace_pickup_sequence_count;
+static unsigned dftrace_pickup_sequence_primed;
 static const char *dftrace_pickup_traversal_prefix;
 static unsigned dftrace_pickup_traversal_count;
 static unsigned dftrace_pickup_traversal_last_y = 0xffffffffu;
@@ -609,7 +610,8 @@ static void dfboot_observe(unsigned pc)
 		dfboot_seen_start = frame;
 	if (pc == dfboot_pc_loader && dfboot_seen_loader == 0xffffffffu)
 		dfboot_seen_loader = frame;
-	if (pc == dfboot_pc_menu && dfboot_seen_menu == 0xffffffffu)
+	if (pc == dfboot_pc_menu && dfboot_seen_menu == 0xffffffffu &&
+		dfboot_seen_loader != 0xffffffffu && MEMORY_mem[dfboot_loader_timer] == 0u)
 		dfboot_seen_menu = frame;
 	if (pc == dfboot_pc_frontend && dfboot_seen_frontend == 0xffffffffu &&
 		MEMORY_mem[dfboot_game_state] == 1u)
@@ -685,7 +687,7 @@ static unsigned dftrace_pickup_glyph_cells(void)
 	for (address = DFTRACE_RING_SCREEN; address < DFTRACE_RING_END; ++address) {
 		unsigned code = MEMORY_mem[address];
 		unsigned index;
-		for (index = 0; index < 4u; ++index)
+		for (index = 0; index < 6u; ++index)
 			if (code == ((base + index) & 0xffu)) {
 				++count;
 				break;
@@ -715,15 +717,22 @@ static void dftrace_pickup_addresses(unsigned *addresses)
 	addresses[1] = (top + 1u) & 0xffffu;
 	addresses[2] = bottom;
 	addresses[3] = (bottom + 1u) & 0xffffu;
+	if (MEMORY_mem[dftrace_entity_screen_hi + 3u] != 0u) {
+		unsigned third = MEMORY_mem[dftrace_entity_screen_lo + 3u] |
+			((unsigned) MEMORY_mem[dftrace_entity_screen_hi + 3u] << 8);
+		addresses[4] = third;
+		addresses[5] = (third + 1u) & 0xffffu;
+	}
 }
 
 static unsigned dftrace_pickup_backing(unsigned index)
 {
 	static unsigned *const backing_addresses[] = {
 		&dftrace_entity_backing0, &dftrace_entity_backing1,
-		&dftrace_entity_backing2, &dftrace_entity_backing3
+		&dftrace_entity_backing2, &dftrace_entity_backing3,
+		&dftrace_entity_backing0, &dftrace_entity_backing1
 	};
-	return MEMORY_mem[*backing_addresses[index] + 1u];
+	return MEMORY_mem[*backing_addresses[index] + (index < 4u ? 1u : 3u)];
 }
 
 static void dftrace_pickup_frame_begin(DFTraceFrame *frame)
@@ -743,7 +752,7 @@ static void dftrace_pickup_frame_begin(DFTraceFrame *frame)
 	if (row_address >= DFTRACE_RING_SCREEN && row_address < DFTRACE_RING_END)
 		frame->pickup_a2_head = (row_address - DFTRACE_RING_SCREEN) / 40u;
 	dftrace_pickup_addresses(frame->pickup_old_address);
-	for (index = 0; index < 4u; ++index) {
+	for (index = 0; index < 6u; ++index) {
 		frame->pickup_old_backing[index] = dftrace_pickup_backing(index);
 		if (dftrace_pickup_screen_address_valid(frame->pickup_old_address[index]))
 			frame->pickup_old_before_erase[index] =
@@ -756,7 +765,7 @@ static void dftrace_pickup_frame_begin(DFTraceFrame *frame)
 static void dftrace_pickup_after_erase(DFTraceFrame *frame)
 {
 	unsigned index;
-	for (index = 0; index < 4u; ++index)
+	for (index = 0; index < 6u; ++index)
 		if (dftrace_pickup_screen_address_valid(frame->pickup_old_address[index]))
 			frame->pickup_old_after_erase[index] =
 				MEMORY_mem[frame->pickup_old_address[index]];
@@ -771,7 +780,7 @@ static void dftrace_pickup_frame_end(DFTraceFrame *frame)
 		frame->pickup_render_phase = (y - DFTRACE_GAMEPLAY_TOP) & 7u;
 	}
 	dftrace_pickup_addresses(frame->pickup_new_address);
-	for (index = 0; index < 4u; ++index) {
+	for (index = 0; index < 6u; ++index) {
 		frame->pickup_new_backing[index] = dftrace_pickup_backing(index);
 		if (dftrace_pickup_screen_address_valid(frame->pickup_new_address[index]))
 			frame->pickup_new_after_draw[index] =
@@ -789,7 +798,7 @@ static void dftrace_pickup_watch(DFTraceFrame *frame, unsigned pc)
 		MEMORY_mem[dftrace_entity_state + 1u] != 2u ||
 		(MEMORY_mem[dftrace_entity_drawn_mask + 1u] & 15u) != 15u)
 		return;
-	for (index = 0; index < 4u; ++index) {
+	for (index = 0; index < 6u; ++index) {
 		unsigned address = frame->pickup_old_address[index];
 		if (dftrace_pickup_screen_address_valid(address) &&
 			MEMORY_mem[address] != ((base + index) & 0xffu)) {
@@ -1339,7 +1348,7 @@ static void dftrace_write(void)
 		perror("darkfighter trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,viper_projectiles,pickup_booster_state,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,viper_projectiles,pickup_booster_state,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_address4,pickup_old_address5,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_backing4,pickup_old_backing5,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_before_erase4,pickup_old_before_erase5,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_old_after_erase4,pickup_old_after_erase5,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_address4,pickup_new_address5,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_backing4,pickup_new_backing5,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_new_after_draw4,pickup_new_after_draw5,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation");
 	for (index = 0; index < DFTRACE_PROFILE_COUNT; ++index)
 		fprintf(file, ",profile_clock%u", index);
 	for (index = 0; index < DFTRACE_PROFILE_DLI_COUNT; ++index)
@@ -1396,9 +1405,9 @@ static void dftrace_write(void)
 		fprintf(file, ",%u,%u", frame->viper_projectiles, frame->pickup_booster_state);
 		fprintf(file,
 			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
-			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
-			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
-			",%u,%u,%u,%u",
+			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
+			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
+			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u",
 			frame->pickup_prev_x, frame->pickup_prev_y,
 			frame->pickup_prev_render_row, frame->pickup_prev_render_phase,
 			frame->pickup_render_row, frame->pickup_render_phase,
@@ -1408,18 +1417,25 @@ static void dftrace_write(void)
 			frame->pickup_draw_scanline, frame->pickup_draw_cycle,
 			frame->pickup_old_address[0], frame->pickup_old_address[1],
 			frame->pickup_old_address[2], frame->pickup_old_address[3],
+			frame->pickup_old_address[4], frame->pickup_old_address[5],
 			frame->pickup_old_backing[0], frame->pickup_old_backing[1],
 			frame->pickup_old_backing[2], frame->pickup_old_backing[3],
+			frame->pickup_old_backing[4], frame->pickup_old_backing[5],
 			frame->pickup_old_before_erase[0], frame->pickup_old_before_erase[1],
 			frame->pickup_old_before_erase[2], frame->pickup_old_before_erase[3],
+			frame->pickup_old_before_erase[4], frame->pickup_old_before_erase[5],
 			frame->pickup_old_after_erase[0], frame->pickup_old_after_erase[1],
 			frame->pickup_old_after_erase[2], frame->pickup_old_after_erase[3],
+			frame->pickup_old_after_erase[4], frame->pickup_old_after_erase[5],
 			frame->pickup_new_address[0], frame->pickup_new_address[1],
 			frame->pickup_new_address[2], frame->pickup_new_address[3],
+			frame->pickup_new_address[4], frame->pickup_new_address[5],
 			frame->pickup_new_backing[0], frame->pickup_new_backing[1],
 			frame->pickup_new_backing[2], frame->pickup_new_backing[3],
+			frame->pickup_new_backing[4], frame->pickup_new_backing[5],
 			frame->pickup_new_after_draw[0], frame->pickup_new_after_draw[1],
 			frame->pickup_new_after_draw[2], frame->pickup_new_after_draw[3],
+			frame->pickup_new_after_draw[4], frame->pickup_new_after_draw[5],
 			frame->pickup_glyph_cells_before, frame->pickup_glyph_cells_after,
 			frame->pickup_footprints_before, frame->pickup_footprints_after,
 			frame->pickup_first_overwrite_pc, frame->pickup_first_overwrite_address,
@@ -1787,10 +1803,20 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 			if (dftrace_pickup_screenshot_frame == 0xffffffffu &&
 				dftrace_pickup_visible_passes == 2u)
 				dftrace_pickup_screenshot_frame = dftrace_count;
-			if (dftrace_pickup_sequence_prefix != NULL &&
-				*dftrace_pickup_sequence_prefix != '\0' &&
-				dftrace_pickup_visible_passes >= 1u &&
-				dftrace_pickup_sequence_count < 16u) {
+		}
+		else
+			dftrace_pickup_visible_passes = 0u;
+		/* The first active hook still exposes the preceding framebuffer. Prime
+		 * once, then capture 16 uninterrupted completed rasters regardless of
+		 * unrelated effect activity elsewhere on screen. */
+		if (dftrace_pickup_sequence_prefix != NULL &&
+			*dftrace_pickup_sequence_prefix != '\0' &&
+			MEMORY_mem[dftrace_entity_state + 1u] == 2u &&
+			MEMORY_mem[dftrace_entity_active_mask] == 2u &&
+			(MEMORY_mem[dftrace_entity_drawn_mask + 1u] & 15u) == 15u &&
+			MEMORY_mem[dftrace_effect_active_count] == 0u &&
+			dftrace_pickup_sequence_count < 16u) {
+			if (dftrace_pickup_sequence_primed >= 2u) {
 				char path[1024];
 				snprintf(path, sizeof(path), "%s-%02u.png",
 					dftrace_pickup_sequence_prefix, dftrace_pickup_sequence_count);
@@ -1801,9 +1827,15 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 				}
 				++dftrace_pickup_sequence_count;
 			}
+			else
+				++dftrace_pickup_sequence_primed;
 		}
-		else
-			dftrace_pickup_visible_passes = 0u;
+		else if (dftrace_pickup_sequence_prefix != NULL &&
+			*dftrace_pickup_sequence_prefix != '\0' &&
+			dftrace_pickup_sequence_count < 16u) {
+			dftrace_pickup_sequence_count = 0u;
+			dftrace_pickup_sequence_primed = 0u;
+		}
 		/* Traversal evidence follows the production slot even when an unrelated
 		 * explosion effect overlaps the same frame. Glyph-cell accounting still
 		 * proves that only one capsule footprint is resident. */
@@ -1813,6 +1845,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 			MEMORY_mem[dftrace_entity_active_mask] == 2u &&
 			(MEMORY_mem[dftrace_entity_drawn_mask + 1u] & 15u) == 15u &&
 			dftrace_pickup_traversal_count < 21u &&
+			((MEMORY_mem[dftrace_entity_y + 1u] - DFTRACE_GAMEPLAY_TOP) & 7u) == 0u &&
 			MEMORY_mem[dftrace_entity_y + 1u] != dftrace_pickup_traversal_last_y) {
 			char path[1024];
 			snprintf(path, sizeof(path), "%s-%02u.png",

@@ -612,8 +612,11 @@ ENTITY_SAFE_SPAWN_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_END_COLUMN*4
 ENTITY_DEBRIS_GLYPH_BASE = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
 EFFECT_FRAGMENT_GLYPH_BASE = ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT
 WEAPON_PICKUP_GLYPH_BASE = EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT
-WEAPON_PICKUP_SPREAD_GLYPH_BASE = WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_GLYPH_COUNT
+WEAPON_PICKUP_SPREAD_GLYPH_BASE = WEAPON_PICKUP_GLYPH_BASE
 WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE
+WEAPON_PICKUP_PHASE_BANK = $8800
+WEAPON_PICKUP_PACKED_STAGING = $7BD0
+WEAPON_PICKUP_COLD_STAGING = $4801
 VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
@@ -652,10 +655,10 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert EFFECT_FRAGMENT_GLYPH_COUNT = 2, error, "debris fragments must use exactly two glyphs"
 .assert EFFECT_FRAGMENT_GLYPH_BASE = 118, error, "debris fragment glyph indices must begin at 118"
 .assert WEAPON_PICKUP_GLYPH_BASE = 120, error, "Rapid Fire glyph indices must begin at 120"
-.assert WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_GLYPH_COUNT = 124, error, "Rapid Fire must use only glyphs 120-123"
-.assert WEAPON_PICKUP_SPREAD_GLYPH_BASE = 124, error, "Spread Shot glyph indices must begin at 124"
-.assert WEAPON_PICKUP_SPREAD_GLYPH_BASE+WEAPON_PICKUP_SPREAD_GLYPH_COUNT = 128, error, "Spread Shot must end at the gameplay charset boundary"
-.assert WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE, error, "Shield must share the erased capsule's dynamic glyph bank"
+.assert WEAPON_PICKUP_PHASE_GLYPH_COUNT = 6, error, "pickup fine compositor must own a two-by-three glyph bank"
+.assert WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_PHASE_GLYPH_COUNT = 126, error, "pickup phase glyphs must occupy 120-125"
+.assert WEAPON_PICKUP_SPREAD_GLYPH_BASE = 120, error, "all pickup types must share the phased glyph bank"
+.assert WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE, error, "all pickup types must share the phased glyph bank"
 .assert WEAPON_PICKUP_SHIELD_GLYPH_BYTES = WEAPON_PICKUP_SPREAD_GLYPH_BYTES, error, "Shared pickup glyph banks must have identical footprints"
 .assert VIPER_COMPOSITE_GLYPH_BASE+VIPER_PROJECTILE_SLOT_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "slot-owned Viper composite glyphs overlap capital hulls"
 .assert ENTITY_ACTIVE_LIMIT = 2, error, "debris and the fixed weapon-pickup slot must coexist"
@@ -910,6 +913,7 @@ layout_d_stage_boot_streams_complete:
 layout_d_entity_unpack_complete:
     jsr stage_a2_kernel
     jsr init_entity_effects
+    jsr unpack_weapon_pickup_phase_runtime
 layout_d_glue_holding_complete:
 
     lda #STATE_LOADER
@@ -981,19 +985,14 @@ unpack_starfield_runtime:
     sta broadside_destination+2
     jmp broadside_unpack_command
 
-; Patched by scripts/build.mjs. Four source/destination/size records preserve
-; the resident suffix, ENTITY_CODE stream, starfield stream and A2 bytes before
-; either decompressor can overwrite their low-memory payload source.
+; Patched by scripts/build.mjs. Resident, A2 and ENTITY_CODE are preserved
+; first. Their initial sources are then dead, so the externally loaded pickup
+; stream can move to $4801 before the final starfield copy overwrites $7BD0.
 boot_stage_streams:
 resident_packed_source:
     .word $FFFF
     .word PACKED_RESIDENT_STAGING
 resident_packed_size:
-    .word $FFFF
-starfield_packed_source:
-    .word $FFFF
-    .word STARFIELD_STAGING
-starfield_packed_size:
     .word $FFFF
 a2_kernel_source:
     .word $FFFF
@@ -1005,6 +1004,16 @@ entity_staged_source:
     .word $FFFF
 entity_packed_size:
     .word $FFFF
+pickup_packed_source:
+    .word WEAPON_PICKUP_PACKED_STAGING
+    .word WEAPON_PICKUP_COLD_STAGING
+pickup_packed_size:
+    .word $FFFF
+starfield_packed_source:
+    .word $FFFF
+    .word STARFIELD_STAGING
+starfield_packed_size:
+    .word $FFFF
 boot_stage_streams_end:
 
 stage_boot_streams:
@@ -1012,7 +1021,7 @@ stage_boot_streams:
     sta frontend_data_ptr
     lda #>boot_stage_streams
     sta frontend_data_ptr+1
-    lda #$04
+    lda #$05
     sta loader_dli_phase
 @record:
     ldy #$00
@@ -1038,12 +1047,11 @@ stage_boot_streams:
     lda frontend_data_ptr
     adc #$06
     sta frontend_data_ptr
-    bcc :+
-    inc frontend_data_ptr+1
-:
     dec loader_dli_phase
     bne @record
     rts
+
+.assert >boot_stage_streams = >(boot_stage_streams_end-1), error, "boot staging records cross a page"
 
 copy_boot_stream:
     ldy #$00
@@ -1061,7 +1069,6 @@ copy_boot_stream:
 @tail_setup:
     ldx loader_repeat_value
     beq @done
-    ldy #$00
 @tail:
     lda (src_ptr),y
     sta (dst_ptr),y
@@ -2198,7 +2205,7 @@ start_gameplay_end:
 .segment "BROADSIDE"
 
 main_loop:
-    jsr wait_frame
+    jsr wait_gameplay_frame
     lda #CONSOL_OPTION_MASK
     bit CONSOL
     beq main_loop_option_pressed
@@ -2210,7 +2217,9 @@ main_loop_frame_active = *
 profile_after_entity_erase = *
     jsr erase_fighter_projectile_overlays
 profile_after_projectile_erase = *
-    jsr render_weapon_pickup_overlay
+    nop
+    nop
+    nop                         ; capsule draws only at the late entity fence
 profile_after_capsule = *
     jsr tick_shared_fighter_explosions
     jsr tick_capital_explosions
@@ -2644,8 +2653,19 @@ copy_pause_screen:
 ; -----------------------------------------------------------------------------
 ; Frame and initialization
 
+; A pending or visible capsule needs the complete pre-display interval for its
+; one final overlay pass. Starting the same 50 Hz simulation frame 64 scanlines
+; earlier changes no logical cadence or ring operation; it only guarantees the
+; backed erase/update/render chain completes before ANTIC reaches the capsule.
+wait_gameplay_frame:
+    lda ENTITY_STATE+WEAPON_PICKUP_SLOT
+    beq wait_frame
+    lda #$50
+    bne wait_frame_at_line
+
 wait_frame:
     lda #$70
+wait_frame_at_line:
 @wait_for_line:
     cmp VCOUNT
     bne @wait_for_line
@@ -2840,20 +2860,6 @@ copy_charset:
     sta CHARSET+$300,x
     inx
     bne @loop
-    ; Install the established RF source kept with resident RODATA, then the
-    ; Spread source stored in the existing unconditional ENTITY_CODE reserve.
-    ldx #(WEAPON_PICKUP_GLYPH_BYTES-1)
-@weapon_pickup:
-    lda weapon_pickup_glyph,x
-    sta CHARSET+WEAPON_PICKUP_GLYPH_BASE*8,x
-    dex
-    bpl @weapon_pickup
-    ldx #(WEAPON_PICKUP_SPREAD_GLYPH_BYTES-1)
-@spread_pickup:
-    lda weapon_pickup_spread_glyph,x
-    sta CHARSET+WEAPON_PICKUP_SPREAD_GLYPH_BASE*8,x
-    dex
-    bpl @spread_pickup
     rts
 
 ; Expands the two packed 32x9 hull maps once after the loader has released
@@ -6690,10 +6696,6 @@ frontend_display_lists_end:
 ; Pixel values: 0=black, 1=white, 2=steel blue, 3=COLPF2 or COLPF3 when
 ; bit 7 of the screen code is set. The frontend sets COLPF3 to Kawasaki
 ; green; gameplay restores red before enabling DMA.
-weapon_pickup_glyph:
-    EMIT_WEAPON_PICKUP_GLYPHS
-weapon_pickup_glyph_end:
-
 charset_data:
     ; 0: space
     .byte $00,$00,$00,$00,$00,$00,$00,$00
@@ -7235,9 +7237,9 @@ update_broadside:
 :
     jsr schedule_broadside
 @done:
-    ; The only caller immediately resolves damage. Tail-repair the resident
-    ; entity layer after every broadside erase/draw without another call site.
-    jmp render_weapon_pickup_overlay
+    rts
+    nop
+    nop                         ; preserve the fixed BROADSIDE layout
 
 schedule_broadside:
     lda CAPITAL_SECTOR_STATE
@@ -8738,6 +8740,20 @@ unpack_broadside_runtime:
     stx broadside_destination+2
     jmp broadside_unpack_command
 
+; The external pickup record initially lands inside the later starfield staging
+; range. stage_boot_streams preserves it in not-yet-initialised frontend
+; charset RAM after its initial packed source has been consumed.
+unpack_weapon_pickup_phase_runtime:
+    ldx #>WEAPON_PICKUP_COLD_STAGING
+    lda #<WEAPON_PICKUP_COLD_STAGING
+    sta broadside_read_source+1
+    stx broadside_read_source+2
+    ldx #>WEAPON_PICKUP_PHASE_BANK
+    lda #<WEAPON_PICKUP_PHASE_BANK
+    sta broadside_destination+1
+    stx broadside_destination+2
+    jmp broadside_unpack_command
+
 ; New backed overlays form the top of the character stack. Effects are
 ; restored first, then interactive entities. Existing fighter projectiles and
 ; broadside shells are restored later by their established routines.
@@ -8804,13 +8820,26 @@ erase_interactive_entity_overlays:
     ; active path is republished at its current logical row by the late render.
     bne erase_weapon_pickup_overlay
 
-; Restore the exact last-rendered 2x2 footprint. Logical X/Y and the A2 head may
-; already describe another row or a reset state, so erase intentionally uses
-; only the four saved physical addresses and backing bytes.
+; Restore the exact last-rendered 2x2/2x3 footprint in reverse draw order.
+; Logical X/Y and the A2 head may already describe another row, so erase uses
+; only saved physical addresses. Reserved slot three owns the optional third
+; row pointer and its two backing bytes; it is never allocator-visible.
 erase_weapon_pickup_overlay:
     ldx ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
     beq weapon_pickup_erase_done
 erase_weapon_pickup_overlay_restore:
+    lda ENTITY_SCREEN_HI+3
+    beq @middle
+    sta dst_ptr+1
+    lda ENTITY_SCREEN_LO+3
+    sta dst_ptr
+    ldy #$01
+    lda ENTITY_BACKING1+3
+    sta (dst_ptr),y
+    dey
+    lda ENTITY_BACKING0+3
+    sta (dst_ptr),y
+@middle:
     lda ENTITY_VY+WEAPON_PICKUP_SLOT
     sta dst_ptr+1
     lda ENTITY_VX+WEAPON_PICKUP_SLOT
@@ -8833,6 +8862,7 @@ erase_weapon_pickup_overlay_restore:
     lda #$00
     sta ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
     sta ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
+    sta ENTITY_SCREEN_HI+3
     lda ENTITY_RENDERED_MASK
     and #($FF-WEAPON_PICKUP_ACTIVE_MASK)
     sta ENTITY_RENDERED_MASK
@@ -8943,25 +8973,32 @@ update_weapon_pickup_active:
     ; hidden delay, but they can no longer consume any collectible screen path.
     jmp integration_pickup_pending_tick
 @motion:
-    ; ANTIC has no sub-character vertical placement here. Follow the proven
-    ; native A2/near-ring step instead of accumulating a rare independent
-    ; full-row jump. The glyph cells and their backing remain in the same
-    ; physical RAM while the ring maps them to the next visible row.
-    ; The hull pass clears PLAYFIELD_RING_FLAGS before entity update. A zero
-    ; near phase on the still-published world event is the authoritative 1/2
-    ; cadence that rotated A2 this frame.
-    lda STAR_NEAR_PHASE
-    bne @after_motion
-    lda ENTITY_FRAME_EVENTS
-    beq @after_motion
-    lda ENTITY_Y+WEAPON_PICKUP_SLOT
+    ; Keep exactly one-half of the selected world speed, expressed directly in
+    ; scanlines. EASY/MEDIUM/HARD add 8/9/10 fifths per PAL frame; the bounded
+    ; accumulator therefore advances by one or two scanlines without an
+    ; eight-scanline character jump.
+    ldx DIFFICULTY_SETTING
+    lda ENTITY_TIMER+WEAPON_PICKUP_SLOT
     clc
-    adc #ENTITY_DEBRIS_VY
+    adc world_scroll_rates,x
+    ldx #$00
+@consume_scanline:
+    cmp #WEAPON_PICKUP_FINE_RATE_DENOMINATOR
+    bcc @store_fraction
+    sbc #WEAPON_PICKUP_FINE_RATE_DENOMINATOR
+    inx
+    bne @consume_scanline
+@store_fraction:
+    sta ENTITY_TIMER+WEAPON_PICKUP_SLOT
+    txa
+    clc
+    adc ENTITY_Y+WEAPON_PICKUP_SLOT
     sta ENTITY_Y+WEAPON_PICKUP_SLOT
-@after_motion:
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
     cmp #WEAPON_PICKUP_RELEASE_TOP
     bcc weapon_pickup_collide_player
+    lda #WEAPON_PICKUP_RELEASE_TOP
+    sta ENTITY_Y+WEAPON_PICKUP_SLOT
     jmp weapon_pickup_release
 weapon_pickup_collide_player:
     lda player_y
@@ -9058,6 +9095,8 @@ integration_pickup_reveal_body:
     lda #$00                    ; unreachable packed-layout sentinel
 :
     sta ENTITY_Y+WEAPON_PICKUP_SLOT
+    lda #$00
+    sta ENTITY_TIMER+WEAPON_PICKUP_SLOT
     lda #WEAPON_PICKUP_STATE_ACTIVE
     sta ENTITY_STATE+WEAPON_PICKUP_SLOT
     ora ENTITY_ACTIVE_MASK
@@ -9091,22 +9130,8 @@ weapon_pickup_record_qualified_kill:
     sta ENTITY_HP+WEAPON_PICKUP_SLOT
     lda ENTITY_TYPE+WEAPON_PICKUP_NEXT_TYPE_SLOT
     sta ENTITY_TYPE+WEAPON_PICKUP_SLOT
-    beq @rapid_render
-    cmp #WEAPON_PICKUP_TYPE_SPREAD
-    beq @spread_render
-    ; The prior capsule is already absent: qualification is gated on idle
-    ; slot one, and release restores its backing before state zero. Install
-    ; the shared 124-127 bank before publishing the pending Shield capsule.
-    jsr install_weapon_pickup_shield_glyph
-    lda #WEAPON_PICKUP_SHIELD_GLYPH_BASE
-    bne @store_render_id
-@spread_render:
-    jsr install_weapon_pickup_spread_glyph
-    lda #(WEAPON_PICKUP_SPREAD_GLYPH_BASE|$80)
-    bne @store_render_id
-@rapid_render:
-    lda #WEAPON_PICKUP_GLYPH_BASE
-@store_render_id:
+    tax
+    lda weapon_pickup_render_ids,x
     sta ENTITY_RENDER_ID+WEAPON_PICKUP_SLOT
     inc ENTITY_TYPE+WEAPON_PICKUP_NEXT_TYPE_SLOT
     lda ENTITY_TYPE+WEAPON_PICKUP_NEXT_TYPE_SLOT
@@ -9615,12 +9640,12 @@ render_interactive_entity_overlays:
     ; capsule path. Both retain byte-exact two-cell backing and layer order.
     lda ENTITY_ACTIVE_MASK
     lsr
-    bcc render_weapon_pickup_overlay
+    bcc @pickup
     lda ENTITY_Y
     cmp #ENTITY_GAMEPLAY_TOP
-    bcc render_weapon_pickup_overlay
+    bcc @pickup
     cmp #ENTITY_GAMEPLAY_BOTTOM
-    bcs render_weapon_pickup_overlay
+    bcs @pickup
     sec
     sbc #ENTITY_GAMEPLAY_TOP
     lsr
@@ -9667,7 +9692,10 @@ render_interactive_entity_overlays:
     lda #$03
     sta ENTITY_DRAWN_MASK
     inc ENTITY_RENDERED_MASK
+@pickup:
+    jmp render_weapon_pickup_overlay
 
+.segment "PICKUP_CODE"
 render_weapon_pickup_overlay:
     lda ENTITY_ACTIVE_MASK
     lsr
@@ -9675,24 +9703,22 @@ render_weapon_pickup_overlay:
     bcs :+
     rts
 :
-    ldx ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
-    beq @new
-    lda ENTITY_SCREEN_LO+WEAPON_PICKUP_SLOT
-    sta dst_ptr
-    lda ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
-    sta dst_ptr+1
-    bne @draw_top
-@new:
-    ; ACTIVE enters at the top and releases before an out-of-range render. Map
-    ; from logical Y every frame because the physical A2 ring may have rotated.
+    lda ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
+    beq :+
+    rts
+:
+    jsr compose_weapon_pickup_phase
+
+    ; Map once, after A2 has published its final ring head for this frame.
+    ; Every touched row saves its exact physical pointer and prior two bytes.
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
     sec
     sbc #ENTITY_GAMEPLAY_TOP
     lsr
     lsr
     lsr
-    adc #$00
     tax
+    stx ENTITY_SCRATCH_SLOT
     lda PLAYFIELD_ROW_LO,x
     sta dst_ptr
     lda PLAYFIELD_ROW_HI,x
@@ -9702,6 +9728,7 @@ render_weapon_pickup_overlay:
     sbc #GAMEPLAY_LEFT_HPOS
     lsr
     lsr
+    clc
     adc dst_ptr
     sta dst_ptr
     sta ENTITY_SCREEN_LO+WEAPON_PICKUP_SLOT
@@ -9717,7 +9744,6 @@ render_weapon_pickup_overlay:
     iny
     lda (dst_ptr),y
     sta ENTITY_BACKING1+WEAPON_PICKUP_SLOT
-@draw_top:
     ldy #$00
     lda ENTITY_RENDER_ID+WEAPON_PICKUP_SLOT
     sta (dst_ptr),y
@@ -9726,24 +9752,18 @@ render_weapon_pickup_overlay:
     iny
     sta (dst_ptr),y
 
-    ; Advance the exact top cell through the ring-aware mapper. This preserves
-    ; the column and wraps the physical row at $43C0. The fixed slot's unused
-    ; VX/VY bytes retain that bottom pointer so reverse erase does not repeat
-    ; the ring mapping in the same hot frame.
+    ; Slot one's dormant VX/VY pair retains the middle physical pointer.
     jsr advance_dst_to_next_ring_row
     lda dst_ptr
     sta ENTITY_VX+WEAPON_PICKUP_SLOT
     lda dst_ptr+1
     sta ENTITY_VY+WEAPON_PICKUP_SLOT
-    txa
-    bne @draw_bottom
     ldy #$00
     lda (dst_ptr),y
     sta ENTITY_BACKING2+WEAPON_PICKUP_SLOT
     iny
     lda (dst_ptr),y
     sta ENTITY_BACKING3+WEAPON_PICKUP_SLOT
-@draw_bottom:
     ldy #$00
     lda ENTITY_RENDER_ID+WEAPON_PICKUP_SLOT
     clc
@@ -9752,12 +9772,78 @@ render_weapon_pickup_overlay:
     adc #$01
     iny
     sta (dst_ptr),y
+
+    ; A non-zero phase spills the shifted 16-scanline source into a third row.
+    ; Clip that row at the bottom of the 22-row viewport. Reserved slot three
+    ; records both its address and backing for exact next-frame reverse erase.
+    lda ENTITY_SCRATCH0
+    beq @two_rows
+    lda ENTITY_SCRATCH_SLOT
+    cmp #(ENTITY_LOGICAL_ROWS-2)
+    bcs @two_rows
+    jsr advance_dst_to_next_ring_row
+    lda dst_ptr
+    sta ENTITY_SCREEN_LO+3
+    lda dst_ptr+1
+    sta ENTITY_SCREEN_HI+3
+    ldy #$00
+    lda (dst_ptr),y
+    sta ENTITY_BACKING0+3
+    iny
+    lda (dst_ptr),y
+    sta ENTITY_BACKING1+3
+    ldy #$00
+    lda ENTITY_RENDER_ID+WEAPON_PICKUP_SLOT
+    clc
+    adc #$04
+    sta (dst_ptr),y
+    adc #$01
+    iny
+    sta (dst_ptr),y
+@two_rows:
     lda #$0F
     sta ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
     lda ENTITY_ACTIVE_MASK
     sta ENTITY_RENDERED_MASK
 render_weapon_pickup_overlay_done:
     rts
+
+; Publish one build-generated vertical phase in the six private glyphs 120-125.
+; The immutable 3-type x 8-phase bank is loaded after cold staging into free
+; runtime RAM at $8800. A phase is 48 contiguous bytes (three row pairs).
+compose_weapon_pickup_phase:
+    lda ENTITY_Y+WEAPON_PICKUP_SLOT
+    sec
+    sbc #ENTITY_GAMEPLAY_TOP
+    and #(WEAPON_PICKUP_VERTICAL_PHASE_COUNT-1)
+    sta ENTITY_SCRATCH0
+    tax
+    ldy ENTITY_TYPE+WEAPON_PICKUP_SLOT
+    lda weapon_pickup_type_base_lo,y
+    clc
+    adc weapon_pickup_phase_offset_lo,x
+    sta src_ptr
+    lda weapon_pickup_type_base_hi,y
+    adc weapon_pickup_phase_offset_hi,x
+    sta src_ptr+1
+    ldy #(WEAPON_PICKUP_PHASE_GLYPH_COUNT*8-1)
+@copy:
+    lda (src_ptr),y
+    sta CHARSET+WEAPON_PICKUP_GLYPH_BASE*8,y
+    dey
+    bpl @copy
+    rts
+
+weapon_pickup_type_base_lo:
+    .byte <(WEAPON_PICKUP_PHASE_BANK+$000),<(WEAPON_PICKUP_PHASE_BANK+$180),<(WEAPON_PICKUP_PHASE_BANK+$300)
+weapon_pickup_type_base_hi:
+    .byte >(WEAPON_PICKUP_PHASE_BANK+$000),>(WEAPON_PICKUP_PHASE_BANK+$180),>(WEAPON_PICKUP_PHASE_BANK+$300)
+weapon_pickup_phase_offset_lo:
+    .byte <$000,<$030,<$060,<$090,<$0C0,<$0F0,<$120,<$150
+weapon_pickup_phase_offset_hi:
+    .byte >$000,>$030,>$060,>$090,>$0C0,>$0F0,>$120,>$150
+weapon_pickup_render_ids:
+    .byte WEAPON_PICKUP_GLYPH_BASE,WEAPON_PICKUP_GLYPH_BASE|$80,WEAPON_PICKUP_GLYPH_BASE
 
 ; Effects render after the interactive layer. Slot order is core then the four
 ; fragments; erase scans the physical pool in the exact opposite direction.
@@ -9898,27 +9984,6 @@ install_entity_effects_glyph:
     sta CHARSET+ENTITY_DEBRIS_GLYPH_BASE*8,x
     dex
     bpl @copy_glyph
-    rts
-
-; Glyphs 124-127 are a single-owner dynamic capsule bank. These installers are
-; called only while slot one is idle, after reverse erase has removed every
-; screen code using the previous definition and before pending state is set.
-install_weapon_pickup_spread_glyph:
-    ldx #(WEAPON_PICKUP_SPREAD_GLYPH_BYTES-1)
-@copy:
-    lda weapon_pickup_spread_glyph,x
-    sta CHARSET+WEAPON_PICKUP_SPREAD_GLYPH_BASE*8,x
-    dex
-    bpl @copy
-    rts
-
-install_weapon_pickup_shield_glyph:
-    ldx #(WEAPON_PICKUP_SHIELD_GLYPH_BYTES-1)
-@copy:
-    lda weapon_pickup_shield_glyph,x
-    sta CHARSET+WEAPON_PICKUP_SHIELD_GLYPH_BASE*8,x
-    dex
-    bpl @copy
     rts
 
 install_shield_hud_glyph:
@@ -10184,14 +10249,6 @@ profile_projectile_compose_end = *
 
 .export profile_projectile_compose_end
 
-.segment "BROADSIDE"
-weapon_pickup_spread_glyph:
-    EMIT_WEAPON_PICKUP_SPREAD_GLYPHS
-weapon_pickup_spread_glyph_end:
-weapon_pickup_shield_glyph:
-    EMIT_WEAPON_PICKUP_SHIELD_GLYPHS
-weapon_pickup_shield_glyph_end:
-
 .segment "CODE"
 entity_slot_bit_masks:
     .byte $01,$02,$04,$08,$10
@@ -10315,15 +10372,14 @@ integration_pickup_pending_tick:
 .assert entity_archetype_descriptors_end-entity_archetype_descriptors = ENTITY_ARCHETYPE_DESCRIPTOR_BYTES, error, "entity descriptor size changed"
 .assert entity_debris_glyph_end-entity_debris_glyph = ENTITY_DEBRIS_GLYPH_BYTES, error, "debris glyph bank size changed"
 .assert effect_fragment_glyph_end-effect_fragment_glyph = EFFECT_FRAGMENT_GLYPH_BYTES, error, "fragment glyph bank size changed"
-.assert weapon_pickup_glyph_end-weapon_pickup_glyph = WEAPON_PICKUP_GLYPH_BYTES, error, "Rapid Fire glyph bank size changed"
-.assert weapon_pickup_spread_glyph_end-weapon_pickup_spread_glyph = WEAPON_PICKUP_SPREAD_GLYPH_BYTES, error, "Spread Shot glyph bank size changed"
-.assert weapon_pickup_shield_glyph_end-weapon_pickup_shield_glyph = WEAPON_PICKUP_SHIELD_GLYPH_BYTES, error, "Shield glyph bank size changed"
 .assert *-__ENTITY_CODE_RUN__ <= ENTITY_CODE_RESERVED_BYTES, error, "ENTITY_CODE exceeds its unconditional RAM reservation"
 
 .export init_entity_effects, install_entity_effects_glyph
-.export install_weapon_pickup_spread_glyph, install_weapon_pickup_shield_glyph
+.export compose_weapon_pickup_phase
+.export unpack_weapon_pickup_phase_runtime
 .export ENTITY_DEBRIS_GLYPH_BASE
-.export WEAPON_PICKUP_GLYPH_BASE, WEAPON_PICKUP_SPREAD_GLYPH_BASE, WEAPON_PICKUP_SHIELD_GLYPH_BASE, weapon_pickup_glyph
+.export WEAPON_PICKUP_GLYPH_BASE, WEAPON_PICKUP_SPREAD_GLYPH_BASE, WEAPON_PICKUP_SHIELD_GLYPH_BASE
+.export WEAPON_PICKUP_PHASE_BANK
 .export entity_effects_erase, entity_effects_update, entity_effects_render
 .export entity_spawn_debris, entity_player_debris_overlap, entity_damage_applied, entity_despawn_debris
 .export entity_begin_sector_complete, entity_complete_scroll_tick
