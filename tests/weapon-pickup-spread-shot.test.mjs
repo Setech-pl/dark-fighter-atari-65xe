@@ -116,7 +116,7 @@ test("both capsule types spawn and Spread moves through every A2 step without gh
     frame.bottomLeftCode, frame.bottomRightCode,
   ]), Array.from({ length: 8 }, () => [2, 15, 252, 253, 254, 255]));
   assert.deepEqual(trace.spreadCapsuleFrames.map(({ y }) => y),
-    [43, 51, 51, 59, 59, 67, 67, 75]);
+    [24, 32, 32, 40, 40, 48, 48, 56]);
   assert.deepEqual(trace.spreadCapsuleFrames.map(({ a2Head }) => a2Head),
     [0, 21, 21, 20, 20, 19, 19, 18]);
   for (const frame of trace.spreadCapsuleFrames) {

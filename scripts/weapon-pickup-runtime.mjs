@@ -394,6 +394,83 @@ export function executeWeaponPickupTrace({
   };
 }
 
+export function executeWeaponPickupTraversalTrace({
+  root = defaultRoot, artifact = "xex",
+} = {}) {
+  const types = [
+    ["rapid", 0, 120],
+    ["spread", 1, 0xfc],
+    ["shield", 2, 124],
+  ];
+  const traces = types.map(([name, pickupType, renderId]) => {
+    const { memory, labels, manifest } = initialiseRuntime(root, artifact);
+    const slot = 1;
+    const state = requiredLabel(labels, "ENTITY_STATE") + slot;
+    const activeMask = requiredLabel(labels, "ENTITY_ACTIVE_MASK");
+    const activeCount = requiredLabel(labels, "ENTITY_ACTIVE_COUNT");
+    const frameEvents = requiredLabel(labels, "ENTITY_FRAME_EVENTS");
+    const nearPhaseAddress = requiredLabel(labels, "ENEMY_PENDING_SOURCE") + 2;
+    memory[requiredLabel(labels, "ENTITY_HP") + slot] = 2;
+    memory[requiredLabel(labels, "ENTITY_TYPE") + 2] = pickupType;
+    memory[requiredLabel(labels, "FIGHTER_EXPLOSION_X") + 1] = 124;
+    memory[requiredLabel(labels, "FIGHTER_EXPLOSION_Y") + 1] = 136;
+    runRoutine(memory, labels, "weapon_pickup_record_qualified_kill");
+    const created = pickupSnapshot(memory, labels, manifest, { phase: "CREATED", frame: 0 });
+
+    const pending = [];
+    memory[nearPhaseAddress] = 0;
+    for (let frame = 0; frame < 64 && memory[state] === 1; frame += 1) {
+      memory[frameEvents] = 1;
+      runRoutine(memory, labels, "update_weapon_pickup_active", { x: 1 });
+      if (memory[state] === 1) {
+        pending.push(pickupSnapshot(memory, labels, manifest, { phase: "PENDING", frame }));
+      }
+    }
+    if (memory[state] !== 2) throw new Error(`${name} pickup did not activate`);
+    runRoutine(memory, labels, "render_interactive_entity_overlays");
+
+    const visible = [pickupSnapshot(memory, labels, manifest, { phase: "ACTIVE", frame: 0 })];
+    let worldAccumulator = 0;
+    let nearPhase = memory[nearPhaseAddress];
+    for (let frame = 1; frame < 256 && memory[state] === 2; frame += 1) {
+      runRoutine(memory, labels, "entity_effects_erase");
+      worldAccumulator += 9;
+      let event = 0;
+      if (worldAccumulator >= 20) {
+        worldAccumulator -= 20;
+        event = 1;
+        nearPhase = (nearPhase + 1) & 1;
+      }
+      memory[nearPhaseAddress] = nearPhase;
+      memory[frameEvents] = event;
+      runRoutine(memory, labels, "update_weapon_pickup_active", { x: 2 });
+      if (memory[state] === 2) {
+        runRoutine(memory, labels, "entity_effects_render");
+        visible.push(pickupSnapshot(memory, labels, manifest, { phase: "ACTIVE", frame }));
+      }
+    }
+    const released = pickupSnapshot(memory, labels, manifest, {
+      phase: "RELEASED", frame: visible.length,
+    });
+    const footprintCount = (snapshot) => [...snapshot.screen]
+      .filter((code) => code === renderId).length;
+    return {
+      name,
+      pickupType,
+      renderId,
+      created,
+      pending,
+      visible,
+      released,
+      maximumLogicalSlots: Math.max(created.activeCount,
+        ...pending.map(({ activeCount: count }) => count),
+        ...visible.map(({ activeCount: count }) => count)),
+      maximumVisualFootprints: Math.max(...visible.map(footprintCount)),
+    };
+  });
+  return { artifact, traces };
+}
+
 export function executeViperBurstBalanceTrace({
   root = defaultRoot, artifact = "xex", coldFill = 0xa5, windowFrames = 80,
 } = {}) {

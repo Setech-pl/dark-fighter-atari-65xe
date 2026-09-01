@@ -96,8 +96,9 @@
     "pendingFrames": 30,
     "movementNumerator": 1,
     "movementDenominator": 2,
-    "safeTopScanline": 40,
-    "safeBottomScanline": 152,
+    "spawnTopScanline": 8,
+    "activationTopScanline": 24,
+    "releaseTopScanline": 192,
     "widthHpos": 8,
     "heightScanlines": 16,
     "glyphs": [

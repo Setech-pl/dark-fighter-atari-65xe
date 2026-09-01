@@ -137,6 +137,15 @@ const weaponPickupSessions = [{
   kind: "weapon-pickup-coverage",
 }];
 
+const weaponPickupTraversalSessions = [{
+  id: "weapon-pickup-traversal-2-observe-fire4",
+  difficulty: 2,
+  policy: "pickup-observe",
+  fireDelay: 4,
+  frames: 1_800,
+  kind: "weapon-pickup-traversal",
+}];
+
 const directorCompletionSessions = [0, 1, 2].map((difficulty) => ({
   id: `director-complete-${difficulty}-natural-sweep-fire0`,
   difficulty,
@@ -547,6 +556,44 @@ function writeScreenshotContact(paths, outputPath, columns) {
     bytes: png.length,
     sha256: sha256(png),
   };
+}
+
+function rgbTemplate(image, left, top, width, height) {
+  const rgb = Buffer.alloc(width * height * 3);
+  for (let y = 0; y < height; y += 1) {
+    image.rgb.copy(rgb, y * width * 3,
+      ((top + y) * image.width + left) * 3,
+      ((top + y) * image.width + left + width) * 3);
+  }
+  return { width, height, rgb };
+}
+
+function findRgbTemplate(image, template) {
+  let anchor = 0;
+  while (anchor < template.width * template.height &&
+    template.rgb[anchor * 3] === 4 && template.rgb[anchor * 3 + 1] === 4 &&
+    template.rgb[anchor * 3 + 2] === 4) anchor += 1;
+  invariant(anchor < template.width * template.height, "Raster template is blank");
+  const anchorX = anchor % template.width;
+  const anchorY = Math.floor(anchor / template.width);
+  const matches = [];
+  for (let y = 0; y <= image.height - template.height; y += 1) {
+    for (let x = 0; x <= image.width - template.width; x += 1) {
+      const imageAnchor = ((y + anchorY) * image.width + x + anchorX) * 3;
+      if (image.rgb[imageAnchor] !== template.rgb[anchor * 3] ||
+        image.rgb[imageAnchor + 1] !== template.rgb[anchor * 3 + 1] ||
+        image.rgb[imageAnchor + 2] !== template.rgb[anchor * 3 + 2]) continue;
+      let equal = true;
+      for (let row = 0; row < template.height && equal; row += 1) {
+        const imageOffset = ((y + row) * image.width + x) * 3;
+        const templateOffset = row * template.width * 3;
+        equal = image.rgb.subarray(imageOffset, imageOffset + template.width * 3)
+          .equals(template.rgb.subarray(templateOffset, templateOffset + template.width * 3));
+      }
+      if (equal) matches.push({ x, y });
+    }
+  }
+  return matches;
 }
 
 function argumentValue(name) {
@@ -1152,6 +1199,9 @@ function main() {
   const spreadScreenshotPath = path.join(buildDirectory,
     "weapon-pickup-spread-projectiles-atari800.png");
   const pickupSequencePrefix = path.join(buildDirectory, "weapon-pickup-frame");
+  const pickupTraversalPrefix = path.join(buildDirectory, "weapon-pickup-traversal");
+  const pickupTraversalContactPath = path.join(buildDirectory,
+    "weapon-pickup-traversal-contact.png");
   if (!reuseExistingTraces && onlySession === undefined) {
     if (fs.existsSync(pickupScreenshotPath)) fs.unlinkSync(pickupScreenshotPath);
     if (fs.existsSync(rapidScreenshotPath)) fs.unlinkSync(rapidScreenshotPath);
@@ -1164,6 +1214,7 @@ function main() {
   let sessionsToRun = smokeFrames === null
     ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
       ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
+      ...weaponPickupTraversalSessions,
       ...memoryIntegritySessions]
       .concat(engineDiagnosticSessions, engineRestartSessions)
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
@@ -1194,6 +1245,9 @@ function main() {
         DFTRACE_RAPID_SCREENSHOT: rapidScreenshotPath,
         DFTRACE_SPREAD_SCREENSHOT: spreadScreenshotPath,
       } : {}),
+      ...(session.kind === "weapon-pickup-traversal" ? {
+        DFTRACE_PICKUP_TRAVERSAL_PREFIX: pickupTraversalPrefix,
+      } : {}),
 	  ...(session.kind === "engine-first-150" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
 	  } : {}),
@@ -1222,6 +1276,43 @@ function main() {
       "Atari800 did not render a yellow Rapid Fire Viper projectile during the pickup replay");
     invariant(fs.existsSync(spreadScreenshotPath),
       "Atari800 did not render a three-projectile Spread Shot fan during the pickup replay");
+  }
+  if (smokeFrames === null && sessionsToRun.some(({ kind }) => kind === "weapon-pickup-traversal")) {
+    const traversalPaths = [];
+    for (let index = 0; index < 21; ++index) {
+      const framePath = `${pickupTraversalPrefix}-${index.toString().padStart(2, "0")}.png`;
+      invariant(fs.existsSync(framePath),
+        `Atari800 did not capture pickup traversal position ${index}`);
+      traversalPaths.push(framePath);
+    }
+    const traversalRows = allRows.filter(({ trace_kind: kind }) =>
+      kind === "weapon-pickup-traversal");
+    const pendingRows = traversalRows.filter(({ pickup_state: state }) => state === 1);
+    const activeRows = traversalRows.filter(({ pickup_state: state }) => state === 2);
+    const expectedY = Array.from({ length: 21 }, (_, index) => 24 + index * 8);
+    invariant(pendingRows.length > 0 && pendingRows.every(({ pickup_y: y }) => y === 8),
+      "Native PENDING moved through visible playfield before activation");
+    invariant(activeRows.length === 81 &&
+      JSON.stringify([...new Set(activeRows.map(({ pickup_y: y }) => y))]) ===
+        JSON.stringify(expectedY),
+    "Native pickup did not traverse all 21 Hard-mode positions at the 1/2 cadence");
+    invariant(activeRows.every((row) => row.entity_active_mask === 2 &&
+      row.pickup_drawn_mask === 15 && row.pickup_footprints_after === 1 &&
+      row.pickup_glyph_cells_after === 4 && row.pickup_draw_calls === 3),
+    "Native pickup did not remain one logical slot and one four-cell footprint");
+    const releaseRow = traversalRows.find(({ frame }) => frame === activeRows.at(-1).frame + 1);
+    invariant(releaseRow?.pickup_state === 0 && releaseRow.pickup_y === 192 &&
+      releaseRow.entity_active_mask === 0 && releaseRow.pickup_drawn_mask === 0 &&
+      releaseRow.pickup_footprints_after === 0,
+    "Native pickup slot was not released cleanly at the lower boundary");
+    const images = traversalPaths.map((framePath) =>
+      decodeAtari800Screenshot(fs.readFileSync(framePath)));
+    const capsule = rgbTemplate(images[0], 144, 16, 16, 16);
+    images.forEach((frame, index) => invariant(
+      JSON.stringify(findRgbTemplate(frame, capsule)) ===
+        JSON.stringify([{ x: 144, y: 16 + index * 8 }]),
+      `Final raster position ${index} does not contain exactly one capsule`));
+    writeScreenshotContact(traversalPaths, pickupTraversalContactPath, 7);
   }
   if (smokeFrames !== null) {
     console.log(`Observer smoke completed: ${smokeFrames} gameplay frames`);

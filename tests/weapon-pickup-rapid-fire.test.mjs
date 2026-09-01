@@ -23,6 +23,7 @@ import {
   executeWeaponPickupCollisionTrace,
   executeWeaponPickupLifecycleTrace,
   executeWeaponPickupTrace,
+  executeWeaponPickupTraversalTrace,
   executeViperBurstBalanceTrace,
   executeViperProjectileColourTrace,
   executeViperProjectileColourLifecycleTrace,
@@ -58,8 +59,9 @@ test("Rapid Fire owns fixed slot one without extending BSS or physical pools", (
     pendingFrames: 30,
     movementNumerator: 1,
     movementDenominator: 2,
-    safeTopScanline: 40,
-    safeBottomScanline: 152,
+    spawnTopScanline: 8,
+    activationTopScanline: 24,
+    releaseTopScanline: 192,
     widthHpos: 8,
     heightScanlines: 16,
     glyphs: [
@@ -109,6 +111,14 @@ test("four glyphs form one tapered 8x16 capsule with a single continuous black c
   assert.match(include, /WEAPON_PICKUP_GLYPH_COUNT = 4/);
   assert.doesNotMatch(include, /WEAPON_PICKUP_PHASE_FRAMES/);
   assert.match(source, /WEAPON_PICKUP_GLYPH_BASE = EFFECT_FRAGMENT_GLYPH_BASE\+EFFECT_FRAGMENT_GLYPH_COUNT/);
+  assert.match(source,
+    /copy_charset:[\s\S]+lda weapon_pickup_glyph,x[\s\S]+sta CHARSET\+WEAPON_PICKUP_GLYPH_BASE\*8,x/);
+  for (const artifact of ["xex", "atr"]) {
+    const runtime = executeWeaponPickupTrace({ root, artifact });
+    assert.deepEqual(Array.from(runtime.charset.subarray(120 * 8, 124 * 8)),
+      Array.from(entities.pickupGlyphs),
+      `${artifact.toUpperCase()} must unpack glyphs 120-123 into the live Atari charset`);
+  }
   assert.deepEqual(entities.weaponPickupRapidFire.palette, {
     outlineRegister: "COLPF1", outlineValue: 0x84,
     fillRegister: "COLPF2", fillValue: 0x1e,
@@ -158,14 +168,49 @@ test("pending is hidden and non-colliding for thirty full frames after Raider br
   const pending = trace.records.filter(({ phase }) => phase === "PENDING");
   assert.equal(pending.length, 30);
   assert.equal(pending.every((record) => record.state === 1 &&
+    record.y === 8 &&
     (record.activeMask & 2) === 0 && record.drawnMask === 0 &&
     record.screenAddress === 0 && record.leftCode === 0 && record.rightCode === 0), true);
   assert.deepEqual([pending[0].timer, pending.at(-1).timer], [30, 1]);
   const firstActive = trace.records.find(({ phase }) => phase === "ACTIVE");
   assert.deepEqual([
     firstActive.state, firstActive.activeMask, firstActive.activeCount,
-    firstActive.effectActiveMask, firstActive.effectActiveCount,
-  ], [2, 2, 1, 0, 0], "Raider fragments must expire before the capsule is shown");
+    firstActive.effectActiveMask, firstActive.effectActiveCount, firstActive.y,
+  ], [2, 2, 1, 0, 0, 24], "Raider fragments must expire before the capsule enters at the top");
+});
+
+test("every booster type enters at the top, crosses the full playfield once and releases below it", () => {
+  const expectedPositions = Array.from({ length: 21 }, (_, index) => 24 + index * 8);
+  const summarize = ({ traces }) => traces.map((trace) => ({
+    name: trace.name,
+    created: [trace.created.state, trace.created.y, trace.created.activeMask,
+      trace.created.activeCount, trace.created.drawnMask],
+    pendingY: [...new Set(trace.pending.map(({ y }) => y))],
+    visibleY: [...new Set(trace.visible.map(({ y }) => y))],
+    visibleStates: [...new Set(trace.visible.map(({ state, activeMask, activeCount }) =>
+      `${state}:${activeMask}:${activeCount}`))],
+    visibleFrames: trace.visible.length,
+    maximumLogicalSlots: trace.maximumLogicalSlots,
+    maximumVisualFootprints: trace.maximumVisualFootprints,
+    released: [trace.released.state, trace.released.y, trace.released.activeMask,
+      trace.released.activeCount, trace.released.drawnMask],
+  }));
+  const xex = summarize(executeWeaponPickupTraversalTrace({ root, artifact: "xex" }));
+  const atr = summarize(executeWeaponPickupTraversalTrace({ root, artifact: "atr" }));
+  assert.deepEqual(atr, xex, "XEX and ATR must execute the same complete traversal");
+  for (const trace of xex) {
+    assert.deepEqual(trace.created, [1, 8, 0, 0, 0], `${trace.name} must spawn fully above`);
+    assert.deepEqual(trace.pendingY, [8], `${trace.name} PENDING must not consume visible travel`);
+    assert.deepEqual(trace.visibleY, expectedPositions,
+      `${trace.name} must visit every complete 8-scanline position`);
+    assert.deepEqual(trace.visibleStates, ["2:2:1"]);
+    assert.equal(trace.maximumLogicalSlots, 1);
+    assert.equal(trace.maximumVisualFootprints, 1);
+    assert.deepEqual(trace.released, [0, 192, 0, 0, 0],
+      `${trace.name} must release immediately below its last fully visible position`);
+  }
+  assert.equal(new Set(xex.map(({ visibleFrames }) => visibleFrames)).size, 1,
+    "all three booster types must retain the same movement cadence");
 });
 
 test("active capsule renders one static 2x2 code block continuously and cannot be shot", () => {
@@ -250,7 +295,7 @@ test("release collision covers the complete half-open 8-HPOS by 16-scanline caps
   assert.deepEqual({ artifact: "release", cases: xex }, { artifact: "release", cases: atr });
   assert.equal(xex.every(({ expectedHit, collected }) => expectedHit === collected), true);
   assert.match(source,
-    /cmp #\(ENTITY_GAMEPLAY_BOTTOM-\(WEAPON_PICKUP_HEIGHT_SCANLINES-8\)\)/);
+    /cmp #WEAPON_PICKUP_RELEASE_TOP/);
 });
 
 test("pickup collection is single-shot and changes neither score, HULL nor LIFE", () => {

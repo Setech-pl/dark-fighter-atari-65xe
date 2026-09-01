@@ -215,8 +215,12 @@ export function loadEntityEffectsDefinition(sourcePath) {
     "Rapid Fire must enter pending after three qualified kills for thirty frames");
   invariant(pickup.movementNumerator === 1 && pickup.movementDenominator === 2,
     "Rapid Fire pickup must inherit the native near-ring cadence");
-  invariant(pickup.safeTopScanline === 40 && pickup.safeBottomScanline === 152,
-    "Rapid Fire activation must clamp to the reviewed visible Y range");
+  invariant(pickup.spawnTopScanline === 8 &&
+    pickup.activationTopScanline === coordinates.gameplayTopScanline &&
+    pickup.releaseTopScanline === coordinates.gameplayBottomExclusive -
+      (pickup.heightScanlines - 8),
+  "Every pickup must spawn fully above, activate at the playfield top, and release after " +
+    "its last complete visible row");
   invariant(pickup.widthHpos === 8 && pickup.heightScanlines === 16,
     "Rapid Fire capsule must occupy exactly two-by-two ANTIC 4 cells");
   invariant(Array.isArray(pickup.glyphs) && pickup.glyphs.length === 4 &&
@@ -453,8 +457,9 @@ export function renderEntityEffectsCa65Include(asset) {
     `WEAPON_PICKUP_PENDING_TIMER_LOAD = ${pickup.pendingFrames + 2}`,
     `WEAPON_PICKUP_MOVE_NUMERATOR = ${pickup.movementNumerator}`,
     `WEAPON_PICKUP_MOVE_DENOMINATOR = ${pickup.movementDenominator}`,
-    `WEAPON_PICKUP_SAFE_TOP = ${pickup.safeTopScanline}`,
-    `WEAPON_PICKUP_SAFE_BOTTOM = ${pickup.safeBottomScanline}`,
+    `WEAPON_PICKUP_SPAWN_TOP = ${pickup.spawnTopScanline}`,
+    `WEAPON_PICKUP_ACTIVATION_TOP = ${pickup.activationTopScanline}`,
+    `WEAPON_PICKUP_RELEASE_TOP = ${pickup.releaseTopScanline}`,
     `WEAPON_PICKUP_WIDTH_HPOS = ${pickup.widthHpos}`,
     `WEAPON_PICKUP_HEIGHT_SCANLINES = ${pickup.heightScanlines}`,
     "ENTITY_EVENT_WORLD_ROW_ADVANCED = $01",

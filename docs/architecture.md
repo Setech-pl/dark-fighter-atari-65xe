@@ -240,6 +240,13 @@ successful capsule creation through Rapid Fire, Spread Shot, and Shield,
 starting with Rapid Fire on New Game. Slot 2 holds the non-rendered timed-
 booster controller and next-type selector. All three states are mutually
 exclusive. Rapid Fire and Spread Shot last 500 active frames; Shield lasts 250.
+The capsule is created at Y=8, wholly above the gameplay display. PENDING and
+Director admission retries cannot change that coordinate. Admission activates
+it at Y=24; the one shared renderer publishes one 2x2 footprint through the
+last fully visible position Y=184, and the slot is released at Y=192. The
+interactive erase pass restores that footprint every frame and the late render
+maps it again from logical Y after A2 rotation; no physical ring address may
+carry the capsule around the display independently of its 1/2 cadence.
 
 The fixed ANTIC 2 HUD uses cells `$4019-$401C` for four permanent HULL plates.
 Glyph 5 is a low intact plate and glyph 12 a low cracked plate; the stored

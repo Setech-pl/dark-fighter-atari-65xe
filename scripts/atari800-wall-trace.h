@@ -379,6 +379,9 @@ static unsigned dftrace_pickup_screenshot_frame = 0xffffffffu;
 static unsigned dftrace_pickup_visible_passes;
 static const char *dftrace_pickup_sequence_prefix;
 static unsigned dftrace_pickup_sequence_count;
+static const char *dftrace_pickup_traversal_prefix;
+static unsigned dftrace_pickup_traversal_count;
+static unsigned dftrace_pickup_traversal_last_y = 0xffffffffu;
 static unsigned dftrace_pickup_hunt_active_frames;
 static const char *dftrace_rapid_screenshot;
 static unsigned dftrace_rapid_screenshot_frame = 0xffffffffu;
@@ -889,6 +892,25 @@ static void dftrace_set_gameplay_input(unsigned frame)
 			else if (x > target + 3u)
 				stick = 0x0bu;
 			}
+		}
+	}
+	else if (strcmp(dftrace_policy, "pickup-observe") == 0) {
+		/* Earn the drop through normal play, then stay horizontally clear so
+		 * one production capsule can traverse the complete visible playfield. */
+		if (MEMORY_mem[dftrace_entity_state + 1u] == 2u) {
+			unsigned target = MEMORY_mem[dftrace_entity_x + 1u];
+			trigger = 1u;
+			if (target < 128u)
+				stick = x < 164u ? 0x07u : 0x0fu;
+			else
+				stick = x > 84u ? 0x0bu : 0x0fu;
+		}
+		else if (MEMORY_mem[dftrace_enemy_active] != 0) {
+			unsigned target = MEMORY_mem[dftrace_enemy_x];
+			if (x + 3u < target)
+				stick = 0x07u;
+			else if (x > target + 3u)
+				stick = 0x0bu;
 		}
 	}
 	else if (strcmp(dftrace_policy, "restart") == 0 &&
@@ -1631,6 +1653,7 @@ static void dftrace_init(void)
 #undef DFTRACE_ADDRESS
 	dftrace_pickup_screenshot = getenv("DFTRACE_PICKUP_SCREENSHOT");
 	dftrace_pickup_sequence_prefix = getenv("DFTRACE_PICKUP_SEQUENCE_PREFIX");
+	dftrace_pickup_traversal_prefix = getenv("DFTRACE_PICKUP_TRAVERSAL_PREFIX");
 	dftrace_rapid_screenshot = getenv("DFTRACE_RAPID_SCREENSHOT");
 	dftrace_spread_screenshot = getenv("DFTRACE_SPREAD_SCREENSHOT");
 	dftrace_pause_test_enabled = getenv("DFTRACE_PAUSE_TEST") != NULL;
@@ -1781,6 +1804,27 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		}
 		else
 			dftrace_pickup_visible_passes = 0u;
+		/* Traversal evidence follows the production slot even when an unrelated
+		 * explosion effect overlaps the same frame. Glyph-cell accounting still
+		 * proves that only one capsule footprint is resident. */
+		if (dftrace_pickup_traversal_prefix != NULL &&
+			*dftrace_pickup_traversal_prefix != '\0' &&
+			MEMORY_mem[dftrace_entity_state + 1u] == 2u &&
+			MEMORY_mem[dftrace_entity_active_mask] == 2u &&
+			(MEMORY_mem[dftrace_entity_drawn_mask + 1u] & 15u) == 15u &&
+			dftrace_pickup_traversal_count < 21u &&
+			MEMORY_mem[dftrace_entity_y + 1u] != dftrace_pickup_traversal_last_y) {
+			char path[1024];
+			snprintf(path, sizeof(path), "%s-%02u.png",
+				dftrace_pickup_traversal_prefix, dftrace_pickup_traversal_count);
+			if (!Screen_SaveScreenshot(path, 0)) {
+				fprintf(stderr, "darkfighter trace: pickup traversal screenshot failed: %s\n",
+					path);
+				exit(2);
+			}
+			dftrace_pickup_traversal_last_y = MEMORY_mem[dftrace_entity_y + 1u];
+			++dftrace_pickup_traversal_count;
+		}
 		if (dftrace_count != 0 &&
 			dftrace_frames[dftrace_count - 1].next_start_clock == 0u) {
 			DFTraceFrame *previous = &dftrace_frames[dftrace_count - 1];

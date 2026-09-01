@@ -109,13 +109,19 @@ counter.
 
 The current implementation creates a pickup after every third qualifying kill.
 The sequence is `Rapid Fire -> Spread Shot -> Shield -> Rapid Fire`; a new
-game always starts the sequence with Rapid Fire. A successful kill starts a
-30-frame hidden delay before the capsule becomes collectible. The current
-three-kill cadence describes shipped behavior, not accepted final balance; a
-separate owner-playtest tuning task is recorded in the roadmap.
+game always starts the sequence with Rapid Fire. A successful kill creates the
+capsule wholly above the playfield at Y=8. Its 30-frame PENDING delay, including
+any admission retry, remains at that off-screen coordinate. Admission publishes
+the capsule at the first fully visible position, Y=24; it then follows the
+existing near-ring cadence through Y=184 and releases its slot at Y=192. Thus
+PENDING cannot consume any collectible screen travel. The current three-kill
+cadence describes shipped behavior, not accepted final balance; a separate
+owner-playtest tuning task is recorded in the roadmap.
 
-Capsules are static, non-flickering 2x2-character objects that move with the
-world. Picking up the same active type refreshes it. Picking up another type
+Each type is one logical slot and one static, non-flickering 2x2-character
+visual footprint. It traverses every fully visible 8-scanline position from
+the top to the bottom of the playfield. Picking up the same active type
+refreshes it. Picking up another type
 replaces it, so Rapid Fire, Spread Shot, and Shield are mutually exclusive.
 Pause freezes
 their timers; life loss, Game Over, and New Game clear them; a live sector

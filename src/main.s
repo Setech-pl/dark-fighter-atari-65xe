@@ -8778,9 +8778,9 @@ erase_transient_effect_overlays:
     rts
 
 erase_interactive_entity_overlays:
-    ; The pickup remains composed until the late presentation boundary. Only
-    ; the ordinary slot-zero entity is removed at frame start. The main-loop
-    ; lifecycle guard has already removed an inactive resident capsule.
+    ; Remove both interactive layers at frame start. The pickup is remapped
+    ; from logical Y after A2 rotates, so its 1/2 cadence cannot inherit every
+    ; physical ring step or wrap into a second visual pass.
 @debris:
     lda ENTITY_SCREEN_HI
     beq @done
@@ -8800,13 +8800,13 @@ erase_interactive_entity_overlays:
     lda ENTITY_ACTIVE_MASK
     and #WEAPON_PICKUP_ACTIVE_MASK
     sta ENTITY_RENDERED_MASK
-    ; An active capsule stays in the same four physical A2 cells. A released
-    ; resident falls through and restores its backing at this safe boundary.
-    bne weapon_pickup_erase_done
+    ; Both branch paths deliberately restore the old physical footprint. The
+    ; active path is republished at its current logical row by the late render.
+    bne erase_weapon_pickup_overlay
 
-; Restore the exact last-rendered 2x2 footprint at frame-start release. Logical
-; X/Y and the A2 head may already describe a reset state; erase intentionally
-; uses only the four saved physical addresses and backing bytes.
+; Restore the exact last-rendered 2x2 footprint. Logical X/Y and the A2 head may
+; already describe another row or a reset state, so erase intentionally uses
+; only the four saved physical addresses and backing bytes.
 erase_weapon_pickup_overlay:
     ldx ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
     beq weapon_pickup_erase_done
@@ -8937,6 +8937,11 @@ profile_after_pickup_booster_update = *
 ; booster controller uses reserved slot-two fields, so one capsule may be
 ; earned and collected while the previous mutually exclusive booster runs.
 update_weapon_pickup_active:
+    cpx #WEAPON_PICKUP_STATE_PENDING
+    bne @motion
+    ; PENDING stays wholly above the display. Director retries may extend the
+    ; hidden delay, but they can no longer consume any collectible screen path.
+    jmp integration_pickup_pending_tick
 @motion:
     ; ANTIC has no sub-character vertical placement here. Follow the proven
     ; native A2/near-ring step instead of accumulating a rare independent
@@ -8954,12 +8959,8 @@ update_weapon_pickup_active:
     adc #ENTITY_DEBRIS_VY
     sta ENTITY_Y+WEAPON_PICKUP_SLOT
 @after_motion:
-    cpx #WEAPON_PICKUP_STATE_PENDING
-    bne :+
-    jmp integration_pickup_pending_tick
-:
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
-    cmp #(ENTITY_GAMEPLAY_BOTTOM-(WEAPON_PICKUP_HEIGHT_SCANLINES-8))
+    cmp #WEAPON_PICKUP_RELEASE_TOP
     bcc weapon_pickup_collide_player
     jmp weapon_pickup_release
 weapon_pickup_collide_player:
@@ -9046,14 +9047,15 @@ weapon_pickup_pending_tick:
     dec ENTITY_TIMER+WEAPON_PICKUP_SLOT
     bne weapon_pickup_collision_done
 integration_pickup_reveal_body:
+    ; Preserve the fixed resident layout while collapsing the former
+    ; kill-relative safe range to the one canonical top-entry coordinate.
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
-    cmp #WEAPON_PICKUP_SAFE_TOP
-    bcs :+
-    lda #WEAPON_PICKUP_SAFE_TOP
-:
-    cmp #(WEAPON_PICKUP_SAFE_BOTTOM+1)
-    bcc :+
-    lda #WEAPON_PICKUP_SAFE_BOTTOM
+    cmp #WEAPON_PICKUP_ACTIVATION_TOP
+    beq :+
+    lda #WEAPON_PICKUP_ACTIVATION_TOP
+    cmp #(WEAPON_PICKUP_ACTIVATION_TOP-1)
+    bne :+
+    lda #$00                    ; unreachable packed-layout sentinel
 :
     sta ENTITY_Y+WEAPON_PICKUP_SLOT
     lda #WEAPON_PICKUP_STATE_ACTIVE
@@ -9082,7 +9084,8 @@ weapon_pickup_record_qualified_kill:
     lda #(ENTITY_CORRIDOR_RIGHT_HPOS-WEAPON_PICKUP_WIDTH_HPOS)
 :
     sta ENTITY_X+WEAPON_PICKUP_SLOT
-    lda FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_ENEMY_SLOT
+    lda #WEAPON_PICKUP_SPAWN_TOP
+    nop                         ; keep the reviewed packed layout stable
     sta ENTITY_Y+WEAPON_PICKUP_SLOT
     lda #$00
     sta ENTITY_HP+WEAPON_PICKUP_SLOT
@@ -9680,8 +9683,8 @@ render_weapon_pickup_overlay:
     sta dst_ptr+1
     bne @draw_top
 @new:
-    ; ACTIVE is clamped into the viewport and released before an out-of-range
-    ; render, so the fixed slot needs no duplicate Y bounds checks.
+    ; ACTIVE enters at the top and releases before an out-of-range render. Map
+    ; from logical Y every frame because the physical A2 ring may have rotated.
     lda ENTITY_Y+WEAPON_PICKUP_SLOT
     sec
     sbc #ENTITY_GAMEPLAY_TOP
