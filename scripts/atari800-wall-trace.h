@@ -13,8 +13,12 @@
 
 #define DFTRACE_PAL_FRAME_CYCLES 35568u
 #define DFTRACE_GAMEPLAY_TOP 24u
-#define DFTRACE_RING_SCREEN 0x4050u
-#define DFTRACE_RING_END 0x43c0u
+#define DFTRACE_GAMEPLAY_BOTTOM 240u
+#define DFTRACE_PLAYER_MIN_Y 32u
+#define DFTRACE_PLAYER_MAX_Y 225u
+#define DFTRACE_RING_ROWS 27u
+#define DFTRACE_RING_SCREEN 0x8140u
+#define DFTRACE_RING_END 0x8578u
 #define DFTRACE_PICKUP_GLYPH_BASE 120u
 #define DFTRACE_ENGINE_ALLIED_GLYPH 83u
 #define DFTRACE_ENGINE_ENEMY_GLYPH 84u
@@ -27,7 +31,6 @@
 #define DFTRACE_ALLIED_FLASH_CODE 0x51u
 #define DFTRACE_ENEMY_FLASH_CODE 0xd2u
 #define DFTRACE_DIVIDER_SCREEN 0x4028u
-#define DFTRACE_SCREEN_END 0x4400u
 #define DFTRACE_CHARSET 0x4400u
 #define DFTRACE_PROFILE_COUNT 22u
 #define DFTRACE_PROFILE_DLI_COUNT 2u
@@ -424,6 +427,7 @@ static unsigned dftrace_next_dlist_lo;
 static const char *dftrace_engine_screenshot_prefix;
 static unsigned dftrace_engine_screenshot_count;
 static unsigned dftrace_engine_screenshot_generation;
+static unsigned dftrace_engine_screenshot_limit;
 static unsigned dftrace_gameplay_generation;
 static int dftrace_restart_game_over_seeded;
 static unsigned dftrace_previous_pc;
@@ -741,15 +745,20 @@ static unsigned dftrace_count_far_rendered(void)
 {
 	unsigned index;
 	unsigned count = 0;
-	for (index = 0; index < 24; ++index)
+	for (index = 0; index < 29; ++index)
 		if ((MEMORY_mem[dftrace_far_active + index] & 0x80u) != 0)
 			++count;
 	return count;
 }
 
-static int dftrace_pickup_screen_address_valid(unsigned address)
+static int dftrace_is_ring_address(unsigned address)
 {
 	return address >= DFTRACE_RING_SCREEN && address < DFTRACE_RING_END;
+}
+
+static int dftrace_pickup_screen_address_valid(unsigned address)
+{
+	return dftrace_is_ring_address(address);
 }
 
 static unsigned dftrace_pickup_glyph_cells(void)
@@ -902,9 +911,8 @@ static void dftrace_snapshot_rapid_projectile(DFTraceFrame *frame)
 			 * code: a later base/broadside glyph may occupy the same cell. */
 			if (frame->rapid_projectile_slot == 0xffffffffu ||
 				((frame->rapid_projectile_screen_code != 0x0fu ||
-				  frame->rapid_projectile_address < 0x4050u ||
-				  frame->rapid_projectile_address >= 0x43c0u) && screen_code == 0x0fu &&
-				 address >= 0x4050u && address < 0x43c0u)) {
+				  !dftrace_is_ring_address(frame->rapid_projectile_address)) &&
+				screen_code == 0x0fu && dftrace_is_ring_address(address))) {
 				frame->rapid_projectile_slot = slot;
 				frame->rapid_projectile_address = address;
 				frame->rapid_projectile_screen_code = screen_code;
@@ -932,7 +940,7 @@ static void dftrace_set_gameplay_input(unsigned frame)
 		unsigned slot;
 		unsigned target_owner = strcmp(dftrace_policy, "capital-contact-cylon") == 0;
 		unsigned target_x = 124u;
-		unsigned target_y = 184u;
+		unsigned target_y = DFTRACE_PLAYER_MAX_Y;
 		for (slot = 0u; slot < 3u; ++slot) {
 			unsigned state = MEMORY_mem[dftrace_broad_state + slot];
 			if ((state == 1u || state == 2u) &&
@@ -940,7 +948,7 @@ static void dftrace_set_gameplay_input(unsigned frame)
 				unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
 				target_y = shell_y > 7u ? shell_y - 7u : 40u;
 				if (target_y < 40u) target_y = 40u;
-				if (target_y > 184u) target_y = 184u;
+				if (target_y > DFTRACE_PLAYER_MAX_Y) target_y = DFTRACE_PLAYER_MAX_Y;
 				break;
 			}
 		}
@@ -952,6 +960,38 @@ static void dftrace_set_gameplay_input(unsigned frame)
 			stick &= 0x0eu;
 		else if (y + 1u < target_y)
 			stick &= 0x0du;
+	}
+	else if (strcmp(dftrace_policy, "vertical-boundary") == 0) {
+		static int reached_top;
+		trigger = 1u;
+		if (!reached_top) {
+			if (y > DFTRACE_PLAYER_MIN_Y)
+				stick = 0x0eu;
+			else
+				reached_top = 1;
+		}
+		if (reached_top && y < DFTRACE_PLAYER_MAX_Y)
+			stick = 0x0du;
+	}
+	else if (strcmp(dftrace_policy, "lower-contact-cylon") == 0) {
+		unsigned slot;
+		unsigned target_y = DFTRACE_PLAYER_MAX_Y;
+		trigger = 1u;
+		for (slot = 0u; slot < 3u; ++slot) {
+			unsigned state = MEMORY_mem[dftrace_broad_state + slot];
+			unsigned owner = MEMORY_mem[dftrace_broad_state + 3u + slot];
+			unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
+			if ((state == 1u || state == 2u) && owner == 1u && shell_y >= 191u) {
+				target_y = shell_y - 7u;
+				if (target_y > DFTRACE_PLAYER_MAX_Y)
+					target_y = DFTRACE_PLAYER_MAX_Y;
+				break;
+			}
+		}
+		if (y > target_y + 1u)
+			stick = 0x0eu;
+		else if (y + 1u < target_y)
+			stick = 0x0du;
 	}
 	else if (strcmp(dftrace_policy, "sweep") == 0 ||
 		strcmp(dftrace_policy, "broadside-proof") == 0) {
@@ -965,7 +1005,7 @@ static void dftrace_set_gameplay_input(unsigned frame)
 			(x > 98u ? 0x0bu : 0x0fu);
 		if (frame % 128u < 48u && y > 142u)
 			stick &= 0x0eu;
-		else if (frame % 128u >= 80u && y < 184u)
+		else if (frame % 128u >= 80u && y < DFTRACE_PLAYER_MAX_Y)
 			stick &= 0x0du;
 	}
 	else if (strcmp(dftrace_policy, "hunt") == 0) {
@@ -1005,6 +1045,8 @@ static void dftrace_set_gameplay_input(unsigned frame)
 	else if (strcmp(dftrace_policy, "pickup-observe") == 0) {
 		/* Earn the drop through normal play, then stay horizontally clear so
 		 * one production capsule can traverse the complete visible playfield. */
+		if (MEMORY_mem[dftrace_entity_state + 1u] != 0u)
+			trigger = 1u;
 		if (MEMORY_mem[dftrace_entity_state + 1u] == 2u) {
 			unsigned target = MEMORY_mem[dftrace_entity_x + 1u];
 			trigger = 1u;
@@ -1012,6 +1054,8 @@ static void dftrace_set_gameplay_input(unsigned frame)
 				stick = x < 164u ? 0x07u : 0x0fu;
 			else
 				stick = x > 84u ? 0x0bu : 0x0fu;
+			if (y < DFTRACE_PLAYER_MAX_Y)
+				stick &= 0x0du;
 		}
 		else if (MEMORY_mem[dftrace_enemy_active] != 0) {
 			unsigned target = MEMORY_mem[dftrace_enemy_x];
@@ -1019,6 +1063,12 @@ static void dftrace_set_gameplay_input(unsigned frame)
 				stick = 0x07u;
 			else if (x > target + 3u)
 				stick = 0x0bu;
+		}
+		if (MEMORY_mem[dftrace_entity_state + 1u] != 2u) {
+			if (y > 143u)
+				stick &= 0x0eu;
+			else if (y + 1u < 142u)
+				stick &= 0x0du;
 		}
 	}
 	else if (strcmp(dftrace_policy, "pickup-overlap") == 0) {
@@ -1220,11 +1270,11 @@ static void dftrace_snapshot_engine(DFTraceFrame *frame)
 		else if (MEMORY_mem[address] == DFTRACE_ENGINE_ENEMY_CODE)
 			++frame->engine_enemy_cells;
 	}
-	/* Count capital glyphs only in the 22 physical rows selected by the list
+	/* Count capital glyphs only in the physical rows selected by the list
 	 * ANTIC is currently displaying. The complete-ring engine counts above
 	 * intentionally include backing; these identify first final-raster hull
 	 * visibility for each character-colour bank instead. */
-	for (index = 0; index < 22u; ++index) {
+	for (index = 0; index < DFTRACE_RING_ROWS; ++index) {
 		unsigned row = MEMORY_mem[display_list_base + 7u + index * 3u] |
 			((unsigned) MEMORY_mem[display_list_base + 8u + index * 3u] << 8);
 		unsigned column;
@@ -1255,7 +1305,7 @@ static void dftrace_snapshot_engine(DFTraceFrame *frame)
 		((unsigned) MEMORY_mem[0x7f00u + frame->engine_active_dlist_lo + 8u] << 8);
 	for (index = 0; index < 8u; ++index) {
 		frame->engine_divider[index] = MEMORY_mem[0x4028u + index];
-		frame->engine_recycled[index] = MEMORY_mem[0x4398u + index];
+		frame->engine_recycled[index] = MEMORY_mem[DFTRACE_RING_END - 40u + index];
 	}
 }
 
@@ -1317,12 +1367,12 @@ static void dftrace_watch_recycled_write(DFTraceFrame *frame)
 	unsigned index;
 	if (!dftrace_recycled_previous_valid) {
 		for (index = 0; index < 40u; ++index)
-			dftrace_recycled_previous[index] = MEMORY_mem[0x4398u + index];
+			dftrace_recycled_previous[index] = MEMORY_mem[DFTRACE_RING_END - 40u + index];
 		dftrace_recycled_previous_valid = 1;
 		return;
 	}
 	for (index = 0; index < 40u; ++index) {
-		unsigned value = MEMORY_mem[0x4398u + index];
+		unsigned value = MEMORY_mem[DFTRACE_RING_END - 40u + index];
 		if (value != dftrace_recycled_previous[index]) {
 			/* The recycled physical row is written by rotate_playfield_rows before
 			 * the logical table changes. Ignore unrelated overlays: the diagnostic
@@ -1332,7 +1382,7 @@ static void dftrace_watch_recycled_write(DFTraceFrame *frame)
 				dftrace_previous_pc >= dftrace_pc_rotate_start &&
 				dftrace_previous_pc < dftrace_pc_rotate_end && index < 8u) {
 				frame->engine_first_recycled_write_pc = dftrace_previous_pc;
-				frame->engine_first_recycled_write_address = 0x4398u + index;
+				frame->engine_first_recycled_write_address = DFTRACE_RING_END - 40u + index;
 				frame->engine_first_recycled_write_old =
 					dftrace_recycled_previous[index];
 				frame->engine_first_recycled_write_new = value;
@@ -1466,7 +1516,7 @@ static unsigned dftrace_logical_row_address(unsigned row)
 {
 	if (row == 0u)
 		return DFTRACE_DIVIDER_SCREEN;
-	if (row > 22u)
+	if (row > DFTRACE_RING_ROWS)
 		return 0u;
 	return MEMORY_mem[dftrace_playfield_row_lo + row - 1u] |
 		(MEMORY_mem[dftrace_playfield_row_hi + row - 1u] << 8);
@@ -1515,7 +1565,14 @@ static void dftrace_snapshot_muzzles(DFTraceFrame *frame)
 		else if (pointer != 0u || row != 0u || frame->muzzle_domain[slot] != 0u)
 			++frame->muzzle_pointer_errors;
 	}
-	for (address = DFTRACE_DIVIDER_SCREEN; address < DFTRACE_SCREEN_END; ++address) {
+	for (address = DFTRACE_DIVIDER_SCREEN; address < DFTRACE_DIVIDER_SCREEN + 40u; ++address) {
+		if (!dftrace_is_hull_transient(MEMORY_mem[address]))
+			continue;
+		++frame->muzzle_code_cells;
+		if (address != frame->muzzle_pointer[0] && address != frame->muzzle_pointer[1])
+			++frame->muzzle_illegal_cells;
+	}
+	for (address = DFTRACE_RING_SCREEN; address < DFTRACE_RING_END; ++address) {
 		if (!dftrace_is_hull_transient(MEMORY_mem[address]))
 			continue;
 		++frame->muzzle_code_cells;
@@ -1538,7 +1595,7 @@ static void dftrace_snapshot_muzzles(DFTraceFrame *frame)
 		frame->broad_raster_row[slot] = 0xffffffffu;
 		if (pointer == DFTRACE_DIVIDER_SCREEN)
 			frame->broad_raster_row[slot] = 0u;
-		else for (display_row = 0u; display_row < 22u; ++display_row) {
+		else for (display_row = 0u; display_row < DFTRACE_RING_ROWS; ++display_row) {
 			unsigned base = 0x7f00u + dftrace_displayed_dlist_lo;
 			unsigned displayed_pointer = MEMORY_mem[base + 7u + display_row * 3u] |
 				((unsigned) MEMORY_mem[base + 8u + display_row * 3u] << 8);
@@ -1841,6 +1898,9 @@ static void dftrace_init(void)
 	dftrace_engine_screenshot_generation =
 		getenv("DFTRACE_ENGINE_SCREENSHOT_GENERATION") == NULL ? 1u :
 		dftrace_env_u("DFTRACE_ENGINE_SCREENSHOT_GENERATION");
+	dftrace_engine_screenshot_limit =
+		getenv("DFTRACE_ENGINE_SCREENSHOT_LIMIT") == NULL ? 150u :
+		dftrace_env_u("DFTRACE_ENGINE_SCREENSHOT_LIMIT");
 	if (dftrace_difficulty > 2) {
 		fprintf(stderr, "darkfighter trace: invalid difficulty %u\n", dftrace_difficulty);
 		exit(2);
@@ -2095,8 +2155,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 				(rapid.rapid_projectile_screen_code & 0x80u) == 0u &&
 				rapid.rapid_projectile_screen_code >= 11u &&
 				rapid.rapid_projectile_screen_code < 47u &&
-				rapid.rapid_projectile_address >= 0x4050u &&
-				rapid.rapid_projectile_address < 0x43c0u) {
+				dftrace_is_ring_address(rapid.rapid_projectile_address)) {
 				if (!Screen_SaveScreenshot(dftrace_rapid_screenshot, 0)) {
 					fprintf(stderr, "darkfighter trace: Rapid Fire screenshot failed: %s\n",
 						dftrace_rapid_screenshot);
@@ -2182,7 +2241,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 			MEMORY_mem[dftrace_entity_state + 1u] == 2u &&
 			MEMORY_mem[dftrace_entity_active_mask] == 2u &&
 			(MEMORY_mem[dftrace_entity_drawn_mask + 1u] & 15u) == 15u &&
-			dftrace_pickup_traversal_count < 21u &&
+			dftrace_pickup_traversal_count < DFTRACE_RING_ROWS &&
 			((MEMORY_mem[dftrace_entity_y + 1u] - DFTRACE_GAMEPLAY_TOP) & 7u) == 0u &&
 			MEMORY_mem[dftrace_entity_y + 1u] != dftrace_pickup_traversal_last_y) {
 			char path[1024];
@@ -2306,7 +2365,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		if (dftrace_engine_screenshot_prefix != NULL &&
 			*dftrace_engine_screenshot_prefix != '\0' &&
 			dftrace_gameplay_generation == dftrace_engine_screenshot_generation &&
-			dftrace_engine_screenshot_count < 150u) {
+			dftrace_engine_screenshot_count < dftrace_engine_screenshot_limit) {
 			char path[1024];
 			snprintf(path, sizeof(path), "%s-%03u.png",
 				dftrace_engine_screenshot_prefix, dftrace_engine_screenshot_count);

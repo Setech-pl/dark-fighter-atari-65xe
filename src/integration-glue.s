@@ -8,8 +8,8 @@ DIRECTOR_REQUEST = $9EA7
 DIRECTOR_RELEASE = $9F23
 DIRECTOR_HAZARD_DEBRIS = 1
 ENTITY_REPEAT_SPAWN_DELAY = 64
-entity_spawn_debris = $98E4
-entity_despawn_debris = $99F8
+entity_spawn_debris = $98FF
+entity_despawn_debris = $9A13
 .segment "GLUE"
 .export integration_director_world_row, integration_debris_spawn, integration_debris_release
 integration_director_world_row:

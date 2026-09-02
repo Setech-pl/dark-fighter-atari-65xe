@@ -59,6 +59,7 @@ import {
 import { packBroadsideLzss, unpackBroadsideLzss } from "../scripts/broadside-lzss.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
+import { canonicalPlayfield } from "../scripts/playfield.mjs";
 import {
   createBroadsideAcceptanceSequencePreview,
   createBroadsideCadenceSequencePreview,
@@ -117,8 +118,8 @@ function createLinkedRuntimeMemory() {
   installRuntimeSegments(memory, rootDirectory);
   const rowLo = labels.get("PLAYFIELD_ROW_LO");
   const rowHi = labels.get("PLAYFIELD_ROW_HI");
-  for (let row = 0; row < 22; row += 1) {
-    const address = 0x4050 + row * 40;
+  for (let row = 0; row < canonicalPlayfield.ringRows; row += 1) {
+    const address = canonicalPlayfield.ringBufferAddress + row * 40;
     memory[rowLo + row] = address & 0xff;
     memory[rowHi + row] = address >> 8;
   }
@@ -511,7 +512,7 @@ test("assembled fractional cadence makes hull movement 100% of the legacy world 
     difficultyAddress + 1 & 0xff, difficultyAddress + 1 >> 8])), -1);
 });
 
-test("tracked muzzle records replace the 23-row redraw scan without changing scroll cadence", () => {
+test("tracked muzzle records replace the full-row redraw scan without changing scroll cadence", () => {
   const update = routine("update_starfield", "generate_corridor_row");
   const worldRing = routine("scroll_world_columns", "init_playfield_display_lists");
   const hullCopy = routine("scroll_hull_columns", "update_sector_state");
@@ -555,10 +556,13 @@ test("assembled muzzle records preserve backing and complete the full visible li
   const turretFired = labels.get("BROAD_TURRET_FIRED");
   const destination = labels.get("dst_ptr");
   const gameplayScreen = 0x4028;
+  const logicalAddress = (row) => row === 0 ? gameplayScreen :
+    memory[labels.get("PLAYFIELD_ROW_LO") + row - 1] |
+      memory[labels.get("PLAYFIELD_ROW_HI") + row - 1] << 8;
   const alliedColumn = 8;
   const enemyColumn = 31;
 
-  for (let row = 0; row < 23; row += 1) {
+  for (let row = 0; row < canonicalPlayfield.gameplayRows; row += 1) {
     memory[leftBacking + row] = 0x10 + row;
     memory[rightBacking + row] = 0x30 + row;
   }
@@ -586,15 +590,15 @@ test("assembled muzzle records preserve backing and complete the full visible li
 
   memory[turretFired] = 1;
   memory[turretFired + 1] = 1;
-  for (let row = 1; row < 23; row += 1) {
+  for (let row = 1; row < canonicalPlayfield.gameplayRows; row += 1) {
     runAssembledRoutine(memory, "restore_active_muzzles");
     runAssembledRoutine(memory, "advance_tracked_muzzles");
     assert.deepEqual([memory[muzzleRow], memory[muzzleRow + 1]], [row, row]);
     assert.deepEqual([memory[muzzleDomain], memory[muzzleDomain + 1]], [1, 1]);
     assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8,
-      gameplayScreen + row * 40 + alliedColumn);
+      logicalAddress(row) + alliedColumn);
     assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
-      gameplayScreen + row * 40 + enemyColumn);
+      logicalAddress(row) + enemyColumn);
   }
   runAssembledRoutine(memory, "reset_exited_turret_lifecycles");
   assert.deepEqual([memory[turretFired], memory[turretFired + 1]], [1, 1]);
@@ -652,14 +656,18 @@ test("fixed divider muzzles and launch flashes remap without trails through repe
     memory[broadRowHi + slot] << 8;
   const transientCounts = () => {
     const counts = new Map([...muzzleCodes, ...flashCodes].map((code) => [code, 0]));
-    for (let address = divider; address < 0x4400; address += 1) {
-      if (counts.has(memory[address])) counts.set(memory[address], counts.get(memory[address]) + 1);
-    }
+    for (const [start, end] of [
+      [divider, divider + canonicalPlayfield.screenColumns],
+      [canonicalPlayfield.ringBufferAddress, canonicalPlayfield.ringBufferEnd],
+    ]) for (let address = start; address < end; address += 1) {
+        if (counts.has(memory[address])) counts.set(memory[address], counts.get(memory[address]) + 1);
+      }
     return counts;
   };
 
-  memory.fill(0, divider, 0x4400);
-  for (let row = 0; row < 23; row += 1) {
+  memory.fill(0, divider, divider + canonicalPlayfield.screenColumns);
+  memory.fill(0, canonicalPlayfield.ringBufferAddress, canonicalPlayfield.ringBufferEnd);
+  for (let row = 0; row < canonicalPlayfield.gameplayRows; row += 1) {
     memory[leftBacking + row] = 0x11;
     memory[rightBacking + row] = 0x22;
   }
@@ -685,7 +693,7 @@ test("fixed divider muzzles and launch flashes remap without trails through repe
     }
     if (lifecycle === 0) runAssembledRoutine(memory, "render_launch_flashes");
 
-    for (let row = 1; row <= 23; row += 1) {
+    for (let row = 1; row <= canonicalPlayfield.gameplayRows; row += 1) {
       const oldPointers = [trackedAddress(0), trackedAddress(1)];
       runAssembledRoutine(memory, "scroll_world_columns");
       for (const [slot, pointer] of oldPointers.entries()) {
@@ -705,7 +713,7 @@ test("fixed divider muzzles and launch flashes remap without trails through repe
         for (let slot = 0; slot < 2; slot += 1)
           runAssembledRoutine(memory, "advance_broadside_row", { x: slot });
       }
-      if (row < 23) {
+      if (row < canonicalPlayfield.gameplayRows) {
         assert.deepEqual(Array.from(memory.subarray(muzzleDomain, muzzleDomain + 2)), [1, 1]);
         assert.deepEqual([trackedAddress(0), trackedAddress(1)],
           columns.map((column) => logicalAddress(row) + column));
@@ -752,21 +760,31 @@ test("hybrid world ring and hull-only copy preserve every logical row and both h
     ? gameplayScreen
     : memory[rowLo + row - 1] | memory[rowHi + row - 1] << 8;
   const fillScreen = (memory) => {
-    for (let row = 0; row < 23; row += 1) {
+    const snapshot = new Uint8Array(canonicalPlayfield.gameplayRows * 40);
+    for (let row = 0; row < canonicalPlayfield.gameplayRows; row += 1) {
+      const address = logicalAddress(memory, row);
       for (let column = 0; column < 40; column += 1) {
-        memory[gameplayScreen + row * 40 + column] = (row * 41 + column * 7 + 3) & 0xff;
+        const value = (row * 41 + column * 7 + 3) & 0xff;
+        memory[address + column] = value;
+        snapshot[row * 40 + column] = value;
       }
       memory[leftBacking + row] = 0x20 + row;
       memory[rightBacking + row] = 0x60 + row;
     }
-    return Uint8Array.from(memory.subarray(gameplayScreen, gameplayScreen + 23 * 40));
+    return snapshot;
   };
+  const snapshotScreen = (memory) => Uint8Array.from(
+    { length: canonicalPlayfield.gameplayRows * 40 }, (_, index) => {
+      const row = Math.floor(index / 40);
+      return memory[logicalAddress(memory, row) + index % 40];
+    },
+  );
 
   const corridorMemory = createLinkedRuntimeMemory();
   const corridorBefore = fillScreen(corridorMemory);
   corridorMemory[0x4ea5] = 0;
   runAssembledRoutine(corridorMemory, "scroll_world_columns");
-  for (let row = 1; row < 23; row += 1) {
+  for (let row = 1; row < canonicalPlayfield.gameplayRows; row += 1) {
     const address = logicalAddress(corridorMemory, row);
     for (let column = 8; column <= 31; column += 1) {
       assert.equal(corridorMemory[address + column],
@@ -780,7 +798,7 @@ test("hybrid world ring and hull-only copy preserve every logical row and both h
   const completeBefore = fillScreen(completeMemory);
   completeMemory[0x4ea5] = 6;
   runAssembledRoutine(completeMemory, "scroll_world_columns");
-  for (let row = 1; row < 23; row += 1) {
+  for (let row = 1; row < canonicalPlayfield.gameplayRows; row += 1) {
     const address = logicalAddress(completeMemory, row);
     for (let column = 0; column < 40; column += 1) {
       assert.equal(completeMemory[address + column],
@@ -793,7 +811,7 @@ test("hybrid world ring and hull-only copy preserve every logical row and both h
   completeDispatchMemory[labels.get("CAPITAL_SECTOR_STATE")] = 6;
   completeDispatchMemory[labels.get("PLAYFIELD_RING_FLAGS")] = 0;
   runAssembledRoutine(completeDispatchMemory, "scroll_hull_columns");
-  for (let row = 1; row < 23; row += 1) {
+  for (let row = 1; row < canonicalPlayfield.gameplayRows; row += 1) {
     const address = logicalAddress(completeDispatchMemory, row);
     for (let column = 0; column < 40; column += 1) {
       assert.equal(completeDispatchMemory[address + column],
@@ -810,7 +828,7 @@ test("hybrid world ring and hull-only copy preserve every logical row and both h
   alreadyRotatedMemory[labels.get("PLAYFIELD_RING_FLAGS")] = 1;
   runAssembledRoutine(alreadyRotatedMemory, "scroll_hull_columns");
   assert.deepEqual(
-    alreadyRotatedMemory.subarray(gameplayScreen, gameplayScreen + 23 * 40),
+    snapshotScreen(alreadyRotatedMemory),
     alreadyRotatedBefore,
     "a near-layer world step must not rotate the complete-state ring twice",
   );
@@ -821,15 +839,15 @@ test("hybrid world ring and hull-only copy preserve every logical row and both h
   hullMemory[0x4ea5] = 0;
   hullMemory[labels.get("corridor_phase")] = 32;
   runAssembledRoutine(hullMemory, "scroll_hull_columns");
-  for (let row = 1; row < 23; row += 1) {
+  for (let row = 1; row < canonicalPlayfield.gameplayRows; row += 1) {
     for (const column of [0, 1, 6, 7, 32, 33, 38, 39]) {
-      assert.equal(hullMemory[gameplayScreen + row * 40 + column],
+      assert.equal(hullMemory[logicalAddress(hullMemory, row) + column],
         hullBefore[(row - 1) * 40 + column], `hull ${row},${column}`);
     }
   }
 });
 
-test("HUD and divider LMS remain fixed for every one of the 22 ring heads", () => {
+test("HUD and divider LMS remain fixed for every canonical ring head", () => {
   const memory = createLinkedRuntimeMemory();
   const rowLo = labels.get("PLAYFIELD_ROW_LO");
   const rowHi = labels.get("PLAYFIELD_ROW_HI");
@@ -838,7 +856,7 @@ test("HUD and divider LMS remain fixed for every one of the 22 ring heads", () =
   runAssembledRoutine(memory, "init_playfield_row_table");
   runAssembledRoutine(memory, "init_playfield_display_lists");
 
-  for (let head = 0; head < 22; head += 1) {
+  for (let head = 0; head < canonicalPlayfield.ringRows; head += 1) {
     const list = 0x7f00 | memory[activeListLo];
     assert.deepEqual(Array.from(memory.subarray(list, list + 6)), [
       0xc2, 0x00, 0x40,
@@ -846,19 +864,22 @@ test("HUD and divider LMS remain fixed for every one of the 22 ring heads", () =
     ], `head ${head} must keep HUD=$4000 and divider=$4028`);
 
     const addresses = [];
-    for (let row = 0; row < 22; row += 1) {
+    for (let row = 0; row < canonicalPlayfield.ringRows; row += 1) {
       const offset = list + 6 + row * 3;
-      assert.equal(memory[offset], row === 21 ? 0xc4 : 0x44,
+      assert.equal(memory[offset], row === canonicalPlayfield.ringRows - 1 ? 0xc4 : 0x44,
         `head ${head}, row ${row} mode`);
       const address = memory[offset + 1] | memory[offset + 2] << 8;
       addresses.push(address);
       assert.equal(address, memory[rowLo + row] | memory[rowHi + row] << 8,
         `head ${head}, row ${row} mapper/list mismatch`);
     }
-    assert.equal(new Set(addresses).size, 22, `head ${head} duplicates a ring row`);
-    assert.deepEqual(addresses, Array.from({ length: 22 }, (_, row) =>
-      0x4050 + ((row - head + 22) % 22) * 40));
-    assert.deepEqual(Array.from(memory.subarray(list + 72, list + 75)),
+    assert.equal(new Set(addresses).size, canonicalPlayfield.ringRows,
+      `head ${head} duplicates a ring row`);
+    assert.deepEqual(addresses, Array.from({ length: canonicalPlayfield.ringRows }, (_, row) =>
+      canonicalPlayfield.ringBufferAddress +
+        ((row - head + canonicalPlayfield.ringRows) % canonicalPlayfield.ringRows) * 40));
+    const jumpOffset = list + 6 + canonicalPlayfield.ringRows * 3;
+    assert.deepEqual(Array.from(memory.subarray(jumpOffset, jumpOffset + 3)),
       [0x41, list & 0xff, 0x7f]);
 
     const oldDlistl = memory[dlistl];
@@ -988,10 +1009,10 @@ test("muzzle tracking resets with a new sector/game but survives a same-sector l
 test("provisional PAL scheduler emits three staggered Cylon cycles without simultaneous starts", () => {
   const corrected = simulateBroadsideCadence(asset, { frames: 1000 });
   assert.deepEqual(corrected.warningStats, {
-    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 96,
+    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 68,
   });
   assert.deepEqual(corrected.launchStats, {
-    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 96,
+    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 68,
   });
   assert.equal(corrected.maximumStartsPerFrame, 1);
   assert.equal(corrected.cancelledWarnings, 0);
@@ -1130,6 +1151,20 @@ test("assembled Colonial and Cylon shells share raster-aligned player collision 
     /jsr capital_shell_hits_player[\s\S]+jsr capital_shell_hits_enemy/);
   assert.doesNotMatch(shared, /\b(?:COLPF|COLPM|MUZZLE)[A-Z0-9_]*\b/,
     "owner-independent contact cannot be inferred from colour or renderer addresses");
+});
+
+test("assembled Colonial and Cylon shells damage the Viper at the recovered lower boundary", () => {
+  for (const owner of [0, 1]) {
+    const contact = prepareAssembledCapitalPlayerContact({
+      owner,
+      shellX: owner === 0 ? 122 : 132,
+      shellY: 230,
+      playerY: 225,
+    });
+    runAssembledRoutine(contact.memory, "update_broadside");
+    assert.equal(contact.memory[contact.broadState], BROADSIDE_STATES.IMPACT);
+    assert.equal(contact.memory[contact.constants.get("BROAD_PLAYER_HEALTH")], 8);
+  }
 });
 
 test("assembled capital-shell edges use the final 16-HPOS Viper raster and near misses stay clear", () => {
@@ -1518,7 +1553,7 @@ test("death decrements one life and respawns atomically at canonical corridor ce
   }
   assert.equal(advancePlayerLifecycle(state, asset), "respawn");
   assert.deepEqual([state.playerX, state.playerY], [PLAYER_RESPAWN_X, PLAYER_RESPAWN_Y]);
-  assert.deepEqual([PLAYER_RESPAWN_X, PLAYER_RESPAWN_Y], [124, 184]);
+  assert.deepEqual([PLAYER_RESPAWN_X, PLAYER_RESPAWN_Y], [124, 225]);
   assert.equal(state.health, 100);
   assert.equal(state.playerLifecycle, PLAYER_LIFECYCLE_STATES.RESPAWN_INVULNERABLE);
   assert.equal(state.respawnInvulnerabilityTimer, 250);
@@ -1552,7 +1587,7 @@ test("respawn is invulnerable for exactly 250 controlled blinking PAL frames", (
       assert.equal(result, "alive");
     }
   }
-  assert.ok(positions.every(([x, y]) => x === 124 && y === 184));
+  assert.ok(positions.every(([x, y]) => x === 124 && y === PLAYER_RESPAWN_Y));
   assert.deepEqual(visibility.slice(0, 16), [
     true, true, true, true, true, true, true, true,
     false, false, false, false, false, false, false, false,
@@ -1616,7 +1651,7 @@ test("expiry clears captured and hardware collision latches before restoring ALI
   assert.ok(containsBytes(bytes, [0xa9, 124, 0x85, labels.get("player_x")]));
   assert.ok(containsBytes(bytes, [0x8d, 0x00, 0xd0]));
   assert.ok(containsBytes(bytes, [0x8d, 0x03, 0xd0]));
-  assert.ok(containsBytes(bytes, [0xa9, 184, 0x85, labels.get("player_y")]));
+  assert.ok(containsBytes(bytes, [0xa9, PLAYER_RESPAWN_Y, 0x85, labels.get("player_y")]));
   assert.ok(containsBytes(bytes, [0xa9, 250, 0x8d,
     0xac, 0x4e]));
 });
@@ -1688,7 +1723,7 @@ test("respawn evidence is source-derived across centered passes, real contacts, 
     "REAL LEFT CONTACT  ONE LIFE EVENT",
     "REAL RIGHT CONTACT  ONE LIFE EVENT",
     "DEATH FRAME 006  PLAYER HIDDEN",
-    "RESPAWN FRAME 000  X124 Y184",
+    "RESPAWN FRAME 000  X124 Y225",
     "INVULN FRAME 007  VISIBLE M0 ACTIVE",
     "INVULN FRAME 008  HIDDEN M0 ACTIVE",
     "INVULN FRAME 249  LAST PROTECTED",
@@ -1777,7 +1812,7 @@ test("cadence preview plots source-derived warning, launch, and world-scroll tim
   assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [3, 3]);
   assert.deepEqual(
     [state.final.warningStats.minimumGap, state.final.warningStats.averageGap],
-    [68, 96],
+    [68, 68],
   );
   assert.ok(state.final.warningScrolls.some(({ frame }) => frame % 4 === 0));
 

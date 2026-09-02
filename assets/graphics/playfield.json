@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "activeImageTop": 8,
+  "hudRows": 1,
+  "dividerRows": 1,
+  "ringRows": 27,
+  "screenColumns": 40,
+  "leftHpos": 48,
+  "ringBufferAddress": 33088
+}

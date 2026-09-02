@@ -7,6 +7,7 @@ import zlib from "node:zlib";
 import { parseViceLabels } from "./runtime-cycles.mjs";
 import { LOADER_DISPLAY_LIST_ADDRESS } from "./loader-assets.mjs";
 import { runtimeArtifactSet, runtimeArtifactNames } from "./runtime-evidence.mjs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -14,6 +15,8 @@ const buildDirectory = path.join(rootDirectory, "build", "runtime-wall-trace");
 const reportPath = path.join(rootDirectory, "docs", "runtime-wall-trace.json");
 const headerPath = path.join(scriptDirectory, "atari800-wall-trace.h");
 const PAL_FRAME_CYCLES = 35_568;
+const RING_SCREEN = canonicalPlayfield.ringBufferAddress;
+const RING_END = canonicalPlayfield.ringBufferEnd;
 const HISTORICAL_PHYSICAL_GATE_CYCLES = 31_568;
 const ENTITY_EFFECTS_BASELINE_WALL_CYCLES = 31_440;
 const ENTITY_EFFECTS_BASELINE_HEADROOM_CYCLES = 4_128;
@@ -236,6 +239,25 @@ const engineRestartSessions = ["XEX", "ATR"].map((medium) => ({
   kind: "engine-restart-after-game-over",
   engineScreenshotGeneration: 2,
 }));
+
+const lowerPlayfieldSessions = [{
+  id: "lower-playfield-xex-hard",
+  medium: "XEX",
+  difficulty: 2,
+  policy: "vertical-boundary",
+  fireDelay: 4_000,
+  frames: 420,
+  kind: "lower-playfield-boundary",
+}, {
+  id: "lower-playfield-cylon-contact-xex-hard",
+  medium: "XEX",
+  difficulty: 2,
+  policy: "lower-contact-cylon",
+  fireDelay: 4_000,
+  frames: 1_200,
+  kind: "lower-playfield-contact",
+  contactOwner: 1,
+}];
 
 const traceLabels = {
   DFTRACE_PC_ACTIVE: "main_loop_option_poll",
@@ -1302,7 +1324,7 @@ function main() {
       ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
       ...weaponPickupTraversalSessions, ...weaponPickupContactSessions,
       ...capitalMuzzleSessions, ...provisionalCapitalSessions, ...capitalContactSessions,
-      ...memoryIntegritySessions]
+      ...memoryIntegritySessions, ...lowerPlayfieldSessions]
       .concat(engineDiagnosticSessions, engineRestartSessions)
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
   if (onlySession !== undefined) {
@@ -1321,7 +1343,8 @@ function main() {
         ? path.join(buildDirectory, `${session.id}-muzzle`) : undefined;
     const provisionalEntryPrefix = session.kind === "provisional-capital-cold"
       ? path.join(buildDirectory, `${session.id}-entry`) : undefined;
-    const capitalContactPrefix = session.kind === "capital-projectile-contact"
+    const capitalContactPrefix = session.kind === "capital-projectile-contact" ||
+      session.kind === "lower-playfield-contact"
       ? path.join(buildDirectory, `${session.id}-frame`) : undefined;
     if (pickupContactPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(pickupContactPrefix);
@@ -1332,6 +1355,13 @@ function main() {
     }
     if (muzzleScreenshotPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(muzzleScreenshotPrefix);
+      for (const name of fs.readdirSync(buildDirectory)) {
+        if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
+          fs.unlinkSync(path.join(buildDirectory, name));
+      }
+    }
+    if (session.kind === "weapon-pickup-traversal" && !reuseExistingTraces) {
+      const basename = path.basename(pickupTraversalPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
         if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
           fs.unlinkSync(path.join(buildDirectory, name));
@@ -1383,6 +1413,10 @@ function main() {
       }),
 	  ...(session.kind === "engine-first-150" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
+	  } : {}),
+	  ...(session.kind === "lower-playfield-boundary" ? {
+	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
+	    DFTRACE_ENGINE_SCREENSHOT_LIMIT: String(session.frames),
 	  } : {}),
 	  ...(provisionalEntryPrefix === undefined ? {} : {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: provisionalEntryPrefix,
@@ -1803,7 +1837,7 @@ function main() {
   }
   if (smokeFrames === null && sessionsToRun.some(({ kind }) => kind === "weapon-pickup-traversal")) {
     const traversalPaths = [];
-    for (let index = 0; index < 21; ++index) {
+    for (let index = 0; index < canonicalPlayfield.ringRows; ++index) {
       const framePath = `${pickupTraversalPrefix}-${index.toString().padStart(2, "0")}.png`;
       invariant(fs.existsSync(framePath),
         `Atari800 did not capture pickup traversal position ${index}`);
@@ -1811,36 +1845,136 @@ function main() {
     }
     const traversalRows = allRows.filter(({ trace_kind: kind }) =>
       kind === "weapon-pickup-traversal");
-    const pendingRows = traversalRows.filter(({ pickup_state: state }) => state === 1);
-    const activeRows = traversalRows.filter(({ pickup_state: state }) => state === 2);
-    const expectedY = Array.from({ length: 84 }, (_, index) => 24 + index * 2);
+    const firstActiveIndex = traversalRows.findIndex(({ pickup_state: state }) => state === 2);
+    invariant(firstActiveIndex > 0, "Native pickup never entered ACTIVE");
+    const pendingRows = traversalRows.slice(0, firstActiveIndex)
+      .filter(({ pickup_state: state }) => state === 1);
+    const activeRows = traversalRows.slice(firstActiveIndex)
+      .slice(0, traversalRows.slice(firstActiveIndex)
+        .findIndex(({ pickup_state: state }) => state !== 2));
+    const expectedY = Array.from({ length: 108 }, (_, index) => 24 + index * 2);
     invariant(pendingRows.length > 0 && pendingRows.every(({ pickup_y: y }) => y === 8),
       "Native PENDING moved through visible playfield before activation");
-    invariant(activeRows.length === 84 &&
+    invariant(activeRows.length === expectedY.length &&
       JSON.stringify([...new Set(activeRows.map(({ pickup_y: y }) => y))]) ===
         JSON.stringify(expectedY),
     "Native pickup did not traverse every Hard-mode raster position at +2 scanlines/frame");
     invariant(activeRows.every((row) => row.entity_active_mask === 2 &&
-      row.pickup_drawn_mask === 15 && row.pickup_footprints_after === 1 &&
+      row.pickup_drawn_mask === (row.pickup_render_row === 26 ? 3 : 15) &&
+      row.pickup_footprints_after === 1 &&
       row.pickup_glyph_cells_after ===
-        (row.pickup_render_phase === 0 || row.pickup_render_row >= 20 ? 4 : 6) &&
+        (row.pickup_render_row === 26 ? 2 :
+          row.pickup_render_phase === 0 || row.pickup_render_row >= 25 ? 4 : 6) &&
       row.pickup_draw_calls === 1),
     "Native pickup did not remain one logical slot and one phased 2x2/2x3 footprint");
     invariant(activeRows.slice(1).every((row) => Array.from({ length: 6 }, (_, index) => {
       const address = row[`pickup_old_address${index}`];
-      return address < 0x4050 || address >= 0x43c0 ||
+      return address < RING_SCREEN || address >= RING_END ||
         row[`pickup_old_after_erase${index}`] === row[`pickup_old_backing${index}`];
     }).every(Boolean)),
     "Native reverse erase did not restore every exact saved physical cell");
     const releaseRow = traversalRows.find(({ frame }) => frame === activeRows.at(-1).frame + 1);
-    invariant(releaseRow?.pickup_state === 0 && releaseRow.pickup_y === 192 &&
+    invariant(releaseRow?.pickup_state === 0 && releaseRow.pickup_y === 240 &&
       releaseRow.entity_active_mask === 0 && releaseRow.pickup_drawn_mask === 0 &&
       releaseRow.pickup_footprints_after === 0,
     "Native pickup slot was not released cleanly at the lower boundary");
     // The exact one-footprint and position assertions above come from the
-    // production screen codes. These 21 native PNGs retain the complete final
+    // production screen codes. These 27 native PNGs retain the complete final
     // raster, including legitimate stars/effects that can cross the 16x16 box.
     writeScreenshotContact(traversalPaths, pickupTraversalContactPath, 7);
+    const evidencePath = path.join(buildDirectory, "weapon-pickup-traversal-evidence.json");
+    const maximumWall = Math.max(...traversalRows.map((row) => row.wall_cycles));
+    fs.writeFileSync(evidencePath, `${JSON.stringify({
+      session: "weapon-pickup-traversal-2-observe-fire4",
+      emulator: "Atari800 7.1.2 PAL/XL",
+      production_artifact: path.relative(rootDirectory, xexPath),
+      first_complete_traversal: {
+        active_frames: activeRows.length,
+        first_y: activeRows[0].pickup_y,
+        last_y: activeRows.at(-1).pickup_y,
+        release_y: releaseRow.pickup_y,
+        maximum_logical_slots: Math.max(...activeRows.map((row) => row.entity_active)),
+        maximum_final_footprints: Math.max(...activeRows.map((row) =>
+          row.pickup_footprints_after)),
+        final_draws_per_frame: [...new Set(activeRows.map((row) => row.pickup_draw_calls))],
+      },
+      complete_traversals_observed: traversalRows.filter((row, index) =>
+        index !== 0 && row.pickup_state === 0 && traversalRows[index - 1].pickup_state === 2 &&
+        row.pickup_y === canonicalPlayfield.gameplayBottom).length,
+      timing: {
+        maximum_wall_cycles: maximumWall,
+        pal_headroom: PAL_FRAME_CYCLES - maximumWall,
+        missed_frames: traversalRows.reduce((sum, row) => sum + row.missed_frames, 0),
+        deadline_overruns: traversalRows.filter((row) =>
+          row.wall_cycles > PAL_FRAME_CYCLES).length,
+        extra_vbi_boundaries: traversalRows.reduce((sum, row) =>
+          sum + row.extra_vbi_boundaries, 0),
+      },
+      screenshot_sequence: path.relative(rootDirectory, pickupTraversalContactPath),
+      raw_trace: path.relative(rootDirectory,
+        path.join(buildDirectory, "weapon-pickup-traversal-2-observe-fire4.csv")),
+      passed: true,
+    }, null, 2)}\n`);
+  }
+  if (smokeFrames === null && sessionsToRun.some(({ kind }) =>
+    kind === "lower-playfield-boundary")) {
+    const rows = allRows.filter(({ trace_kind: kind }) => kind === "lower-playfield-boundary");
+    const top = rows.reduce((selected, row) => row.player_y < selected.player_y ? row : selected);
+    const returnedBottom = rows.find((row) => row.frame > top.frame &&
+      row.player_y === canonicalPlayfield.gameplayBottom - 15);
+    invariant(top.player_y === 32 && returnedBottom !== undefined &&
+      rows.every((row) => row.player_y >= 32 &&
+        row.player_y <= canonicalPlayfield.gameplayBottom - 15),
+    "Native joystick replay did not reach both opaque-Viper-safe PAL clamps");
+    invariant(rows.every((row) => row.far_rendered > 0 && row.missed_frames === 0 &&
+      row.extra_vbi_boundaries === 0 && row.dli_sequence_violations === 0) &&
+      rows.some((row) => row.active_muzzles > 0) && rows.some((row) => row.broadside > 0),
+    "Lower-playfield replay lost stars, timing, or the capital encounter");
+    const selectedFrames = [0, top.frame, returnedBottom.frame, 407, rows.at(-1).frame];
+    const selectedPaths = selectedFrames.map((frame) => path.join(buildDirectory,
+      `lower-playfield-xex-hard-${String(frame).padStart(3, "0")}.png`));
+    invariant(selectedPaths.every((screenshotPath) => fs.existsSync(screenshotPath)),
+      "Lower-playfield replay is missing a selected native raster");
+    const sheetPath = path.join(buildDirectory, "lower-playfield-boundary-sequence.png");
+    writeScreenshotContact(selectedPaths, sheetPath, 5);
+    const evidencePath = path.join(buildDirectory, "lower-playfield-boundary-evidence.json");
+    fs.writeFileSync(evidencePath, `${JSON.stringify({
+      session: "lower-playfield-xex-hard",
+      emulator: "Atari800 7.1.2 PAL/XL",
+      production_artifact: path.relative(rootDirectory, xexPath),
+      canonical_raster: {
+        hud: [canonicalPlayfield.hudTop, canonicalPlayfield.hudBottom - 1],
+        divider: [canonicalPlayfield.gameplayTop, canonicalPlayfield.entityTop - 1],
+        ring: [canonicalPlayfield.entityTop, canonicalPlayfield.gameplayBottom - 1],
+        bottom_exclusive: canonicalPlayfield.gameplayBottom,
+      },
+      viper: {
+        minimum_pmg_y: top.player_y,
+        minimum_frame: top.frame,
+        maximum_pmg_y: returnedBottom.player_y,
+        returned_maximum_frame: returnedBottom.frame,
+        lowest_opaque_scanline: returnedBottom.player_y + 14,
+      },
+      stars: {
+        minimum_visible_records: Math.min(...rows.map((row) => row.far_rendered)),
+        maximum_visible_records: Math.max(...rows.map((row) => row.far_rendered)),
+      },
+      capital: {
+        maximum_active_muzzles: Math.max(...rows.map((row) => row.active_muzzles)),
+        maximum_active_broadside: Math.max(...rows.map((row) => row.broadside)),
+      },
+      timing: {
+        maximum_wall_cycles: Math.max(...rows.map((row) => row.wall_cycles)),
+        pal_headroom: PAL_FRAME_CYCLES - Math.max(...rows.map((row) => row.wall_cycles)),
+        missed_frames: rows.reduce((sum, row) => sum + row.missed_frames, 0),
+        extra_vbi_boundaries: rows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0),
+      },
+      screenshot_sequence: path.relative(rootDirectory, sheetPath),
+      selected_frames: selectedFrames,
+      raw_trace: path.relative(rootDirectory,
+        path.join(buildDirectory, "lower-playfield-xex-hard.csv")),
+      passed: true,
+    }, null, 2)}\n`);
   }
   if (smokeFrames !== null) {
     console.log(`Observer smoke completed: ${smokeFrames} gameplay frames`);
@@ -2188,7 +2322,7 @@ function main() {
     // the other three cells must contain their expected pickup glyphs and the
     // replacement must be an effect-bank screen code.
     const validIndexes = addresses.flatMap((address, index) =>
-      address >= 0x4050 && address < 0x43c0 ? [index] : []);
+      address >= RING_SCREEN && address < RING_END ? [index] : []);
     const mismatches = validIndexes.flatMap((index) => {
       const value = row[`pickup_new_after_draw${index}`];
       const expected = (row.pickup_render_id + index) & 0xff;
@@ -2231,7 +2365,7 @@ function main() {
     (row.rapid_projectile_screen_code & 0x80) === 0 &&
       row.rapid_projectile_screen_code >= 11 &&
       row.rapid_projectile_screen_code < 47 &&
-      row.rapid_projectile_address >= 0x4050 && row.rapid_projectile_address < 0x43c0);
+      row.rapid_projectile_address >= RING_SCREEN && row.rapid_projectile_address < RING_END);
   const rapidScreenshotRow = rapidProjectileVisibleRows.find((row) =>
     row.rapid_projectiles >= 3 && row.effect_active_count === 0);
   const spreadScreenshotRow = spreadVolleyRows.find((row) => row.effect_active_count === 0);

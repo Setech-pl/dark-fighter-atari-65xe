@@ -1,12 +1,5 @@
 {
   "formatVersion": 1,
-  "viewport": {
-    "activeImageTop": 8,
-    "hudRows": 1,
-    "gameplayRows": 23,
-    "screenColumns": 40,
-    "leftHpos": 48
-  },
   "glyphLayout": {
     "viperBase": 11,
     "raiderBase": 90

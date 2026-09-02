@@ -1,10 +1,5 @@
 {
   "formatVersion": 1,
-  "coordinateSystem": {
-    "gameplayTopScanline": 24,
-    "gameplayBottomExclusive": 200,
-    "logicalRows": 22
-  },
   "pools": {
     "interactiveSlots": 4,
     "interactiveActiveLimit": 2,
@@ -99,9 +94,6 @@
     "fineMotionDenominator": 5,
     "verticalPhaseCount": 8,
     "maximumFootprintRows": 3,
-    "spawnTopScanline": 8,
-    "activationTopScanline": 24,
-    "releaseTopScanline": 192,
     "widthHpos": 8,
     "heightScanlines": 16,
     "glyphs": [

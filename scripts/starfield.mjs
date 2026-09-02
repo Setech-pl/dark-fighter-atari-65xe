@@ -1,7 +1,8 @@
 import fs from "node:fs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
-const SCREEN_COLUMNS = 40;
-const GAMEPLAY_ROWS = 23;
+const SCREEN_COLUMNS = canonicalPlayfield.screenColumns;
+const GAMEPLAY_ROWS = canonicalPlayfield.gameplayRows;
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);

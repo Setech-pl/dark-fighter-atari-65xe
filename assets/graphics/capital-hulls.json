@@ -318,7 +318,6 @@
   "sector": {
     "moduleRows": 8,
     "sidePhaseRows": 8,
-    "visibleRows": 23,
     "previewSectorRow": 78,
     "engineAnimationFrames": 8,
     "launchFlashFrames": 4,

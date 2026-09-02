@@ -77,31 +77,31 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
     /boot_stage_streams:[\s\S]+a2_kernel_source:[\s\S]+entity_packed_source:[\s\S]+pickup_packed_source:[\s\S]+resident_packed_source:[\s\S]+starfield_packed_source:/,
     "pickup must be preserved after A2/ENTITY sources and before resident staging overwrites $8C80");
   const resident = fs.readFileSync(path.join(root, "build/resident-runtime.bin"));
-  assert.deepEqual([...resident.subarray(0x40, 0x46)], [0x20, 0x8f, 0x21, 0x20, 0x9e, 0x9a]);
+  assert.deepEqual([...resident.subarray(0x40, 0x46)], [0x20, 0x8f, 0x21, 0x20, 0xb9, 0x9a]);
 });
 
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
-  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12770);
-  assert.equal(manifest.transportCapacity.initialBootBytes, 12800);
-  assert.equal(manifest.transportCapacity.totalTransportSectors, 157);
-  assert.equal(manifest.transportCapacity.totalTransportBytes, 20096);
+  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12797);
+  assert.equal(manifest.transportCapacity.initialBootBytes, 12928);
+  assert.equal(manifest.transportCapacity.totalTransportSectors, 158);
+  assert.equal(manifest.transportCapacity.totalTransportBytes, 20224);
   assert.equal(manifest.transportCapacity.stage2.bytes, 1191);
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [101, 44, 5579, 6557, 0x5e10],
-    [145, 7, 857, 857, 0x8c80],
-    [152, 1, 41, 39, 0x5259],
-    [153, 5, 585, 645, 0x9d75],
+    [102, 44, 5581, 6557, 0x5e10],
+    [146, 7, 873, 873, 0x8c80],
+    [153, 1, 41, 39, 0x5259],
+    [154, 5, 585, 645, 0x9d75],
   ]);
-  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16949);
+  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16989);
   assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18787);
   assert.equal(manifest.encounterDirector.safeResidencyBytes, 3400);
 });
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {
   assert.equal(a2.length, 255);
-  assert.equal(sha256(a2), "af34b94a729a2bfd2e86f32dff1360f18dda835b04be5723fb7e4e38fbca76ce");
+  assert.equal(sha256(a2), "71891e0ce4ff6ce72ebdc02cb49bad9ed1fe51825e2fcf279e8e6b5dc010c3d6");
   for (const artifact of ["xex", "atr"]) for (const fill of [0xa5, 0x5a]) {
     const staged = stageArtifact(artifact, fill);
     assert.equal(sha256(staged.sourceA2), sha256(a2), `${artifact} staged A2`);

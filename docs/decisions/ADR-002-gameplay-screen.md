@@ -11,7 +11,8 @@ consume too much RAM and make smooth scrolling harder on a stock 65XE.
 ## Decision
 
 - The fixed HUD and divider use ANTIC 2 with a dedicated RAM charset.
-- The 22-row scrolling playfield uses ANTIC 4 with a separate gameplay charset.
+- The 27-row scrolling ring uses ANTIC 4 with a separate gameplay charset; a
+  fixed divider row above it completes the 28-row gameplay raster.
 - The playfield palette is black, cold white/steel, amber/yellow, and a switched
   red/burgundy bank.
 - P0 and P3 form the Viper; P1 is the Raider and P2 its red scanner.

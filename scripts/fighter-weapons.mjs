@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -54,12 +55,15 @@ function binaryMask(value, name) {
 }
 
 export function loadFighterWeaponsDefinition(sourcePath) {
-  const definition = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+  const definition = {
+    ...JSON.parse(fs.readFileSync(sourcePath, "utf8")),
+    viewport: canonicalPlayfield,
+  };
   invariant(definition.formatVersion === 1, "Unsupported fighter-weapons formatVersion");
   const viewport = definition.viewport;
   integer(viewport?.activeImageTop, "viewport.activeImageTop", 0, 32);
   integer(viewport?.hudRows, "viewport.hudRows", 1, 4);
-  integer(viewport?.gameplayRows, "viewport.gameplayRows", 1, 24);
+  integer(viewport?.gameplayRows, "viewport.gameplayRows", 1, 32);
   invariant(viewport.screenColumns === 40, "Gameplay viewport must remain 40 columns");
   invariant(viewport.leftHpos === 48, "Gameplay HPOS origin must remain 48");
 

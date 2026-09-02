@@ -138,7 +138,8 @@ game always starts the sequence with Rapid Fire. A successful kill creates the
 capsule wholly above the playfield at Y=8. Its 30-frame PENDING delay, including
 any admission retry, remains at that off-screen coordinate. Admission publishes
 the capsule at the first fully visible position, Y=24; it then crosses every
-scanline phase through Y=190 and releases its slot at exactly Y=192. Thus
+scanline phase through the last visible scanline Y=239 and releases its slot at
+the exclusive boundary Y=240. Thus
 PENDING cannot consume any collectible screen travel. The current three-kill
 cadence describes shipped behavior, not accepted final balance; a separate
 owner-playtest tuning task is recorded in the roadmap.
@@ -153,6 +154,17 @@ transparent PMG pixels reveal the capsule until the single accepted collection
 removes it. Picking up the same active type
 refreshes it. Picking up another type
 replaces it, so Rapid Fire, Spread Shot, and Shield are mutually exclusive.
+
+## Canonical gameplay raster
+
+`assets/graphics/playfield.json` is the single source for the PAL gameplay
+boundary. The HUD occupies scanlines 8-15, the fixed divider 16-23, and the
+rotating entity field 24-239; gameplay therefore ends exclusively at Y=240.
+The Viper may move from PMG Y=32 through Y=225. Its body/engine union has
+non-transparent rows 0-14, so the lowest legal opaque pixel is exactly Y=239.
+Stars, fighter and capital projectiles, pickups, debris, ordinary enemies,
+rendering, collision, and culling all consume this same boundary. No transient
+may use HUD/divider memory as ring backing.
 Pause freezes
 their timers; life loss, Game Over, and New Game clear them; a live sector
 transition preserves them.

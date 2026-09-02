@@ -1,3 +1,5 @@
+import { canonicalPlayfield } from "./playfield.mjs";
+
 export const BROADSIDE_STATES = Object.freeze({ FREE: 0, WARNING: 1, FLYING: 2, IMPACT: 3 });
 export const BROADSIDE_OWNERS = Object.freeze({ allied: 0, enemy: 1 });
 export const MISSILE_MASKS = Object.freeze([0x03, 0x0c, 0x30, 0xc0]);
@@ -12,8 +14,8 @@ export const HULL_SCROLL_DIFFICULTIES = Object.freeze({
 export const PMG_LEFT_EDGE = 48;
 export const PMG_SCREEN_TOP = 8;
 export const GAMEPLAY_FIRST_HULL_ROW = 1;
-export const GAMEPLAY_HULL_ROWS = 23;
-export const BROADSIDE_WARNING_Y_MAX = 191;
+export const GAMEPLAY_HULL_ROWS = canonicalPlayfield.gameplayRows;
+export const BROADSIDE_WARNING_Y_MAX = canonicalPlayfield.gameplayBottom - 9;
 export const CAPITAL_SECTOR_STATES = Object.freeze({
   ENGINES: 0,
   AFT: 1,
@@ -31,7 +33,7 @@ export const PLAYER_LIFECYCLE_STATES = Object.freeze({
   GAME_OVER: 3,
 });
 export const PLAYER_RESPAWN_X = 124;
-export const PLAYER_RESPAWN_Y = 184;
+export const PLAYER_RESPAWN_Y = canonicalPlayfield.gameplayBottom - 15;
 export const SHARED_FIGHTER_EXPLOSION_TOTAL = 24;
 
 function invariant(condition, message) {

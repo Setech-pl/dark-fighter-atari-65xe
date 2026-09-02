@@ -14,6 +14,7 @@ import {
   loadFighterWeaponsDefinition,
 } from "../scripts/fighter-weapons.mjs";
 import { compileEnemyRoster, loadEnemyRosterDefinition } from "../scripts/enemy-roster.mjs";
+import { canonicalPlayfield } from "../scripts/playfield.mjs";
 import {
   assertWeaponPickupTraceParity,
   executeHudPresentationTrace,
@@ -92,7 +93,7 @@ test("Rapid Fire owns fixed slot one without extending BSS or physical pools", (
     maximumFootprintRows: 3,
     spawnTopScanline: 8,
     activationTopScanline: 24,
-    releaseTopScanline: 192,
+    releaseTopScanline: 240,
     widthHpos: 8,
     heightScanlines: 16,
     glyphs: [
@@ -214,7 +215,7 @@ test("pending is hidden and non-colliding for thirty full frames after Raider br
 });
 
 test("every booster type enters at the top, crosses the full playfield once and releases below it", () => {
-  const expectedPositions = Array.from({ length: 84 }, (_, index) => 24 + index * 2);
+  const expectedPositions = Array.from({ length: 108 }, (_, index) => 24 + index * 2);
   const summarize = ({ traces }) => traces.map((trace) => ({
     name: trace.name,
     created: [trace.created.state, trace.created.y, trace.created.activeMask,
@@ -240,7 +241,7 @@ test("every booster type enters at the top, crosses the full playfield once and 
     assert.deepEqual(trace.visibleStates, ["2:2:1"]);
     assert.equal(trace.maximumLogicalSlots, 1);
     assert.equal(trace.maximumVisualFootprints, 1);
-    assert.deepEqual(trace.released, [0, 192, 0, 0, 0],
+    assert.deepEqual(trace.released, [0, 240, 0, 0, 0],
       `${trace.name} must release immediately below its last fully visible position`);
   }
   assert.equal(new Set(xex.map(({ visibleFrames }) => visibleFrames)).size, 1,
@@ -287,13 +288,15 @@ test("pickup movement resolves half world speed into smooth scanline phases", ()
 });
 
 test("debris and the reserved pickup coexist without allocator overwrite for every A2 head", () => {
-  for (let head = 0; head < 22; head += 1) {
+  for (let head = 0; head < canonicalPlayfield.ringRows; head += 1) {
     const trace = executeWeaponPickupTrace({ root, artifact: "xex", head, coexistDebris: true });
     const firstActive = trace.records.find(({ phase }) => phase === "ACTIVE");
     assert.deepEqual([firstActive.activeMask, firstActive.activeCount], [3, 2]);
     const logicalRow = Math.floor((firstActive.y - 24) / 8);
-    const expectedRow = 0x4050 + ((head + logicalRow) % 22) * 40;
-    const expectedBottomRow = 0x4050 + ((head + logicalRow + 1) % 22) * 40;
+    const expectedRow = canonicalPlayfield.ringBufferAddress +
+      ((head + logicalRow) % canonicalPlayfield.ringRows) * 40;
+    const expectedBottomRow = canonicalPlayfield.ringBufferAddress +
+      ((head + logicalRow + 1) % canonicalPlayfield.ringRows) * 40;
     assert.ok(firstActive.screenAddress >= expectedRow && firstActive.screenAddress + 1 < expectedRow + 40);
     assert.ok(firstActive.bottomScreenAddress >= expectedBottomRow &&
       firstActive.bottomScreenAddress + 1 < expectedBottomRow + 40);
@@ -305,7 +308,7 @@ test("debris and the reserved pickup coexist without allocator overwrite for eve
 });
 
 test("four-cell backing restores byte-exact data in reverse layer order at every A2 head", () => {
-  for (let head = 0; head < 22; head += 1) {
+  for (let head = 0; head < canonicalPlayfield.ringRows; head += 1) {
     const xex = executeWeaponPickupBackingTrace({ root, artifact: "xex", head });
     const atr = executeWeaponPickupBackingTrace({ root, artifact: "atr", head });
     assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
@@ -324,7 +327,7 @@ test("four-cell backing restores byte-exact data in reverse layer order at every
 });
 
 test("reverse erase restores every 2x2/2x3 phase across the A2 wrap", () => {
-  for (const head of [0, 21]) {
+  for (const head of [0, canonicalPlayfield.ringRows - 1]) {
     for (let phase = 0; phase < 8; phase += 1) {
       const trace = executeWeaponPickupBackingTrace({
         root, artifact: "xex", head, y: 104 + phase,
@@ -421,15 +424,16 @@ test("one logical footprint survives repeated ring wraps and cannot return after
   });
   assert.deepEqual(summarize(atr), summarize(xex));
   assert.ok(xex.wrapCount >= 6);
-  assert.equal(xex.records.length, 84);
+  assert.equal(xex.records.length, 108);
   assert.equal(xex.records.every((record) => record.exactReverseErase &&
-    record.capsuleCells === (record.thirdScreenAddress === 0 ? 4 : 6) &&
+    record.capsuleCells === (record.bottomScreenAddress === 0 ? 2 :
+      record.thirdScreenAddress === 0 ? 4 : 6) &&
     record.capsuleFootprints === record.logicalSlots &&
     record.logicalSlots === 1 && record.finalDrawCalls === 1), true);
   assert.deepEqual([
     xex.releasedState, xex.releasedY, xex.activeMask, xex.activeCount,
     xex.cellsAtRelease, xex.cellsAfterAdditionalWraps,
-  ], [0, 192, 0, 0, 0, 0]);
+  ], [0, 240, 0, 0, 0, 0]);
 });
 
 test("EASY MEDIUM and HARD preserve their rates without full-row raster jumps", () => {
@@ -444,7 +448,7 @@ test("EASY MEDIUM and HARD preserve their rates without full-row raster jumps", 
       assert.equal(deltas.slice(index, index + 5).reduce((sum, value) => sum + value, 0),
         rate, `difficulty ${difficulty} changed its five-frame travel`);
     }
-    assert.deepEqual([trace.records[0].y, trace.releasedY], [24, 192]);
+    assert.deepEqual([trace.records[0].y, trace.releasedY], [24, 240]);
   }
 });
 
@@ -635,10 +639,10 @@ test("packed runtime distinguishes 8-shot normal, 10-shot Rapid and 8-salvo Spre
     mode.maximumPoolOccupancy,
   ]);
   assert.deepEqual(summary, [
-    ["NORMAL", 8, 3, 12, 8, 8, 21, 8],
-    ["RAPID", 10, 2, 12, 10, 10, 30, 10],
-    ["SPREAD", 8, 10, 12, 8, 24, 24, 9],
-    ["SHIELD", 8, 3, 12, 8, 8, 21, 8],
+    ["NORMAL", 8, 3, 12, 8, 8, 21, 9],
+    ["RAPID", 10, 2, 12, 10, 10, 25, 10],
+    ["SPREAD", 8, 10, 12, 8, 20, 20, 10],
+    ["SHIELD", 8, 3, 12, 8, 8, 21, 9],
   ]);
   const firstBurstFrames = (mode) => mode.records
     .filter(({ allocatedProjectiles }) => allocatedProjectiles > 0)

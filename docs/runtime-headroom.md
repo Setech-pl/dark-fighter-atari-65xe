@@ -187,6 +187,25 @@ steady-state volley as three projectiles and keeps the tenth slot reserved.
 
 ## Evidence pipeline and method
 
+## Focused full-height playfield checkpoint
+
+The candidate-only lower-playfield replay extends the safe gameplay raster to
+scanline 239 without running the full release gauntlet. A 420-frame native XEX
+joystick replay reaches PMG Y=32 and Y=225, shows far stars and the capital
+encounter throughout the recovered rows, and peaks at 24,569 wall cycles
+(10,999 cycles PAL headroom). A separate 1,200-frame lower Cylon-contact replay
+records a real hit with player PMG Y=199 and peaks at 24,734 cycles (10,834
+headroom). The 1,800-frame native pickup traversal covers two complete Y=24 to
+Y=238 passes and release at Y=240; its focused maximum is 29,216 cycles (6,352
+headroom). All three traces have zero missed frames, deadline overruns, extra
+VBI boundaries, and DLI-order violations.
+
+This checkpoint changes linked executable bytes by +40 versus `d94702b2`:
+main CODE -14 B, ENTITY_CODE +27 B, and PICKUP_CODE +27 B. RODATA and the
+256-byte persistent entity/Director BSS are unchanged. The post-loader screen
+workspace grows by 220 B: +200 B for five ring rows, +10 B for row pointers,
+and +10 B for hull boundary backing. No glyphs are added.
+
 Runtime evidence has four explicit phases:
 
 1. `npm run build:candidate` creates current packed artifacts and marks the

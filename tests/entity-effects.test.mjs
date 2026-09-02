@@ -11,6 +11,7 @@ import {
 } from "../scripts/entity-effects.mjs";
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import { installBootArtifact, installRuntimeSegments } from "../scripts/runtime-image.mjs";
+import { canonicalPlayfield } from "../scripts/playfield.mjs";
 import {
   assertDebrisDestructionTraceParity,
   assertRaiderBreakupTraceParity,
@@ -206,9 +207,9 @@ function runRoutineTrace(memory, name, watchedNames) {
 }
 
 function initialiseRows(memory, head = 0) {
-  for (let logical = 0; logical < 22; logical += 1) {
-    const physical = (head + logical) % 22;
-    const address = 0x4050 + physical * 40;
+  for (let logical = 0; logical < canonicalPlayfield.ringRows; logical += 1) {
+    const physical = (head + logical) % canonicalPlayfield.ringRows;
+    const address = canonicalPlayfield.ringBufferAddress + physical * 40;
     memory[addresses.rowLo + logical] = address & 0xff;
     memory[addresses.rowHi + logical] = address >> 8;
   }
@@ -223,7 +224,7 @@ function initialiseEntity(memory, { x = 124, y = 24 } = {}) {
   memory[addresses.vy] = 8;
   memory[addresses.renderId] = manifest.entityEffects.glyphIndex ?? 110;
   memory[addresses.playerX] = 196;
-  memory[addresses.playerY] = 184;
+  memory[addresses.playerY] = canonicalPlayfield.gameplayBottom - 15;
   memory[addresses.playerLifecycle] = 0;
   memory[addresses.sectorState] = 0;
 }
@@ -504,8 +505,8 @@ test("$A5 and $5A cold RAM are fully and identically initialised for XEX and ATR
 });
 
 test("all four 2x1 debris phases map both cells through every logical row and A2 ring head", () => {
-  for (let head = 0; head < 22; head += 1) {
-    for (let logical = 0; logical < 22; logical += 1) {
+  for (let head = 0; head < canonicalPlayfield.ringRows; head += 1) {
+    for (let logical = 0; logical < canonicalPlayfield.ringRows; logical += 1) {
       for (const glyphOffset of [0, 2, 4, 6]) {
         const memory = createRuntimeMemory();
         initialiseRows(memory, head);
@@ -514,7 +515,8 @@ test("all four 2x1 debris phases map both cells through every logical row and A2
         memory[addresses.renderId] = manifest.entityEffects.glyphIndex + glyphOffset;
         runRoutine(memory, "entity_effects_render");
         const pointer = memory[addresses.screenLo] | memory[addresses.screenHi] << 8;
-        const expectedRow = 0x4050 + ((head + logical) % 22) * 40;
+        const expectedRow = canonicalPlayfield.ringBufferAddress +
+          ((head + logical) % canonicalPlayfield.ringRows) * 40;
         assert.equal(pointer, expectedRow + 19,
           `glyph ${glyphOffset}, head ${head}, logical ${logical} mapped outside its ring row`);
         assert.equal(memory[pointer], manifest.entityEffects.glyphIndex + glyphOffset);
@@ -522,14 +524,15 @@ test("all four 2x1 debris phases map both cells through every logical row and A2
         assert.equal(memory[addresses.drawnMask], 3);
         assert.ok(pointer + 1 <= expectedRow + 39,
           "both cells crossed a physical row boundary");
-        assert.ok(pointer >= 0x4050 && pointer <= 0x43bf);
+        assert.ok(pointer >= canonicalPlayfield.ringBufferAddress &&
+          pointer < canonicalPlayfield.ringBufferEnd);
       }
     }
   }
 });
 
 test("divider and HUD coordinates cannot render or collide", () => {
-  for (const y of [8, 15, 16, 23, 200, 255]) {
+  for (const y of [8, 15, 16, 23, 240, 255]) {
     const memory = createRuntimeMemory();
     initialiseRows(memory);
     initialiseEntity(memory, { x: 124, y });
@@ -623,7 +626,7 @@ test("X, Y and tumbling phase change only on WORLD_ROW_ADVANCED", () => {
     assert.equal(memory[addresses.x], event < 4 ? 124 : 128);
     assert.equal(memory[addresses.moveAccumulator], event < 4 ? event : 0);
   }
-  memory[addresses.y] = 192;
+  memory[addresses.y] = canonicalPlayfield.gameplayBottom - 8;
   memory[addresses.verticalAccumulator] = 2;
   const xBeforeDespawn = memory[addresses.x];
   const phaseBeforeDespawn = memory[addresses.renderId];
@@ -854,7 +857,7 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
     transition[addresses.rng], transition[addresses.spawnPhase],
   ], [0, 64, 101, 0]);
 
-  transition[addresses.sectorDrainRows] = 23;
+  transition[addresses.sectorDrainRows] = canonicalPlayfield.gameplayRows;
   transition.fill(0, addresses.broadsideState, addresses.broadsideState + 3);
   transition.fill(0, addresses.broadsideFlashTimer, addresses.broadsideFlashTimer + 3);
   transition.fill(0, addresses.capitalExplosionTimer, addresses.capitalExplosionTimer + 2);
@@ -862,7 +865,7 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
   runRoutine(transition, "update_sector_completion");
   assert.deepEqual([
     transition[addresses.sectorState], transition[addresses.spawnTimerHi],
-  ], [6, 22]);
+  ], [6, canonicalPlayfield.ringRows]);
   transition[addresses.spawnTimer] = 1;
   runRoutine(transition, "entity_effects_update");
   assert.deepEqual([
@@ -870,7 +873,7 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
     transition[addresses.rng],
   ], [0, 64, 101], "COMPLETE must defer without consuming entity RNG");
 
-  for (let row = 1; row <= 21; row += 1) {
+  for (let row = 1; row < canonicalPlayfield.ringRows; row += 1) {
     runRoutine(transition, "scroll_world_columns");
     assert.equal(transition[addresses.sectorState], 6,
       `COMPLETE ended before reconstruction row ${row + 1}`);
@@ -884,7 +887,7 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
   "OPEN must re-arm normal delay without clearing the pool or consuming RNG");
   const postReconstructionStarRng = transition[addresses.starfieldRng];
   assert.notEqual(postReconstructionStarRng, 0xa7,
-    "22 normal ring rotations must retain normal starfield RNG progression");
+    "one complete ring reconstruction must retain normal starfield RNG progression");
   for (let frame = 1; frame <= 31; frame += 1) {
     runRoutine(transition, "entity_effects_update");
     assert.equal(transition[addresses.activeMask], 0,
@@ -919,12 +922,13 @@ test("pause, new game, life loss, full sector transition and Game Over preserve 
 
 test("phase and position changes preserve backing across A2 ring wrap without ghosts", () => {
   const memory = createRuntimeMemory();
-  initialiseRows(memory, 21);
+  initialiseRows(memory, canonicalPlayfield.ringRows - 1);
   initialiseEntity(memory, { x: 140, y: 24 });
   memory[addresses.vx] = 4;
   memory[addresses.moveAccumulator] = 3;
   memory[addresses.renderId] = manifest.entityEffects.glyphIndex;
-  const oldCell = 0x4050 + 21 * 40 + 23;
+  const oldCell = canonicalPlayfield.ringBufferAddress +
+    (canonicalPlayfield.ringRows - 1) * 40 + 23;
   memory[oldCell] = 0x91;
   memory[oldCell + 1] = 0x92;
   runRoutine(memory, "entity_effects_render");
@@ -946,7 +950,7 @@ test("phase and position changes preserve backing across A2 ring wrap without gh
     memory[addresses.x], memory[addresses.y], memory[addresses.renderId],
     memory[addresses.moveAccumulator],
   ], [144, 32, manifest.entityEffects.glyphIndex + 2, 0]);
-  const newCell = 0x4050 + 40 + 24;
+  const newCell = canonicalPlayfield.ringBufferAddress + 40 + 24;
   memory[newCell] = 0x66;
   memory[newCell + 1] = 0x67;
   runRoutine(memory, "entity_effects_render");
@@ -1885,7 +1889,7 @@ test("backed overlay stack restores base, shell/projectile, entity and effect in
     const memory = createRuntimeMemory();
     initialiseRows(memory);
     initialiseEntity(memory, { x: 124, y: 24 });
-    const cell = 0x4050 + 19;
+    const cell = canonicalPlayfield.ringBufferAddress + 19;
     const base = 0x0a;
     const baseRight = 0x0b;
     memory[cell] = base;

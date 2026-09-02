@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 const SIDES = ["allied", "enemy"];
 const SIDE_IDS = new Map([["allied", 0], ["enemy", 1]]);
@@ -178,7 +179,11 @@ export function decodePackedHullMap(packed, codebook, segmentRows) {
 }
 
 export function loadCapitalHullsDefinition(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const definition = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  return {
+    ...definition,
+    sector: { ...definition.sector, visibleRows: canonicalPlayfield.gameplayRows },
+  };
 }
 
 function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes) {
@@ -187,7 +192,7 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
   invariant(source.moduleRows === 8, "Capital hull modules must contain eight character rows");
   invariant(Number.isInteger(source.sidePhaseRows) && source.sidePhaseRows >= 0 &&
     source.sidePhaseRows <= 16, "sector.sidePhaseRows must be a bounded row offset");
-  invariant(source.visibleRows === 23, "The compact gameplay viewport must expose 23 hull rows");
+  invariant(source.visibleRows === 28, "The PAL gameplay viewport must expose 28 hull rows");
   invariant(Number.isInteger(source.previewSectorRow) && source.previewSectorRow >= source.visibleRows &&
     source.previewSectorRow < 240, "sector.previewSectorRow must expose a complete visible ship span");
   invariant(Number.isInteger(source.engineAnimationFrames) &&

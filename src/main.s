@@ -178,10 +178,13 @@ BROAD_STATE_END             = BROAD_VISIBLE_SCROLLS+$01
 DIFFICULTY_SETTING          = BROAD_STATE_END        ; 1 B, persists across frontend states
 FRONTEND_PERSISTENT_END     = DIFFICULTY_SETTING+$01
 HULL_SCROLL_ACCUMULATOR     = FRONTEND_PERSISTENT_END
-CORRIDOR_BOUNDARY_ROWS      = 23
-CORRIDOR_BOUNDARY_LEFT      = HULL_SCROLL_ACCUMULATOR+$01 ; 23 B star backing
+CORRIDOR_BOUNDARY_ROWS      = CAPITAL_HULL_VISIBLE_ROWS
+; The original 23+23 bytes remain a compatibility hole so every following
+; resident-state address stays fixed. Expanded boundary backing lives beside
+; the high-RAM ring tables after cold staging.
+CORRIDOR_BOUNDARY_LEFT      = PLAYFIELD_RING_STATE_END
 CORRIDOR_BOUNDARY_RIGHT     = CORRIDOR_BOUNDARY_LEFT+CORRIDOR_BOUNDARY_ROWS
-BROAD_TURRET_FIRED          = CORRIDOR_BOUNDARY_RIGHT+CORRIDOR_BOUNDARY_ROWS
+BROAD_TURRET_FIRED          = HULL_SCROLL_ACCUMULATOR+$2F
 BROAD_FLASH_TIMER           = BROAD_TURRET_FIRED+CAPITAL_HULL_TURRET_COUNT ; 3 B
 CAPITAL_SECTOR_STATE        = BROAD_FLASH_TIMER+$03
 CAPITAL_SECTOR_DRAIN_ROWS   = CAPITAL_SECTOR_STATE+$01
@@ -211,8 +214,9 @@ GAMEPLAY_RESIDENT_END       = ENEMY_PENDING_SOURCE+$01
 ; Sparse far stars are decorative overlays above the authoritative near-layer
 ; cells.  Their row is logical and their column physical within that row, so a
 ; 50%-rate LMS rotation cannot accidentally drag the independent 25%-rate
-; layer.  The existing four byte arrays keep the state footprint unchanged.
-STAR_FAR_ACTIVE              = $54CA
+; layer. The expanded population moves into the released-loader gap below
+; $5000 rather than growing back into STARFIELD code at $552A.
+STAR_FAR_ACTIVE              = $4F25
 STAR_FAR_ROW                 = STAR_FAR_ACTIVE+STAR_FAR_CAPACITY
 STAR_FAR_COLUMN              = STAR_FAR_ROW+STAR_FAR_CAPACITY
 STAR_FAR_CODE                = STAR_FAR_COLUMN+STAR_FAR_CAPACITY
@@ -283,15 +287,15 @@ SESSION_SCORE_STATE_END      = TOP_SCORE_TABLE_END
 .include "fighter-weapons.inc"
 
 ; A2 hybrid-ring runtime contract. HUD and divider LMS operands are immutable;
-; only the 22 rows below the divider participate in the ring. The two lists and
-; their logical row lookup tables occupy the otherwise unused tail immediately
-; after the released starfield staging reservation. Keeping both lists on page
-; $7F permits an atomic DLISTL-only swap while DLISTH remains unchanged.
+; only the rows below the divider participate in the ring. Both display lists
+; remain together on page $7F for atomic DLISTL publication. The expanded
+; physical ring and lookup/state bytes reuse post-loader RAM at $8140.
 PLAYFIELD_RING_ROWS = GAMEPLAY_SCREEN_ROWS-1
 PLAYFIELD_DLIST_BYTES = 3+3+PLAYFIELD_RING_ROWS*3+3
 PLAYFIELD_DLIST_A = STARFIELD_STAGING+STARFIELD_STAGING_BYTES
 PLAYFIELD_DLIST_B = PLAYFIELD_DLIST_A+PLAYFIELD_DLIST_BYTES
-PLAYFIELD_ROW_LO = PLAYFIELD_DLIST_B+PLAYFIELD_DLIST_BYTES
+PLAYFIELD_DLIST_END = PLAYFIELD_DLIST_B+PLAYFIELD_DLIST_BYTES
+PLAYFIELD_ROW_LO = GAMEPLAY_RING_SCREEN_END
 PLAYFIELD_ROW_HI = PLAYFIELD_ROW_LO+PLAYFIELD_RING_ROWS
 PLAYFIELD_ACTIVE_DLIST_LO = PLAYFIELD_ROW_HI+PLAYFIELD_RING_ROWS
 PLAYFIELD_NEXT_DLIST_LO = PLAYFIELD_ACTIVE_DLIST_LO+$01
@@ -301,12 +305,13 @@ PLAYFIELD_CAPITAL_EXPLOSION_ROW = PLAYFIELD_BROAD_ROW+BROADSIDE_SLOT_COUNT
 PLAYFIELD_PREBUILD_PENDING = PLAYFIELD_CAPITAL_EXPLOSION_ROW+$02
 PLAYFIELD_RING_STATE_END = PLAYFIELD_PREBUILD_PENDING+$01
 
-.assert GAMEPLAY_SCREEN_ROWS = 23, error, "display requires divider plus 22 gameplay rows"
-.assert PLAYFIELD_RING_ROWS = 22, error, "hybrid ring must exclude the fixed divider"
-.assert PLAYFIELD_DLIST_BYTES = 75, error, "per-row LMS display list size changed"
+.assert GAMEPLAY_SCREEN_ROWS = 28, error, "display requires divider plus 27 gameplay rows"
+.assert PLAYFIELD_RING_ROWS = 27, error, "hybrid ring must exclude the fixed divider"
+.assert PLAYFIELD_DLIST_BYTES = 90, error, "expanded per-row LMS display list size changed"
 .assert >PLAYFIELD_DLIST_A = >PLAYFIELD_DLIST_B, error, "hybrid display lists must share one page"
-.assert PLAYFIELD_RING_STATE_END <= $7FDD, error, "hybrid ring exceeds its reviewed 205-byte reservation"
-.assert PLAYFIELD_RING_STATE_END <= $8000, error, "hybrid ring overlaps future entity/effects RAM"
+.assert PLAYFIELD_DLIST_END <= $8000, error, "expanded display lists overlap entity/effects RAM"
+.assert PLAYFIELD_RING_STATE_END <= WEAPON_PICKUP_PHASE_BANK, error, "expanded ring overlaps pickup phases"
+.assert CORRIDOR_BOUNDARY_RIGHT+CORRIDOR_BOUNDARY_ROWS <= WEAPON_PICKUP_PHASE_BANK, error, "expanded boundary backing overlaps pickup phases"
 .export PLAYFIELD_DLIST_A, PLAYFIELD_DLIST_B, PLAYFIELD_ROW_LO, PLAYFIELD_ROW_HI
 .export PLAYFIELD_RING_ROWS
 .export PLAYFIELD_ACTIVE_DLIST_LO, PLAYFIELD_NEXT_DLIST_LO, PLAYFIELD_RING_FLAGS
@@ -360,8 +365,9 @@ BROADSIDE_PLAYFIELD_TOP = GAMEPLAY_TOP
 GAMEPLAY_FIRST_SCREEN_ROW = 1
 GAMEPLAY_SCREEN = SCREEN+GAMEPLAY_FIRST_SCREEN_ROW*40
 GAMEPLAY_DIVIDER_SCREEN = GAMEPLAY_SCREEN
-GAMEPLAY_RING_SCREEN = GAMEPLAY_DIVIDER_SCREEN+40
-GAMEPLAY_SCREEN_END = SCREEN+24*40
+GAMEPLAY_RING_SCREEN = $8140
+GAMEPLAY_RING_SCREEN_END = GAMEPLAY_RING_SCREEN+PLAYFIELD_RING_ROWS*40
+GAMEPLAY_SCREEN_END = GAMEPLAY_RING_SCREEN_END
 BROADSIDE_SLOT_COUNT = 3
 ENEMY_SLOT_COUNT = 1
 ENEMY_SLOT_INDEX = 0
@@ -385,10 +391,11 @@ PLAYER_COLLISION_WIDTH = 8
 ; Narrow legacy contracts retain PLAYER_COLLISION_WIDTH where explicitly used.
 PLAYER_VISIBLE_WIDTH_HPOS = 16
 PLAYER_COLLISION_LAST_ROW = 14
+PLAYER_OPAQUE_HEIGHT = PLAYER_COLLISION_LAST_ROW+1
 PLAYER_X_MIN = 48
 PLAYER_X_MAX = 200
 PLAYER_Y_MIN = GAMEPLAY_TOP+16
-PLAYER_Y_MAX = GAMEPLAY_BOTTOM-PLAYER_H
+PLAYER_Y_MAX = GAMEPLAY_BOTTOM-PLAYER_OPAQUE_HEIGHT
 
 ; Atari screen-code values for the OS character set.
 CH_SPACE    = 0
@@ -605,7 +612,7 @@ CORRIDOR_ENEMY_COLUMNS = 8
 CORRIDOR_LEFT_HPOS = PLAYER_X_MIN + CORRIDOR_CENTRAL_FIRST*4
 CORRIDOR_RIGHT_HPOS = PLAYER_X_MIN + CORRIDOR_CENTRAL_END*4
 PLAYER_RESPAWN_X = CORRIDOR_LEFT_HPOS + (CORRIDOR_RIGHT_HPOS-CORRIDOR_LEFT_HPOS-PLAYER_COLLISION_WIDTH)/2
-PLAYER_RESPAWN_Y = GAMEPLAY_BOTTOM-PLAYER_H
+PLAYER_RESPAWN_Y = PLAYER_Y_MAX
 ENEMY_X_MIN = CORRIDOR_LEFT_HPOS
 ENEMY_X_MAX = CORRIDOR_RIGHT_HPOS-ENEMY_RELEASE_VISIBLE_WIDTH
 ENEMY_VISIBLE_WIDTH = ENEMY_RELEASE_VISIBLE_WIDTH
@@ -656,7 +663,7 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert ENTITY_VERTICAL_STEP_DENOMINATOR = 5, error, "debris vertical cadence denominator changed"
 .assert ENTITY_GAMEPLAY_TOP = GAMEPLAY_TOP+8, error, "entity gameplay must begin below the fixed divider"
 .assert ENTITY_GAMEPLAY_BOTTOM = GAMEPLAY_BOTTOM, error, "entity gameplay bottom must match the visible viewport"
-.assert ENTITY_LOGICAL_ROWS = PLAYFIELD_RING_ROWS, error, "entities must address exactly the 22 rotating rows"
+.assert ENTITY_LOGICAL_ROWS = PLAYFIELD_RING_ROWS, error, "entities must address exactly the rotating rows"
 .assert ENTITY_DEBRIS_VARIANT_COUNT = 2, error, "debris must retain two visual variants"
 .assert ENTITY_DEBRIS_PHASE_COUNT = 2, error, "debris must retain two tumbling phases"
 .assert ENTITY_DEBRIS_GLYPHS_PER_PHASE = 2, error, "debris renderer must remain exactly 2x1"
@@ -675,12 +682,12 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
 .assert HUD_BOTTOM = GAMEPLAY_TOP, error, "gameplay must begin immediately below the HUD"
 .assert GAMEPLAY_BOTTOM-GAMEPLAY_TOP = CAPITAL_HULL_VISIBLE_ROWS*8, error, "gameplay viewport height changed"
-.assert GAMEPLAY_SCREEN_ROWS = 23, error, "compact HUD must expose 23 gameplay rows"
-.assert GAMEPLAY_SCREEN+GAMEPLAY_SCREEN_ROWS*40 = GAMEPLAY_SCREEN_END, error, "gameplay must retain the 960-byte screen end"
+.assert GAMEPLAY_BOTTOM = 240, error, "expanded gameplay must end before PAL overscan/VBI"
+.assert GAMEPLAY_SCREEN_ROWS = 28, error, "PAL HUD must expose 28 gameplay rows"
 .assert GAMEPLAY_DIVIDER_SCREEN = $4028, error, "divider LMS address changed"
-.assert GAMEPLAY_RING_SCREEN = $4050, error, "ring must begin below the divider"
-.assert GAMEPLAY_RING_SCREEN+PLAYFIELD_RING_ROWS*40 = GAMEPLAY_SCREEN_END, error, "22-row ring must end at $43BF"
-.assert PLAYER_RESPAWN_Y = 184, error, "respawn must retain its accepted hardware Y"
+.assert GAMEPLAY_RING_SCREEN = $8140, error, "expanded ring must reuse reviewed post-loader RAM"
+.assert GAMEPLAY_RING_SCREEN+PLAYFIELD_RING_ROWS*40 = GAMEPLAY_RING_SCREEN_END, error, "27-row ring extent changed"
+.assert PLAYER_RESPAWN_Y = 225, error, "respawn must place the final opaque Viper row at scanline 239"
 .assert VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "Viper phase glyphs overlap capital hulls"
 .assert RAIDER_PROJECTILE_GLYPH_BASE >= CAPITAL_HULL_GLYPH_BASE+CAPITAL_HULL_GLYPH_COUNT, error, "Raider phase glyphs overlap capital hulls"
 .assert RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT <= 128, error, "Raider phase glyphs exceed the charset"
@@ -3173,7 +3180,7 @@ clear_screen:
     bne @loop
     rts
 
-; Build the logical-to-physical lookup for the 22 rows below the fixed divider.
+; Build the logical-to-physical lookup for the 27 rows below the fixed divider.
 ; Logical row zero is always $4028 and is handled directly by the mapper.
 init_playfield_row_table:
     lda #<GAMEPLAY_RING_SCREEN
@@ -3234,15 +3241,11 @@ init_screen:
     inx
     bne @title_loop
 @title_done:
-    lda #<GAMEPLAY_SCREEN
-    sta dst_ptr
-    lda #>GAMEPLAY_SCREEN
-    sta dst_ptr+1
-    lda #GAMEPLAY_SCREEN_ROWS
-    sta row_counter
     lda #$00
     sta BROAD_WORK_COUNT
 @corridor_rows:
+    lda BROAD_WORK_COUNT
+    jsr set_gameplay_row_ptr
     jsr generate_starfield_row  ; initial near background uses its independent seed
     ldx BROAD_WORK_COUNT
     ldy #CORRIDOR_CENTRAL_FIRST
@@ -3254,14 +3257,8 @@ init_screen:
     jsr store_boundary_star
     sta CORRIDOR_BOUNDARY_RIGHT,x
     inc BROAD_WORK_COUNT
-    clc
-    lda dst_ptr
-    adc #40
-    sta dst_ptr
-    bcc :+
-    inc dst_ptr+1
-:
-    dec row_counter
+    lda BROAD_WORK_COUNT
+    cmp #GAMEPLAY_SCREEN_ROWS
     bne @corridor_rows
     rts
 
@@ -5001,7 +4998,7 @@ advance_starfield_layers:
 
 ; A near/ring step is selected from, and always coincident with, the 100%-rate
 ; hull/world clock. Keep
-; logical row zero at the fixed divider LMS, rotate the 22 rows below it, copy
+; logical row zero at the fixed divider LMS, rotate the 27 rows below it, copy
 ; the prior divider into logical row one, then regenerate logical row zero.
 ; Hull generation follows; hull-only events retain their side-band copy path.
 scroll_world_columns:
@@ -5190,7 +5187,7 @@ build_star_glyphs:
     bne @byte
     rts
 
-; Initial setup distributes exactly 24 logical far stars over the 23 gameplay
+; Initial setup distributes the configured logical far stars over all gameplay
 ; rows. Cells already occupied by a near star remain logically present but are
 ; not drawn until their next 25%-rate step reaches clear background.
 init_far_star_population:
@@ -5951,7 +5948,7 @@ update_sector_state:
     sta CAPITAL_SECTOR_STATE
     rts
 
-; At most one source muzzle per side can be visible in the 23-row viewport.
+; At most one source muzzle per side can be visible in the gameplay viewport.
 ; Logical row plus explicit fixed-divider/ring domain are authoritative. The
 ; exact pointer is only a derived overlay address; its high byte also doubles
 ; as the active flag.
@@ -6095,7 +6092,7 @@ reset_exited_turret_lifecycles:
 ; Generates one bounded 8+24+8 row. Static hull maps also contain one declared
 ; projection cell at columns 8/31, used only for turret muzzles. Stars inspect
 ; those boundary cells and therefore cannot overwrite a muzzle. This combined
-; path is used only for the initial 23 rows; visible scrolling uses the split
+; path is used only for the initial 28 rows; visible scrolling uses the split
 ; world and hull routines above.
 generate_corridor_row:
     lda #CH_SPACE
@@ -8002,8 +7999,8 @@ restore_capital_explosions:
     rts
 
 ; Move a physical gameplay pointer to the next logical row. The fixed divider
-; enters the current ring head; within the 22-row physical ring only the last
-; row wraps back to $4050.
+; enters the current ring head; within the physical ring only the last
+; row wraps back to the current high-RAM ring head.
 advance_dst_to_next_physical_row:
     lda dst_ptr
     cmp #<GAMEPLAY_DIVIDER_SCREEN
@@ -8889,6 +8886,7 @@ erase_weapon_pickup_overlay_restore:
     sta (dst_ptr),y
 @middle:
     lda ENTITY_VY+WEAPON_PICKUP_SLOT
+    beq @top
     sta dst_ptr+1
     lda ENTITY_VX+WEAPON_PICKUP_SLOT
     sta dst_ptr
@@ -8898,6 +8896,7 @@ erase_weapon_pickup_overlay_restore:
     dey
     lda ENTITY_BACKING2+WEAPON_PICKUP_SLOT
     sta (dst_ptr),y
+@top:
     stx dst_ptr+1
     lda ENTITY_SCREEN_LO+WEAPON_PICKUP_SLOT
     sta dst_ptr
@@ -8911,6 +8910,7 @@ erase_weapon_pickup_overlay_restore:
     sta ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
     sta ENTITY_SCREEN_HI+WEAPON_PICKUP_SLOT
     sta ENTITY_SCREEN_HI+3
+    sta ENTITY_VY+WEAPON_PICKUP_SLOT
     lda ENTITY_RENDERED_MASK
     and #($FF-WEAPON_PICKUP_ACTIVE_MASK)
     sta ENTITY_RENDERED_MASK
@@ -9005,6 +9005,18 @@ profile_after_pickup_booster_update = *
     clc
     adc ENTITY_VX
     sta ENTITY_X
+    cmp #ENTITY_CORRIDOR_LEFT_HPOS
+    bcs @right_limit
+    lda #ENTITY_CORRIDOR_LEFT_HPOS
+    bne @stop_horizontal
+@right_limit:
+    cmp #(ENTITY_CORRIDOR_RIGHT_HPOS-ENTITY_DEBRIS_WIDTH_HPOS+1)
+    bcc @collision
+    lda #(ENTITY_CORRIDOR_RIGHT_HPOS-ENTITY_DEBRIS_WIDTH_HPOS)
+@stop_horizontal:
+    sta ENTITY_X
+    lda #$00
+    sta ENTITY_VX
 @collision:
     ; Active update has already proved that Y remains in gameplay. Direct
     ; calls retain the guarded public entry below for boundary tests.
@@ -9335,7 +9347,7 @@ entity_next_rng:
     sta ENTITY_RNG_STATE
     rts
 
-; COMPLETE lasts for exactly one full 22-row reconstruction pass. No debris
+; COMPLETE lasts for exactly one full ring reconstruction pass. No debris
 ; can spawn in DRAIN or COMPLETE. The post-pass OPEN state keeps the same
 ; full-width starfield and combat behavior, but gives the entity scheduler a
 ; deterministic legal boundary and restores the normal initial spawn delay.
@@ -9347,7 +9359,7 @@ entity_begin_sector_complete:
     inc CAPITAL_SECTOR_STATE
     rts
 
-; COMPLETE receives exactly one full 22-rotation reconstruction pass. The
+; COMPLETE receives exactly one full ring reconstruction pass. The
 ; following OPEN frame starts with the normal delayed entity scheduler. This
 ; helper is called only by the relocated hull/sector runtime and shares its
 ; remaining BROADSIDE reservation rather than expanding packed ENTITY_CODE.
@@ -9756,6 +9768,9 @@ render_weapon_pickup_overlay:
     rts
 :
     jsr compose_weapon_pickup_phase
+    lda #$00
+    sta ENTITY_VY+WEAPON_PICKUP_SLOT
+    sta ENTITY_SCREEN_HI+3
 
     ; Map once, after A2 has published its final ring head for this frame.
     ; Every touched row saves its exact physical pointer and prior two bytes.
@@ -9800,7 +9815,11 @@ render_weapon_pickup_overlay:
     iny
     sta (dst_ptr),y
 
-    ; Slot one's dormant VX/VY pair retains the middle physical pointer.
+    ; Slot one's dormant VX/VY pair retains the middle physical pointer. At
+    ; the final ring row only the still-visible top slice is published.
+    lda ENTITY_SCRATCH_SLOT
+    cmp #(ENTITY_LOGICAL_ROWS-1)
+    bcs @one_row
     jsr advance_dst_to_next_ring_row
     lda dst_ptr
     sta ENTITY_VX+WEAPON_PICKUP_SLOT
@@ -9822,7 +9841,7 @@ render_weapon_pickup_overlay:
     sta (dst_ptr),y
 
     ; A non-zero phase spills the shifted 16-scanline source into a third row.
-    ; Clip that row at the bottom of the 22-row viewport. Reserved slot three
+    ; Clip that row at the bottom of the ring viewport. Reserved slot three
     ; records both its address and backing for exact next-frame reverse erase.
     lda ENTITY_SCRATCH0
     beq @two_rows
@@ -9850,6 +9869,12 @@ render_weapon_pickup_overlay:
     sta (dst_ptr),y
 @two_rows:
     lda #$0F
+    sta ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
+    lda ENTITY_ACTIVE_MASK
+    sta ENTITY_RENDERED_MASK
+    rts
+@one_row:
+    lda #$03
     sta ENTITY_DRAWN_MASK+WEAPON_PICKUP_SLOT
     lda ENTITY_ACTIVE_MASK
     sta ENTITY_RENDERED_MASK

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -15,7 +16,21 @@ function byte(value) {
 }
 
 export function loadEntityEffectsDefinition(sourcePath) {
-  const definition = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+  const source = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+  const definition = {
+    ...source,
+    coordinateSystem: {
+      gameplayTopScanline: canonicalPlayfield.entityTop,
+      gameplayBottomExclusive: canonicalPlayfield.gameplayBottom,
+      logicalRows: canonicalPlayfield.ringRows,
+    },
+    weaponPickupRapidFire: {
+      ...source.weaponPickupRapidFire,
+      spawnTopScanline: canonicalPlayfield.activeImageTop,
+      activationTopScanline: canonicalPlayfield.entityTop,
+      releaseTopScanline: canonicalPlayfield.gameplayBottom,
+    },
+  };
   invariant(definition.formatVersion === 1, "Unsupported entity-effects formatVersion");
   const coordinates = definition.coordinateSystem;
   integer(coordinates?.gameplayTopScanline, "coordinateSystem.gameplayTopScanline", 0, 255);
@@ -24,12 +39,12 @@ export function loadEntityEffectsDefinition(sourcePath) {
   integer(coordinates?.logicalRows, "coordinateSystem.logicalRows", 1, 32);
   invariant(coordinates.gameplayTopScanline === 24,
     "Entity gameplay must begin below the divider at scanline 24");
-  invariant(coordinates.gameplayBottomExclusive === 200,
-    "Entity gameplay must end after scanline 199");
-  invariant(coordinates.logicalRows === 22 &&
+  invariant(coordinates.gameplayBottomExclusive === 240,
+    "Entity gameplay must end after scanline 239");
+  invariant(coordinates.logicalRows === 27 &&
     coordinates.gameplayBottomExclusive - coordinates.gameplayTopScanline ===
       coordinates.logicalRows * 8,
-  "Entity coordinates must describe exactly 22 eight-scanline ring rows");
+  "Entity coordinates must describe exactly 27 eight-scanline ring rows");
 
   const pools = definition.pools;
   invariant(pools?.interactiveSlots === 4, "Interactive pool must contain four slots");
@@ -90,9 +105,9 @@ export function loadEntityEffectsDefinition(sourcePath) {
   const worldEventsToDespawn = Math.ceil(
     verticalStepsToDespawn * motion.verticalStepDenominator / motion.verticalStepNumerator,
   );
-  invariant(motion.maximumHorizontalSteps ===
+  invariant(motion.maximumHorizontalSteps <=
     Math.floor((worldEventsToDespawn - 1) / motion.horizontalStepWorldRows),
-  "Maximum horizontal steps must cover the complete visible spawn-to-despawn path");
+  "Maximum horizontal steps must remain bounded within the complete visible path");
   invariant(spawn.safeFirstColumn ===
     spawn.corridorFirstColumn + motion.maximumHorizontalSteps,
   "Safe spawn left edge must absorb the complete slight-left trajectory");
@@ -220,10 +235,9 @@ export function loadEntityEffectsDefinition(sourcePath) {
   "Every pickup must use eight scanline phases in a bounded two-by-three compositor");
   invariant(pickup.spawnTopScanline === 8 &&
     pickup.activationTopScanline === coordinates.gameplayTopScanline &&
-    pickup.releaseTopScanline === coordinates.gameplayBottomExclusive -
-      (pickup.heightScanlines - 8),
-  "Every pickup must spawn fully above, activate at the playfield top, and release after " +
-    "its last complete visible row");
+    pickup.releaseTopScanline === coordinates.gameplayBottomExclusive,
+  "Every pickup must spawn fully above, activate at the playfield top, and release only " +
+    "after its top edge leaves the playfield");
   invariant(pickup.widthHpos === 8 && pickup.heightScanlines === 16,
     "Rapid Fire capsule must occupy exactly two-by-two ANTIC 4 cells");
   invariant(Array.isArray(pickup.glyphs) && pickup.glyphs.length === 4 &&

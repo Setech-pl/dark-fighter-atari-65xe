@@ -66,7 +66,8 @@ For both XEX and ATR:
       post-hit cooldown, and the same-frame damage latch retain their gates,
       while the Raider enters its normal scored breakup exactly once.
 - [ ] Every pickup begins off-screen at Y=8, becomes active at Y=24, advances
-      smoothly to Y=190, and releases at Y=192. HARD advances two scanlines on
+      smoothly through the lower playfield to Y=238, and releases at Y=240.
+      HARD advances two scanlines on
       every successive frame; no 0,0,0,+8 character-row jump is visible.
 - [ ] Rapid Fire capsule remains one coherent 8x16 object (one phased 2x2/2x3
       footprint) through several ring wraps; no ghost or second pass returns.

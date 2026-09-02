@@ -163,13 +163,13 @@ test("starfield source is compact, table-driven, and assembled byte-for-byte", (
     stateBytes: asset.stateBytes,
   }, {
     seed: 0xa7,
-    farPopulation: 24,
+    farPopulation: 29,
     farRate: [1, 4],
     nearRate: [1, 2],
     nearDensity: [3, 8],
     twinkle: 16,
     glyphBytes: 48,
-    stateBytes: 102,
+    stateBytes: 122,
   });
   assert.equal(generated, renderStarfieldCa65Include(asset));
   assert.deepEqual([...runtimeBytes("star_glyph_bytes", asset.glyphBytes.length)],
@@ -198,7 +198,7 @@ test("deterministic seed reproduces layouts while a different seed changes them"
   const different = composeStarfield(asset, createStarfieldState(asset, { seed: 0x53 }));
   assert.equal(screenHash(first), screenHash(repeat));
   assert.notEqual(screenHash(first), screenHash(different));
-  assert.deepEqual(counts(first), { far: 20, near: 6 });
+  assert.deepEqual(counts(first), { far: 19, near: 8 });
 });
 
 test("hulls keep the legacy world rate while stars hold exact 50% and 25% ratios", () => {

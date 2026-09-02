@@ -481,7 +481,7 @@ function gameplayDmaCycles() {
   // cycles: 40 screen-name fetches plus eight 40-byte font fetches, with the
   // documented first-line refresh overlap. The hybrid ring display list uses
   // one LMS instruction for the HUD, one fixed divider LMS and one for each
-  // of the 22 rotating gameplay rows,
+  // of the 27 rotating gameplay rows,
   // and a three-byte JVB.  Counting all operand fetches is important here:
   // this remains only an additive diagnostic, but it must describe the linked
   // display-list architecture accurately.

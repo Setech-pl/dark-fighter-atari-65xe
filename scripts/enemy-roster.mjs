@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 export const ENEMY_ROSTER_IDS = Object.freeze([
   "RAIDER",
@@ -223,7 +224,22 @@ function compileImplementedArchetype(source, index, runtime) {
 }
 
 export function loadEnemyRosterDefinition(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const definition = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const pursuit = definition.runtime.movementPolicy.raiderSoftPursuit;
+  return {
+    ...definition,
+    runtime: {
+      ...definition.runtime,
+      movementPolicy: {
+        ...definition.runtime.movementPolicy,
+        raiderSoftPursuit: {
+          ...pursuit,
+          attackActiveTop: canonicalPlayfield.gameplayTop,
+          attackActiveBottomExclusive: canonicalPlayfield.gameplayBottom,
+        },
+      },
+    },
+  };
 }
 
 export function compileEnemyRoster(definition, rootDirectory) {
@@ -242,7 +258,8 @@ export function compileEnemyRoster(definition, rootDirectory) {
     pursuit.maximumSpeedRatioNumerator === 4 &&
     pursuit.maximumSpeedRatioDenominator === 5 &&
     pursuit.weaveAmplitudeHpos === 4 && pursuit.weavePeriodFrames === 32 &&
-    pursuit.attackActiveTop === 16 && pursuit.attackActiveBottomExclusive === 200,
+    pursuit.attackActiveTop === canonicalPlayfield.gameplayTop &&
+    pursuit.attackActiveBottomExclusive === canonicalPlayfield.gameplayBottom,
   "Raider soft-pursuit parameters must remain the reviewed bounded profile");
   invariant(runtime.corridor?.leftHpos === 80 && runtime.corridor?.rightHposExclusive === 176,
     "Enemy roster must use the accepted 24-column corridor bounds");

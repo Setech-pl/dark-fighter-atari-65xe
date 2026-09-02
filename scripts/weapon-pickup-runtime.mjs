@@ -3,10 +3,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Nmos6502 } from "./nmos6502.mjs";
+import { canonicalPlayfield } from "./playfield.mjs";
 import { installBootArtifact } from "./runtime-image.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..");
+const ringRows = canonicalPlayfield.ringRows;
+const ringBase = canonicalPlayfield.ringBufferAddress;
+const ringEnd = canonicalPlayfield.ringBufferEnd;
+const playerMaximumY = canonicalPlayfield.gameplayBottom - 15;
 
 function labelsFromFile(sourcePath) {
   return new Map(fs.readFileSync(sourcePath, "utf8")
@@ -59,7 +64,7 @@ function drawRuntimeHullScene(memory, labels, { head, topPhase }) {
   memory.fill(0, 0x4028, 0x4400);
   const dst = requiredLabel(labels, "dst_ptr");
   const phase = requiredLabel(labels, "corridor_phase");
-  for (let row = 0; row < 23; row += 1) {
+  for (let row = 0; row < canonicalPlayfield.gameplayRows; row += 1) {
     const address = physicalGameplayAddress(memory, labels, row, 0);
     memory[dst] = address & 0xff;
     memory[dst + 1] = address >> 8;
@@ -71,9 +76,9 @@ function drawRuntimeHullScene(memory, labels, { head, topPhase }) {
 function initialiseRows(memory, labels, head = 0) {
   const lo = requiredLabel(labels, "PLAYFIELD_ROW_LO");
   const hi = requiredLabel(labels, "PLAYFIELD_ROW_HI");
-  for (let logical = 0; logical < 22; logical += 1) {
-    const physical = (head + logical) % 22;
-    const address = 0x4050 + physical * 40;
+  for (let logical = 0; logical < ringRows; logical += 1) {
+    const physical = (head + logical) % ringRows;
+    const address = ringBase + physical * canonicalPlayfield.screenColumns;
     memory[lo + logical] = address & 0xff;
     memory[hi + logical] = address >> 8;
   }
@@ -86,16 +91,18 @@ function renderEntityEffects(memory, labels) {
 function logicalScreen(memory, labels) {
   const lo = requiredLabel(labels, "PLAYFIELD_ROW_LO");
   const hi = requiredLabel(labels, "PLAYFIELD_ROW_HI");
-  const screen = new Uint8Array(22 * 40);
-  for (let row = 0; row < 22; row += 1) {
+  const screen = new Uint8Array(ringRows * canonicalPlayfield.screenColumns);
+  for (let row = 0; row < ringRows; row += 1) {
     const address = memory[lo + row] | memory[hi + row] << 8;
-    screen.set(memory.subarray(address, address + 40), row * 40);
+    screen.set(memory.subarray(address, address + canonicalPlayfield.screenColumns),
+      row * canonicalPlayfield.screenColumns);
   }
   return screen;
 }
 
 function logicalDisplay(memory, labels) {
-  const display = new Uint8Array(24 * 40);
+  const display = new Uint8Array((canonicalPlayfield.gameplayRows + 1) *
+    canonicalPlayfield.screenColumns);
   display.set(memory.subarray(0x4000, 0x4050));
   display.set(logicalScreen(memory, labels), 80);
   return display;
@@ -161,7 +168,7 @@ function initialiseRuntime(root, artifact, coldFill = 0) {
   memory[requiredLabel(labels, "ENTITY_SPAWN_TIMER_LO")] = 0xff;
   memory[requiredLabel(labels, "DIFFICULTY_SETTING")] = 2;
   memory[requiredLabel(labels, "player_x")] = 196;
-  memory[requiredLabel(labels, "player_y")] = 184;
+  memory[requiredLabel(labels, "player_y")] = playerMaximumY;
   memory[requiredLabel(labels, "PLAYER_LIFECYCLE")] = 0;
   memory[fixedStateAddress(labels, "BROAD_PLAYER_HEALTH")] = 10;
   memory[fixedStateAddress(labels, "PLAYER_LIVES")] = 3;
@@ -187,9 +194,9 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
   // The resident pickup follows the A2 ring without remapping its physical
   // cells. VX/VY are the authoritative saved bottom-row pointer; deriving it
   // from the advanced logical Y would inspect a different physical row.
-  const bottomScreenAddress = screenAddress === 0 ? 0 :
-    memory[requiredLabel(labels, "ENTITY_VX") + slot] |
-    memory[requiredLabel(labels, "ENTITY_VY") + slot] << 8;
+  const bottomHigh = memory[requiredLabel(labels, "ENTITY_VY") + slot];
+  const bottomScreenAddress = screenAddress === 0 || bottomHigh === 0 ? 0 :
+    memory[requiredLabel(labels, "ENTITY_VX") + slot] | bottomHigh << 8;
   const thirdHigh = memory[requiredLabel(labels, "ENTITY_SCREEN_HI") + 3];
   const thirdScreenAddress = thirdHigh === 0 ? 0 :
     memory[requiredLabel(labels, "ENTITY_SCREEN_LO") + 3] | thirdHigh << 8;
@@ -242,7 +249,8 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
     )),
     renderId: memory[requiredLabel(labels, "ENTITY_RENDER_ID") + slot],
     a2Head: ((memory[requiredLabel(labels, "PLAYFIELD_ROW_LO")] |
-      memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - 0x4050) / 40,
+      memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - ringBase) /
+      canonicalPlayfield.screenColumns,
     screenAddress,
     bottomScreenAddress,
     thirdScreenAddress,
@@ -451,15 +459,16 @@ export function executeWeaponPickupTrace({
 }
 
 export function executeWeaponPickupTraversalTrace({
-  root = defaultRoot, artifact = "xex",
+  root = defaultRoot, artifact = "xex", difficulty = 2,
 } = {}) {
   const types = [
     ["rapid", 0, 120],
     ["spread", 1, 0xfc],
-    ["shield", 2, 124],
+    ["shield", 2, 120],
   ];
   const traces = types.map(([name, pickupType, renderId]) => {
     const { memory, labels, manifest } = initialiseRuntime(root, artifact);
+    memory[requiredLabel(labels, "DIFFICULTY_SETTING")] = difficulty;
     const slot = 1;
     const state = requiredLabel(labels, "ENTITY_STATE") + slot;
     const activeMask = requiredLabel(labels, "ENTITY_ACTIVE_MASK");
@@ -524,7 +533,7 @@ export function executeWeaponPickupTraversalTrace({
       maximumVisualFootprints: Math.max(...visible.map(footprintCount)),
     };
   });
-  return { artifact, traces };
+  return { artifact, difficulty, traces };
 }
 
 export function executeWeaponPickupRingWrapTrace({
@@ -532,9 +541,8 @@ export function executeWeaponPickupRingWrapTrace({
 } = {}) {
   const { memory, labels, manifest } = initialiseRuntime(root, artifact);
   initialiseRows(memory, labels, 0);
-  for (let address = 0x4028; address < 0x43c0; address += 1) {
-    memory[address] = 1 + address % 100;
-  }
+  for (let address = 0x4028; address < 0x4050; address += 1) memory[address] = 1 + address % 100;
+  for (let address = ringBase; address < ringEnd; address += 1) memory[address] = 1 + address % 100;
   const slot = 1;
   const state = requiredLabel(labels, "ENTITY_STATE") + slot;
   memory[state] = 2;
@@ -546,22 +554,27 @@ export function executeWeaponPickupRingWrapTrace({
   memory[requiredLabel(labels, "ENTITY_RENDER_ID") + slot] = 120;
   memory[requiredLabel(labels, "DIFFICULTY_SETTING")] = difficulty;
   memory[requiredLabel(labels, "player_x")] = 196;
-  memory[requiredLabel(labels, "player_y")] = 184;
+  memory[requiredLabel(labels, "player_y")] = playerMaximumY;
 
-  const capsuleCells = () => Array.from(memory.subarray(0x4028, 0x43c0))
+  const gameplayCells = () => [
+    ...memory.subarray(0x4028, 0x4050),
+    ...memory.subarray(ringBase, ringEnd),
+  ];
+  const capsuleCells = () => gameplayCells()
     .filter((code) => (code & 0x7f) >= 120 && (code & 0x7f) <= 125).length;
-  const capsuleFootprints = () => Array.from(memory.subarray(0x4028, 0x43c0))
+  const capsuleFootprints = () => gameplayCells()
     .filter((code) => code === 120).length;
   const records = [];
   let previous = null;
-  for (let frame = 0; frame < 128 && memory[state] === 2; frame += 1) {
+  for (let frame = 0; frame < 160 && memory[state] === 2; frame += 1) {
     let exactReverseErase = true;
     if (frame !== 0) {
       runRoutine(memory, labels, "entity_effects_erase");
       exactReverseErase = memory[previous.screenAddress] === previous.backing[0] &&
         memory[previous.screenAddress + 1] === previous.backing[1] &&
-        memory[previous.bottomScreenAddress] === previous.backing[2] &&
-        memory[previous.bottomScreenAddress + 1] === previous.backing[3] &&
+        (previous.bottomScreenAddress === 0 ||
+          (memory[previous.bottomScreenAddress] === previous.backing[2] &&
+            memory[previous.bottomScreenAddress + 1] === previous.backing[3])) &&
         (previous.thirdScreenAddress === 0 ||
           (memory[previous.thirdScreenAddress] === previous.thirdBacking[0] &&
             memory[previous.thirdScreenAddress + 1] === previous.thirdBacking[1]));
@@ -597,7 +610,7 @@ export function executeWeaponPickupRingWrapTrace({
     activeCount: memory[requiredLabel(labels, "ENTITY_ACTIVE_COUNT")],
     cellsAtRelease,
     cellsAfterAdditionalWraps: capsuleCells(),
-    wrapCount: Math.floor((records.length - 1 + wrapFramesAfterRelease) / 22),
+    wrapCount: Math.floor((records.length - 1 + wrapFramesAfterRelease) / ringRows),
   };
 }
 
@@ -618,7 +631,7 @@ export function executeViperBurstBalanceTrace({
     const burstTimer = requiredLabel(labels, "VIPER_BURST_TIMER");
     const booster = requiredLabel(labels, "ENTITY_STATE") + 2;
     memory[requiredLabel(labels, "player_x")] = 124;
-    memory[requiredLabel(labels, "player_y")] = 184;
+    memory[requiredLabel(labels, "player_y")] = playerMaximumY;
     memory[booster] = boosterState;
     if (boosterState !== 0) {
       memory[requiredLabel(labels, "ENTITY_TIMER") + 2] = 0xf4;
@@ -839,7 +852,8 @@ export function executeViperProjectileColourTrace({
     normalAfterExpiry,
     rapidTimerAtSpawn,
     a2Head: ((memory[requiredLabel(labels, "PLAYFIELD_ROW_LO")] |
-      memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - 0x4050) / 40,
+      memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - ringBase) /
+      canonicalPlayfield.screenColumns,
     rendered,
     raiderRendered,
     normalDisplay: Array.from(normalDisplay),
@@ -1402,7 +1416,7 @@ function collectVisibleWeaponPickup(memory, labels) {
   memory[requiredLabel(labels, "frame_counter")] += 1;
   runRoutine(memory, labels, "entity_effects_update");
   memory[requiredLabel(labels, "player_x")] = 196;
-  memory[requiredLabel(labels, "player_y")] = 184;
+  memory[requiredLabel(labels, "player_y")] = playerMaximumY;
 }
 
 export function executeSpreadShotTrace({
@@ -1449,7 +1463,7 @@ export function executeSpreadShotTrace({
     runRoutine(memory, labels, "entity_effects_erase");
     const nearRowAdvanced = frame % 2;
     if (nearRowAdvanced) {
-      capsuleHead = (capsuleHead + 21) % 22;
+      capsuleHead = (capsuleHead + ringRows - 1) % ringRows;
       initialiseRows(memory, labels, capsuleHead);
     }
     memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = nearRowAdvanced;
@@ -1464,7 +1478,7 @@ export function executeSpreadShotTrace({
     { phase: "SPREAD_PICKUP", frame: 0 });
 
   memory[requiredLabel(labels, "player_x")] = 124;
-  memory[requiredLabel(labels, "player_y")] = 184;
+  memory[requiredLabel(labels, "player_y")] = playerMaximumY;
   runRoutine(memory, labels, "clear_viper_projectiles");
   runRoutine(memory, labels, "allocate_viper_projectile");
   const trajectoryFrames = [viperProjectileSnapshot(memory, labels,
@@ -1551,7 +1565,7 @@ export function executeSpreadShotCooldownSafetyTrace({
     const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
     memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
     memory[requiredLabel(labels, "player_x")] = 124;
-    memory[requiredLabel(labels, "player_y")] = 184;
+    memory[requiredLabel(labels, "player_y")] = playerMaximumY;
     let maximumPoolOccupancy = 0;
     const allocationSizes = [];
     for (let frame = 0; frame < frames; frame += 1) {
@@ -1589,7 +1603,7 @@ export function executeSpreadShotMotionTrace({ root = defaultRoot, artifact = "x
   const yAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_Y");
   memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
   memory[requiredLabel(labels, "player_x")] = 124;
-  memory[requiredLabel(labels, "player_y")] = 184;
+  memory[requiredLabel(labels, "player_y")] = playerMaximumY;
   runRoutine(memory, labels, "allocate_viper_projectile");
   const initial = Array.from(memory.subarray(xAddress, xAddress + 3));
   for (let frame = 0; frame < 100; frame += 1) {
@@ -1635,7 +1649,7 @@ export function executeSpreadShotCollisionTrace({ root = defaultRoot, artifact =
     const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
     memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
     memory[requiredLabel(labels, "player_x")] = 124;
-    memory[requiredLabel(labels, "player_y")] = 184;
+    memory[requiredLabel(labels, "player_y")] = playerMaximumY;
     runRoutine(memory, labels, "allocate_viper_projectile");
     memory[requiredLabel(labels, "ENEMY_ACTIVE")] = 1;
     memory[requiredLabel(labels, "ENEMY_ARCHETYPE")] = 0;
@@ -1667,7 +1681,7 @@ export function executeSpreadShotCollisionTrace({ root = defaultRoot, artifact =
     const projectileX = requiredLabel(labels, "FIGHTER_PROJECTILE_X");
     memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
     memory[requiredLabel(labels, "player_x")] = 124;
-    memory[requiredLabel(labels, "player_y")] = 184;
+    memory[requiredLabel(labels, "player_y")] = playerMaximumY;
     runRoutine(memory, labels, "allocate_viper_projectile");
     for (let slot = 0; slot < 3; slot += 1) {
       if (slot !== selectedSlot) memory[active + slot] = 0;
@@ -2085,7 +2099,7 @@ export function executeShieldBoosterTrace({
     m[requiredLabel(l, "BROAD_DAMAGE_COOLDOWN")] = 0;
     m[fixedStateAddress(l, "BROAD_PLAYER_HEALTH")] = 10;
     m[requiredLabel(l, "player_x")] = 124;
-    m[requiredLabel(l, "player_y")] = 184;
+    m[requiredLabel(l, "player_y")] = playerMaximumY;
     m[requiredLabel(l, "FIGHTER_PROJECTILE_ACTIVE") + slot] = 2;
     m[requiredLabel(l, "FIGHTER_PROJECTILE_X") + slot] = 124;
     m[requiredLabel(l, "FIGHTER_PROJECTILE_Y") + slot] = 178;

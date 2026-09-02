@@ -21,6 +21,7 @@ import {
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import { loadCapitalHullsDefinition } from "../scripts/capital-hulls.mjs";
+import { canonicalPlayfield } from "../scripts/playfield.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(directory, "..");
@@ -43,24 +44,14 @@ function xexBytes(address, length) {
   return readRuntimeBytes(root, address, length);
 }
 
-test("assembled gameplay display keeps HUD, divider and 22 ring rows distinct", () => {
+test("assembled gameplay display keeps HUD, divider and 27 ring rows distinct", () => {
   assert.match(source, /PLAYFIELD_DLIST_BYTES\s*=\s*3\+3\+PLAYFIELD_RING_ROWS\*3\+3/);
   assert.match(source, /lda #\$C2[\s\S]+lda #\$44[\s\S]+lda #\$C4[\s\S]+lda #\$41/);
   assert.doesNotMatch(source.slice(
     source.indexOf("build_playfield_display_list:"),
     source.indexOf("rotate_playfield_rows:"),
   ), /lda #\$70/);
-  assert.deepEqual(weapons.viewport, {
-    activeImageTop: 8,
-    hudRows: 1,
-    gameplayRows: 23,
-    screenColumns: 40,
-    leftHpos: 48,
-    hudTop: 8,
-    hudBottom: 16,
-    gameplayTop: 16,
-    gameplayBottom: 200,
-  });
+  assert.deepEqual(weapons.viewport, canonicalPlayfield);
 });
 
 test("Raider PMG drawing clips every frame to the gameplay viewport", () => {

@@ -125,7 +125,7 @@ test("release Raider uses bounded soft pursuit rather than a player-independent 
     weaveAmplitudeHpos: 4,
     weavePeriodFrames: 32,
     attackActiveTop: 16,
-    attackActiveBottomExclusive: 200,
+    attackActiveBottomExclusive: 240,
   });
   const start = createRaiderPursuitState(asset, { x: 128, y: 56 });
   const left = simulateRaiderSoftPursuit(asset, {
@@ -276,9 +276,9 @@ test("ten-shot burst intervals and post-burst difficulty pauses are exact", () =
     const allocations = simulation.trace.filter(({ allocationResult }) =>
       allocationResult === "ALLOCATED");
     assert.deepEqual(allocations.slice(0, 10).map(({ frame }) => frame),
-      [1, 5, 9, 13, 17, 21, 25, 29, 33, 37]);
+      [1, 5, 9, 13, 17, 21, 25, 29, 33, 42]);
     assert.equal(allocations[9].cooldown, postBurst);
-    assert.equal(allocations[10]?.frame, 37 + postBurst);
+    assert.equal(allocations[10]?.frame, 42 + postBurst);
   }
 });
 
@@ -330,7 +330,7 @@ test("inactive, exploding, off-screen, and weaponless enemies cannot fire", () =
     { enemyActive: false },
     { enemyExploding: true },
     { enemyY: 20 },
-    { enemyY: 220 },
+    { enemyY: 240 },
     { archetype: talon },
     { archetype: bomber },
   ]) {

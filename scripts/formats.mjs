@@ -313,7 +313,7 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(manifest.runtimeCodeBudget?.frontendH31?.baselineBytes ===
     SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES &&
     (manifest.encounterDirector?.enabled === true
-      ? manifest.encounterDirector.linkedRuntimeBytes === 16949
+      ? manifest.encounterDirector.linkedRuntimeBytes === 16989
       : manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <=
         FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES),
   "H3.1 exceeds its linked runtime hard budget");

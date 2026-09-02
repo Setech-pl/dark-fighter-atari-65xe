@@ -16,9 +16,7 @@
         "maximumSpeedRatioNumerator": 4,
         "maximumSpeedRatioDenominator": 5,
         "weaveAmplitudeHpos": 4,
-        "weavePeriodFrames": 32,
-        "attackActiveTop": 16,
-        "attackActiveBottomExclusive": 200
+        "weavePeriodFrames": 32
       }
     },
     "corridor": {

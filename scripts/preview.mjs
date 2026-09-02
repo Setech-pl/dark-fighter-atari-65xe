@@ -97,6 +97,7 @@ import {
   simulateBroadsideSpeedSequence,
   warningVisual,
 } from "./broadside.mjs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -106,6 +107,7 @@ const frontendH31Asset = compileFrontendH31(loadFrontendH31Definition(
 
 const SCREEN_COLUMNS = 40;
 const SCREEN_ROWS = 24;
+const GAMEPLAY_SCREEN_ROWS = canonicalPlayfield.gameplayRows + canonicalPlayfield.hudRows;
 const CHARACTER_HEIGHT = 8;
 const ANTIC_PIXELS_PER_BYTE = 4;
 const HIGH_RES_PIXELS_PER_COLOR_CLOCK = 2;
@@ -833,7 +835,7 @@ export function readGameGraphicsSource(
     ["HUD_BOTTOM", fighterWeapons.viewport.hudBottom],
     ["GAMEPLAY_TOP", fighterWeapons.viewport.gameplayTop],
     ["GAMEPLAY_BOTTOM", fighterWeapons.viewport.gameplayBottom],
-    ["PLAYER_RESPAWN_Y", fighterWeapons.viewport.gameplayBottom - 16],
+    ["PLAYER_RESPAWN_Y", fighterWeapons.viewport.gameplayBottom - 15],
     ["VIPER_PROJECTILE_COLOR", fighterWeapons.viper.colourValue],
     ["RAIDER_PROJECTILE_COLOR", fighterWeapons.raider.colourValue],
     ["SHARED_FIGHTER_EXPLOSION_TOTAL", fighterWeapons.sharedFighterExplosion.totalFrames],
@@ -925,20 +927,24 @@ export function readGameGraphicsSource(
     hudHardwareState.set(register, requireValue(gameplayEntryState, register));
   }
 
-  // Runtime A2 keeps HUD and divider LMS operands fixed, then maps the 22-row
+  // Runtime A2 keeps HUD and divider LMS operands fixed, then maps the canonical ring.
   // ring. Preview uses the exact accepted head-zero address sequence.
   const screenAddress = requireValue(constants, "SCREEN");
   const gameplayDisplayList = Uint8Array.from([
     0xc2, screenAddress & 0xff, screenAddress >>> 8,
     0x44, (screenAddress + 40) & 0xff, (screenAddress + 40) >>> 8,
-    ...Array.from({ length: 22 }, (_, row) => {
+    ...Array.from({ length: canonicalPlayfield.ringRows }, (_, row) => {
       const address = screenAddress + (row + 2) * 40;
-      return [row === 21 ? 0xc4 : 0x44, address & 0xff, address >>> 8];
+      return [row === canonicalPlayfield.ringRows - 1 ? 0xc4 : 0x44,
+        address & 0xff, address >>> 8];
     }).flat(),
   ]);
   const gameplayLayout = decodeMainMenuDisplayList(
     gameplayDisplayList,
     requireValue(constants, "SCREEN"),
+    GAMEPLAY_SCREEN_ROWS * CHARACTER_HEIGHT,
+    false,
+    GAMEPLAY_SCREEN_ROWS * SCREEN_COLUMNS,
   );
 
   const mainMenuHardwareState = new Map(frontendHardwareState);
@@ -1007,11 +1013,11 @@ export function readGameGraphicsSource(
 
   const gameplayModes = graphics.gameplayLayout.rows.map(({ mode }) => mode);
   if (
-    gameplayModes.length !== SCREEN_ROWS ||
+    gameplayModes.length !== GAMEPLAY_SCREEN_ROWS ||
     gameplayModes[0] !== 2 ||
     gameplayModes.slice(1).some((mode) => mode !== 4)
   ) {
-    throw new Error("Preview source does not contain one ANTIC 2 HUD row and 23 ANTIC 4 playfield rows");
+    throw new Error("Preview source does not contain one ANTIC 2 HUD row and 28 ANTIC 4 playfield rows");
   }
 
   return graphics;
@@ -1022,6 +1028,7 @@ function decodeMainMenuDisplayList(
   screenAddress,
   expectedHeight = SOURCE_HEIGHT,
   countBlankRows = false,
+  maximumScreenBytes = 1024,
 ) {
   const rows = [];
   let offset = 0;
@@ -1062,7 +1069,7 @@ function decodeMainMenuDisplayList(
     y += height;
   }
 
-  if (y !== expectedHeight || screenOffset > 1024) {
+  if (y !== expectedHeight || screenOffset > maximumScreenBytes) {
     throw new Error(`Frontend display list does not describe a bounded 320x${expectedHeight} screen`);
   }
   return { rows, screenBytes: screenOffset, height: expectedHeight };
@@ -1232,7 +1239,7 @@ function createCanonicalScreenRuntimeState(
   { sectorPhase = graphics.capitalHulls.sector.previewSectorRow } = {},
 ) {
   const { constants, initialState } = graphics;
-  const screen = new Uint8Array(SCREEN_COLUMNS * SCREEN_ROWS);
+  const screen = new Uint8Array(SCREEN_COLUMNS * GAMEPLAY_SCREEN_ROWS);
   screen.fill(requireValue(constants, "CH_SPACE"));
 
   for (let index = 0; index < graphics.hud.length && graphics.hud[index] !== 0; index += 1) {
@@ -1245,7 +1252,7 @@ function createCanonicalScreenRuntimeState(
   const gameplayFirstRow = requireValue(constants, "GAMEPLAY_FIRST_SCREEN_ROW");
   const visibleRowCount = graphics.capitalHulls.sector.visibleRows;
 
-  for (let row = gameplayFirstRow; row < SCREEN_ROWS; row += 1) {
+  for (let row = gameplayFirstRow; row < GAMEPLAY_SCREEN_ROWS; row += 1) {
     const starRow = row - gameplayFirstRow;
     screen.set(
       starfieldScreen.subarray(starRow * SCREEN_COLUMNS, (starRow + 1) * SCREEN_COLUMNS),
@@ -1336,7 +1343,7 @@ function advanceCanonicalScreenRuntimeState(state, graphics) {
   const gameplayFirstRow = requireValue(graphics.constants, "GAMEPLAY_FIRST_SCREEN_ROW");
   state.starfieldState = stepStarfieldWorld(graphics.starfield, state.starfieldState);
   const composed = composeStarfield(graphics.starfield, state.starfieldState);
-  for (let row = gameplayFirstRow; row < SCREEN_ROWS; row += 1) {
+  for (let row = gameplayFirstRow; row < GAMEPLAY_SCREEN_ROWS; row += 1) {
     const starRow = row - gameplayFirstRow;
     for (let column = 9; column <= 30; column += 1) {
       state.screen[row * SCREEN_COLUMNS + column] =
@@ -1751,7 +1758,7 @@ function applyCapitalShellVisualToScreen(screen, asset, visual) {
   if (visual.renderer !== "ANTIC4_PLAYFIELD_OVERLAY") return null;
   const screenRow = Math.floor((visual.y - PMG_SCREEN_TOP) / CHARACTER_HEIGHT);
   const screenColumn = Math.floor((visual.x - PMG_LEFT_EDGE) / ANTIC_PIXELS_PER_BYTE);
-  if (screenRow < 1 || screenRow >= SCREEN_ROWS ||
+  if (screenRow < 1 || screenRow >= GAMEPLAY_SCREEN_ROWS ||
       screenColumn < 0 || screenColumn >= SCREEN_COLUMNS) return null;
   const screenIndex = screenRow * SCREEN_COLUMNS + screenColumn;
   const cellCount = visual.width / ANTIC_PIXELS_PER_BYTE;
@@ -5276,7 +5283,8 @@ export function readPlayerRespawnSequenceRuntimeState(
     { label: "REAL RIGHT CONTACT  ONE LIFE EVENT",
       player: { x: enemyContact.clampedX, y: playerY }, contact: enemyContact },
     { label: "DEATH FRAME 006  PLAYER HIDDEN", player: { x: playerX, y: playerY, visible: false } },
-    { label: "RESPAWN FRAME 000  X124 Y184", player: { x: playerX, y: playerY } },
+    { label: `RESPAWN FRAME 000  X${playerX} Y${playerY}`,
+      player: { x: playerX, y: playerY } },
     { label: "INVULN FRAME 007  VISIBLE M0 ACTIVE", player: { x: playerX, y: playerY }, bullet },
     { label: "INVULN FRAME 008  HIDDEN M0 ACTIVE",
       player: { x: playerX, y: playerY, visible: false }, bullet },

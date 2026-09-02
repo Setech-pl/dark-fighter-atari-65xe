@@ -19,8 +19,8 @@ verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
 
 ## Cold startup and loader
 
-The Encounter Director configuration uses a 100-sector initial block at
-`$2000-$51FF` and enters at `$201E` with a 449-byte raw bootstrap prefix. A
+The Encounter Director configuration uses a 101-sector initial block at
+`$2000-$527F` and enters at `$201E` with a 449-byte raw bootstrap prefix. A
 1,191-byte stage-2 overlay runs at `$21C1-$2667`; after it validates
 the complete manifest, it reads extension sectors through standard OS SIOV
 while OS IRQ/NMI and disk services are still available. Each chunk is fully
@@ -28,20 +28,20 @@ read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
 controlled destination. Any failure blanks DMA, selects a fixed red error
 background, and halts before partially loaded code can execute.
 
-The four ordered DFMC records are BROADSIDE in sectors 101-144, the packed
-pickup phase/code stream in sectors 145-151, 39-byte integration glue in sector
-152, and the Encounter Director in sectors 153-157. ATR stages each record at
+The four ordered DFMC records are BROADSIDE in sectors 102-145, the packed
+pickup phase/code stream in sectors 146-152, 39-byte integration glue in sector
+153, and the Encounter Director in sectors 154-158. ATR stages each record at
 `$8100`; BROADSIDE expands 6,557 bytes to `$5E10-$77AC`, the pickup stream is
 published temporarily at `$8C80`, glue expands first to `$5259-$527F`, and the
 645-byte Director expands to `$9D75-$9FF9`. The last BROADSIDE source read makes `$8100` reusable;
 only then does startup copy the packed resident suffix and stage it at
-`$8100-$9AFA`. The 7,743-byte suffix is stored as a 6,650-byte LZ-10/5 stream
+`$8100-$9A53`. The 7,743-byte suffix is stored as a 6,584-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. No loader byte remains resident or enters gameplay.
 
 The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
-accepts RAW or LZ records. The current initial block and four records use 157
-sectors (20,096 B). The ATR itself has 563 unused sectors (72,064 B); runtime
+accepts RAW or LZ records. The current initial block and four records use 158
+sectors (20,224 B). The ATR itself has 562 unused sectors (71,936 B); runtime
 residency remains a separate constraint.
 
 ### DFMC v1 byte format
@@ -62,11 +62,11 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production records begin at sectors 101, 145, 152, and 153. Their packed/raw
-lengths are respectively 5,579/6,557 B, 857/857 B, 41/39 B, and 585/645 B.
+Production records begin at sectors 102, 146, 153, and 154. Their packed/raw
+lengths are respectively 5,581/6,557 B, 873/873 B, 41/39 B, and 585/645 B.
 The second record carries the compressed immutable pickup phase bank plus its
-late compositor. Its cold copy at `$8C80-$8FD8` is first preserved at
-`$4801-$4B59`, then decompressed to `$8800-$8E2E`; source and destination never
+late compositor. Its cold copy at `$8C80-$8FE8` is first preserved at
+`$4801-$4B69`, then decompressed to `$8800-$8E49`; source and destination never
 overlap while live. Glue is transported to `$5259`, held at `$7F16-$7F3C` while
 ENTITY_CODE is unpacked, and late-published to `$4EFE-$4F24`. The Director ends
 at `$9FF9`; `$9FFA-$9FFF` is a six-byte untouched guard.
@@ -137,12 +137,13 @@ disk persistence is performed.
 
 ## Display, scrolling, and frame publication
 
-Gameplay uses a fixed ANTIC 2 HUD and divider plus 22 ANTIC 4 logical playfield
-rows. Two 75-byte A2 display lists are built and published alternately. The
+Gameplay uses a fixed ANTIC 2 HUD and divider plus 27 ANTIC 4 logical playfield
+rows. Two 90-byte A2 display lists are built and published alternately. The
 first DLI selects byte three of the active A2 list before playfield DMA; the
 second restores HUD state and leaves the next frame's publication to the JVB.
 
-Logical rows map to a 23-row physical ring. World and hull scroll operations
+The divider stays at `$4028-$404F`; logical rows below it map to a 27-row
+physical ring at `$8140-$8577`. World and hull scroll operations
 write the recycled physical row before the new list becomes visible. All A2
 heads, row wrap, and the fixed HUD boundary are therefore handled without a
 visible partial list.
@@ -264,8 +265,9 @@ exclusive. Rapid Fire and Spread Shot last 500 active frames; Shield lasts 250.
 The capsule is created at Y=8, wholly above the gameplay display. PENDING and
 Director admission retries cannot change that coordinate. Admission activates
 it at Y=24; the one authoritative late renderer runs once after the A2 ring
-update and publishes one phased 2x2/2x3 footprint through Y=190. The slot is
-released at exactly Y=192. At frame start the interactive erase pass restores
+update and publishes one phased 2x2/2x3 footprint through Y=239, clipping only
+the scanlines that have actually crossed the exclusive boundary. The slot is
+released at exactly Y=240. At frame start the interactive erase pass restores
 the exact four or six physical cells saved by the preceding draw, in reverse
 row order. Capsule codes are never committed to ring backing, tail repair, or
 wrap-copy sources, so an old footprint cannot return after a ring wrap. The

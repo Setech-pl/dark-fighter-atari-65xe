@@ -1,4 +1,5 @@
 import { ENEMY_WEAPON_PROFILES } from "./enemy-roster.mjs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 export const ENEMY_COMBAT_SECTOR_STATES = Object.freeze({
   ACTIVE: 0,
@@ -10,7 +11,7 @@ export const ENEMY_COMBAT_SECTOR_STATES = Object.freeze({
 // runtime's exclusive bottom test. Keeping the simulator in the same units is
 // essential: a source-space row is not a visible enemy Y coordinate.
 export const ENEMY_FULLY_VISIBLE_TOP = 24;
-export const ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = 200;
+export const ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = canonicalPlayfield.gameplayBottom;
 
 // Lower numeric values are the deterministic same-frame credit priority.
 // Allegiance and colour remain separate from this destruction policy.
@@ -403,7 +404,7 @@ export function simulateNaturalRaiderFire(asset, {
   initialEnemyY = ENEMY_FULLY_VISIBLE_TOP,
   initialPool,
   initialSizeM = 0x54,
-  player = { x: 80, y: 184, width: 8, height: 16 },
+  player = { x: 80, y: 184, width: 8, height: 15 },
   sectorState = ENEMY_COMBAT_SECTOR_STATES.ACTIVE,
 } = {}) {
   const archetype = asset.implemented[0];
