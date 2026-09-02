@@ -380,9 +380,9 @@ ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = GAMEPLAY_BOTTOM
 
 PLAYER_H    = 16
 PLAYER_COLLISION_WIDTH = 8
-; The Viper's eight PMG bits are rendered double-width, so player/debris
-; contact owns the complete visible 16-HPOS horizontal envelope. Other combat
-; collision contracts intentionally retain PLAYER_COLLISION_WIDTH.
+; The Viper's eight PMG bits are rendered double-width, so player/debris and
+; capital-shell contact own the complete visible 16-HPOS horizontal envelope.
+; Narrow legacy contracts retain PLAYER_COLLISION_WIDTH where explicitly used.
 PLAYER_VISIBLE_WIDTH_HPOS = 16
 PLAYER_COLLISION_LAST_ROW = 14
 PLAYER_X_MIN = 48
@@ -624,7 +624,7 @@ WEAPON_PICKUP_GLYPH_BASE = EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUN
 WEAPON_PICKUP_SPREAD_GLYPH_BASE = WEAPON_PICKUP_GLYPH_BASE
 WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE
 WEAPON_PICKUP_PHASE_BANK = $8800
-WEAPON_PICKUP_PACKED_STAGING = $7BD0
+WEAPON_PICKUP_PACKED_STAGING = $8C80
 WEAPON_PICKUP_COLD_STAGING = $4801
 VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT
 
@@ -994,15 +994,12 @@ unpack_starfield_runtime:
     sta broadside_destination+2
     jmp broadside_unpack_command
 
-; Patched by scripts/build.mjs. Resident, A2 and ENTITY_CODE are preserved
-; first. Their initial sources are then dead, so the externally loaded pickup
-; stream can move to $4801 before the final starfield copy overwrites $7BD0.
+; Patched by scripts/build.mjs. A2 and ENTITY_CODE are preserved before the
+; pickup stream moves to $4801 and destroys their initial-source tail. The
+; pickup copy must precede resident staging at $8100, whose maximum write would
+; otherwise destroy the temporary packed source at $8C80. All three are safe
+; before the final starfield staging copy.
 boot_stage_streams:
-resident_packed_source:
-    .word $FFFF
-    .word PACKED_RESIDENT_STAGING
-resident_packed_size:
-    .word $FFFF
 a2_kernel_source:
     .word $FFFF
     .word BOOT_A2_STAGING
@@ -1017,6 +1014,11 @@ pickup_packed_source:
     .word WEAPON_PICKUP_PACKED_STAGING
     .word WEAPON_PICKUP_COLD_STAGING
 pickup_packed_size:
+    .word $FFFF
+resident_packed_source:
+    .word $FFFF
+    .word PACKED_RESIDENT_STAGING
+resident_packed_size:
     .word $FFFF
 starfield_packed_source:
     .word $FFFF
@@ -8133,61 +8135,7 @@ render_capital_explosion:
 ; bit 1 Cylon fighter. The swept rectangle includes the previous and current
 ; positions and the full eight-HPOS by six-scanline visible playfield slug.
 capital_shell_collision_flags:
-    stx BROAD_WORK_SLOT
-    lda BROAD_X,x
-    sta src_ptr                  ; swept left edge
-    clc
-    adc #(CAPITAL_PROJECTILE_WIDTH_HPOS-1)
-    sta src_ptr+1                ; swept right edge (inclusive)
-    lda BROAD_OWNER,x
-    beq @allied_sweep
-    lda src_ptr+1
-    clc
-    adc #BROADSIDE_PROJECTILE_SPEED
-    sta src_ptr+1                ; enemy moved left: old right lies two beyond
-    jsr capital_shell_hits_enemy
-    bcc @enemy_player_only
-    jsr capital_shell_hits_player
-    bcc @fighter_first
-    ; For a left-moving shell, the target with the greatest right edge is hit
-    ; first. Equal edges deterministically credit the fighter.
-    ldy ENEMY_ARCHETYPE
-    lda enemy_x
-    clc
-    adc enemy_visible_widths,y
-    sta row_counter
-    lda player_x
-    clc
-    adc #PLAYER_COLLISION_WIDTH
-    cmp row_counter
-    bcc @fighter_result
-    beq @fighter_result
-    lda #$01
-    bne @store_result
-@fighter_result:
-@fighter_first:
-    lda #$02
-    bne @store_result
-@enemy_player_only:
-    jsr capital_shell_hits_player
-    bcc @zero_result
-    lda #$01
-    bne @store_result
-@allied_sweep:
-    lda src_ptr
-    sec
-    sbc #BROADSIDE_PROJECTILE_SPEED
-    sta src_ptr                  ; allied moved right: old left lies two before
-    jsr capital_shell_hits_enemy
-    bcc @zero_result
-    lda #$02
-    bne @store_result
-@zero_result:
-    lda #$00
-@store_result:
-    ldx BROAD_WORK_SLOT
-    sta BROAD_COLLISION,x
-    rts
+    jmp capital_shell_collision_flags_shared
 
 ; Target helpers expand the target vertically by the shell half-height, then
 ; share four exclusive rectangle comparisons. src_ptr contains shell L/R;
@@ -8225,12 +8173,12 @@ capital_shell_hits_enemy:
     sta dst_ptr+1
     lda enemy_y
     sec
-    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2-1)
     sta frontend_data_ptr
     clc
     lda frontend_data_ptr
     adc enemy_frame_heights,y
-    adc #CAPITAL_PROJECTILE_VISIBLE_HEIGHT
+    adc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT-1)
     sta frontend_data_ptr+1
     jmp capital_shell_hits_target
 @miss:
@@ -8241,17 +8189,92 @@ capital_shell_hits_player:
     lda player_x
     sta dst_ptr
     clc
-    adc #(PLAYER_COLLISION_WIDTH-1)
+    adc #(PLAYER_VISIBLE_WIDTH_HPOS-1)
     sta dst_ptr+1
     lda player_y
     sec
-    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2)
+    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2-1)
     sta frontend_data_ptr
     clc
     lda frontend_data_ptr
-    adc #(PLAYER_COLLISION_LAST_ROW+1+CAPITAL_PROJECTILE_VISIBLE_HEIGHT)
+    adc #(PLAYER_COLLISION_LAST_ROW+CAPITAL_PROJECTILE_VISIBLE_HEIGHT)
     sta frontend_data_ptr+1
     jmp capital_shell_hits_target
+
+.segment "PICKUP_CODE"
+; Both capital factions share one final-raster collision compositor. The shell
+; sweep is derived from the two character-aligned positions actually rendered,
+; and the Viper target is its complete double-width PMG envelope. OWNER selects
+; travel direction and spatial-first arbitration only; it never filters player
+; friendly fire.
+capital_shell_collision_flags_shared:
+    stx BROAD_WORK_SLOT
+    lda BROAD_X,x
+    and #$FC
+    sta src_ptr                  ; current rendered left edge
+    clc
+    adc #(CAPITAL_PROJECTILE_WIDTH_HPOS-1)
+    sta src_ptr+1                ; current rendered right edge, inclusive
+    lda BROAD_OWNER,x
+    beq @right_sweep
+    lda BROAD_X,x
+    clc
+    adc #BROADSIDE_PROJECTILE_SPEED
+    and #$FC
+    clc
+    adc #(CAPITAL_PROJECTILE_WIDTH_HPOS-1)
+    sta src_ptr+1                ; prior left-moving rendered right edge
+    jmp @targets
+@right_sweep:
+    lda BROAD_X,x
+    sec
+    sbc #BROADSIDE_PROJECTILE_SPEED
+    and #$FC
+    sta src_ptr                  ; prior right-moving rendered left edge
+@targets:
+    lda #$00
+    sta BROAD_COLLISION,x
+    jsr capital_shell_hits_player
+    bcc :+
+    ldx BROAD_WORK_SLOT
+    lda #$01
+    sta BROAD_COLLISION,x
+:
+    jsr capital_shell_hits_enemy
+    bcc @done
+    ldx BROAD_WORK_SLOT
+    lda BROAD_COLLISION,x
+    beq @fighter_first
+    lda BROAD_OWNER,x
+    beq @right_order
+    ; Left-moving: greatest target right edge is spatially first. A tie keeps
+    ; the existing deterministic fighter precedence.
+    ldy ENEMY_ARCHETYPE
+    lda enemy_x
+    clc
+    adc enemy_visible_widths,y
+    sta row_counter
+    lda player_x
+    clc
+    adc #PLAYER_VISIBLE_WIDTH_HPOS
+    cmp row_counter
+    bcc @fighter_first
+    beq @fighter_first
+    bcs @done
+@right_order:
+    ; Right-moving: smallest target left edge is spatially first. Equal edges
+    ; retain the same fighter precedence used by the opposite direction.
+    lda player_x
+    cmp enemy_x
+    bcc @done
+@fighter_first:
+    lda #$02
+    sta BROAD_COLLISION,x
+@done:
+    ldx BROAD_WORK_SLOT
+    rts
+
+.segment "BROADSIDE"
 
 ; Keep this label adjacent to the shared test so disassembly and tests can
 ; prove that both factions use archetype envelopes rather than GTIA colour.
@@ -8765,9 +8788,9 @@ unpack_broadside_runtime:
     stx broadside_destination+2
     jmp broadside_unpack_command
 
-; The external pickup record initially lands inside the later starfield staging
-; range. stage_boot_streams preserves it in not-yet-initialised frontend
-; charset RAM after its initial packed source has been consumed.
+; The external pickup record initially lands in its not-yet-unpacked runtime
+; reservation. stage_boot_streams preserves it in not-yet-initialised frontend
+; charset RAM before the final $8800-$8FFF unpack overwrites that packed copy.
 unpack_weapon_pickup_phase_runtime:
     ldx #>WEAPON_PICKUP_COLD_STAGING
     lda #<WEAPON_PICKUP_COLD_STAGING

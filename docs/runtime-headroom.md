@@ -97,10 +97,19 @@ boundaries, illegal `$45/$D0` cells, and tracked-muzzle/BROADSIDE pointer errors
 are all zero. These focused measurements do not replace the accepted global
 gauntlet report below.
 
-This provisional gate adds 107 B of linked code/data, no BSS, and no glyphs.
-Linked runtime is 16,924 B; simultaneous residency is 18,762 B and safe
-residency is 3,425 B. The entry and muzzle raster sequences plus raw per-frame
+At that provisional checkpoint the gate added 107 B of linked code/data, no
+BSS, and no glyphs. Linked runtime was 16,924 B; simultaneous residency was
+18,762 B and safe residency was 3,425 B. The entry and muzzle raster sequences plus raw per-frame
 traces are stored under `build/runtime-wall-trace/provisional-capital-*-cold-*`.
+
+The owner-independent capital-shell collision correction moves its common
+dispatcher into PICKUP_CODE: BROADSIDE shrinks by 96 B, PICKUP_CODE grows by
+121 B, and the net linked code/data increase is 25 B. Current linked runtime is
+16,949 B, simultaneous residency is 18,787 B, safe residency is 3,400 B, and
+BSS/glyph allocation is unchanged. Focused native Colonial and Cylon contact
+traces peak at 20,852 and 20,166 wall cycles respectively, leaving at least
+14,716 cycles of the 35,568-cycle PAL frame. Both record zero missed frames,
+deadline overruns, and extra VBI boundaries.
 
 ## Heaviest legal frame
 

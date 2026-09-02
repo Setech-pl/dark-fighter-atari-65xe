@@ -180,6 +180,16 @@ const provisionalCapitalSessions = [0, 1, 2].map((difficulty) => ({
   kind: "provisional-capital-cold",
 }));
 
+const capitalContactSessions = [0, 1].map((owner) => ({
+  id: `capital-contact-${owner === 0 ? "colonial" : "cylon"}-medium`,
+  difficulty: 1,
+  policy: owner === 0 ? "capital-contact-colonial" : "capital-contact-cylon",
+  fireDelay: 4_000,
+  frames: owner === 0 ? 560 : 360,
+  kind: "capital-projectile-contact",
+  contactOwner: owner,
+}));
+
 const directorCompletionSessions = [0, 1, 2].map((difficulty) => ({
   id: `director-complete-${difficulty}-natural-sweep-fire0`,
   difficulty,
@@ -259,6 +269,8 @@ const traceLabels = {
   DFTRACE_PC_PLAYER_DRAW: "draw_player",
   DFTRACE_PC_ENGINE_UPDATE: "update_engine_animation",
   DFTRACE_PC_ENGINE_COPY: "copy_engine_animation_phase",
+  DFTRACE_PC_CAPITAL_COLLISION: "capital_shell_collision_flags",
+  DFTRACE_PC_CAPITAL_PLAYER_DAMAGE: "apply_broadside_player_damage",
   DFTRACE_PC_GAMEPLAY_INIT: "start_gameplay",
   DFTRACE_PC_ROTATE_START: "rotate_playfield_rows",
   DFTRACE_PC_ROTATE_END: "rotate_playfield_table_shift",
@@ -417,9 +429,16 @@ for (const field of ["muzzle_code_cells", "muzzle_illegal_cells", "muzzle_pointe
   "muzzle_divider_allied", "muzzle_divider_enemy", "broad_pointer_errors"])
   numericCsvFields.add(field);
 for (const slot of [0, 1, 2]) {
-  for (const field of ["state", "flash", "turret", "row", "pointer"])
+  for (const field of ["state", "flash", "turret", "row", "pointer", "owner", "x", "y",
+    "collision", "raster_x", "raster_row"])
     numericCsvFields.add(`broad${slot}_${field}`);
 }
+for (const field of ["player_health", "player_lives", "player_invulnerability",
+  "player_damage_cooldown", "player_damage_applied", "capital_collision_calls",
+  "capital_player_damage_calls", "player_lifecycle_after", "player_x_after",
+  "player_y_after", "player_health_after", "player_lives_after",
+  "player_invulnerability_after", "player_damage_cooldown_after"])
+  numericCsvFields.add(field);
 for (const name of [
   "pickup_prev_x", "pickup_prev_y", "pickup_prev_render_row",
   "pickup_prev_render_phase", "pickup_render_row", "pickup_render_phase",
@@ -1282,7 +1301,7 @@ function main() {
     ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
       ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
       ...weaponPickupTraversalSessions, ...weaponPickupContactSessions,
-      ...capitalMuzzleSessions, ...provisionalCapitalSessions,
+      ...capitalMuzzleSessions, ...provisionalCapitalSessions, ...capitalContactSessions,
       ...memoryIntegritySessions]
       .concat(engineDiagnosticSessions, engineRestartSessions)
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
@@ -1302,6 +1321,8 @@ function main() {
         ? path.join(buildDirectory, `${session.id}-muzzle`) : undefined;
     const provisionalEntryPrefix = session.kind === "provisional-capital-cold"
       ? path.join(buildDirectory, `${session.id}-entry`) : undefined;
+    const capitalContactPrefix = session.kind === "capital-projectile-contact"
+      ? path.join(buildDirectory, `${session.id}-frame`) : undefined;
     if (pickupContactPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(pickupContactPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
@@ -1318,6 +1339,13 @@ function main() {
     }
     if (provisionalEntryPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(provisionalEntryPrefix);
+      for (const name of fs.readdirSync(buildDirectory)) {
+        if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
+          fs.unlinkSync(path.join(buildDirectory, name));
+      }
+    }
+    if (capitalContactPrefix !== undefined && !reuseExistingTraces) {
+      const basename = path.basename(capitalContactPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
         if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
           fs.unlinkSync(path.join(buildDirectory, name));
@@ -1358,6 +1386,10 @@ function main() {
 	  } : {}),
 	  ...(provisionalEntryPrefix === undefined ? {} : {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: provisionalEntryPrefix,
+	  }),
+	  ...(capitalContactPrefix === undefined ? {} : {
+	    DFTRACE_CAPITAL_CONTACT_PREFIX: capitalContactPrefix,
+	    DFTRACE_CAPITAL_CONTACT_OWNER: String(session.contactOwner),
 	  }),
 	  ...(session.kind === "engine-restart-after-game-over" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
@@ -1551,6 +1583,110 @@ function main() {
         },
         entry_screenshot_sequence: path.relative(rootDirectory, entrySheet),
       }, null, 2)}\n`);
+    }
+    if (capitalContactPrefix !== undefined) {
+      const basename = path.basename(capitalContactPrefix);
+      const paths = fs.readdirSync(buildDirectory)
+        .filter((name) => name.startsWith(`${basename}-`) && name.endsWith(".png"))
+        .sort()
+        .map((name) => path.join(buildDirectory, name));
+      invariant(paths.length === 16,
+        `${session.id} did not capture 16 consecutive contact rasters`);
+      const damageRows = rows.filter((row) => row.capital_player_damage_calls !== 0);
+      invariant(damageRows.length === 1 && damageRows[0].capital_player_damage_calls === 1,
+        `${session.id} did not enter the capital damage pipeline exactly once`);
+      const contactIndex = rows.indexOf(damageRows[0]);
+      const before = rows[contactIndex - 1];
+      const contact = rows[contactIndex];
+      const after = rows[contactIndex + 1];
+      invariant(before !== undefined && after !== undefined,
+        `${session.id} contact is missing an adjacent trace frame`);
+      const slot = [0, 1, 2].find((index) =>
+        contact[`broad${index}_owner`] === session.contactOwner &&
+        contact[`broad${index}_state`] === 3 &&
+        (contact[`broad${index}_collision`] & 1) !== 0);
+      invariant(slot !== undefined && before[`broad${slot}_state`] === 2 &&
+        contact.capital_collision_calls === 1,
+      `${session.id} did not transition one matching FLYING shell to IMPACT`);
+      invariant(contact.player_health === 10 && contact.player_health_after === 8 &&
+        contact.player_lives_after === 3 && contact.player_lifecycle_after === 0 &&
+        contact.player_invulnerability_after === 0 &&
+        contact.player_damage_cooldown_after === 25,
+      `${session.id} did not apply exactly two HULL units through the canonical gate`);
+      invariant(after.player_health === 8 && after.player_health_after === 8 &&
+        after.player_damage_cooldown_after === 24 &&
+        rows.slice(contactIndex + 1).every((row) => row.capital_player_damage_calls === 0),
+      `${session.id} repeated damage after the projectile entered IMPACT`);
+      const shellBox = {
+        left: contact[`broad${slot}_raster_x`],
+        right: contact[`broad${slot}_raster_x`] + 7,
+        top: contact[`broad${slot}_y`] - 3,
+        bottom: contact[`broad${slot}_y`] + 2,
+      };
+      const playerBox = {
+        left: contact.player_x_after,
+        right: contact.player_x_after + 15,
+        top: contact.player_y_after,
+        bottom: contact.player_y_after + 14,
+      };
+      invariant(shellBox.left <= playerBox.right && shellBox.right >= playerBox.left &&
+        shellBox.top <= playerBox.bottom && shellBox.bottom >= playerBox.top,
+      `${session.id} damage occurred without final-raster hitbox intersection`);
+      const maximumWall = Math.max(...rows.map((row) => row.wall_cycles));
+      const missed = rows.reduce((sum, row) => sum + row.missed_frames, 0);
+      const extraVbi = rows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0);
+      const overruns = rows.filter((row) => row.wall_cycles > 32_584).length;
+      invariant(missed === 0 && extraVbi === 0 && overruns === 0,
+        `${session.id} missed PAL timing around projectile contact`);
+      const sheetPath = path.join(buildDirectory, `${session.id}-contact-sequence.png`);
+      const sheet = writeScreenshotContact(paths, sheetPath, 4);
+      const frameEvidence = (row) => ({
+        frame: row.frame,
+        player: {
+          x_before_update: row.player_x, y_before_update: row.player_y,
+          x_final: row.player_x_after, y_final: row.player_y_after,
+          hull_before_update: row.player_health, hull_final: row.player_health_after,
+          life_final: row.player_lives_after,
+          respawn_invulnerability_final: row.player_invulnerability_after,
+          damage_cooldown_final: row.player_damage_cooldown_after,
+        },
+        projectile: {
+          slot, owner: row[`broad${slot}_owner`], state: row[`broad${slot}_state`],
+          logical_x: row[`broad${slot}_x`], logical_y: row[`broad${slot}_y`],
+          raster_x: row[`broad${slot}_raster_x`], raster_row: row[`broad${slot}_raster_row`],
+          collision_or_backing: row[`broad${slot}_collision`],
+        },
+        calls: {
+          collision: row.capital_collision_calls,
+          player_damage: row.capital_player_damage_calls,
+        },
+      });
+      fs.writeFileSync(path.join(buildDirectory, `${session.id}-evidence.json`),
+        `${JSON.stringify({
+          session: session.id,
+          owner: session.contactOwner === 0 ? "Colonial/BSG" : "Cylon",
+          emulator: "Atari800 7.1.2 PAL/XL",
+          production_artifact: path.relative(rootDirectory, xexPath),
+          order: "update shell -> common collision -> canonical player damage -> late render",
+          damage_hull_units: 2,
+          post_hit_cooldown_frames: 25,
+          hitboxes: { shell: shellBox, player: playerBox },
+          frames: {
+            before: frameEvidence(before),
+            contact: frameEvidence(contact),
+            after: frameEvidence(after),
+          },
+          timing: {
+            maximum_wall_cycles: maximumWall,
+            pal_headroom: 35_568 - maximumWall,
+            missed_frames: missed,
+            deadline_overruns: overruns,
+            extra_vbi_boundaries: extraVbi,
+          },
+          screenshot_sequence: sheet,
+          raw_trace: path.relative(rootDirectory, outputPath),
+          passed: true,
+        }, null, 2)}\n`);
     }
     if (pickupContactPrefix !== undefined) {
       const basename = path.basename(pickupContactPrefix);

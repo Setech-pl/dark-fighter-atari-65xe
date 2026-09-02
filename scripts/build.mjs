@@ -101,7 +101,7 @@ const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
 const entityPackedStagingAddress = 0x5300;
 const weaponPickupPhaseBankAddress = 0x8800;
-const weaponPickupPackedStagingAddress = 0x7bd0;
+const weaponPickupPackedStagingAddress = 0x8c80;
 const bootA2StagingAddress = 0x7f16;
 const debrisVisualPolishEntityCodeBaselineBytes = 564;
 const debrisVisualPolishEntityCodeBudgetBytes = 512;
@@ -172,7 +172,7 @@ const glueFinalAddress = 0x4efe;
 const directorRunAddress = 0x9d75;
 const directorGuardAddress = 0x9ffa;
 const expectedInitialContentBytes = 12770;
-const expectedLinkedRuntimeBytes = 16924;
+const expectedLinkedRuntimeBytes = 16949;
 const expectedDirectorRawBytes = 645;
 const expectedDirectorPackedBytes = 585;
 const expectedGlueRawBytes = 39;
@@ -828,8 +828,8 @@ async function build() {
   ]);
   if (bootSectors !== 100 || totalTransportSectors !== 157 ||
     transportPayload.length !== 20096 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
-      [101, 45, 5665, 6653, 0x5e10],
-      [146, 6, 743, 743, weaponPickupPackedStagingAddress],
+      [101, 44, 5579, 6557, 0x5e10],
+      [145, 7, 857, 857, weaponPickupPackedStagingAddress],
       [152, 1, 41, 39, glueStagingAddress],
       [153, 5, 585, 645, directorRunAddress],
     ])) {
@@ -947,8 +947,8 @@ async function build() {
       phaseCount: 8,
       initialContentBytes: expectedInitialContentBytes,
       linkedRuntimeBytes: expectedLinkedRuntimeBytes,
-      simultaneousResidencyBytes: 18762,
-      safeResidencyBytes: 3425,
+      simultaneousResidencyBytes: 18787,
+      safeResidencyBytes: 3400,
       glue: {
         stagingAddress: glueStagingAddress,
         holdingAddress: 0x7f16,

@@ -73,6 +73,9 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
   assert.match(source,
     /jsr stage_boot_streams[\s\S]+jsr unpack_entity_runtime\nlayout_d_entity_unpack_complete:\n\s+jsr stage_a2_kernel\n\s+jsr init_entity_effects/);
   assert.doesNotMatch(source, /jsr init_entity_effects\n\s+jsr stage_a2_kernel/);
+  assert.match(source,
+    /boot_stage_streams:[\s\S]+a2_kernel_source:[\s\S]+entity_packed_source:[\s\S]+pickup_packed_source:[\s\S]+resident_packed_source:[\s\S]+starfield_packed_source:/,
+    "pickup must be preserved after A2/ENTITY sources and before resident staging overwrites $8C80");
   const resident = fs.readFileSync(path.join(root, "build/resident-runtime.bin"));
   assert.deepEqual([...resident.subarray(0x40, 0x46)], [0x20, 0x8f, 0x21, 0x20, 0x9e, 0x9a]);
 });
@@ -86,19 +89,19 @@ test("Layout D.2 exact memory and transport budgets remain frozen", () => {
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [101, 45, 5665, 6653, 0x5e10],
-    [146, 6, 743, 743, 0x7bd0],
+    [101, 44, 5579, 6557, 0x5e10],
+    [145, 7, 857, 857, 0x8c80],
     [152, 1, 41, 39, 0x5259],
     [153, 5, 585, 645, 0x9d75],
   ]);
-  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16924);
-  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18762);
-  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3425);
+  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16949);
+  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18787);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3400);
 });
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {
   assert.equal(a2.length, 255);
-  assert.equal(sha256(a2), "efc77ef614a155bd7ae5c321d66e8d17ea1e8d30981991a483ef3322b2d86cc5");
+  assert.equal(sha256(a2), "af34b94a729a2bfd2e86f32dff1360f18dda835b04be5723fb7e4e38fbca76ce");
   for (const artifact of ["xex", "atr"]) for (const fill of [0xa5, 0x5a]) {
     const staged = stageArtifact(artifact, fill);
     assert.equal(sha256(staged.sourceA2), sha256(a2), `${artifact} staged A2`);
@@ -143,22 +146,21 @@ test("pickup hook executes $90EA → $90ED → $90FB, decrements 2 to 1 and retu
 
 test("startup writes never intersect a source before its last read", () => {
   const sources = [
-    { name: "packed ENTITY_CODE", start: 0x4849, end: 0x5237, lastRead: 1 },
-    { name: "GLUE staging", start: 0x5259, end: 0x5280, lastRead: 4 },
-    { name: "A2 source", start: 0x7f16, end: 0x8015, created: 1, lastRead: 4 },
-    { name: "GLUE holding", start: 0x7f16, end: 0x7f3d, created: 4, lastRead: 6 },
+    { name: "A2 initial source", start: 0x4718, end: 0x4817, lastRead: 1 },
+    { name: "packed ENTITY_CODE", start: 0x4817, end: 0x51de, lastRead: 2 },
+    { name: "packed pickup cold source", start: 0x8c80, end: 0x8fd9, lastRead: 3 },
+    { name: "packed resident source", start: 0x2668, end: 0x4018, lastRead: 4 },
+    { name: "packed starfield source", start: 0x4018, end: 0x4718, lastRead: 5 },
   ];
   const writes = [
-    { sequence: 1, start: 0x5300, end: 0x5cef },
-    { sequence: 1, start: 0x6c10, end: 0x8015 },
-    { sequence: 3, start: 0x9000, end: 0x9c75 },
-    { sequence: 4, start: 0x9000, end: 0x90ff },
-    { sequence: 4, start: 0x7f16, end: 0x7f3d },
-    { sequence: 5, start: 0x8000, end: 0x8100 },
-    { sequence: 6, start: 0x4efe, end: 0x4f25 },
+    { sequence: 1, start: 0x7f16, end: 0x8015 },
+    { sequence: 2, start: 0x5300, end: 0x5cc7 },
+    { sequence: 3, start: 0x4801, end: 0x4b5a },
+    { sequence: 4, start: 0x8100, end: 0x9ab0 },
+    { sequence: 5, start: 0x7810, end: 0x7f10 },
   ];
   for (const write of writes) for (const live of sources) {
-    const active = write.sequence < live.lastRead && write.sequence > (live.created ?? 0);
+    const active = write.sequence <= live.lastRead;
     const intersects = write.start < live.end && write.end > live.start;
     assert.equal(active && intersects, false,
       `write ${write.sequence} destroys live ${live.name}`);

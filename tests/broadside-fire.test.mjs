@@ -165,6 +165,33 @@ function broadsideRuntimeBytesAt(address, length) {
   return broadsideRuntime.subarray(offset, offset + length);
 }
 
+function prepareAssembledCapitalPlayerContact({
+  owner,
+  shellX,
+  shellY = 107,
+  playerX = 124,
+  playerY = 100,
+  playerLifecycle = PLAYER_LIFECYCLE_STATES.ALIVE,
+  damageCooldown = 0,
+} = {}) {
+  const memory = createLinkedRuntimeMemory();
+  const broadState = labels.get("BROAD_STATE");
+  const constants = readGameGraphicsSource(source, definition).constants;
+  memory[broadState] = BROADSIDE_STATES.FLYING;
+  memory[broadState + 3] = owner;
+  memory[broadState + 9] = shellX;
+  memory[broadState + 12] = shellY;
+  memory[labels.get("player_x")] = playerX;
+  memory[labels.get("player_y")] = playerY;
+  memory[labels.get("PLAYER_LIFECYCLE")] = playerLifecycle;
+  memory[constants.get("PLAYER_LIVES")] = 3;
+  memory[constants.get("BROAD_PLAYER_HEALTH")] = 10;
+  memory[constants.get("BROAD_DAMAGE_COOLDOWN")] = damageCooldown;
+  memory[constants.get("BROAD_DAMAGE_APPLIED")] = 0;
+  memory[labels.get("CAPITAL_SECTOR_STATE")] = CAPITAL_SECTOR_STATES.DRAIN;
+  return { memory, broadState, constants };
+}
+
 test("broadside source timing and schedule are deterministic and generated with turret metadata", () => {
   const second = compileCapitalHulls(loadCapitalHullsDefinition(definitionPath));
   assert.deepEqual(second.scheduleBytes, asset.scheduleBytes);
@@ -1066,6 +1093,141 @@ test("player damage is one event per frame and the 25-frame cooldown blocks repe
   const third = { ...second, state: BROADSIDE_STATES.FLYING };
   assert.equal(hitPlayer(state, third, asset, 126), true);
   assert.equal(state.health, 60);
+});
+
+test("assembled Colonial and Cylon shells share raster-aligned player collision and canonical damage", () => {
+  const cases = [
+    { name: "Colonial right-moving", owner: 0, shellX: 122, movedX: 124 },
+    { name: "Cylon left-moving", owner: 1, shellX: 132, movedX: 130 },
+  ];
+  for (const { name, owner, shellX, movedX } of cases) {
+    const { memory, broadState, constants } = prepareAssembledCapitalPlayerContact({
+      owner, shellX,
+    });
+    const cycles = runAssembledRoutine(memory, "update_broadside");
+    assert.equal(memory[broadState + 9], movedX, `${name} direction`);
+    assert.equal(memory[broadState + 24], 1, `${name} player collision flag`);
+    assert.equal(memory[broadState], BROADSIDE_STATES.IMPACT, `${name} consumes projectile`);
+    assert.equal(memory[broadState + 15], asset.broadside.impactFrames - 1,
+      `${name} enters the existing same-update impact lifecycle`);
+    assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], 8,
+      `${name} subtracts the documented two HULL units`);
+    assert.equal(memory[constants.get("PLAYER_LIVES")], 3, `${name} is nonlethal`);
+    assert.equal(memory[constants.get("BROAD_DAMAGE_COOLDOWN")], 25,
+      `${name} starts canonical post-hit invulnerability`);
+    assert.equal(memory[constants.get("BROAD_DAMAGE_APPLIED")], 1,
+      `${name} claims exactly one damage event`);
+    assert.ok(cycles < 2_000, `${name} collision update remains bounded`);
+
+    memory[constants.get("BROAD_DAMAGE_APPLIED")] = 0;
+    runAssembledRoutine(memory, "update_broadside");
+    assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], 8,
+      `${name} impact cannot damage again on a later frame`);
+    assert.equal(memory[constants.get("BROAD_DAMAGE_COOLDOWN")], 24);
+  }
+  const shared = routine("capital_shell_collision_flags_shared", "capital_shell_overlaps_enemy_obsolete");
+  assert.match(shared,
+    /jsr capital_shell_hits_player[\s\S]+jsr capital_shell_hits_enemy/);
+  assert.doesNotMatch(shared, /\b(?:COLPF|COLPM|MUZZLE)[A-Z0-9_]*\b/,
+    "owner-independent contact cannot be inferred from colour or renderer addresses");
+});
+
+test("assembled capital-shell edges use the final 16-HPOS Viper raster and near misses stay clear", () => {
+  const cases = [
+    // update moves right by two: raster [116,123] touches player [123,138]
+    { name: "Colonial left edge", owner: 0, shellX: 114, playerX: 123, hit: true },
+    // update moves right by two: raster [112,119] remains one HPOS left of player 120
+    { name: "Colonial left miss", owner: 0, shellX: 110, playerX: 120, hit: false },
+    // update moves left by two: current raster [136,143] touches player [124,139]
+    { name: "Cylon right edge", owner: 1, shellX: 138, playerX: 124, hit: true },
+    // update moves left by two: current raster begins at 144, one HPOS right of player [128,143]
+    { name: "Cylon right miss", owner: 1, shellX: 146, playerX: 128, hit: false },
+  ];
+  for (const item of cases) {
+    const { memory, broadState, constants } = prepareAssembledCapitalPlayerContact(item);
+    runAssembledRoutine(memory, "update_broadside");
+    assert.equal(memory[broadState + 24] & 1, Number(item.hit), item.name);
+    assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], item.hit ? 8 : 10, item.name);
+    assert.equal(memory[broadState], item.hit ? BROADSIDE_STATES.IMPACT : BROADSIDE_STATES.FLYING,
+      item.name);
+  }
+
+  for (const owner of [0, 1]) {
+    for (const [shellY, hit, edge] of [
+      [97, false, "above miss"], [98, true, "top edge"],
+      [117, true, "bottom edge"], [118, false, "below miss"],
+    ]) {
+      const { memory, broadState, constants } = prepareAssembledCapitalPlayerContact({
+        owner,
+        shellX: owner === 0 ? 122 : 132,
+        shellY,
+        playerY: 100,
+      });
+      runAssembledRoutine(memory, "update_broadside");
+      assert.equal(memory[broadState + 24] & 1, Number(hit),
+        `owner ${owner} vertical ${edge}`);
+      assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], hit ? 8 : 10);
+    }
+  }
+});
+
+test("capital-shell impact obeys cooldown, respawn invulnerability, release, and simultaneous latch", () => {
+  for (const owner of [0, 1]) {
+    const blocked = prepareAssembledCapitalPlayerContact({
+      owner,
+      shellX: owner === 0 ? 122 : 132,
+      damageCooldown: 7,
+    });
+    runAssembledRoutine(blocked.memory, "update_broadside");
+    assert.equal(blocked.memory[blocked.constants.get("BROAD_PLAYER_HEALTH")], 10);
+    assert.equal(blocked.memory[blocked.constants.get("BROAD_DAMAGE_COOLDOWN")], 6);
+    assert.equal(blocked.memory[blocked.broadState], BROADSIDE_STATES.IMPACT,
+      `owner ${owner} shell is consumed while damage cooldown protects the player`);
+
+    const invulnerable = prepareAssembledCapitalPlayerContact({
+      owner,
+      shellX: owner === 0 ? 122 : 132,
+      playerLifecycle: PLAYER_LIFECYCLE_STATES.RESPAWN_INVULNERABLE,
+    });
+    invulnerable.memory[invulnerable.constants.get("RESPAWN_INVULNERABLE_TIMER")] = 1;
+    runAssembledRoutine(invulnerable.memory, "update_broadside");
+    assert.equal(invulnerable.memory[invulnerable.constants.get("BROAD_PLAYER_HEALTH")], 10);
+    assert.equal(invulnerable.memory[invulnerable.broadState], BROADSIDE_STATES.IMPACT);
+  }
+
+  const simultaneous = prepareAssembledCapitalPlayerContact({ owner: 0, shellX: 122 });
+  simultaneous.memory[simultaneous.broadState + 1] = BROADSIDE_STATES.FLYING;
+  simultaneous.memory[simultaneous.broadState + 4] = 1;
+  simultaneous.memory[simultaneous.broadState + 10] = 132;
+  simultaneous.memory[simultaneous.broadState + 13] = 107;
+  runAssembledRoutine(simultaneous.memory, "update_broadside");
+  assert.deepEqual(Array.from(simultaneous.memory.subarray(
+    simultaneous.broadState, simultaneous.broadState + 2)),
+  [BROADSIDE_STATES.IMPACT, BROADSIDE_STATES.IMPACT]);
+  assert.deepEqual(Array.from(simultaneous.memory.subarray(
+    simultaneous.broadState + 24, simultaneous.broadState + 26)), [1, 1]);
+  assert.equal(simultaneous.memory[simultaneous.constants.get("BROAD_PLAYER_HEALTH")], 8,
+    "same-frame owner pair may consume both shells but applies one damage event");
+
+  const released = prepareAssembledCapitalPlayerContact({ owner: 1, shellX: 132 });
+  runAssembledRoutine(released.memory, "update_broadside");
+  for (let frame = 0; frame < asset.broadside.impactFrames; frame += 1) {
+    released.memory[released.constants.get("BROAD_DAMAGE_APPLIED")] = 0;
+    runAssembledRoutine(released.memory, "update_broadside");
+  }
+  assert.equal(released.memory[released.broadState], BROADSIDE_STATES.FREE);
+  assert.equal(released.memory[released.broadState + 21], 0,
+    "release leaves no rendered projectile footprint token");
+
+  const postExpiry = prepareAssembledCapitalPlayerContact({ owner: 0, shellX: 122 });
+  runAssembledRoutine(postExpiry.memory, "update_broadside");
+  postExpiry.memory[postExpiry.broadState] = BROADSIDE_STATES.FLYING;
+  postExpiry.memory[postExpiry.broadState + 9] = 122;
+  postExpiry.memory[postExpiry.constants.get("BROAD_DAMAGE_COOLDOWN")] = 0;
+  postExpiry.memory[postExpiry.constants.get("BROAD_DAMAGE_APPLIED")] = 0;
+  runAssembledRoutine(postExpiry.memory, "update_broadside");
+  assert.equal(postExpiry.memory[postExpiry.constants.get("BROAD_PLAYER_HEALTH")], 6,
+    "a later shell damages again after invulnerability expires");
 });
 
 test("source-derived hull contact clamps P0/P3 and shares one deterministic damage gate", () => {

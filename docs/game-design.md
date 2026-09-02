@@ -116,6 +116,15 @@ continues to obey the existing EASY/MEDIUM/HARD intensity ceilings (3/4/5) and
 the three-slot heavy-projectile pool; final placement and difficulty balance
 remain deferred to the level gauntlet.
 
+Every BROADSIDE projectile is a hazard to the Viper, including fire from the
+Colonial/BSG hull; affiliation does not disable friendly fire in this encounter.
+The final character-aligned 8-HPOS shell raster is swept against the Viper's
+complete double-width 16-HPOS PMG envelope. A real overlap consumes the shell
+into its normal impact lifecycle and applies the established capital damage of
+20%, or two of ten HULL units, through the canonical player-damage pipeline.
+Shield, respawn invulnerability, the 25-frame post-hit cooldown, and the
+one-damage-event-per-frame latch retain their existing precedence.
+
 ## Implemented boosters
 
 Only one pickup capsule may exist at a time. A qualifying kill is specifically

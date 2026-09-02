@@ -19,8 +19,8 @@ verify phases bind the boot BIN, XEX, and ATR by exact size and SHA-256.
 
 ## Cold startup and loader
 
-The Encounter Director configuration uses a 101-sector initial block at
-`$2000-$527F` and enters at `$201E` with a 449-byte raw bootstrap prefix. A
+The Encounter Director configuration uses a 100-sector initial block at
+`$2000-$51FF` and enters at `$201E` with a 449-byte raw bootstrap prefix. A
 1,191-byte stage-2 overlay runs at `$21C1-$2667`; after it validates
 the complete manifest, it reads extension sectors through standard OS SIOV
 while OS IRQ/NMI and disk services are still available. Each chunk is fully
@@ -28,11 +28,12 @@ read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
 controlled destination. Any failure blanks DMA, selects a fixed red error
 background, and halts before partially loaded code can execute.
 
-The three ordered DFMC records are BROADSIDE in sectors 102-146, 39-byte
-integration glue in sector 147, and the Encounter Director in sectors 148-152.
-ATR stages each record at `$8100`; BROADSIDE expands 6,656 bytes to
-`$5E10-$780F`, glue expands first to `$5259-$527F`, and the 645-byte Director
-expands to `$9D75-$9FF9`. The last BROADSIDE source read makes `$8100` reusable;
+The four ordered DFMC records are BROADSIDE in sectors 101-144, the packed
+pickup phase/code stream in sectors 145-151, 39-byte integration glue in sector
+152, and the Encounter Director in sectors 153-157. ATR stages each record at
+`$8100`; BROADSIDE expands 6,557 bytes to `$5E10-$77AC`, the pickup stream is
+published temporarily at `$8C80`, glue expands first to `$5259-$527F`, and the
+645-byte Director expands to `$9D75-$9FF9`. The last BROADSIDE source read makes `$8100` reusable;
 only then does startup copy the packed resident suffix and stage it at
 `$8100-$9AFA`. The 7,743-byte suffix is stored as a 6,650-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
@@ -61,10 +62,12 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production records begin at sectors 101, 146, 152, and 153. Their packed/raw
-lengths are respectively 5,665/6,653 B, 743/743 B, 41/39 B, and 585/645 B.
-The second record carries the immutable pickup phase bank plus its late
-compositor. Glue is transported to `$5259`, held at `$7F16-$7F3C` while
+Production records begin at sectors 101, 145, 152, and 153. Their packed/raw
+lengths are respectively 5,579/6,557 B, 857/857 B, 41/39 B, and 585/645 B.
+The second record carries the compressed immutable pickup phase bank plus its
+late compositor. Its cold copy at `$8C80-$8FD8` is first preserved at
+`$4801-$4B59`, then decompressed to `$8800-$8E2E`; source and destination never
+overlap while live. Glue is transported to `$5259`, held at `$7F16-$7F3C` while
 ENTITY_CODE is unpacked, and late-published to `$4EFE-$4F24`. The Director ends
 at `$9FF9`; `$9FFA-$9FFF` is a six-byte untouched guard.
 
@@ -82,7 +85,7 @@ footer palette zones. The loader remains visible for 250 complete PAL frames
 Cold staging also copies:
 
 - validated external broadside/runtime data to `$5E10-$780F` before takeover;
-- packed starfield/music data through `$7810-$7F13` to `$552A-$5DFC`;
+- packed starfield/music data through `$7810-$7F0F` to `$552A-$5DF3`;
 - the 255-byte A2 kernel through `$7F16-$8014` to `$9000-$90FE`, before the
   `$8000-$80FF` entity/effects clear destroys the consumed source;
 - packed entity/effect/frontend code through boot-only staging at `$5300-$5CEF`
@@ -165,6 +168,15 @@ into the recycled row. After every head change the muzzle and attached
 BROADSIDE row pointers are derived again through the logical row table; only the
 current legal cell is redrawn. Warning missiles remain PMG-only and therefore
 never enter ring backing.
+
+BROADSIDE shell contact is owner-independent: Colonial/BSG and Cylon fire both
+enter one collision dispatcher. Owner selects travel direction and spatial
+ordering only. The dispatcher sweeps the two character-aligned shell positions
+actually used by the renderer against the complete 16-HPOS double-width Viper
+envelope, then consumes a hit through the existing impact and canonical
+two-unit player-damage path. Collision runs after shell update and before the
+late shell render; the 25-frame cooldown and per-frame latch prevent repeat
+damage while the impact lifecycle releases the projectile normally.
 
 ## Gameplay layers and backing
 

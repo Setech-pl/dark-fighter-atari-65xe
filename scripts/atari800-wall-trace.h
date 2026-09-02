@@ -61,6 +61,18 @@ typedef struct {
 	unsigned player_lifecycle;
 	unsigned player_x;
 	unsigned player_y;
+	unsigned player_health;
+	unsigned player_lives;
+	unsigned player_invulnerability;
+	unsigned player_damage_cooldown;
+	unsigned player_damage_applied;
+	unsigned player_lifecycle_after;
+	unsigned player_x_after;
+	unsigned player_y_after;
+	unsigned player_health_after;
+	unsigned player_lives_after;
+	unsigned player_invulnerability_after;
+	unsigned player_damage_cooldown_after;
 	unsigned prior;
 	unsigned player_erase_calls;
 	unsigned player_draw_calls;
@@ -80,11 +92,19 @@ typedef struct {
 	unsigned muzzle_divider_allied;
 	unsigned muzzle_divider_enemy;
 	unsigned broad_state[3];
+	unsigned broad_owner[3];
+	unsigned broad_x[3];
+	unsigned broad_y[3];
+	unsigned broad_collision[3];
+	unsigned broad_raster_x[3];
+	unsigned broad_raster_row[3];
 	unsigned broad_flash[3];
 	unsigned broad_turret[3];
 	unsigned broad_row[3];
 	unsigned broad_pointer[3];
 	unsigned broad_pointer_errors;
+	unsigned capital_collision_calls;
+	unsigned capital_player_damage_calls;
 	unsigned entity_active;
 	unsigned entity_x;
 	unsigned entity_y;
@@ -318,6 +338,8 @@ static unsigned dftrace_pc_player_erase;
 static unsigned dftrace_pc_player_draw;
 static unsigned dftrace_pc_engine_update;
 static unsigned dftrace_pc_engine_copy;
+static unsigned dftrace_pc_capital_collision;
+static unsigned dftrace_pc_capital_player_damage;
 static unsigned dftrace_pc_gameplay_init;
 static unsigned dftrace_pc_dlist_publish;
 static unsigned dftrace_pc_rotate_start;
@@ -431,6 +453,10 @@ static unsigned dftrace_pickup_contact_after_collect;
 static const char *dftrace_muzzle_screenshot_prefix;
 static unsigned dftrace_muzzle_screenshot_count;
 static int dftrace_muzzle_screenshot_primed;
+static const char *dftrace_capital_contact_prefix;
+static unsigned dftrace_capital_contact_owner;
+static unsigned dftrace_capital_contact_count;
+static int dftrace_capital_contact_primed;
 static const char *dftrace_rapid_screenshot;
 static unsigned dftrace_rapid_screenshot_frame = 0xffffffffu;
 static const char *dftrace_spread_screenshot;
@@ -901,7 +927,33 @@ static void dftrace_set_gameplay_input(unsigned frame)
 	unsigned trigger = frame <= dftrace_fire_delay ? 1 : 0;
 	unsigned x = MEMORY_mem[dftrace_player_x];
 	unsigned y = MEMORY_mem[dftrace_player_y];
-	if (strcmp(dftrace_policy, "sweep") == 0 ||
+	if (strcmp(dftrace_policy, "capital-contact-colonial") == 0 ||
+		strcmp(dftrace_policy, "capital-contact-cylon") == 0) {
+		unsigned slot;
+		unsigned target_owner = strcmp(dftrace_policy, "capital-contact-cylon") == 0;
+		unsigned target_x = 124u;
+		unsigned target_y = 184u;
+		for (slot = 0u; slot < 3u; ++slot) {
+			unsigned state = MEMORY_mem[dftrace_broad_state + slot];
+			if ((state == 1u || state == 2u) &&
+				MEMORY_mem[dftrace_broad_state + 3u + slot] == target_owner) {
+				unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
+				target_y = shell_y > 7u ? shell_y - 7u : 40u;
+				if (target_y < 40u) target_y = 40u;
+				if (target_y > 184u) target_y = 184u;
+				break;
+			}
+		}
+		if (x + 1u < target_x)
+			stick = 0x07u;
+		else if (x > target_x + 1u)
+			stick = 0x0bu;
+		if (y > target_y + 1u)
+			stick &= 0x0eu;
+		else if (y + 1u < target_y)
+			stick &= 0x0du;
+	}
+	else if (strcmp(dftrace_policy, "sweep") == 0 ||
 		strcmp(dftrace_policy, "broadside-proof") == 0) {
 		int target_right = ((frame / 72u) & 1u) == 0;
 		stick = target_right ? (x < 154u ? 0x07u : 0x0fu) :
@@ -1374,6 +1426,11 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->player_lifecycle = MEMORY_mem[dftrace_player_lifecycle];
 	frame->player_x = MEMORY_mem[dftrace_player_x];
 	frame->player_y = MEMORY_mem[dftrace_player_y];
+	frame->player_health = MEMORY_mem[dftrace_broad_state + 29u];
+	frame->player_lives = MEMORY_mem[dftrace_player_lifecycle + 1u];
+	frame->player_invulnerability = MEMORY_mem[dftrace_player_lifecycle + 2u];
+	frame->player_damage_cooldown = MEMORY_mem[dftrace_broad_state + 30u];
+	frame->player_damage_applied = MEMORY_mem[dftrace_broad_state + 37u];
 	frame->prior = GTIA_PRIOR;
 	frame->sector_state = MEMORY_mem[dftrace_sector_state];
 	frame->gameplay_frame = MEMORY_mem[dftrace_gameplay_frame];
@@ -1427,6 +1484,13 @@ static void dftrace_snapshot_muzzles(DFTraceFrame *frame)
 {
 	unsigned address;
 	unsigned slot;
+	frame->player_lifecycle_after = MEMORY_mem[dftrace_player_lifecycle];
+	frame->player_x_after = MEMORY_mem[dftrace_player_x];
+	frame->player_y_after = MEMORY_mem[dftrace_player_y];
+	frame->player_health_after = MEMORY_mem[dftrace_broad_state + 29u];
+	frame->player_lives_after = MEMORY_mem[dftrace_player_lifecycle + 1u];
+	frame->player_invulnerability_after = MEMORY_mem[dftrace_player_lifecycle + 2u];
+	frame->player_damage_cooldown_after = MEMORY_mem[dftrace_broad_state + 30u];
 	frame->active_muzzles = 0u;
 	frame->muzzle_code_cells = 0u;
 	frame->muzzle_illegal_cells = 0u;
@@ -1464,7 +1528,25 @@ static void dftrace_snapshot_muzzles(DFTraceFrame *frame)
 		unsigned row = MEMORY_mem[dftrace_playfield_broad_row + slot];
 		unsigned pointer = MEMORY_mem[dftrace_broad_row_lo + slot] |
 			(MEMORY_mem[dftrace_broad_row_hi + slot] << 8);
+		unsigned display_row;
 		frame->broad_state[slot] = MEMORY_mem[dftrace_broad_state + slot];
+		frame->broad_owner[slot] = MEMORY_mem[dftrace_broad_state + 3u + slot];
+		frame->broad_x[slot] = MEMORY_mem[dftrace_broad_state + 9u + slot];
+		frame->broad_y[slot] = MEMORY_mem[dftrace_broad_state + 12u + slot];
+		frame->broad_collision[slot] = MEMORY_mem[dftrace_broad_state + 24u + slot];
+		frame->broad_raster_x[slot] = frame->broad_x[slot] & 0xfcu;
+		frame->broad_raster_row[slot] = 0xffffffffu;
+		if (pointer == DFTRACE_DIVIDER_SCREEN)
+			frame->broad_raster_row[slot] = 0u;
+		else for (display_row = 0u; display_row < 22u; ++display_row) {
+			unsigned base = 0x7f00u + dftrace_displayed_dlist_lo;
+			unsigned displayed_pointer = MEMORY_mem[base + 7u + display_row * 3u] |
+				((unsigned) MEMORY_mem[base + 8u + display_row * 3u] << 8);
+			if (pointer == displayed_pointer) {
+				frame->broad_raster_row[slot] = display_row + 1u;
+				break;
+			}
+		}
 		frame->broad_flash[slot] = MEMORY_mem[dftrace_broad_flash_timer + slot];
 		frame->broad_turret[slot] = MEMORY_mem[dftrace_broad_turret + slot];
 		frame->broad_row[slot] = row;
@@ -1559,9 +1641,14 @@ static void dftrace_write(void)
 	fprintf(file, ",muzzle_code_cells,muzzle_illegal_cells,muzzle_pointer_errors"
 		",muzzle_divider_allied,muzzle_divider_enemy");
 	for (index = 0; index < 3u; ++index)
-		fprintf(file, ",broad%u_state,broad%u_flash,broad%u_turret,broad%u_row,broad%u_pointer",
-			index, index, index, index, index);
-	fprintf(file, ",broad_pointer_errors\n");
+		fprintf(file, ",broad%u_state,broad%u_flash,broad%u_turret,broad%u_row,broad%u_pointer"
+			",broad%u_owner,broad%u_x,broad%u_y,broad%u_collision,broad%u_raster_x,broad%u_raster_row",
+			index, index, index, index, index, index, index, index, index, index, index);
+	fprintf(file, ",broad_pointer_errors,player_health,player_lives,player_invulnerability"
+		",player_damage_cooldown,player_damage_applied,capital_collision_calls"
+		",capital_player_damage_calls,player_lifecycle_after,player_x_after,player_y_after"
+		",player_health_after,player_lives_after,player_invulnerability_after"
+		",player_damage_cooldown_after\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -1712,10 +1799,20 @@ static void dftrace_write(void)
 			frame->muzzle_illegal_cells, frame->muzzle_pointer_errors,
 			frame->muzzle_divider_allied, frame->muzzle_divider_enemy);
 		for (unsigned slot = 0; slot < 3u; ++slot)
-			fprintf(file, ",%u,%u,%u,%u,%u", frame->broad_state[slot],
+			fprintf(file, ",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u", frame->broad_state[slot],
 				frame->broad_flash[slot], frame->broad_turret[slot],
-				frame->broad_row[slot], frame->broad_pointer[slot]);
-		fprintf(file, ",%u\n", frame->broad_pointer_errors);
+				frame->broad_row[slot], frame->broad_pointer[slot],
+				frame->broad_owner[slot], frame->broad_x[slot], frame->broad_y[slot],
+				frame->broad_collision[slot], frame->broad_raster_x[slot],
+				frame->broad_raster_row[slot]);
+		fprintf(file, ",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+			frame->broad_pointer_errors,
+			frame->player_health, frame->player_lives, frame->player_invulnerability,
+			frame->player_damage_cooldown, frame->player_damage_applied,
+			frame->capital_collision_calls, frame->capital_player_damage_calls,
+			frame->player_lifecycle_after, frame->player_x_after, frame->player_y_after,
+			frame->player_health_after, frame->player_lives_after,
+			frame->player_invulnerability_after, frame->player_damage_cooldown_after);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -1816,6 +1913,8 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_player_draw, "DFTRACE_PC_PLAYER_DRAW");
 	DFTRACE_ADDRESS(dftrace_pc_engine_update, "DFTRACE_PC_ENGINE_UPDATE");
 	DFTRACE_ADDRESS(dftrace_pc_engine_copy, "DFTRACE_PC_ENGINE_COPY");
+	DFTRACE_ADDRESS(dftrace_pc_capital_collision, "DFTRACE_PC_CAPITAL_COLLISION");
+	DFTRACE_ADDRESS(dftrace_pc_capital_player_damage, "DFTRACE_PC_CAPITAL_PLAYER_DAMAGE");
 	DFTRACE_ADDRESS(dftrace_pc_gameplay_init, "DFTRACE_PC_GAMEPLAY_INIT");
 	DFTRACE_ADDRESS(dftrace_pc_rotate_start, "DFTRACE_PC_ROTATE_START");
 	DFTRACE_ADDRESS(dftrace_pc_rotate_end, "DFTRACE_PC_ROTATE_END");
@@ -1900,6 +1999,15 @@ static void dftrace_init(void)
 	dftrace_pickup_traversal_prefix = getenv("DFTRACE_PICKUP_TRAVERSAL_PREFIX");
 	dftrace_pickup_contact_prefix = getenv("DFTRACE_PICKUP_CONTACT_PREFIX");
 	dftrace_muzzle_screenshot_prefix = getenv("DFTRACE_MUZZLE_SCREENSHOT_PREFIX");
+	dftrace_capital_contact_prefix = getenv("DFTRACE_CAPITAL_CONTACT_PREFIX");
+	if (dftrace_capital_contact_prefix != NULL && *dftrace_capital_contact_prefix != '\0') {
+		dftrace_capital_contact_owner = dftrace_env_u("DFTRACE_CAPITAL_CONTACT_OWNER");
+		if (dftrace_capital_contact_owner > 1u) {
+			fprintf(stderr, "darkfighter trace: invalid capital contact owner %u\n",
+				dftrace_capital_contact_owner);
+			exit(2);
+		}
+	}
 	dftrace_rapid_screenshot = getenv("DFTRACE_RAPID_SCREENSHOT");
 	dftrace_spread_screenshot = getenv("DFTRACE_SPREAD_SCREENSHOT");
 	dftrace_pause_test_enabled = getenv("DFTRACE_PAUSE_TEST") != NULL;
@@ -2132,6 +2240,40 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 				++dftrace_muzzle_screenshot_count;
 			}
 		}
+		if (dftrace_capital_contact_prefix != NULL &&
+			*dftrace_capital_contact_prefix != '\0' &&
+			dftrace_capital_contact_count < 16u) {
+			unsigned slot;
+			if (!dftrace_capital_contact_primed) for (slot = 0u; slot < 3u; ++slot) {
+				unsigned state = MEMORY_mem[dftrace_broad_state + slot];
+				unsigned owner = MEMORY_mem[dftrace_broad_state + 3u + slot];
+				unsigned shell_x = MEMORY_mem[dftrace_broad_state + 9u + slot];
+				unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
+				unsigned player_left = MEMORY_mem[dftrace_player_x];
+				unsigned player_right = player_left + 15u;
+				unsigned horizontal_gap = owner == 0u ?
+					(player_left > shell_x + 7u ? player_left - (shell_x + 7u) : 0u) :
+					(shell_x > player_right ? shell_x - player_right : 0u);
+				unsigned player_top = MEMORY_mem[dftrace_player_y];
+				if (state == 2u && owner == dftrace_capital_contact_owner &&
+					horizontal_gap <= 16u && shell_y + 10u >= player_top &&
+					shell_y < player_top + 18u) {
+					dftrace_capital_contact_primed = 1;
+					break;
+				}
+			}
+			if (dftrace_capital_contact_primed) {
+				char path[1024];
+				snprintf(path, sizeof(path), "%s-%02u.png",
+					dftrace_capital_contact_prefix, dftrace_capital_contact_count);
+				if (!Screen_SaveScreenshot(path, 0)) {
+					fprintf(stderr, "darkfighter trace: capital contact screenshot failed: %s\n",
+						path);
+					exit(2);
+				}
+				++dftrace_capital_contact_count;
+			}
+		}
 		if (dftrace_count != 0 &&
 			dftrace_frames[dftrace_count - 1].next_start_clock == 0u) {
 			DFTraceFrame *previous = &dftrace_frames[dftrace_count - 1];
@@ -2192,6 +2334,10 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		++dftrace_current.player_draw_calls;
 		dftrace_current.player_draw_scanline = ANTIC_ypos;
 	}
+	if (pc == dftrace_pc_capital_collision)
+		++dftrace_current.capital_collision_calls;
+	if (pc == dftrace_pc_capital_player_damage)
+		++dftrace_current.capital_player_damage_calls;
 
 	if (dftrace_current.profile_next < DFTRACE_PROFILE_COUNT &&
 		pc == dftrace_pc_profile[dftrace_current.profile_next]) {

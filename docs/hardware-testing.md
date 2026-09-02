@@ -53,6 +53,12 @@ For both XEX and ATR:
       25-frame warning -> four-frame flash -> projectile launches on EASY,
       MEDIUM, and HARD. No two warnings begin together and a full three-slot
       heavy-projectile pool must suppress an otherwise due launch legally.
+- [ ] Steer the Viper into the centre and then the edge of one Cylon and one
+      Colonial/BSG BROADSIDE shell. Each unshielded hit removes exactly two of
+      ten HULL units, leaves LIFE unchanged when nonlethal, starts the existing
+      25-frame post-hit cooldown, and consumes the shell once. A one-HPOS near
+      miss must leave HULL unchanged; affiliation must not suppress Colonial
+      friendly fire.
 - [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
       Raider breakup, and debris breakup behave normally.
 - [ ] Without Shield, an accepted direct Raider contact destroys the Viper
@@ -124,7 +130,7 @@ the XEX through the owner's normal real-hardware loader path when available.
 
 - [ ] Cold boot succeeds repeatedly after power-off, not only after warm reset.
 - [ ] The 100-sector OS boot read is followed by standard-speed SIOV reads of
-      sectors 101-145; no SIO turbo support is required.
+      extension sectors 101-157; no SIO turbo support is required.
 - [ ] A deliberately truncated or CRC-corrupted test ATR stops on the fixed red
       loader error screen and never enters partially loaded code.
 - [ ] Loader duration, menu transitions, audio, controls, pause, Game Over, and
