@@ -162,6 +162,15 @@ const weaponPickupContactSessions = [{
   kind: "weapon-pickup-overlap",
 }];
 
+const capitalMuzzleSessions = [{
+  id: "capital-muzzle-ring-2-sweep-fire4",
+  difficulty: 2,
+  policy: "broadside-proof",
+  fireDelay: 4,
+  frames: 6_000,
+  kind: "capital-muzzle-lifecycle",
+}];
+
 const directorCompletionSessions = [0, 1, 2].map((difficulty) => ({
   id: `director-complete-${difficulty}-natural-sweep-fire0`,
   difficulty,
@@ -272,6 +281,13 @@ const traceLabels = {
   DFTRACE_GAMEPLAY_FRAME: "frame_counter",
   DFTRACE_MUZZLE_SCREEN_HI: "MUZZLE_SCREEN_HI",
   DFTRACE_MUZZLE_SCREEN_LO: "MUZZLE_SCREEN_LO",
+  DFTRACE_MUZZLE_ROW_DOMAIN: "MUZZLE_ROW_DOMAIN",
+  DFTRACE_MUZZLE_VISIBLE_ROW: "MUZZLE_VISIBLE_ROW",
+  DFTRACE_BROAD_TURRET: "BROAD_TURRET",
+  DFTRACE_BROAD_ROW_LO: "BROAD_ROW_LO",
+  DFTRACE_BROAD_ROW_HI: "BROAD_ROW_HI",
+  DFTRACE_BROAD_FLASH_TIMER: "BROAD_FLASH_TIMER",
+  DFTRACE_PLAYFIELD_BROAD_ROW: "PLAYFIELD_BROAD_ROW",
   DFTRACE_BROAD_TURRET_FIRED: "BROAD_TURRET_FIRED",
   DFTRACE_CORRIDOR_PHASE: "corridor_phase",
   DFTRACE_ENTITY_ACTIVE_COUNT: "ENTITY_ACTIVE_COUNT",
@@ -386,6 +402,15 @@ const numericCsvFields = new Set([
   "pause_timer_after", "pause_engine_timer_before", "pause_engine_timer_after",
   "pause_engine_phase_before", "pause_engine_phase_after", "pause_host_frames",
 ]);
+for (const slot of [0, 1]) for (const field of ["domain", "row", "pointer", "cell"])
+  numericCsvFields.add(`muzzle${slot}_${field}`);
+for (const field of ["muzzle_code_cells", "muzzle_illegal_cells", "muzzle_pointer_errors",
+  "muzzle_divider_allied", "muzzle_divider_enemy", "broad_pointer_errors"])
+  numericCsvFields.add(field);
+for (const slot of [0, 1, 2]) {
+  for (const field of ["state", "flash", "turret", "row", "pointer"])
+    numericCsvFields.add(`broad${slot}_${field}`);
+}
 for (const name of [
   "pickup_prev_x", "pickup_prev_y", "pickup_prev_render_row",
   "pickup_prev_render_phase", "pickup_render_row", "pickup_render_phase",
@@ -1247,6 +1272,7 @@ function main() {
     ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
       ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
       ...weaponPickupTraversalSessions, ...weaponPickupContactSessions,
+      ...capitalMuzzleSessions,
       ...memoryIntegritySessions]
       .concat(engineDiagnosticSessions, engineRestartSessions)
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
@@ -1260,8 +1286,17 @@ function main() {
       ? path.join(buildDirectory, "weapon-pickup-contact-nose")
       : session.kind === "weapon-pickup-overlap"
         ? path.join(buildDirectory, "weapon-pickup-contact-edge") : undefined;
+    const muzzleScreenshotPrefix = session.kind === "capital-muzzle-lifecycle"
+      ? path.join(buildDirectory, "capital-muzzle-clean") : undefined;
     if (pickupContactPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(pickupContactPrefix);
+      for (const name of fs.readdirSync(buildDirectory)) {
+        if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
+          fs.unlinkSync(path.join(buildDirectory, name));
+      }
+    }
+    if (muzzleScreenshotPrefix !== undefined && !reuseExistingTraces) {
+      const basename = path.basename(muzzleScreenshotPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
         if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
           fs.unlinkSync(path.join(buildDirectory, name));
@@ -1294,6 +1329,9 @@ function main() {
 	  ...(pickupContactPrefix === undefined ? {} : {
 	    DFTRACE_PICKUP_CONTACT_PREFIX: pickupContactPrefix,
 	  }),
+      ...(muzzleScreenshotPrefix === undefined ? {} : {
+        DFTRACE_MUZZLE_SCREENSHOT_PREFIX: muzzleScreenshotPrefix,
+      }),
 	  ...(session.kind === "engine-first-150" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
 	  } : {}),
@@ -1310,6 +1348,100 @@ function main() {
       ], { env: environment });
     }
     const rows = parseCsv(fs.readFileSync(outputPath, "utf8"), session);
+    if (muzzleScreenshotPrefix !== undefined) {
+      const basename = path.basename(muzzleScreenshotPrefix);
+      const paths = fs.readdirSync(buildDirectory)
+        .filter((name) => name.startsWith(`${basename}-`) && name.endsWith(".png"))
+        .sort()
+        .map((name) => path.join(buildDirectory, name));
+      invariant(paths.length === 64,
+        `${session.id} did not capture 64 consecutive capital-muzzle rasters`);
+      const activeRows = rows.filter((row) => row.active_muzzles !== 0);
+      const transientCodes = new Set([0x45, 0xd0, 0x51, 0xd2]);
+      const broadsideOccludesMuzzle = (row, muzzleSlot) => [0, 1, 2].some((slot) => {
+        const turret = row[`broad${slot}_turret`];
+        const column = turret === 0 ? 8 : turret === 1 ? 31 : -1;
+        return row[`broad${slot}_state`] !== 0 && column >= 0 &&
+          row[`broad${slot}_pointer`] + column === row[`muzzle${muzzleSlot}_pointer`];
+      });
+      const occludedRows = rows.filter((row) => [0, 1].some((slot) =>
+        row[`muzzle${slot}_pointer`] !== 0 &&
+        !transientCodes.has(row[`muzzle${slot}_cell`]) &&
+        broadsideOccludesMuzzle(row, slot)));
+      invariant(activeRows.length > 0 && [0, 1].every((slot) =>
+        activeRows.some((row) => row[`muzzle${slot}_domain`] === 0) &&
+        activeRows.some((row) => row[`muzzle${slot}_domain`] === 1)),
+      `${session.id} did not cover fixed-divider and ring domains for both hulls`);
+      invariant(rows.every((row) => {
+        const legalMuzzleCodes = [0, 1].filter((slot) =>
+          row[`muzzle${slot}_pointer`] !== 0 &&
+          transientCodes.has(row[`muzzle${slot}_cell`])).length;
+        const legalBroadsideOcclusions = [0, 1].filter((slot) =>
+          row[`muzzle${slot}_pointer`] !== 0 &&
+          !transientCodes.has(row[`muzzle${slot}_cell`]) &&
+          broadsideOccludesMuzzle(row, slot)).length;
+        return row.muzzle_illegal_cells === 0 && row.muzzle_pointer_errors === 0 &&
+          row.broad_pointer_errors === 0 && row.muzzle_code_cells === legalMuzzleCodes &&
+          legalMuzzleCodes + legalBroadsideOcclusions === row.active_muzzles;
+      }),
+      `${session.id} observed a stale muzzle/flash code or invalid derived pointer`);
+      invariant(activeRows.every((row) =>
+        (row.muzzle0_domain !== 1 || ![0x45, 0x51].includes(row.muzzle_divider_allied)) &&
+        (row.muzzle1_domain !== 1 || ![0xd0, 0xd2].includes(row.muzzle_divider_enemy))),
+      `${session.id} retained a transient on the fixed divider after ring transition`);
+      const warningRows = rows.filter((row) => [0, 1, 2].some((slot) =>
+        row[`broad${slot}_state`] === 1));
+      const flyingRows = rows.filter((row) => [0, 1, 2].some((slot) =>
+        row[`broad${slot}_state`] === 2));
+      const flashRows = rows.filter((row) => [0, 1, 2].some((slot) =>
+        row[`broad${slot}_flash`] !== 0));
+      invariant(warningRows.length > 0 && flyingRows.length > 0 && flashRows.length > 0,
+        `${session.id} did not cover warning, launch flash and flying BROADSIDE`);
+      const wraps = rows.slice(1).filter((row, index) =>
+        row.engine_a2_head > rows[index].engine_a2_head).length;
+      invariant(wraps >= 3, `${session.id} covered only ${wraps} A2 ring wraps`);
+      const sheetPath = path.join(buildDirectory, "capital-muzzle-clean-sequence.png");
+      writeScreenshotContact(paths, sheetPath, 8);
+      const transitionRows = activeRows.filter((row, index) => index === 0 ||
+        row.muzzle0_domain !== activeRows[index - 1].muzzle0_domain ||
+        row.muzzle1_domain !== activeRows[index - 1].muzzle1_domain);
+      const evidence = {
+        session: session.id,
+        emulator: "Atari800 7.1.2 PAL/XL",
+        production_artifact: path.relative(rootDirectory, xexPath),
+        frames: rows.length,
+        maximum_wall_cycles: Math.max(...rows.map((row) => row.wall_cycles)),
+        missed_frames: rows.reduce((sum, row) => sum + row.missed_frames, 0),
+        ring_wraps: wraps,
+        active_muzzle_frames: activeRows.length,
+        warning_frames: warningRows.length,
+        flash_frames: flashRows.length,
+        flying_frames: flyingRows.length,
+        legal_broadside_muzzle_occlusion_frames: occludedRows.length,
+        maximum_muzzle_codes: Math.max(...rows.map((row) => row.muzzle_code_cells)),
+        maximum_illegal_codes: Math.max(...rows.map((row) => row.muzzle_illegal_cells)),
+        pointer_errors: rows.reduce((sum, row) => sum + row.muzzle_pointer_errors +
+          row.broad_pointer_errors, 0),
+        transitions: transitionRows.map((row) => ({
+          frame: row.frame,
+          ring_head: row.engine_a2_head,
+          allied: {
+            domain: row.muzzle0_domain, row: row.muzzle0_row,
+            pointer: row.muzzle0_pointer, cell: row.muzzle0_cell,
+          },
+          enemy: {
+            domain: row.muzzle1_domain, row: row.muzzle1_row,
+            pointer: row.muzzle1_pointer, cell: row.muzzle1_cell,
+          },
+          divider: [row.muzzle_divider_allied, row.muzzle_divider_enemy],
+        })),
+        screenshot_sequence: path.relative(rootDirectory, sheetPath),
+        raw_trace: path.relative(rootDirectory, outputPath),
+        passed: true,
+      };
+      fs.writeFileSync(path.join(buildDirectory, `${session.id}-evidence.json`),
+        `${JSON.stringify(evidence, null, 2)}\n`);
+    }
     if (pickupContactPrefix !== undefined) {
       const basename = path.basename(pickupContactPrefix);
       const paths = fs.readdirSync(buildDirectory)

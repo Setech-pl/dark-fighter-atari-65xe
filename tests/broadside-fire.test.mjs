@@ -128,11 +128,14 @@ function createLinkedRuntimeMemory() {
   return memory;
 }
 
-function runAssembledRoutine(memory, name) {
+function runAssembledRoutine(memory, name, { x = 0, y = 0, a = 0 } = {}) {
   const cpu = new Nmos6502(memory);
   const stop = 0x7fff;
   cpu.push((stop - 1) >> 8);
   cpu.push((stop - 1) & 0xff);
+  cpu.x = x;
+  cpu.y = y;
+  cpu.a = a;
   cpu.pc = labels.get(name);
   for (let steps = 0; steps < 100_000 && cpu.pc !== stop; steps += 1) cpu.step();
   assert.equal(cpu.pc, stop, `${name} did not return`);
@@ -454,7 +457,7 @@ test("assembled fractional cadence makes hull movement 100% of the legacy world 
   assert.match(routine("update_starfield", "generate_corridor_row"),
     /ldx DIFFICULTY_SETTING[\s\S]+adc hull_scroll_rates,x[\s\S]+cmp #HULL_SCROLL_RATE_DENOMINATOR[\s\S]+sbc #HULL_SCROLL_RATE_DENOMINATOR/);
   assert.match(routine("main_loop", "wait_frame"),
-    /jsr wait_frame[\s\S]+jsr update_starfield[\s\S]+jmp main_loop/);
+    /jsr wait_gameplay_frame[\s\S]+jsr update_starfield[\s\S]+jmp main_loop/);
   const rateTableAddress = labels.get("hull_scroll_rates");
   const difficultyAddress = readGameGraphicsSource(source, definition).constants.get(
     "DIFFICULTY_SETTING",
@@ -487,8 +490,8 @@ test("tracked muzzle records replace the 23-row redraw scan without changing scr
   assert.match(update,
     /jsr scroll_hull_columns[\s\S]+lsr PLAYFIELD_RING_FLAGS[\s\S]+rts/);
   assert.match(worldRing,
-    /sta PLAYFIELD_RING_FLAGS\s+jsr rotate_playfield_rows[\s\S]+sta CORRIDOR_BOUNDARY_LEFT[\s\S]+sta CORRIDOR_BOUNDARY_RIGHT/,
-    "a world step must rotate LMS rows and shift the two backing streams");
+    /jsr restore_active_muzzles\s+lda #\$01\s+sta PLAYFIELD_RING_FLAGS\s+jsr rotate_playfield_rows[\s\S]+sta CORRIDOR_BOUNDARY_LEFT[\s\S]+sta CORRIDOR_BOUNDARY_RIGHT/,
+    "a world step must restore divider transients before rotating LMS rows");
   assert.match(hullCopy,
     /jsr restore_active_muzzles[\s\S]+jsr advance_tracked_muzzles[\s\S]+jsr track_top_muzzles[\s\S]+jsr redraw_tracked_muzzles/,
     "a hull step must restore, advance, claim and redraw at most two tracked records");
@@ -515,6 +518,7 @@ test("capital exit preserves one full-scene recycle per production world event",
 
 test("assembled muzzle records preserve backing and complete the full visible lifecycle", () => {
   const memory = createLinkedRuntimeMemory();
+  const muzzleDomain = labels.get("MUZZLE_ROW_DOMAIN");
   const muzzleRow = labels.get("MUZZLE_VISIBLE_ROW");
   const muzzleLo = labels.get("MUZZLE_SCREEN_LO");
   const muzzleHi = labels.get("MUZZLE_SCREEN_HI");
@@ -537,8 +541,9 @@ test("assembled muzzle records preserve backing and complete the full visible li
   runAssembledRoutine(memory, "track_top_muzzles");
 
   assert.deepEqual(
-    [memory[muzzleRow], memory[muzzleRow + 1]],
-    [0, 0],
+    [memory[muzzleDomain], memory[muzzleDomain + 1],
+      memory[muzzleRow], memory[muzzleRow + 1]],
+    [0, 0, 0, 0],
   );
   assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8, gameplayScreen + alliedColumn);
   assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
@@ -557,6 +562,7 @@ test("assembled muzzle records preserve backing and complete the full visible li
     runAssembledRoutine(memory, "restore_active_muzzles");
     runAssembledRoutine(memory, "advance_tracked_muzzles");
     assert.deepEqual([memory[muzzleRow], memory[muzzleRow + 1]], [row, row]);
+    assert.deepEqual([memory[muzzleDomain], memory[muzzleDomain + 1]], [1, 1]);
     assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8,
       gameplayScreen + row * 40 + alliedColumn);
     assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
@@ -568,20 +574,144 @@ test("assembled muzzle records preserve backing and complete the full visible li
   runAssembledRoutine(memory, "restore_active_muzzles");
   runAssembledRoutine(memory, "advance_tracked_muzzles");
   assert.deepEqual(
-    [memory[muzzleRow], memory[muzzleRow + 1], memory[muzzleHi], memory[muzzleHi + 1]],
-    [0, 0, 0, 0],
+    [memory[muzzleDomain], memory[muzzleDomain + 1], memory[muzzleRow],
+      memory[muzzleRow + 1], memory[muzzleHi], memory[muzzleHi + 1]],
+    [0, 0, 0, 0, 0, 0],
   );
   runAssembledRoutine(memory, "reset_exited_turret_lifecycles");
   assert.deepEqual([memory[turretFired], memory[turretFired + 1]], [0, 0]);
 
   memory[muzzleRow] = 9;
   memory[muzzleHi] = 0x42;
+  memory[muzzleDomain] = 1;
+  memory[muzzleDomain + 1] = 1;
   runAssembledRoutine(memory, "init_broadside");
   assert.deepEqual(
     Array.from(memory.subarray(muzzleRow, muzzleHi + 2)),
     [0, 0, 0, 0, 0, 0],
     "a new sector/game lifecycle cannot inherit stale muzzle records",
   );
+  assert.deepEqual(Array.from(memory.subarray(muzzleDomain, muzzleDomain + 2)), [0, 0]);
+});
+
+test("fixed divider muzzles and launch flashes remap without trails through repeated ring wraps", () => {
+  const memory = createLinkedRuntimeMemory();
+  const muzzleDomain = labels.get("MUZZLE_ROW_DOMAIN");
+  const muzzleRow = labels.get("MUZZLE_VISIBLE_ROW");
+  const muzzleLo = labels.get("MUZZLE_SCREEN_LO");
+  const muzzleHi = labels.get("MUZZLE_SCREEN_HI");
+  const rowLo = labels.get("PLAYFIELD_ROW_LO");
+  const rowHi = labels.get("PLAYFIELD_ROW_HI");
+  const broadRow = labels.get("PLAYFIELD_BROAD_ROW");
+  const broadRowLo = labels.get("BROAD_ROW_LO");
+  const broadRowHi = labels.get("BROAD_ROW_HI");
+  const broadTurret = labels.get("BROAD_TURRET");
+  const flashTimer = labels.get("BROAD_FLASH_TIMER");
+  const destination = labels.get("dst_ptr");
+  const leftBacking = labels.get("CORRIDOR_BOUNDARY_LEFT");
+  const rightBacking = labels.get("CORRIDOR_BOUNDARY_RIGHT");
+  const divider = 0x4028;
+  const columns = [8, 31];
+  const muzzleCodes = [asset.turrets[alliedTurretIndex].muzzleScreenCode,
+    asset.turrets[enemyTurretIndex].muzzleScreenCode];
+  const flashCodes = ["allied", "enemy"].map((side) =>
+    asset.glyphs.find(({ name }) => name === `${side}_launch_flash`).screenCode);
+  const logicalAddress = (row) => row === 0 ? divider :
+    memory[rowLo + row - 1] | memory[rowHi + row - 1] << 8;
+  const trackedAddress = (slot) => memory[muzzleLo + slot] |
+    memory[muzzleHi + slot] << 8;
+  const broadAddress = (slot) => memory[broadRowLo + slot] |
+    memory[broadRowHi + slot] << 8;
+  const transientCounts = () => {
+    const counts = new Map([...muzzleCodes, ...flashCodes].map((code) => [code, 0]));
+    for (let address = divider; address < 0x4400; address += 1) {
+      if (counts.has(memory[address])) counts.set(memory[address], counts.get(memory[address]) + 1);
+    }
+    return counts;
+  };
+
+  memory.fill(0, divider, 0x4400);
+  for (let row = 0; row < 23; row += 1) {
+    memory[leftBacking + row] = 0x11;
+    memory[rightBacking + row] = 0x22;
+  }
+  memory[labels.get("CAPITAL_SECTOR_STATE")] = 0;
+  memory[labels.get("corridor_phase")] = 1;
+
+  for (let lifecycle = 0; lifecycle < 3; lifecycle += 1) {
+    memory[destination] = divider & 0xff;
+    memory[destination + 1] = divider >> 8;
+    for (let slot = 0; slot < 2; slot += 1)
+      memory[divider + columns[slot]] = muzzleCodes[slot];
+    runAssembledRoutine(memory, "track_top_muzzles");
+    assert.deepEqual(Array.from(memory.subarray(muzzleDomain, muzzleDomain + 2)), [0, 0]);
+    assert.deepEqual([trackedAddress(0), trackedAddress(1)],
+      [divider + columns[0], divider + columns[1]]);
+
+    for (let slot = 0; slot < 2; slot += 1) {
+      memory[broadRow + slot] = 0;
+      memory[broadRowLo + slot] = divider & 0xff;
+      memory[broadRowHi + slot] = divider >> 8;
+      memory[broadTurret + slot] = slot;
+      memory[flashTimer + slot] = lifecycle === 0 ? 4 : 0;
+    }
+    if (lifecycle === 0) runAssembledRoutine(memory, "render_launch_flashes");
+
+    for (let row = 1; row <= 23; row += 1) {
+      const oldPointers = [trackedAddress(0), trackedAddress(1)];
+      runAssembledRoutine(memory, "scroll_world_columns");
+      for (const [slot, pointer] of oldPointers.entries()) {
+        assert.notEqual(memory[pointer], muzzleCodes[slot],
+          `lifecycle ${lifecycle} row ${row}: old muzzle cell was not restored`);
+        assert.notEqual(memory[pointer], flashCodes[slot],
+          `lifecycle ${lifecycle} row ${row}: old flash cell was copied`);
+      }
+      for (let slot = 0; slot < 2; slot += 1) {
+        assert.equal([...muzzleCodes, ...flashCodes].includes(
+          memory[divider + columns[slot]]), false,
+        `lifecycle ${lifecycle} row ${row}: divider retained a transient`);
+      }
+
+      runAssembledRoutine(memory, "advance_tracked_muzzles");
+      if (row <= 4 && lifecycle === 0) {
+        for (let slot = 0; slot < 2; slot += 1)
+          runAssembledRoutine(memory, "advance_broadside_row", { x: slot });
+      }
+      if (row < 23) {
+        assert.deepEqual(Array.from(memory.subarray(muzzleDomain, muzzleDomain + 2)), [1, 1]);
+        assert.deepEqual([trackedAddress(0), trackedAddress(1)],
+          columns.map((column) => logicalAddress(row) + column));
+        runAssembledRoutine(memory, "redraw_tracked_muzzles");
+        if (row <= 4 && lifecycle === 0) {
+          assert.deepEqual([broadAddress(0), broadAddress(1)],
+            [logicalAddress(row), logicalAddress(row)]);
+          runAssembledRoutine(memory, "render_launch_flashes");
+        }
+        const counts = transientCounts();
+        const expectedCodes = row <= 4 && lifecycle === 0 ? flashCodes : muzzleCodes;
+        for (const code of [...muzzleCodes, ...flashCodes]) {
+          assert.equal(counts.get(code), expectedCodes.filter((value) => value === code).length,
+            `lifecycle ${lifecycle} row ${row}: illegal transient code $${code.toString(16)}`);
+        }
+      } else {
+        assert.deepEqual(Array.from(memory.subarray(muzzleDomain, muzzleDomain + 2)), [0, 0]);
+        assert.deepEqual([memory[muzzleHi], memory[muzzleHi + 1]], [0, 0]);
+        assert.equal([...transientCounts().values()].reduce((sum, count) => sum + count, 0), 0);
+      }
+      if (row === 4) {
+        memory[flashTimer] = 0;
+        memory[flashTimer + 1] = 0;
+      }
+    }
+  }
+});
+
+test("muzzle remapping leaves the single late booster compositor unchanged", () => {
+  const main = routine("main_loop", "wait_frame");
+  const muzzle = routine("restore_active_muzzles", "generate_corridor_row");
+  assert.equal((source.match(/jmp render_weapon_pickup_overlay/g) ?? []).length, 1);
+  assert.match(main, /jsr entity_effects_erase[\s\S]+jsr entity_effects_render/);
+  assert.doesNotMatch(muzzle, /WEAPON_PICKUP|ENTITY_(?:BACKING|DRAWN_MASK)/);
 });
 
 test("hybrid world ring and hull-only copy preserve every logical row and both hull bands", () => {

@@ -157,6 +157,14 @@ Engine pixels have two phases, `dim` and `bright`, held for eight active frames
 each. Phase changes update source glyph rows atomically before a recycled base
 row is published.
 
+Tracked muzzle records keep a logical row plus an explicit fixed-divider/ring
+domain as their authority. Before a world rotation, the exact previous physical
+cell is restored so the fixed divider cannot copy muzzle or launch-flash codes
+into the recycled row. After every head change the muzzle and attached
+BROADSIDE row pointers are derived again through the logical row table; only the
+current legal cell is redrawn. Warning missiles remain PMG-only and therefore
+never enter ring backing.
+
 ## Gameplay layers and backing
 
 Every visible gameplay row is composed in this order:

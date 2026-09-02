@@ -321,6 +321,8 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
     const frameCounter = labels.get("frame_counter");
     image[labels.get("DIFFICULTY_SETTING")] = difficulty;
     image[lifecycle] = 0;
+    run(image, "init_playfield_row_table");
+    run(image, "init_playfield_display_lists");
     run(image, "unpack_capital_hull_maps");
     run(image, "director_init", { a: 0x6d ^ difficulty });
     run(image, "init_broadside");
@@ -382,6 +384,8 @@ test("natural capital exit performs one scene recycle on every world row", () =>
   const rotate = labels.get("rotate_playfield_rows");
   image[labels.get("DIFFICULTY_SETTING")] = 2;
   image[lifecycle] = 0;
+  run(image, "init_playfield_row_table");
+  run(image, "init_playfield_display_lists");
   run(image, "unpack_capital_hull_maps");
   run(image, "director_init", { a: 0x6f });
   run(image, "init_broadside");

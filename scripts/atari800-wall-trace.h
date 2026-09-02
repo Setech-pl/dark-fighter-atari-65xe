@@ -20,6 +20,12 @@
 #define DFTRACE_ENGINE_ENEMY_GLYPH 84u
 #define DFTRACE_ENGINE_ALLIED_CODE 0x53u
 #define DFTRACE_ENGINE_ENEMY_CODE 0xd4u
+#define DFTRACE_ALLIED_MUZZLE_CODE 0x45u
+#define DFTRACE_ENEMY_MUZZLE_CODE 0xd0u
+#define DFTRACE_ALLIED_FLASH_CODE 0x51u
+#define DFTRACE_ENEMY_FLASH_CODE 0xd2u
+#define DFTRACE_DIVIDER_SCREEN 0x4028u
+#define DFTRACE_SCREEN_END 0x4400u
 #define DFTRACE_CHARSET 0x4400u
 #define DFTRACE_PROFILE_COUNT 22u
 #define DFTRACE_PROFILE_DLI_COUNT 2u
@@ -62,6 +68,21 @@ typedef struct {
 	unsigned gameplay_frame;
 	unsigned difficulty;
 	unsigned active_muzzles;
+	unsigned muzzle_domain[2];
+	unsigned muzzle_row[2];
+	unsigned muzzle_pointer[2];
+	unsigned muzzle_cell[2];
+	unsigned muzzle_code_cells;
+	unsigned muzzle_illegal_cells;
+	unsigned muzzle_pointer_errors;
+	unsigned muzzle_divider_allied;
+	unsigned muzzle_divider_enemy;
+	unsigned broad_state[3];
+	unsigned broad_flash[3];
+	unsigned broad_turret[3];
+	unsigned broad_row[3];
+	unsigned broad_pointer[3];
+	unsigned broad_pointer_errors;
 	unsigned entity_active;
 	unsigned entity_x;
 	unsigned entity_y;
@@ -334,6 +355,13 @@ static unsigned dftrace_difficulty_setting;
 static unsigned dftrace_gameplay_frame;
 static unsigned dftrace_muzzle_screen_hi;
 static unsigned dftrace_muzzle_screen_lo;
+static unsigned dftrace_muzzle_row_domain;
+static unsigned dftrace_muzzle_visible_row;
+static unsigned dftrace_broad_turret;
+static unsigned dftrace_broad_row_lo;
+static unsigned dftrace_broad_row_hi;
+static unsigned dftrace_broad_flash_timer;
+static unsigned dftrace_playfield_broad_row;
 static unsigned dftrace_entity_active_count;
 static unsigned dftrace_entity_x;
 static unsigned dftrace_entity_y;
@@ -396,6 +424,9 @@ static unsigned dftrace_pickup_hunt_active_frames;
 static const char *dftrace_pickup_contact_prefix;
 static unsigned dftrace_pickup_contact_count;
 static unsigned dftrace_pickup_contact_after_collect;
+static const char *dftrace_muzzle_screenshot_prefix;
+static unsigned dftrace_muzzle_screenshot_count;
+static int dftrace_muzzle_screenshot_primed;
 static const char *dftrace_rapid_screenshot;
 static unsigned dftrace_rapid_screenshot_frame = 0xffffffffu;
 static const char *dftrace_spread_screenshot;
@@ -1349,6 +1380,76 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->score_hi = MEMORY_mem[dftrace_score_hi];
 }
 
+static unsigned dftrace_logical_row_address(unsigned row)
+{
+	if (row == 0u)
+		return DFTRACE_DIVIDER_SCREEN;
+	if (row > 22u)
+		return 0u;
+	return MEMORY_mem[dftrace_playfield_row_lo + row - 1u] |
+		(MEMORY_mem[dftrace_playfield_row_hi + row - 1u] << 8);
+}
+
+static int dftrace_is_hull_transient(unsigned value)
+{
+	return value == DFTRACE_ALLIED_MUZZLE_CODE ||
+		value == DFTRACE_ENEMY_MUZZLE_CODE ||
+		value == DFTRACE_ALLIED_FLASH_CODE ||
+		value == DFTRACE_ENEMY_FLASH_CODE;
+}
+
+static void dftrace_snapshot_muzzles(DFTraceFrame *frame)
+{
+	unsigned address;
+	unsigned slot;
+	frame->active_muzzles = 0u;
+	frame->muzzle_code_cells = 0u;
+	frame->muzzle_illegal_cells = 0u;
+	frame->muzzle_pointer_errors = 0u;
+	frame->broad_pointer_errors = 0u;
+	for (slot = 0u; slot < 2u; ++slot) {
+		unsigned pointer = MEMORY_mem[dftrace_muzzle_screen_lo + slot] |
+			(MEMORY_mem[dftrace_muzzle_screen_hi + slot] << 8);
+		unsigned row = MEMORY_mem[dftrace_muzzle_visible_row + slot];
+		unsigned expected = dftrace_logical_row_address(row);
+		if (expected != 0u)
+			expected += slot == 0u ? 8u : 31u;
+		frame->muzzle_domain[slot] = MEMORY_mem[dftrace_muzzle_row_domain + slot];
+		frame->muzzle_row[slot] = row;
+		frame->muzzle_pointer[slot] = pointer;
+		frame->muzzle_cell[slot] = pointer == 0u ? 0u : MEMORY_mem[pointer];
+		if (MEMORY_mem[dftrace_muzzle_screen_hi + slot] != 0u) {
+			++frame->active_muzzles;
+			if (pointer != expected || frame->muzzle_domain[slot] != (row == 0u ? 0u : 1u))
+				++frame->muzzle_pointer_errors;
+		}
+		else if (pointer != 0u || row != 0u || frame->muzzle_domain[slot] != 0u)
+			++frame->muzzle_pointer_errors;
+	}
+	for (address = DFTRACE_DIVIDER_SCREEN; address < DFTRACE_SCREEN_END; ++address) {
+		if (!dftrace_is_hull_transient(MEMORY_mem[address]))
+			continue;
+		++frame->muzzle_code_cells;
+		if (address != frame->muzzle_pointer[0] && address != frame->muzzle_pointer[1])
+			++frame->muzzle_illegal_cells;
+	}
+	frame->muzzle_divider_allied = MEMORY_mem[DFTRACE_DIVIDER_SCREEN + 8u];
+	frame->muzzle_divider_enemy = MEMORY_mem[DFTRACE_DIVIDER_SCREEN + 31u];
+	for (slot = 0u; slot < 3u; ++slot) {
+		unsigned row = MEMORY_mem[dftrace_playfield_broad_row + slot];
+		unsigned pointer = MEMORY_mem[dftrace_broad_row_lo + slot] |
+			(MEMORY_mem[dftrace_broad_row_hi + slot] << 8);
+		frame->broad_state[slot] = MEMORY_mem[dftrace_broad_state + slot];
+		frame->broad_flash[slot] = MEMORY_mem[dftrace_broad_flash_timer + slot];
+		frame->broad_turret[slot] = MEMORY_mem[dftrace_broad_turret + slot];
+		frame->broad_row[slot] = row;
+		frame->broad_pointer[slot] = pointer;
+		if ((frame->broad_state[slot] != 0u || frame->broad_flash[slot] != 0u) &&
+			pointer != dftrace_logical_row_address(row))
+			++frame->broad_pointer_errors;
+	}
+}
+
 static void dftrace_snapshot_flash(DFTraceFrame *frame)
 {
 	dftrace_snapshot_rapid_projectile(frame);
@@ -1426,7 +1527,16 @@ static void dftrace_write(void)
 		",profile_effect_update_end,profile_pickup_update_end"
 		",profile_pickup_render_start,profile_effect_render_start"
 		",player_x,player_y,prior,player_erase_calls,player_draw_calls"
-		",player_erase_scanline,player_draw_scanline\n");
+		",player_erase_scanline,player_draw_scanline");
+	for (index = 0; index < 2u; ++index)
+		fprintf(file, ",muzzle%u_domain,muzzle%u_row,muzzle%u_pointer,muzzle%u_cell",
+			index, index, index, index);
+	fprintf(file, ",muzzle_code_cells,muzzle_illegal_cells,muzzle_pointer_errors"
+		",muzzle_divider_allied,muzzle_divider_enemy");
+	for (index = 0; index < 3u; ++index)
+		fprintf(file, ",broad%u_state,broad%u_flash,broad%u_turret,broad%u_row,broad%u_pointer",
+			index, index, index, index, index);
+	fprintf(file, ",broad_pointer_errors\n");
 	for (index = 0; index < dftrace_count; ++index) {
 		DFTraceFrame *frame = &dftrace_frames[index];
 		uint64_t wall = frame->end_clock - frame->start_clock;
@@ -1554,7 +1664,7 @@ static void dftrace_write(void)
 				(unsigned long long) frame->profile_dli_end[dli],
 				frame->profile_dli_segment[dli]);
 		fprintf(file, ",%u,%u,%u,%u,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu"
-			",%u,%u,%u,%u,%u,%u,%u\n",
+			",%u,%u,%u,%u,%u,%u,%u",
 			frame->profile_compose_calls, frame->profile_compose_cycles,
 			frame->profile_pointer_calls, frame->profile_pointer_cycles,
 			(unsigned long long) frame->profile_erase_viper_start,
@@ -1568,6 +1678,18 @@ static void dftrace_write(void)
 			frame->player_x, frame->player_y, frame->prior,
 			frame->player_erase_calls, frame->player_draw_calls,
 			frame->player_erase_scanline, frame->player_draw_scanline);
+		for (unsigned slot = 0; slot < 2u; ++slot)
+			fprintf(file, ",%u,%u,%u,%u", frame->muzzle_domain[slot],
+				frame->muzzle_row[slot], frame->muzzle_pointer[slot],
+				frame->muzzle_cell[slot]);
+		fprintf(file, ",%u,%u,%u,%u,%u", frame->muzzle_code_cells,
+			frame->muzzle_illegal_cells, frame->muzzle_pointer_errors,
+			frame->muzzle_divider_allied, frame->muzzle_divider_enemy);
+		for (unsigned slot = 0; slot < 3u; ++slot)
+			fprintf(file, ",%u,%u,%u,%u,%u", frame->broad_state[slot],
+				frame->broad_flash[slot], frame->broad_turret[slot],
+				frame->broad_row[slot], frame->broad_pointer[slot]);
+		fprintf(file, ",%u\n", frame->broad_pointer_errors);
 	}
 	if (fclose(file) != 0) {
 		perror("darkfighter trace close");
@@ -1706,6 +1828,13 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_gameplay_frame, "DFTRACE_GAMEPLAY_FRAME");
 	DFTRACE_ADDRESS(dftrace_muzzle_screen_hi, "DFTRACE_MUZZLE_SCREEN_HI");
 	DFTRACE_ADDRESS(dftrace_muzzle_screen_lo, "DFTRACE_MUZZLE_SCREEN_LO");
+	DFTRACE_ADDRESS(dftrace_muzzle_row_domain, "DFTRACE_MUZZLE_ROW_DOMAIN");
+	DFTRACE_ADDRESS(dftrace_muzzle_visible_row, "DFTRACE_MUZZLE_VISIBLE_ROW");
+	DFTRACE_ADDRESS(dftrace_broad_turret, "DFTRACE_BROAD_TURRET");
+	DFTRACE_ADDRESS(dftrace_broad_row_lo, "DFTRACE_BROAD_ROW_LO");
+	DFTRACE_ADDRESS(dftrace_broad_row_hi, "DFTRACE_BROAD_ROW_HI");
+	DFTRACE_ADDRESS(dftrace_broad_flash_timer, "DFTRACE_BROAD_FLASH_TIMER");
+	DFTRACE_ADDRESS(dftrace_playfield_broad_row, "DFTRACE_PLAYFIELD_BROAD_ROW");
 	DFTRACE_ADDRESS(dftrace_entity_active_count, "DFTRACE_ENTITY_ACTIVE_COUNT");
 	DFTRACE_ADDRESS(dftrace_entity_x, "DFTRACE_ENTITY_X");
 	DFTRACE_ADDRESS(dftrace_entity_y, "DFTRACE_ENTITY_Y");
@@ -1744,6 +1873,7 @@ static void dftrace_init(void)
 	dftrace_pickup_sequence_prefix = getenv("DFTRACE_PICKUP_SEQUENCE_PREFIX");
 	dftrace_pickup_traversal_prefix = getenv("DFTRACE_PICKUP_TRAVERSAL_PREFIX");
 	dftrace_pickup_contact_prefix = getenv("DFTRACE_PICKUP_CONTACT_PREFIX");
+	dftrace_muzzle_screenshot_prefix = getenv("DFTRACE_MUZZLE_SCREENSHOT_PREFIX");
 	dftrace_rapid_screenshot = getenv("DFTRACE_RAPID_SCREENSHOT");
 	dftrace_spread_screenshot = getenv("DFTRACE_SPREAD_SCREENSHOT");
 	dftrace_pause_test_enabled = getenv("DFTRACE_PAUSE_TEST") != NULL;
@@ -1958,6 +2088,24 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 					++dftrace_pickup_contact_after_collect;
 			}
 		}
+		if (dftrace_muzzle_screenshot_prefix != NULL &&
+			*dftrace_muzzle_screenshot_prefix != '\0' &&
+			dftrace_muzzle_screenshot_count < 64u) {
+			if (!dftrace_muzzle_screenshot_primed &&
+				(MEMORY_mem[dftrace_muzzle_screen_hi] != 0u ||
+				 MEMORY_mem[dftrace_muzzle_screen_hi + 1u] != 0u))
+				dftrace_muzzle_screenshot_primed = 1;
+			if (dftrace_muzzle_screenshot_primed) {
+				char path[1024];
+				snprintf(path, sizeof(path), "%s-%02u.png",
+					dftrace_muzzle_screenshot_prefix, dftrace_muzzle_screenshot_count);
+				if (!Screen_SaveScreenshot(path, 0)) {
+					fprintf(stderr, "darkfighter trace: muzzle screenshot failed: %s\n", path);
+					exit(2);
+				}
+				++dftrace_muzzle_screenshot_count;
+			}
+		}
 		if (dftrace_count != 0 &&
 			dftrace_frames[dftrace_count - 1].next_start_clock == 0u) {
 			DFTraceFrame *previous = &dftrace_frames[dftrace_count - 1];
@@ -2169,6 +2317,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 	if (pc == dftrace_pc_end) {
 		dftrace_snapshot_flash(&dftrace_current);
 		dftrace_snapshot_engine(&dftrace_current);
+		dftrace_snapshot_muzzles(&dftrace_current);
 		dftrace_pickup_frame_end(&dftrace_current);
 		dftrace_current.end_clock = dftrace_clock();
 		dftrace_current.end_host_frame = (unsigned) Atari800_nframes;

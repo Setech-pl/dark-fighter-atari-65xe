@@ -65,6 +65,20 @@ order the remainder of the PAL frame before the next pass reaches the new
 position. It adds no simulation work: world rates, ring rotation, movement
 cadence, and global scrolling retain their prior values.
 
+## Focused tracked-muzzle candidate evidence
+
+The host-only Atari800 7.1.2 observer measured 6,000 HARD PAL frames through
+the deterministic capital-section fixture. It covered both fixed-divider to
+ring transitions, logical rows 0-22 for allied and enemy muzzles, 137 ring
+wraps, 75 warning frames, 12 launch-flash frames, and 134 flying BROADSIDE
+frames. The trace found zero transient codes outside the two current legal
+footprints and zero muzzle or BROADSIDE pointer mismatches. Six frames contain
+a legal `$CD/$CE` shell overlay on the current muzzle cell rather than a muzzle
+code; none create another footprint. The maximum wall interval is 24,781
+cycles, leaving 10,787 cycles of the 35,568-cycle PAL frame, with no missed
+frame. This focused candidate measurement does not replace the accepted global
+report below.
+
 ## Heaviest legal frame
 
 The global maximum is HARD session `weapon-pickup-2-hunt-fire4`, frame 3,183.

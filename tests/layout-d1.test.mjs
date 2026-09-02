@@ -78,7 +78,7 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
 });
 
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
-  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12765);
+  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12770);
   assert.equal(manifest.transportCapacity.initialBootBytes, 12800);
   assert.equal(manifest.transportCapacity.totalTransportSectors, 156);
   assert.equal(manifest.transportCapacity.totalTransportBytes, 19968);
@@ -86,7 +86,7 @@ test("Layout D.2 exact memory and transport budgets remain frozen", () => {
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [101, 44, 5611, 6592, 0x5e10],
+    [101, 44, 5604, 6589, 0x5e10],
     [145, 6, 700, 700, 0x7bd0],
     [151, 1, 41, 39, 0x5259],
     [152, 5, 587, 645, 0x9d75],
@@ -98,7 +98,7 @@ test("Layout D.2 exact memory and transport budgets remain frozen", () => {
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {
   assert.equal(a2.length, 255);
-  assert.equal(sha256(a2), "0caf1d924375f01ba3a7107b53670c1c7b02bced2b9a6f546ed9e53e47cc9ea5");
+  assert.equal(sha256(a2), "74c8996d344034df5ccb8f9026cd31eda2d72403219a32380e3661b1ed2e8dfc");
   for (const artifact of ["xex", "atr"]) for (const fill of [0xa5, 0x5a]) {
     const staged = stageArtifact(artifact, fill);
     assert.equal(sha256(staged.sourceA2), sha256(a2), `${artifact} staged A2`);

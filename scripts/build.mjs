@@ -171,7 +171,7 @@ const glueStagingAddress = 0x5259;
 const glueFinalAddress = 0x4efe;
 const directorRunAddress = 0x9d75;
 const directorGuardAddress = 0x9ffa;
-const expectedInitialContentBytes = 12765;
+const expectedInitialContentBytes = 12770;
 const expectedLinkedRuntimeBytes = 16817;
 const expectedDirectorRawBytes = 645;
 const expectedDirectorPackedBytes = 587;
@@ -828,7 +828,7 @@ async function build() {
   ]);
   if (bootSectors !== 100 || totalTransportSectors !== 156 ||
     transportPayload.length !== 19968 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
-      [101, 44, 5611, 6592, 0x5e10],
+      [101, 44, 5604, 6589, 0x5e10],
       [145, 6, 700, 700, weaponPickupPackedStagingAddress],
       [151, 1, 41, 39, glueStagingAddress],
       [152, 5, 587, 645, directorRunAddress],

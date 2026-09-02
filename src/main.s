@@ -227,7 +227,8 @@ STAR_TWINKLE_SLOT            = STAR_TWINKLE_TIMER+$01
 STAR_GENERATION_FLAGS        = STAR_TWINKLE_SLOT+$01
 STARFIELD_STATE_END          = STAR_GENERATION_FLAGS+$01
 SESSION_SCORE_COMPAT_BYTES   = 2
-SESSION_SCORE_COMPAT_END     = STARFIELD_STATE_END+SESSION_SCORE_COMPAT_BYTES
+MUZZLE_ROW_DOMAIN            = STARFIELD_STATE_END          ; 2 B, fixed divider/ring
+SESSION_SCORE_COMPAT_END     = MUZZLE_ROW_DOMAIN+SESSION_SCORE_COMPAT_BYTES
 MUSIC_ACTIVE                 = SESSION_SCORE_COMPAT_END
 MUSIC_ROW_TIMER              = MUSIC_ACTIVE+$01
 MUSIC_SEQUENCE_INDEX         = MUSIC_ROW_TIMER+$01
@@ -257,12 +258,13 @@ TOP_SCORE_BCD_HI             = TOP_SCORE_TABLE_HI
 TOP_SCORE_TABLE_END          = TOP_SCORE_TABLE+TOP_SCORE_TABLE_BYTES
 SESSION_SCORE_STATE_END      = TOP_SCORE_TABLE_END
 
-.export MUZZLE_VISIBLE_ROW, MUZZLE_SCREEN_LO, MUZZLE_SCREEN_HI
+.export MUZZLE_ROW_DOMAIN, MUZZLE_VISIBLE_ROW, MUZZLE_SCREEN_LO, MUZZLE_SCREEN_HI
 .export CORRIDOR_BOUNDARY_LEFT, CORRIDOR_BOUNDARY_RIGHT, BROAD_TURRET_FIRED
 ; Build/debug tooling reads these symbols from the linker label file. Exporting
 ; constants has no runtime footprint and avoids duplicating the resident-state
 ; layout in a host-side wall-clock tracer.
-.export BROAD_STATE, BROAD_DAMAGE_COOLDOWN, BROAD_DAMAGE_APPLIED
+.export BROAD_STATE, BROAD_TURRET, BROAD_ROW_LO, BROAD_ROW_HI, BROAD_FLASH_TIMER
+.export BROAD_DAMAGE_COOLDOWN, BROAD_DAMAGE_APPLIED
 .export DIFFICULTY_SETTING, CAPITAL_SECTOR_STATE, PLAYER_LIFECYCLE
 .export CAPITAL_EXPLOSION_TIMER, CAPITAL_EXPLOSION_SOUND_TIMER, ENEMY_ACTIVE
 .export ENEMY_ARCHETYPE, ENEMY_HP, ENEMY_PENDING_DAMAGE, ENEMY_PENDING_SOURCE
@@ -311,6 +313,8 @@ BROAD_WARNING = 1
 BROAD_FLYING  = 2
 BROAD_IMPACT  = 3
 BROAD_RAIDER_PULSE = 4
+MUZZLE_DOMAIN_FIXED = 0
+MUZZLE_DOMAIN_RING  = 1
 PLAYER_ALIVE                = 0
 PLAYER_DYING                = 1
 PLAYER_RESPAWN_INVULNERABLE = 2
@@ -4993,6 +4997,10 @@ advance_starfield_layers:
 ; the prior divider into logical row one, then regenerate logical row zero.
 ; Hull generation follows; hull-only events retain their side-band copy path.
 scroll_world_columns:
+    ; Remove character transients before the fixed divider becomes a ring-copy
+    ; source. The hull path observes PLAYFIELD_RING_FLAGS and therefore never
+    ; performs this reverse restore twice in the same scroll event.
+    jsr restore_active_muzzles
     lda #$01
     sta PLAYFIELD_RING_FLAGS
     jsr rotate_playfield_rows
@@ -5936,8 +5944,9 @@ update_sector_state:
     rts
 
 ; At most one source muzzle per side can be visible in the 23-row viewport.
-; Each record keeps its row and exact screen pointer, eliminating the former
-; full sector/module scan. The pointer high byte doubles as the active flag.
+; Logical row plus explicit fixed-divider/ring domain are authoritative. The
+; exact pointer is only a derived overlay address; its high byte also doubles
+; as the active flag.
 restore_active_muzzles:
     ldx #(CAPITAL_HULL_TURRET_COUNT-1)
 @slot:
@@ -5970,27 +5979,29 @@ advance_tracked_muzzles:
     lda MUZZLE_VISIBLE_ROW,x
     cmp #CAPITAL_HULL_VISIBLE_ROWS
     bcs @deactivate
-    lda PLAYFIELD_RING_FLAGS
-    bne @next                    ; the retained physical row moved through LMS
+    lda #MUZZLE_DOMAIN_RING
+    sta MUZZLE_ROW_DOMAIN,x
+    stx BROAD_WORK_SLOT
+    lda MUZZLE_VISIBLE_ROW,x
+    jsr set_gameplay_row_ptr
+    ldx BROAD_WORK_SLOT
+    cpx #$00
+    bne @enemy_column
+    lda #CORRIDOR_CENTRAL_FIRST
+    bne @derive_pointer
+@enemy_column:
+    lda #(CORRIDOR_CENTRAL_END-1)
+@derive_pointer:
     clc
-    lda MUZZLE_SCREEN_LO,x
-    adc #40
+    adc dst_ptr
     sta MUZZLE_SCREEN_LO,x
-    lda MUZZLE_SCREEN_HI,x
+    lda dst_ptr+1
     adc #$00
-    sta MUZZLE_SCREEN_HI,x
-    cmp #>GAMEPLAY_SCREEN_END
-    bcc @next
-    lda MUZZLE_SCREEN_LO,x
-    cmp #<GAMEPLAY_SCREEN_END
-    bcc @next
-    sbc #<(PLAYFIELD_RING_ROWS*40)
-    sta MUZZLE_SCREEN_LO,x
-    lda #>GAMEPLAY_RING_SCREEN
     sta MUZZLE_SCREEN_HI,x
     bne @next
 @deactivate:
     lda #$00
+    sta MUZZLE_ROW_DOMAIN,x
     sta MUZZLE_VISIBLE_ROW,x
     sta MUZZLE_SCREEN_LO,x
     sta MUZZLE_SCREEN_HI,x
@@ -7000,6 +7011,7 @@ init_broadside:
     lda #$00
     ldx #(CAPITAL_HULL_TURRET_COUNT-1)
 @clear_muzzles:
+    sta MUZZLE_ROW_DOMAIN,x
     sta MUZZLE_VISIBLE_ROW,x
     sta MUZZLE_SCREEN_LO,x
     sta MUZZLE_SCREEN_HI,x
@@ -7553,9 +7565,6 @@ scroll_broadside_scene:
 
 advance_broadside_row:
     inc PLAYFIELD_BROAD_ROW,x
-    lda PLAYFIELD_RING_FLAGS
-    beq set_broadside_row_ptr
-    rts
 set_broadside_row_ptr:
     stx BROAD_WORK_SLOT
     lda PLAYFIELD_BROAD_ROW,x

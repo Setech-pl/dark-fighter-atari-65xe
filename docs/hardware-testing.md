@@ -41,6 +41,10 @@ For both XEX and ATR:
       banks, A2-head changes, and ring wrap.
 - [ ] Capital engines alternate only between dim and bright, holding each phase
       for eight active frames.
+- [ ] Allied and enemy cannon muzzles enter through the fixed divider without a
+      vertical trail. Observe warning, four-frame launch flash, BROADSIDE and at
+      least three A2 wraps: `$45/$D0/$51/$D2` may exist only at the current
+      tracked cells, and the divider is clean after each ring transition.
 - [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
       Raider breakup, and debris breakup behave normally.
 - [ ] Without Shield, an accepted direct Raider contact destroys the Viper
