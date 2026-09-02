@@ -79,6 +79,29 @@ cycles, leaving 10,787 cycles of the 35,568-cycle PAL frame, with no missed
 frame. This focused candidate measurement does not replace the accepted global
 report below.
 
+## Focused provisional early-capital evidence
+
+Three cold-start Atari800 7.1.2 PAL/XL replays measure 1,100 active gameplay
+frames each on EASY, MEDIUM, and HARD. All three admit the moved, single
+capital encounter at gameplay frame 50. The first Colonial pixels appear at
+frames 52/53/51 and the first frame containing visible pixels from both hulls
+is 72/71/67 respectively; entry remains tied to the normal 20/22.5/25 row/s
+world cadence.
+
+The complete Cylon warning/flash/launch counts are 3/3/3 on EASY, 4/4/4 on
+MEDIUM, and 3/3/3 on HARD. Warning starts are separated by 80, 71-78, and 64
+active frames respectively. Across the 3,300 measured frames, maximum wall
+intervals are 22,760/23,741/24,639 cycles, leaving at least 10,929 cycles of
+the 35,568-cycle PAL frame. Missed frames, deadline overruns, extra VBI
+boundaries, illegal `$45/$D0` cells, and tracked-muzzle/BROADSIDE pointer errors
+are all zero. These focused measurements do not replace the accepted global
+gauntlet report below.
+
+This provisional gate adds 107 B of linked code/data, no BSS, and no glyphs.
+Linked runtime is 16,924 B; simultaneous residency is 18,762 B and safe
+residency is 3,425 B. The entry and muzzle raster sequences plus raw per-frame
+traces are stored under `build/runtime-wall-trace/provisional-capital-*-cold-*`.
+
 ## Heaviest legal frame
 
 The global maximum is HARD session `weapon-pickup-2-hunt-fire4`, frame 3,183.

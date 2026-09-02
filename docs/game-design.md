@@ -100,6 +100,22 @@ left the screen, the ordinary full-width background still advances at the
 listed world rate. Far-star overlays retain their 25% logical parallax step;
 no capital lifecycle state changes the physical scene cadence.
 
+During construction, the existing first capital encounter is provisionally
+admitted on active gameplay frame 50 (about one PAL second after New Game or a
+level restart). Menu, OPTIONS, loader, and initialization frames do not advance
+this counter. A legal pool/budget refusal leaves one pending request which is
+retried deterministically at the first legal frame; the ships still enter from
+above at the ordinary world rate. This moves the original encounter rather than
+adding another one at its former phase boundary. Later encounters,
+`BOSS_HANDOFF`, and level timing remain at their established rows.
+
+The provisional Cylon firing schedule exposes at least three evenly spaced
+legal warning/flash/launch opportunities during that full hull pass. Each warning is
+still 25 frames and each attached launch flash is still four frames. Admission
+continues to obey the existing EASY/MEDIUM/HARD intensity ceilings (3/4/5) and
+the three-slot heavy-projectile pool; final placement and difficulty balance
+remain deferred to the level gauntlet.
+
 ## Implemented boosters
 
 Only one pickup capsule may exist at a time. A qualifying kill is specifically
@@ -190,7 +206,7 @@ phase boundaries:
 | Debris field | 576-1056 | 28.8-52.8 s | 25.6-46.9 s | 23.0-42.2 s |
 | Mixed pressure | 1056-1664 | 52.8-83.2 s | 46.9-74.0 s | 42.2-66.6 s |
 | Recovery | 1664-1856 | 83.2-92.8 s | 74.0-82.5 s | 66.6-74.2 s |
-| Capital/broadside escalation | 1856-2752 | 92.8-137.6 s | 82.5-122.3 s | 74.2-110.1 s |
+| Former capital/broadside escalation window; encounter provisionally moved to gameplay frame 50 | 1856-2752 | 92.8-137.6 s | 82.5-122.3 s | 74.2-110.1 s |
 | Recovery | 2752-2944 | 137.6-147.2 s | 122.3-130.8 s | 110.1-117.8 s |
 | Final approach | 2944-3712 | 147.2-185.6 s | 130.8-165.0 s | 117.8-148.5 s |
 

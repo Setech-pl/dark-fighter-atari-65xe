@@ -293,7 +293,7 @@ test("generated include, packed maps, codebooks, and turret records match assemb
   );
   assert.deepEqual(
     readXexBytes(labels.get("broadside_schedule"), asset.scheduleBytes.length),
-    Buffer.from([1, 68, 0, 126, 1, 68, 0, 138]),
+    Buffer.from([1, 68, 1, 68, 1, 68, 0, 138]),
     "assembled opportunities retain their PAL delays but select a faction side",
   );
   assert.deepEqual(
@@ -359,7 +359,7 @@ test("turret metadata points to complete multi-cell emplacements and real muzzle
   assert.deepEqual(asset.schedule.map(({ side, delayAfterFrames }) =>
     [side, delayAfterFrames]), [
     ["enemy", 68],
-    ["allied", 126],
+    ["enemy", 68],
     ["enemy", 68],
     ["allied", 138],
   ]);

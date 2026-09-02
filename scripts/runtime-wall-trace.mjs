@@ -171,6 +171,15 @@ const capitalMuzzleSessions = [{
   kind: "capital-muzzle-lifecycle",
 }];
 
+const provisionalCapitalSessions = [0, 1, 2].map((difficulty) => ({
+  id: `provisional-capital-${difficulty}-cold-sweep-fire4`,
+  difficulty,
+  policy: "sweep",
+  fireDelay: 4,
+  frames: 1_100,
+  kind: "provisional-capital-cold",
+}));
+
 const directorCompletionSessions = [0, 1, 2].map((difficulty) => ({
   id: `director-complete-${difficulty}-natural-sweep-fire0`,
   difficulty,
@@ -423,7 +432,8 @@ for (const name of [
   "pickup_first_overwrite_value", "pickup_first_overwrite_scanline",
   "engine_timer", "engine_phase", "corridor_phase", "ring_flags",
   "engine_vscroll", "engine_a2_head", "engine_allied_cells",
-  "engine_enemy_cells", "engine_copy_calls", "engine_copy_scanline",
+  "engine_enemy_cells", "capital_visible_allied_cells", "capital_visible_enemy_cells",
+  "engine_copy_calls", "engine_copy_scanline",
   "engine_copy_cycle", "engine_first_write_pc", "engine_first_write_address",
   "engine_first_write_old", "engine_first_write_new",
   "engine_first_write_scanline", "engine_first_write_cycle",
@@ -1272,7 +1282,7 @@ function main() {
     ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
       ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
       ...weaponPickupTraversalSessions, ...weaponPickupContactSessions,
-      ...capitalMuzzleSessions,
+      ...capitalMuzzleSessions, ...provisionalCapitalSessions,
       ...memoryIntegritySessions]
       .concat(engineDiagnosticSessions, engineRestartSessions)
     : [{ ...baselineSessions[0], id: "observer-smoke", kind: "observer-smoke", frames: smokeFrames }];
@@ -1287,7 +1297,11 @@ function main() {
       : session.kind === "weapon-pickup-overlap"
         ? path.join(buildDirectory, "weapon-pickup-contact-edge") : undefined;
     const muzzleScreenshotPrefix = session.kind === "capital-muzzle-lifecycle"
-      ? path.join(buildDirectory, "capital-muzzle-clean") : undefined;
+      ? path.join(buildDirectory, "capital-muzzle-clean")
+      : session.kind === "provisional-capital-cold"
+        ? path.join(buildDirectory, `${session.id}-muzzle`) : undefined;
+    const provisionalEntryPrefix = session.kind === "provisional-capital-cold"
+      ? path.join(buildDirectory, `${session.id}-entry`) : undefined;
     if (pickupContactPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(pickupContactPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
@@ -1297,6 +1311,13 @@ function main() {
     }
     if (muzzleScreenshotPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(muzzleScreenshotPrefix);
+      for (const name of fs.readdirSync(buildDirectory)) {
+        if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
+          fs.unlinkSync(path.join(buildDirectory, name));
+      }
+    }
+    if (provisionalEntryPrefix !== undefined && !reuseExistingTraces) {
+      const basename = path.basename(provisionalEntryPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
         if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
           fs.unlinkSync(path.join(buildDirectory, name));
@@ -1335,6 +1356,9 @@ function main() {
 	  ...(session.kind === "engine-first-150" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
 	  } : {}),
+	  ...(provisionalEntryPrefix === undefined ? {} : {
+	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: provisionalEntryPrefix,
+	  }),
 	  ...(session.kind === "engine-restart-after-game-over" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
 	    DFTRACE_ENGINE_SCREENSHOT_GENERATION: String(session.engineScreenshotGeneration),
@@ -1400,7 +1424,8 @@ function main() {
       const wraps = rows.slice(1).filter((row, index) =>
         row.engine_a2_head > rows[index].engine_a2_head).length;
       invariant(wraps >= 3, `${session.id} covered only ${wraps} A2 ring wraps`);
-      const sheetPath = path.join(buildDirectory, "capital-muzzle-clean-sequence.png");
+      const sheetPath = path.join(buildDirectory, session.kind === "provisional-capital-cold"
+        ? `${session.id}-muzzle-sequence.png` : "capital-muzzle-clean-sequence.png");
       writeScreenshotContact(paths, sheetPath, 8);
       const transitionRows = activeRows.filter((row, index) => index === 0 ||
         row.muzzle0_domain !== activeRows[index - 1].muzzle0_domain ||
@@ -1441,6 +1466,91 @@ function main() {
       };
       fs.writeFileSync(path.join(buildDirectory, `${session.id}-evidence.json`),
         `${JSON.stringify(evidence, null, 2)}\n`);
+    }
+    if (session.kind === "provisional-capital-cold") {
+      const previous = (index, field) => index === 0 ? 0 : rows[index - 1][field];
+      const warningStarts = [];
+      const flashStarts = [];
+      const launches = [];
+      for (let index = 0; index < rows.length; ++index) {
+        const row = rows[index];
+        for (let slot = 0; slot < 3; ++slot) {
+          const state = row[`broad${slot}_state`];
+          const turret = row[`broad${slot}_turret`];
+          if (turret === 1 && state === 1 && previous(index, `broad${slot}_state`) !== 1)
+            warningStarts.push(row);
+          if (turret === 1 && row[`broad${slot}_flash`] > 0 &&
+              previous(index, `broad${slot}_flash`) === 0)
+            flashStarts.push(row);
+          if (turret === 1 && state === 2 && previous(index, `broad${slot}_state`) === 1)
+            launches.push(row);
+        }
+      }
+      const admission = rows.find((row) => row.sector_state !== 7);
+      const admissionTraceFrame = admission?.frame ?? Number.POSITIVE_INFINITY;
+      const firstAllied = rows.find((row) => row.frame >= admissionTraceFrame &&
+        row.capital_visible_allied_cells > 0);
+      const firstEnemy = rows.find((row) => row.frame >= admissionTraceFrame &&
+        row.capital_visible_enemy_cells > 0);
+      const firstBoth = rows.find((row) => row.frame >= admissionTraceFrame &&
+        row.capital_visible_allied_cells > 0 && row.capital_visible_enemy_cells > 0);
+      const complete = admission === undefined ? undefined : rows.find((row) =>
+        row.frame > admission.frame && row.sector_state === 7);
+      const maximumWall = Math.max(...rows.map((row) => row.wall_cycles));
+      const missed = rows.reduce((sum, row) => sum + row.missed_frames, 0);
+      const extraVbi = rows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0);
+      const overruns = rows.filter((row) => row.wall_cycles > 32_584).length;
+      invariant(admission?.gameplay_frame === 50,
+        `${session.id} first capital admission was gameplay frame ${admission?.gameplay_frame}`);
+      invariant(firstAllied !== undefined && firstEnemy !== undefined && firstBoth !== undefined,
+        `${session.id} did not show both capital hulls in the final displayed rows`);
+      invariant(complete !== undefined,
+        `${session.id} did not complete the full capital traversal`);
+      invariant(warningStarts.length >= 3 && flashStarts.length >= 3 && launches.length >= 3,
+        `${session.id} observed ${warningStarts.length}/${flashStarts.length}/${launches.length} ` +
+        "enemy warning/flash/launch starts");
+      invariant(rows.every((row) => row.muzzle_illegal_cells === 0 &&
+        row.muzzle_pointer_errors === 0 && row.broad_pointer_errors === 0),
+      `${session.id} regressed tracked-muzzle legality`);
+      invariant(missed === 0 && extraVbi === 0 && overruns === 0,
+        `${session.id} missed PAL timing: missed=${missed}, extra=${extraVbi}, overruns=${overruns}`);
+      const entryPaths = Array.from({ length: 150 }, (_, frame) =>
+        `${provisionalEntryPrefix}-${String(frame).padStart(3, "0")}.png`);
+      invariant(entryPaths.every((entryPath) => fs.existsSync(entryPath)),
+        `${session.id} did not capture 150 cold-start entry rasters`);
+      const selectedEntryPaths = [...new Set([
+        48, 49, 50, 51, 52,
+        Math.max(0, firstBoth.frame - 2), firstBoth.frame - 1, firstBoth.frame,
+        firstBoth.frame + 1, firstBoth.frame + 2,
+      ])].filter((frame) => frame >= 0 && frame < entryPaths.length)
+        .map((frame) => entryPaths[frame]);
+      const entrySheet = path.join(buildDirectory, `${session.id}-entry-sequence.png`);
+      writeScreenshotContact(selectedEntryPaths, entrySheet, 5);
+      const evidencePath = path.join(buildDirectory, `${session.id}-evidence.json`);
+      const priorEvidence = JSON.parse(fs.readFileSync(evidencePath, "utf8"));
+      fs.writeFileSync(evidencePath, `${JSON.stringify({
+        ...priorEvidence,
+        cold_start: true,
+        admission: { trace_frame: admission.frame, gameplay_frame: admission.gameplay_frame },
+        first_visible: {
+          allied: { trace_frame: firstAllied.frame, gameplay_frame: firstAllied.gameplay_frame },
+          enemy: { trace_frame: firstEnemy.frame, gameplay_frame: firstEnemy.gameplay_frame },
+          both: { trace_frame: firstBoth.frame, gameplay_frame: firstBoth.gameplay_frame },
+        },
+        traversal_complete: {
+          trace_frame: complete.frame, gameplay_frame: complete.gameplay_frame,
+        },
+        enemy_cycles: {
+          warnings: warningStarts.map(({ frame, gameplay_frame }) => ({ frame, gameplay_frame })),
+          flashes: flashStarts.map(({ frame, gameplay_frame }) => ({ frame, gameplay_frame })),
+          launches: launches.map(({ frame, gameplay_frame }) => ({ frame, gameplay_frame })),
+        },
+        timing: {
+          maximum_wall_cycles: maximumWall, pal_headroom: 35_568 - maximumWall,
+          missed_frames: missed, deadline_overruns: overruns, extra_vbi_boundaries: extraVbi,
+        },
+        entry_screenshot_sequence: path.relative(rootDirectory, entrySheet),
+      }, null, 2)}\n`);
     }
     if (pickupContactPrefix !== undefined) {
       const basename = path.basename(pickupContactPrefix);

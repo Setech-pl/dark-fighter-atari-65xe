@@ -143,7 +143,7 @@ director_check_phase:
 :
     sta STATE_RECOVERY
     txa
-    jmp hook_apply_phase_policy
+    jmp @done
 @done:
     rts
 
@@ -322,13 +322,13 @@ level1_phase_reaction_hard:   .byte 48,36,28,24,48,24,48,20
 level1_phase_recovery_easy:   .byte 128,48,40,48,128,48,128,64
 level1_phase_recovery_medium: .byte 112,42,34,42,112,42,112,56
 level1_phase_recovery_hard:   .byte 96,36,28,36,96,36,96,48
-; The visual capital corridor follows the frozen phase design instead of
-; starting during the threat-free intro. Phase 5 owns the finite sector;
-; every other phase retains ordinary open-space publication.
+; The sole capital encounter is admitted by the provisional gameplay-frame
+; gate. Phase transitions must not create a second late copy or interrupt the
+; already-running finite hull lifecycle.
 level1_phase_capital_state:
     .byte CAPITAL_HULL_STATE_OPEN,CAPITAL_HULL_STATE_OPEN
     .byte CAPITAL_HULL_STATE_OPEN,CAPITAL_HULL_STATE_OPEN
-    .byte CAPITAL_HULL_STATE_OPEN,CAPITAL_HULL_STATE_ENGINES
+    .byte CAPITAL_HULL_STATE_OPEN,CAPITAL_HULL_STATE_OPEN
     .byte CAPITAL_HULL_STATE_OPEN,CAPITAL_HULL_STATE_OPEN
 level1_phase_pickups:  .byte $00,$01,$01,$03,$07,$03,$07,$03
 level1_phase_variants: .byte $00,$03,$0F,$1F,$00,$1F,$00,$3F

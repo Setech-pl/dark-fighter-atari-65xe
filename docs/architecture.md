@@ -39,8 +39,8 @@ and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. No loader byte remains resident or enters gameplay.
 
 The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
-accepts RAW or LZ records. The current initial block and three records use 152
-sectors (19,456 B). The ATR itself has 568 unused sectors (72,704 B); runtime
+accepts RAW or LZ records. The current initial block and four records use 157
+sectors (20,096 B). The ATR itself has 563 unused sectors (72,064 B); runtime
 residency remains a separate constraint.
 
 ### DFMC v1 byte format
@@ -61,11 +61,12 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production records begin at sectors 102, 147, and 148. Their packed/raw lengths
-are respectively 5,674/6,656 B, 41/39 B, and 585/645 B. Glue is transported to
-`$5259`, held at `$7F16-$7F3C` while ENTITY_CODE is unpacked, and late-published
-to `$4EFE-$4F24`. The Director ends at `$9FF9`; `$9FFA-$9FFF` is a six-byte
-untouched guard.
+Production records begin at sectors 101, 146, 152, and 153. Their packed/raw
+lengths are respectively 5,665/6,653 B, 743/743 B, 41/39 B, and 585/645 B.
+The second record carries the immutable pickup phase bank plus its late
+compositor. Glue is transported to `$5259`, held at `$7F16-$7F3C` while
+ENTITY_CODE is unpacked, and late-published to `$4EFE-$4F24`. The Director ends
+at `$9FF9`; `$9FFA-$9FFF` is a six-byte untouched guard.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
 mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to

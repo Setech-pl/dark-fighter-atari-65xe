@@ -448,6 +448,7 @@
     "enemy_void_lance": 2
   },
   "broadside": {
+    "provisionalFirstCapitalGameplayFrame": 50,
     "initialDelayFrames": 2,
     "retryDelayFrames": 7,
     "scheduleDelayScale": 2,
@@ -532,7 +533,7 @@
     },
     "schedule": [
       { "side": "enemy", "baseDelayAfterFrames": 2 },
-      { "side": "allied", "baseDelayAfterFrames": 31 },
+      { "side": "enemy", "baseDelayAfterFrames": 2 },
       { "side": "enemy", "baseDelayAfterFrames": 2 },
       { "side": "allied", "baseDelayAfterFrames": 37 }
     ]

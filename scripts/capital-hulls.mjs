@@ -709,6 +709,8 @@ export function compileCapitalHulls(definition) {
     return value;
   };
   const broadsideTiming = {
+    provisionalFirstCapitalGameplayFrame:
+      boundedByte("provisionalFirstCapitalGameplayFrame", 1),
     initialDelayFrames: boundedByte("initialDelayFrames", 1),
     retryDelayFrames: boundedByte("retryDelayFrames", 1),
     scheduleDelayScale: boundedByte("scheduleDelayScale", 1),
@@ -1074,6 +1076,7 @@ export function renderCapitalHullsCa65Include(asset) {
     "CAPITAL_HULL_STATE_COMPLETE = 6",
     "CAPITAL_HULL_STATE_OPEN = 7",
     "CAPITAL_HULL_TURRET_RECORD_BYTES = 7",
+    `PROVISIONAL_FIRST_CAPITAL_FRAME = ${asset.broadside.provisionalFirstCapitalGameplayFrame}`,
     `BROADSIDE_SCHEDULE_COUNT = ${asset.schedule.length}`,
     "BROADSIDE_SCHEDULE_RECORD_BYTES = 2",
     `BROADSIDE_INITIAL_DELAY = ${asset.broadside.initialDelayFrames}`,

@@ -235,8 +235,8 @@ test("only reduced-density combat modules contain staggered functional cannons",
   }
 });
 
-test("flagship keeps the accepted cadence, warning, speed, damage, and M0 ownership", () => {
-  assert.deepEqual([...asset.scheduleBytes], [1, 68, 0, 126, 1, 68, 0, 138]);
+test("flagship keeps the provisional cadence, warning, speed, damage, and M0 ownership", () => {
+  assert.deepEqual([...asset.scheduleBytes], [1, 68, 1, 68, 1, 68, 0, 138]);
   assert.equal(asset.broadside.warningFrames, 25);
   assert.equal(asset.broadside.projectileSpeed, 2);
   assert.equal(asset.broadside.playerDamage, 20);

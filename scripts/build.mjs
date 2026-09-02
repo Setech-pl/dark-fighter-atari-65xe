@@ -172,9 +172,9 @@ const glueFinalAddress = 0x4efe;
 const directorRunAddress = 0x9d75;
 const directorGuardAddress = 0x9ffa;
 const expectedInitialContentBytes = 12770;
-const expectedLinkedRuntimeBytes = 16817;
+const expectedLinkedRuntimeBytes = 16924;
 const expectedDirectorRawBytes = 645;
-const expectedDirectorPackedBytes = 587;
+const expectedDirectorPackedBytes = 585;
 const expectedGlueRawBytes = 39;
 const expectedGluePackedBytes = 41;
 
@@ -826,12 +826,12 @@ async function build() {
     record.startSector, record.sectorCount, record.packedLength,
     record.rawLength, record.finalDestination,
   ]);
-  if (bootSectors !== 100 || totalTransportSectors !== 156 ||
-    transportPayload.length !== 19968 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
-      [101, 44, 5604, 6589, 0x5e10],
-      [145, 6, 700, 700, weaponPickupPackedStagingAddress],
-      [151, 1, 41, 39, glueStagingAddress],
-      [152, 5, 587, 645, directorRunAddress],
+  if (bootSectors !== 100 || totalTransportSectors !== 157 ||
+    transportPayload.length !== 20096 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
+      [101, 45, 5665, 6653, 0x5e10],
+      [146, 6, 743, 743, weaponPickupPackedStagingAddress],
+      [152, 1, 41, 39, glueStagingAddress],
+      [153, 5, 585, 645, directorRunAddress],
     ])) {
     throw new Error(`Layout D.2 transport topology changed: ${JSON.stringify(frozenRecordShape)}`);
   }
@@ -947,8 +947,8 @@ async function build() {
       phaseCount: 8,
       initialContentBytes: expectedInitialContentBytes,
       linkedRuntimeBytes: expectedLinkedRuntimeBytes,
-      simultaneousResidencyBytes: 18655,
-      safeResidencyBytes: 3532,
+      simultaneousResidencyBytes: 18762,
+      safeResidencyBytes: 3425,
       glue: {
         stagingAddress: glueStagingAddress,
         holdingAddress: 0x7f16,

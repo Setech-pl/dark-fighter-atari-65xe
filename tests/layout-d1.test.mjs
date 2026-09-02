@@ -80,25 +80,25 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
   assert.equal(manifest.transportCapacity.initialBootContentBytes, 12770);
   assert.equal(manifest.transportCapacity.initialBootBytes, 12800);
-  assert.equal(manifest.transportCapacity.totalTransportSectors, 156);
-  assert.equal(manifest.transportCapacity.totalTransportBytes, 19968);
+  assert.equal(manifest.transportCapacity.totalTransportSectors, 157);
+  assert.equal(manifest.transportCapacity.totalTransportBytes, 20096);
   assert.equal(manifest.transportCapacity.stage2.bytes, 1191);
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [101, 44, 5604, 6589, 0x5e10],
-    [145, 6, 700, 700, 0x7bd0],
-    [151, 1, 41, 39, 0x5259],
-    [152, 5, 587, 645, 0x9d75],
+    [101, 45, 5665, 6653, 0x5e10],
+    [146, 6, 743, 743, 0x7bd0],
+    [152, 1, 41, 39, 0x5259],
+    [153, 5, 585, 645, 0x9d75],
   ]);
-  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16817);
-  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18655);
-  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3532);
+  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16924);
+  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18762);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3425);
 });
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {
   assert.equal(a2.length, 255);
-  assert.equal(sha256(a2), "74c8996d344034df5ccb8f9026cd31eda2d72403219a32380e3661b1ed2e8dfc");
+  assert.equal(sha256(a2), "efc77ef614a155bd7ae5c321d66e8d17ea1e8d30981991a483ef3322b2d86cc5");
   for (const artifact of ["xex", "atr"]) for (const fill of [0xa5, 0x5a]) {
     const staged = stageArtifact(artifact, fill);
     assert.equal(sha256(staged.sourceA2), sha256(a2), `${artifact} staged A2`);

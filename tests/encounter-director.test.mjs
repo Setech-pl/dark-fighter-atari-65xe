@@ -23,6 +23,11 @@ const state = {
   intensity: 0x80f8, reaction: 0x80f9, recovery: 0x80fa, rng: 0x80fb,
   pending: 0x80fc, defer: 0x80fd, flags: 0x80fe, admissionFrame: 0x80ff,
 };
+const provisionalCapital = {
+  frame: 50,
+  due: 0x80,
+  admitted: 0x40,
+};
 
 function memory() {
   const result = new Uint8Array(0x10000);
@@ -184,6 +189,7 @@ test("BROADSIDE admission is transactional across success, retry, budget and rel
   legal[state.reaction] = 0;
   legal[labels.get("frame_counter")] += 1;
   legal[broadside.scheduleTimer] = 1;
+  legal[broadside.scheduleTimer + 1] = 3;
   armMuzzle(legal, 0, 0);
   run(legal, "schedule_broadside");
   assert.equal(legal[state.intensity], 2, "readmission after release must charge once");
@@ -224,6 +230,7 @@ test("BROADSIDE admission is transactional across success, retry, budget and rel
   parallel[state.reaction] = 0;
   parallel[labels.get("frame_counter")] += 1;
   parallel[broadside.scheduleTimer] = 1;
+  parallel[broadside.scheduleTimer + 1] = 3;
   armMuzzle(parallel, 0, 0);
   run(parallel, "schedule_broadside");
   assert.deepEqual([...parallel.subarray(broadside.state, broadside.state + 3)], [1, 1, 0]);
@@ -309,6 +316,60 @@ test("scheduler ownership remains single-source and lifecycle-owned", () => {
   assert.doesNotMatch(directorSource, /rng_state|STAR_RNG_STATE/);
 });
 
+test("provisional first capital admission is frame-50, resettable and retry-safe", () => {
+  const sectorState = labels.get("CAPITAL_SECTOR_STATE");
+  const frameCounter = labels.get("frame_counter");
+  const legal = memory();
+  run(legal, "director_init", { a: 0x6d });
+  run(legal, "init_broadside");
+  legal[frameCounter] = provisionalCapital.frame - 1;
+  run(legal, "integration_update_first_capital");
+  assert.equal(legal[sectorState], 7);
+  assert.equal(legal[state.flags], 0);
+  legal[frameCounter] = provisionalCapital.frame;
+  run(legal, "integration_update_first_capital");
+  assert.equal(legal[sectorState], 0, "the first legal attempt must admit at gameplay frame 50");
+  assert.equal(legal[state.flags], provisionalCapital.admitted);
+
+  run(legal, "director_init", { a: 0x6d });
+  run(legal, "init_broadside");
+  assert.equal(legal[state.flags], 0, "level restart must reset provisional admission state");
+  assert.equal(legal[sectorState], 7);
+
+  const blocked = memory();
+  run(blocked, "director_init", { a: 0x6d });
+  run(blocked, "init_broadside");
+  blocked[frameCounter] = provisionalCapital.frame;
+  blocked[state.intensity] = 2;
+  run(blocked, "integration_update_first_capital");
+  assert.equal(blocked[sectorState], 7);
+  assert.equal(blocked[state.flags], provisionalCapital.due,
+    "a legal budget block must retain a deterministic pending admission");
+  blocked[frameCounter] += 1;
+  blocked[state.intensity] = 0;
+  run(blocked, "integration_update_first_capital");
+  assert.equal(blocked[sectorState], 0);
+  assert.equal(blocked[state.flags], provisionalCapital.admitted,
+    "retry must commit at the first subsequent legal gameplay frame");
+});
+
+test("the provisional gate moves rather than duplicates the one capital encounter", () => {
+  const image = memory();
+  assert.deepEqual(byteTable(image, "level1_phase_capital_state", 8), Array(8).fill(7));
+  assert.deepEqual(byteTable(image, "level1_event_row_lo", 6),
+    [128, 32, 64, 128, 0, 128]);
+  assert.deepEqual(byteTable(image, "level1_event_row_hi", 6), [0, 4, 7, 11, 14, 14]);
+  assert.equal((mainSource.match(/jsr integration_update_first_capital\n/g) ?? []).length, 1);
+  assert.match(mainSource,
+    /cmp #PROVISIONAL_FIRST_CAPITAL_FRAME[\s\S]+jmp retry_first_capital_admission/);
+
+  run(image, "director_init", { a: 0x6d });
+  image[labels.get("CAPITAL_SECTOR_STATE")] = 2;
+  for (let row = 0; row < 3_000; row += 1) run(image, "director_world_row_tick");
+  assert.equal(image[labels.get("CAPITAL_SECTOR_STATE")], 2,
+    "later phase boundaries must neither duplicate nor interrupt the moved encounter");
+});
+
 test("natural Level 1 reaches a visible two-sided BROADSIDE without state injection", () => {
   const ownersAcrossDifficulties = new Set();
   for (const difficulty of [0, 1, 2]) {
@@ -318,11 +379,13 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
     const broadState = labels.get("BROAD_STATE");
     const broadOwner = 0x4e43;
     const broadX = 0x4e49;
+    const broadFlash = labels.get("BROAD_FLASH_TIMER");
     const frameCounter = labels.get("frame_counter");
     image[labels.get("DIFFICULTY_SETTING")] = difficulty;
     image[lifecycle] = 0;
     run(image, "init_playfield_row_table");
     run(image, "init_playfield_display_lists");
+    run(image, "init_state");
     run(image, "unpack_capital_hull_maps");
     run(image, "director_init", { a: 0x6d ^ difficulty });
     run(image, "init_broadside");
@@ -331,10 +394,18 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
     const visibleByOwner = new Set();
     const motionByOwner = new Set();
     const previousX = new Map();
+    const previousStates = [0, 0, 0];
+    const previousFlashes = [0, 0, 0];
+    const cylonCycles = { warnings: 0, flashes: 0, launches: 0 };
+    let admittedAtFrame = null;
     let enteredCapitalAtRow = null;
     let completedCapital = false;
     for (let frame = 0; frame < 10_000; frame += 1) {
       image[frameCounter] = image[frameCounter] + 1 & 0xff;
+      const stateBeforeAdmission = image[sectorState];
+      run(image, "integration_update_first_capital");
+      if (admittedAtFrame === null && stateBeforeAdmission === 7 && image[sectorState] === 0)
+        admittedAtFrame = frame + 1;
       run(image, "tick_launch_flashes");
       run(image, "update_broadside");
       run(image, "update_starfield");
@@ -344,8 +415,18 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
       const row = image[state.rowLo] | image[state.rowHi] << 8;
       if (enteredCapitalAtRow === null && image[sectorState] < 5) enteredCapitalAtRow = row;
       for (let slot = 0; slot < 3; slot += 1) {
-        if (image[broadState + slot] !== 2) continue;
+        const slotState = image[broadState + slot];
         const owner = image[broadOwner + slot];
+        const flash = image[broadFlash + slot];
+        if (owner === 1 && slotState === 1 && previousStates[slot] !== 1)
+          cylonCycles.warnings += 1;
+        if (owner === 1 && slotState === 2 && previousStates[slot] === 1)
+          cylonCycles.launches += 1;
+        if (owner === 1 && flash !== 0 && previousFlashes[slot] === 0)
+          cylonCycles.flashes += 1;
+        previousStates[slot] = slotState;
+        previousFlashes[slot] = flash;
+        if (image[broadState + slot] !== 2) continue;
         const x = image[broadX + slot];
         if (x >= 48 && x < 208) visibleByOwner.add(owner);
         const key = `${slot}:${owner}`;
@@ -358,15 +439,23 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
         previousX.set(key, x);
       }
       completedCapital ||= enteredCapitalAtRow !== null && image[sectorState] >= 6;
-      if (completedCapital && visibleByOwner.size === 2 && motionByOwner.size === 2) break;
+      if (completedCapital && image[state.intensity] === 0) break;
     }
 
-    assert.equal(enteredCapitalAtRow, 1856,
-      `difficulty ${difficulty} capital section must begin at the frozen boundary`);
-    assert.ok(visibleByOwner.size >= 1,
-      `difficulty ${difficulty} must render at least one natural ship-to-ship projectile`);
+    assert.equal(admittedAtFrame, provisionalCapital.frame,
+      `difficulty ${difficulty} capital admission must occur at active gameplay frame 50`);
+    assert.ok(enteredCapitalAtRow < 32,
+      `difficulty ${difficulty} moved capital section must begin during the provisional intro`);
+    assert.ok(visibleByOwner.has(1),
+      `difficulty ${difficulty} must render a natural Cylon projectile`);
     assert.deepEqual([...motionByOwner].sort(), [...visibleByOwner].sort(),
       `difficulty ${difficulty} visible projectiles must move in their intended directions`);
+    assert.ok(cylonCycles.warnings >= 3,
+      `difficulty ${difficulty} produced only ${cylonCycles.warnings} Cylon warnings`);
+    assert.equal(cylonCycles.flashes, cylonCycles.warnings,
+      `difficulty ${difficulty} warning/flash lifecycle mismatch`);
+    assert.equal(cylonCycles.launches, cylonCycles.warnings,
+      `difficulty ${difficulty} warning/launch lifecycle mismatch`);
     for (const owner of visibleByOwner) ownersAcrossDifficulties.add(owner);
     assert.equal(completedCapital, true, `difficulty ${difficulty} capital section must drain`);
     assert.equal(image[state.intensity], 0,
@@ -386,6 +475,7 @@ test("natural capital exit performs one scene recycle on every world row", () =>
   image[lifecycle] = 0;
   run(image, "init_playfield_row_table");
   run(image, "init_playfield_display_lists");
+  run(image, "init_state");
   run(image, "unpack_capital_hull_maps");
   run(image, "director_init", { a: 0x6f });
   run(image, "init_broadside");
@@ -396,6 +486,7 @@ test("natural capital exit performs one scene recycle on every world row", () =>
   let sawComplete = false;
   for (let frame = 0; frame < 5_000; frame += 1) {
     image[frameCounter] = image[frameCounter] + 1 & 0xff;
+    run(image, "integration_update_first_capital");
     run(image, "tick_launch_flashes");
     run(image, "update_broadside");
     const result = run(image, "update_starfield");

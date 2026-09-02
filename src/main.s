@@ -21,16 +21,21 @@ DIRECTOR_INIT = $9D75
 DIRECTOR_WORLD_ROW_TICK = $9D9B
 DIRECTOR_REQUEST = $9EA7
 DIRECTOR_RELEASE = $9F23
+DIRECTOR_RNG_ADVANCE = $9F32
 DIRECTOR_STATE_REACTION = $80F9
 DIRECTOR_STATE_RECOVERY = $80FA
+DIRECTOR_STATE_INTENSITY = $80F8
 DIRECTOR_STATE_FLAGS = $80FE
 DIRECTOR_STATE_ADMISSION_FRAME = $80FF
 DIRECTOR_FLAG_COMPLETE = $01
+DIRECTOR_FLAG_FIRST_CAPITAL_ADMITTED = $40
+DIRECTOR_FLAG_FIRST_CAPITAL_DUE = $80
 DIRECTOR_HAZARD_RAIDER = 0
 DIRECTOR_HAZARD_DEBRIS = 1
 DIRECTOR_HAZARD_BROADSIDE = 2
 DIRECTOR_HAZARD_PICKUP = 3
 DIRECTOR_RETRY_FRAMES = 8
+PROVISIONAL_CAPITAL_BROADSIDE_REACTION_ROWS = 12
 integration_director_world_row = $4EFE
 integration_debris_spawn = $4F0D
 integration_debris_release = $4F1D
@@ -2241,6 +2246,7 @@ main_loop_lifecycle_ready = *
     lda PLAYER_LIFECYCLE
     cmp #PLAYER_DYING
     beq main_loop_simulation
+    jsr integration_update_first_capital
     jsr read_input
 main_loop_simulation = *
 profile_after_player = *
@@ -10277,6 +10283,33 @@ entity_trajectory_vx:
 
 ; Encounter Director adapters own admission and policy only. Object lifecycle
 ; remains in the existing production routines reached by these gates.
+.segment "PICKUP_CODE"
+integration_update_first_capital:
+    bit DIRECTOR_STATE_FLAGS
+    bmi @retry
+    bvs @done
+    lda frame_counter
+    cmp #PROVISIONAL_FIRST_CAPITAL_FRAME
+    bne @done
+@retry:
+    jmp retry_first_capital_admission
+@done:
+    rts
+
+retry_first_capital_admission:
+    lda #DIRECTOR_FLAG_FIRST_CAPITAL_DUE
+    sta DIRECTOR_STATE_FLAGS
+    lda DIRECTOR_STATE_INTENSITY
+    bne @done
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_OPEN
+    bne @done
+    lda #CAPITAL_HULL_STATE_ENGINES
+    sta CAPITAL_SECTOR_STATE
+    lsr DIRECTOR_STATE_FLAGS     ; DUE $80 becomes ADMITTED $40 atomically
+@done:
+    rts
+
 .segment "CODE"
 integration_update_enemy:
     lda ENEMY_ACTIVE
@@ -10355,7 +10388,7 @@ integration_broadside_due:
     dec BROAD_SCHEDULE_TIMER
     bne @not_due
     ldx #DIRECTOR_HAZARD_BROADSIDE
-    jsr DIRECTOR_REQUEST
+    jsr provisional_capital_broadside_request
     bcs @done
     lda #BROADSIDE_RETRY_DELAY
     sta BROAD_SCHEDULE_TIMER
@@ -10369,6 +10402,47 @@ integration_broadside_release:
     jsr DIRECTOR_RELEASE
     jmp free_broadside_slot
 
+.segment "BROADSIDE"
+; The moved development encounter spans the ordinary phase-0/1 boundary.
+; Admit only its legal ship-to-ship cycles locally so later phase policy,
+; Raider/debris/pickup budgets and the Director event timetable stay frozen.
+provisional_capital_broadside_request:
+    bit DIRECTOR_STATE_FLAGS
+    bvc @normal_policy
+    lda CAPITAL_SECTOR_STATE
+    cmp #CAPITAL_HULL_STATE_DRAIN
+    bcs @normal_policy
+    lda DIRECTOR_STATE_ADMISSION_FRAME
+    cmp frame_counter
+    beq @deny
+    lda DIRECTOR_STATE_INTENSITY
+    clc
+    adc #$02                    ; frozen BROADSIDE Director hazard cost
+    ldx DIFFICULTY_SETTING
+    cmp provisional_capital_budgets,x
+    beq @budget_ok
+    bcs @deny
+@budget_ok:
+    sta DIRECTOR_STATE_INTENSITY
+    lda frame_counter
+    sta DIRECTOR_STATE_ADMISSION_FRAME
+    lda #PROVISIONAL_CAPITAL_BROADSIDE_REACTION_ROWS
+    sta DIRECTOR_STATE_REACTION
+    jsr DIRECTOR_RNG_ADVANCE
+    sec
+    rts
+@normal_policy:
+    jmp DIRECTOR_REQUEST
+@deny:
+    clc
+    rts
+
+; Reuse the established global intensity ceilings without changing any normal
+; phase table: EASY 3, MEDIUM 4, HARD 5.
+provisional_capital_budgets:
+    .byte $03,$04,$05
+
+.segment "A2_KERNEL"
 integration_pickup_pending_tick:
     dec ENTITY_TIMER+WEAPON_PICKUP_SLOT
     bne @done

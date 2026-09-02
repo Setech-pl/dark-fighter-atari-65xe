@@ -45,6 +45,14 @@ For both XEX and ATR:
       vertical trail. Observe warning, four-frame launch flash, BROADSIDE and at
       least three A2 wraps: `$45/$D0/$51/$D2` may exist only at the current
       tracked cells, and the divider is clean after each ring transition.
+- [ ] From New Game, the first capital admission occurs on active gameplay
+      frame 50 (about one PAL second), not while loader, menu, or OPTIONS is
+      active. Restarting the level repeats the same frame-50 admission; a
+      temporarily full legal budget delays it only until the first legal frame.
+- [ ] During a complete Cylon hull pass, count at least three distinct
+      25-frame warning -> four-frame flash -> projectile launches on EASY,
+      MEDIUM, and HARD. No two warnings begin together and a full three-slot
+      heavy-projectile pool must suppress an otherwise due launch legally.
 - [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
       Raider breakup, and debris breakup behave normally.
 - [ ] Without Shield, an accepted direct Raider contact destroys the Viper

@@ -171,6 +171,7 @@ test("broadside source timing and schedule are deterministic and generated with 
   assert.equal(renderCapitalHullsCa65Include(second), renderCapitalHullsCa65Include(asset));
   const { capitalExplosion, ...timing } = asset.broadside;
   assert.deepEqual(timing, {
+    provisionalFirstCapitalGameplayFrame: 50,
     initialDelayFrames: 2,
     retryDelayFrames: 7,
     scheduleDelayScale: 2,
@@ -225,12 +226,12 @@ test("broadside source timing and schedule are deterministic and generated with 
   assert.deepEqual([...asset.worldScrollRateBytes], [8, 9, 10]);
   assert.deepEqual([...asset.hullScrollRateBytes], [8, 9, 10]);
   assert.deepEqual(asset.schedule.map(({ side }) => side), [
-    "enemy", "allied", "enemy", "allied",
+    "enemy", "enemy", "enemy", "allied",
   ]);
   assert.deepEqual(asset.schedule.map(({ baseDelayAfterFrames }) => baseDelayAfterFrames),
-    [2, 31, 2, 37]);
+    [2, 2, 2, 37]);
   assert.deepEqual(asset.schedule.map(({ delayAfterFrames }) => delayAfterFrames),
-    [68, 126, 68, 138]);
+    [68, 68, 68, 138]);
   assert.equal(asset.scheduleBytes.length, 8);
   assert.equal(asset.turretBytes.length, 14);
 });
@@ -957,34 +958,34 @@ test("muzzle tracking resets with a new sector/game but survives a same-sector l
     "a new game/sector must clear both tracked records");
 });
 
-test("PAL-frame scheduler keeps its timing while the faster finite hull pass shortens opportunities", () => {
+test("provisional PAL scheduler emits three staggered Cylon cycles without simultaneous starts", () => {
   const corrected = simulateBroadsideCadence(asset, { frames: 1000 });
   assert.deepEqual(corrected.warningStats, {
-    count: 2, allied: 1, enemy: 1, minimumGap: 103, averageGap: 103,
+    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 96,
   });
   assert.deepEqual(corrected.launchStats, {
-    count: 2, allied: 1, enemy: 1, minimumGap: 103, averageGap: 103,
+    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 96,
   });
   assert.equal(corrected.maximumStartsPerFrame, 1);
   assert.equal(corrected.cancelledWarnings, 0);
-  assert.deepEqual(corrected.deferred, { busy: 0, invisible: 44, separation: 0 });
-  assert.equal(corrected.scheduleAttempts, 46);
+  assert.deepEqual(corrected.deferred, { busy: 0, invisible: 42, separation: 0 });
+  assert.equal(corrected.scheduleAttempts, 45);
 
   const longCorrected = simulateBroadsideCadence(asset, { frames: 10000 });
   assert.deepEqual(
     [longCorrected.warningStats.count, longCorrected.launchStats.count],
-    [2, 2],
+    [3, 3],
   );
   assert.deepEqual(
     [longCorrected.warningStats.allied, longCorrected.warningStats.enemy],
-    [1, 1],
+    [0, 3],
   );
   assert.deepEqual(
     [longCorrected.launchStats.allied, longCorrected.launchStats.enemy],
-    [1, 1],
+    [0, 3],
   );
-  assert.deepEqual(longCorrected.deferred, { busy: 0, invisible: 44, separation: 0 });
-  assert.equal(longCorrected.scheduleAttempts, 46);
+  assert.deepEqual(longCorrected.deferred, { busy: 0, invisible: 42, separation: 0 });
+  assert.equal(longCorrected.scheduleAttempts, 45);
   assert.equal(longCorrected.cancelledWarnings, 0);
   assert.equal(longCorrected.finalSectorState, 6);
   assert.deepEqual(
@@ -1609,12 +1610,12 @@ test("cadence preview plots source-derived warning, launch, and world-scroll tim
   const state = readBroadsideCadenceSequenceRuntimeState(source, definition);
   assert.deepEqual(
     [state.baseline.warningStats.count, state.baseline.launchStats.count],
-    [4, 4],
+    [2, 2],
   );
-  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [2, 2]);
+  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [3, 3]);
   assert.deepEqual(
     [state.final.warningStats.minimumGap, state.final.warningStats.averageGap],
-    [103, 103],
+    [68, 96],
   );
   assert.ok(state.final.warningScrolls.some(({ frame }) => frame % 4 === 0));
 
