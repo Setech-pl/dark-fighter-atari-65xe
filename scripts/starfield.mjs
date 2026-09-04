@@ -65,7 +65,7 @@ export function compileStarfield(definition) {
   near.glyphs.forEach((glyph, index) => validateGlyph(glyph, 4 + index, "Near"));
   const glyphs = [...far.glyphs, ...near.glyphs];
   invariant(glyphs.at(-1).screenCode < 11,
-    "Star glyphs must stay below the Viper projectile glyph bank");
+    "Star glyphs must stay below the PlayerFighter projectile glyph bank");
   return Object.freeze({
     ...definition,
     farLayer: Object.freeze({ ...far, glyphs: Object.freeze(far.glyphs.map(Object.freeze)) }),

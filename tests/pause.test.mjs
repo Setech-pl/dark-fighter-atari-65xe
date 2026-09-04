@@ -52,7 +52,7 @@ test("PAUSED runs no world, combat, animation, score, death, or respawn tick", (
   const paused = routine("pause_loop", "poll_pause_option_edge");
   for (const forbidden of [
     "frame_counter", "read_input", "update_enemy", "update_starfield",
-    "update_viper_weapon", "update_enemy_weapon", "handle_collisions",
+    "update_player_fighter_weapon", "update_enemy_weapon", "handle_collisions",
     "tick_shared_fighter_explosions", "tick_capital_explosions",
     "update_engine_animation", "update_player_death", "tick_respawn_invulnerability",
     "update_score", "music_tick_gameplay", "update_sound",

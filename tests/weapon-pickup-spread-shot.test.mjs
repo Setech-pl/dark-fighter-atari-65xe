@@ -22,7 +22,7 @@ import {
   executeSpreadShotOverlapTrace,
   executeSpreadShotPoolTrace,
   executeSpreadShotTrace,
-  executeViperBurstBalanceTrace,
+  executePlayerFighterBurstBalanceTrace,
   executeWeaponBoosterReplacementTrace,
   executeWeaponPickupBackingTrace,
   executeWeaponPickupLifecycleTrace,
@@ -184,22 +184,22 @@ test("Rapid and Spread replace or refresh one another without combining cadence"
     trace.rapidReplacesSpread.state, trace.rapidReplacesSpread.timer,
   ], [4, 500, 3, 500]);
   assert.match(source,
-    /viper_fire_intervals:[\s\S]+VIPER_RAPID_FIRE_INTERVAL,VIPER_SPREAD_COOLDOWN/);
-  const cadence = source.slice(source.indexOf("update_viper_weapon:"),
-    source.indexOf("allocate_viper_projectile:"));
+    /player_fighter_fire_intervals:[\s\S]+PLAYER_FIGHTER_RAPID_FIRE_INTERVAL,PLAYER_FIGHTER_SPREAD_COOLDOWN/);
+  const cadence = source.slice(source.indexOf("update_player_fighter_weapon:"),
+    source.indexOf("allocate_player_fighter_projectile:"));
   assert.match(cadence,
-    /ldy ENTITY_STATE\+WEAPON_BOOSTER_SLOT[\s\S]+lda viper_fire_intervals,y/);
+    /ldy ENTITY_STATE\+WEAPON_BOOSTER_SLOT[\s\S]+lda player_fighter_fire_intervals,y/);
 });
 
 test("one Spread emission is an unambiguous three-projectile fan", () => {
   const { weapons } = assets();
   assert.deepEqual([
-    weapons.viper.spreadShotDurationFrames,
-    weapons.viper.spreadShotProjectileCount,
-    weapons.viper.spreadShotInitialOffsetHpos,
-    weapons.viper.spreadShotLateralStepHpos,
-    weapons.viper.spreadShotLateralPeriodFrames,
-    weapons.viper.spreadShotCooldownFrames,
+    weapons.player_fighter.spreadShotDurationFrames,
+    weapons.player_fighter.spreadShotProjectileCount,
+    weapons.player_fighter.spreadShotInitialOffsetHpos,
+    weapons.player_fighter.spreadShotLateralStepHpos,
+    weapons.player_fighter.spreadShotLateralPeriodFrames,
+    weapons.player_fighter.spreadShotCooldownFrames,
   ], [500, 3, 4, 1, 2, 10]);
   const frames = executeSpreadShotTrace({ root, artifact: "xex" }).trajectoryFrames;
   assert.deepEqual(frames[0].slots.slice(0, 3).map(({ active, x, y }) => [active, x, y]), [
@@ -215,13 +215,13 @@ test("one Spread emission is an unambiguous three-projectile fan", () => {
     assert.equal([...frames[frame].screen].filter(Boolean).length, 3,
       `frame ${frame} retained an erased projectile cell`);
     assert.equal(frames[frame].slots.slice(0, 3).every(({ active }) => active < 0x80), true,
-      "every Spread projectile must select the Viper's yellow COLPF2 bank");
+      "every Spread projectile must select the PlayerFighter's yellow COLPF2 bank");
   }
 });
 
 test("all three yellow projectiles preserve both capital hulls at sections, A2 heads and wrap", () => {
   const sectionPhases = [32, 128, 224]; // engines, combat midship, broad prow
-  for (const faction of ["colonial", "cylon"]) {
+  for (const faction of ["allied", "hostile"]) {
     for (const topPhase of sectionPhases) {
       for (const selectedSlot of [0, 1, 2]) {
         const xex = executeSpreadShotHullArtifactTrace({
@@ -239,7 +239,7 @@ test("all three yellow projectiles preserve both capital hulls at sections, A2 h
             `${faction} phase ${topPhase} slot ${selectedSlot} left a screen scar`);
           assert.equal(record.backingPixelsPreserved, true,
             `${faction} phase ${topPhase} slot ${selectedSlot} punched a hull hole`);
-          assert.equal(record.inverse, 0, "a Spread projectile selected the Cylon colour bank");
+          assert.equal(record.inverse, 0, "a Spread projectile selected the Hostile colour bank");
           assert.equal(record.changedOffsets.every((offset) => offset >= 80), true,
             "projectile overlay changed the protected HUD/divider rows");
         }
@@ -248,7 +248,7 @@ test("all three yellow projectiles preserve both capital hulls at sections, A2 h
   }
 
   for (let head = 0; head < 22; head += 1) {
-    for (const faction of ["colonial", "cylon"]) {
+    for (const faction of ["allied", "hostile"]) {
       for (const selectedSlot of [0, 1, 2]) {
         const trace = executeSpreadShotHullArtifactTrace({
           root, artifact: "xex", faction, topPhase: 128, head, selectedSlot, frames: 4,
@@ -266,7 +266,7 @@ test("all three yellow projectiles preserve both capital hulls at sections, A2 h
     }
   }
 
-  for (const [faction, selectedSlot] of [["colonial", 0], ["cylon", 1]]) {
+  for (const [faction, selectedSlot] of [["allied", 0], ["hostile", 1]]) {
     for (const topPhase of [31, 32, 55, 56, 183, 184, 207, 208, 239, 240]) {
       const trace = executeSpreadShotHullArtifactTrace({
         root, artifact: "xex", faction, topPhase, head: 21, selectedSlot, frames: 12,
@@ -278,11 +278,11 @@ test("all three yellow projectiles preserve both capital hulls at sections, A2 h
   }
 });
 
-test("overlapping Spread shots compose without erasing the remaining shot or Cylon hull", () => {
+test("overlapping Spread shots compose without erasing the remaining shot or Hostile hull", () => {
   const xex = executeSpreadShotOverlapTrace({ root, artifact: "xex", head: 21 });
   const atr = executeSpreadShotOverlapTrace({ root, artifact: "atr", head: 21 });
   assert.deepEqual({ ...atr, artifact: "release" }, { ...xex, artifact: "release" });
-  assert.ok(xex.reference[xex.displayOffset] & 0x80, "fixture must use a red Cylon hull cell");
+  assert.ok(xex.reference[xex.displayOffset] & 0x80, "fixture must use a red Hostile hull cell");
   assert.deepEqual([xex.bothCode, xex.oneCode], [48, 48]);
   assert.notDeepEqual(xex.bothGlyph, xex.oneGlyph,
     "two shots in one cell must retain both masks until one leaves");
@@ -322,7 +322,7 @@ test("all three projectiles leave the screen cleanly without HUD or charset corr
 test("Spread keeps a reserve slot in steady state and admits centre before an atomic side pair", () => {
   const trace = executeSpreadShotPoolTrace({ root, artifact: "xex" });
   assert.deepEqual([
-    manifest.fighterWeapons.viper.poolSlots,
+    manifest.fighterWeapons.player_fighter.poolSlots,
     trace.empty.activeCount,
     trace.sevenOccupied.activeCount,
   ], [10, 3, 10]);
@@ -333,7 +333,7 @@ test("Spread keeps a reserve slot in steady state and admits centre before an at
   assert.deepEqual(trace.nineOccupied.after.slice(9), [0x11],
     "one free slot must remain sufficient for the priority centre");
   assert.deepEqual(trace.full.after, trace.full.before);
-  const controller = executeViperBurstBalanceTrace({
+  const controller = executePlayerFighterBurstBalanceTrace({
     root, artifact: "xex", windowFrames: 500,
   })
     .traces.find(({ mode }) => mode === "SPREAD");
@@ -349,7 +349,7 @@ test("Spread keeps a reserve slot in steady state and admits centre before an at
   assert.equal(controller.maximumPoolOccupancy, 9);
   assert.equal(controller.emittedSalvos, 49);
   assert.equal(controller.emittedProjectiles, 147);
-  assert.equal(manifest.fighterWeapons.viper.poolSlots, 10);
+  assert.equal(manifest.fighterWeapons.player_fighter.poolSlots, 10);
   assert.equal(manifest.entityEffects.effectActiveLimit, 5);
 });
 
@@ -381,13 +381,13 @@ test("Spread fixed phase is symmetric after 100 updates and both side bounds des
   assert.equal(trace.rightBoundary.active, 0);
 });
 
-test("all three directions collide with debris and Raider scoring resolves only once", () => {
+test("all three directions collide with debris and Interceptor scoring resolves only once", () => {
   const trace = executeSpreadShotCollisionTrace({ root, artifact: "xex" });
   assert.deepEqual(trace.debris.map(({ direction, projectileConsumed, debrisHp, score }) =>
     [direction, projectileConsumed, debrisHp, score]), [
     [0, true, 2, 0], [0x40, true, 2, 0], [0x20, true, 2, 0],
   ]);
-  assert.deepEqual(trace.raider, {
+  assert.deepEqual(trace.interceptor, {
     pendingDamage: 3,
     consumed: [0, 0, 0],
     enemyState: 2,

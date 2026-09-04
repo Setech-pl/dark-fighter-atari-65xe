@@ -13,7 +13,7 @@ import {
   executeHudPresentationTrace,
   executeShieldBoosterTrace,
   executeSpreadShotTrace,
-  executeViperBurstBalanceTrace,
+  executePlayerFighterBurstBalanceTrace,
   executeWeaponPickupBackingTrace,
   executeWeaponPickupLifecycleTrace,
 } from "../scripts/weapon-pickup-runtime.mjs";
@@ -22,7 +22,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = fs.readFileSync(path.join(root, "src", "main.s"), "utf8");
 const entityPath = path.join(root, "assets", "graphics", "entity-effects.json");
 const manifest = JSON.parse(fs.readFileSync(
-  path.join(root, "dist", "dark-fighter-manifest.json"), "utf8"));
+  path.join(root, "dist", "void-strike-65-manifest.json"), "utf8"));
 const shield = executeShieldBoosterTrace({ root, artifact: "xex", coldFill: 0xa5 });
 
 function boundary(timer) {
@@ -35,7 +35,7 @@ test("Shield is generated as controller state 5, pickup type 2 and a 250-frame b
   assert.match(include, /WEAPON_PICKUP_STATE_SHIELD = 5/);
   assert.match(include, /WEAPON_PICKUP_TYPE_SHIELD = 2/);
   assert.match(include, /WEAPON_PICKUP_TYPE_COUNT = 3/);
-  assert.equal(manifest.fighterWeapons.viper.shieldDurationFrames, 250);
+  assert.equal(manifest.fighterWeapons.player_fighter.shieldDurationFrames, 250);
   assert.deepEqual([shield.activation.state, shield.activation.timer], [5, 250]);
 });
 
@@ -77,7 +77,7 @@ test("pickup rotation is exactly Rapid Spread Shield Rapid without RNG", () => {
   assert.doesNotMatch(rotation, /rng|RNG|random/);
 });
 
-test("Shield lasts exactly 250 active ticks and restores HUD and Viper colours on expiry", () => {
+test("Shield lasts exactly 250 active ticks and restores HUD and PlayerFighter colours on expiry", () => {
   assert.equal(boundary(1).tick, 249);
   assert.deepEqual([boundary(1).state, boundary(0).tick, boundary(0).state], [5, 250, 0]);
   assert.deepEqual(shield.expiry.hudRegion, shield.backing);
@@ -144,9 +144,9 @@ test("frame ordering keeps earlier collisions before pickup activation", () => {
 });
 
 test("collision callers retain their consume and impact contracts", () => {
-  assert.deepEqual(shield.damage.raiderProjectile, { active: 0, health: 10, applied: 1 });
+  assert.deepEqual(shield.damage.interceptorProjectile, { active: 0, health: 10, applied: 1 });
   assert.deepEqual(shield.damage.broadsideImpact, { state: 3, health: 10, applied: 1 });
-  assert.match(source, /raider_projectile_hits_player[\s\S]+lda #FIGHTER_PROJECTILE_FREE[\s\S]+jsr apply_player_damage/);
+  assert.match(source, /interceptor_projectile_hits_player[\s\S]+lda #FIGHTER_PROJECTILE_FREE[\s\S]+jsr apply_player_damage/);
   assert.match(source, /begin_broadside_impact[\s\S]+apply_broadside_player_damage/);
   assert.match(source, /jsr apply_player_damage\s+lda BROAD_DAMAGE_APPLIED\s+beq entity_collision_miss[\s\S]+jmp integration_debris_release/);
   assert.match(source,
@@ -186,12 +186,12 @@ test("HUD code 8 is formally isolated from generated screens and other HUD symbo
 });
 
 test("Shield keeps the normal eight-shot cadence while Rapid and Spread remain unchanged", () => {
-  const balance = executeViperBurstBalanceTrace({ root, artifact: "xex", windowFrames: 64 });
+  const balance = executePlayerFighterBurstBalanceTrace({ root, artifact: "xex", windowFrames: 64 });
   const byMode = Object.fromEntries(balance.traces.map((trace) => [trace.mode, trace]));
   assert.deepEqual([byMode.NORMAL.firstBurstProjectiles, byMode.SHIELD.firstBurstProjectiles,
     byMode.RAPID.firstBurstProjectiles], [8, 8, 10]);
-  assert.deepEqual([manifest.fighterWeapons.viper.spreadShotProjectileCount,
-    manifest.fighterWeapons.viper.spreadShotCooldownFrames], [3, 10]);
+  assert.deepEqual([manifest.fighterWeapons.player_fighter.spreadShotProjectileCount,
+    manifest.fighterWeapons.player_fighter.spreadShotCooldownFrames], [3, 10]);
   assert.deepEqual(byMode.SHIELD.records.filter(({ allocatedProjectiles }) =>
     allocatedProjectiles > 0).map(({ frame }) => frame),
   byMode.NORMAL.records.filter(({ allocatedProjectiles }) =>
@@ -202,7 +202,7 @@ test("Shield pulse is solid at all positions and never aliases respawn disappear
   assert.deepEqual([shield.activation.colpm0, shield.activation.colpm3], [0x84, 0x0e]);
   assert.deepEqual([boundary(55).colpm0, boundary(55).colpm3], [0x0e, 0x28]);
   assert.equal(source.includes("sta HPOSP0\n    sta HPOSP3"), true);
-  assert.doesNotMatch(source.slice(source.indexOf("update_shield_viper_colors:"),
+  assert.doesNotMatch(source.slice(source.indexOf("update_shield_player_fighter_colors:"),
     source.indexOf("entity_archetype_descriptors:")), /GRAFP|HPOSP|PLAYER_LIFECYCLE/);
 });
 

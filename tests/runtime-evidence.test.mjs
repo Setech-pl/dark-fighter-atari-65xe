@@ -19,7 +19,7 @@ function completeReport() {
     evidence: { status: "complete", partial: false,
       required_sessions: 3, completed_sessions: 3 },
     artifacts: structuredClone(artifacts),
-    artifact: structuredClone(artifacts["dark-fighter.xex"]),
+    artifact: structuredClone(artifacts["void-strike-65.xex"]),
   };
 }
 

@@ -26,15 +26,15 @@ const entities = compileEntityEffects(loadEntityEffectsDefinition(
 const weapons = compileFighterWeapons(loadFighterWeaponsDefinition(
   path.join(root, "assets/graphics/fighter-weapons.json"),
 ), enemies);
-const raider = enemies.implemented.find(({ id }) => id === "RAIDER");
+const interceptor = enemies.implemented.find(({ id }) => id === "INTERCEPTOR");
 
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const streams = Object.freeze({
   debris: [entities.glyphs, "353e2250550066b1297067b9f31bdc4e40a9da247a7efca929c7aade932c9355"],
-  viperBody: [graphics.playerShape, "37c71b5a9665c6903a340bcb4ad6311ccb67816042f6adb17301c7815d5a56cd"],
-  viperEngine: [graphics.playerEngineShape, "26a5d7d4ba9160cf990bb447624e967ffbc25d0886033975f7d8ee1f32b8ad2b"],
-  raiderBody: [raider.bodyRows, "4e279527cc4ced23b1448dfb113f519d104face22c32ceebc02065b13eb027b7"],
-  raiderAccent: [raider.accentFrameBytes, "caa106f0badbe2daf954f467bf00ca4c293fb3a31da8a0b52dc80fba7be6d713"],
+  player_fighterBody: [graphics.playerShape, "37c71b5a9665c6903a340bcb4ad6311ccb67816042f6adb17301c7815d5a56cd"],
+  player_fighterEngine: [graphics.playerEngineShape, "26a5d7d4ba9160cf990bb447624e967ffbc25d0886033975f7d8ee1f32b8ad2b"],
+  interceptorBody: [interceptor.bodyRows, "4e279527cc4ced23b1448dfb113f519d104face22c32ceebc02065b13eb027b7"],
+  interceptorAccent: [interceptor.accentFrameBytes, "caa106f0badbe2daf954f467bf00ca4c293fb3a31da8a0b52dc80fba7be6d713"],
   capitalGlyphs: [capital.glyphBytes, "6327eae4b71454c9c6aa6e6c800db24b95cc6e107c5e9f75b580d229c6c83ce8"],
   fighterExplosionOuter: [weapons.sharedFighterExplosion.outerBytes, "92d51c739606133505205a5f43f984a6d81f6af59c8eb37d48727ec413e18dc9"],
   fighterExplosionCore: [weapons.sharedFighterExplosion.coreMasks, "61d520aa9d14c10342ec0c64c1066ea9f723ff07c3787130df59f3ccc7ecc888"],
@@ -50,10 +50,10 @@ test("H4/H4.1/H4.2 remains a 460-byte data-only replacement with fixed ownership
   assert.deepEqual(Object.fromEntries(Object.entries(streams).map(([name, [bytes]]) =>
     [name, bytes.length])), {
     debris: 64,
-    viperBody: 16,
-    viperEngine: 16,
-    raiderBody: 14,
-    raiderAccent: 48,
+    player_fighterBody: 16,
+    player_fighterEngine: 16,
+    interceptorBody: 14,
+    interceptorAccent: 48,
     capitalGlyphs: 248,
     fighterExplosionOuter: 48,
     fighterExplosionCore: 6,
@@ -64,5 +64,5 @@ test("H4/H4.1/H4.2 remains a 460-byte data-only replacement with fixed ownership
   assert.equal(entities.glyphs.length, 8 * 8);
   assert.equal(weapons.sharedFighterExplosion.frameCount, 6);
   assert.equal(weapons.sharedFighterExplosion.frameDurationFrames, 4);
-  assert.equal(raider.accentFrames.length, 3);
+  assert.equal(interceptor.accentFrames.length, 3);
 });

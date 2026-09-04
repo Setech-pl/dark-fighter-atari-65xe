@@ -77,9 +77,9 @@ const enemyCombatReviewHarness = process.argv.includes("--enemy-combat-review");
 const enemyPaletteArgument = process.argv.find((argument) => argument.startsWith("--enemy-palette="));
 const enemyPaletteSlug = enemyPaletteArgument?.slice("--enemy-palette=".length);
 const enemyPaletteIds = new Map([
-  ["cylon-oxblood", "CYLON_OXBLOOD"],
-  ["cylon-burgundy", "CYLON_BURGUNDY"],
-  ["cylon-scarlet", "CYLON_SCARLET"],
+  ["hostile-oxblood", "HOSTILE_OXBLOOD"],
+  ["hostile-burgundy", "HOSTILE_BURGUNDY"],
+  ["hostile-scarlet", "HOSTILE_SCARLET"],
 ]);
 if (enemyPaletteSlug && !enemyPaletteIds.has(enemyPaletteSlug)) {
   throw new Error(`Unknown enemy palette build ${enemyPaletteSlug}`);
@@ -174,7 +174,7 @@ const directorGuardAddress = 0x9ffa;
 // Both frontend entry paths now clear the five stale GTIA PMG graphics latches
 // before menu DMA resumes. The twelve resident bytes stay inside the existing
 // 101-sector initial envelope; extension chunk topology remains frozen.
-const expectedInitialContentBytes = 12901;
+const expectedInitialContentBytes = 12842;
 const expectedLinkedRuntimeBytes = 17203;
 const expectedDirectorRawBytes = 645;
 const expectedDirectorPackedBytes = 585;
@@ -442,23 +442,23 @@ async function build() {
       "-C",
       "/project/cfg/atari-boot.cfg",
       "-o",
-      "/project/build/dark-fighter.bin",
+      "/project/build/void-strike-65.bin",
       "-m",
-      "/project/build/dark-fighter.map",
+      "/project/build/void-strike-65.map",
       "-Ln",
-      "/project/build/dark-fighter.lbl",
+      "/project/build/void-strike-65.lbl",
       "/project/build/main.o",
     ],
     [
-      "/project/build/dark-fighter.bin",
-      "/project/build/dark-fighter.map",
-      "/project/build/dark-fighter.lbl",
+      "/project/build/void-strike-65.bin",
+      "/project/build/void-strike-65.map",
+      "/project/build/void-strike-65.lbl",
     ],
   );
 
-  const linkedPayload = Buffer.from(linked.outputs["/project/build/dark-fighter.bin"]);
-  const mapFile = linked.outputs["/project/build/dark-fighter.map"];
-  const labelFile = linked.outputs["/project/build/dark-fighter.lbl"];
+  const linkedPayload = Buffer.from(linked.outputs["/project/build/void-strike-65.bin"]);
+  const mapFile = linked.outputs["/project/build/void-strike-65.map"];
+  const labelFile = linked.outputs["/project/build/void-strike-65.lbl"];
   const labels = parseViceLabels(labelFile.toString("utf8"));
   const startAddress = labels.get("start");
   const bootInitAddress = labels.get("boot_return");
@@ -970,7 +970,7 @@ async function build() {
     throw new Error(`H3.1 linked runtime is ${destructibleDebrisRuntimeCodeBytes} B; ` +
       `limit is ${frontendH31BaselineRuntimeCodeBytes + frontendH31HardRuntimeDeltaBytes} B`);
   }
-  // The historical debris/Raider code budgets describe their accepted commits.
+  // The historical debris/Interceptor code budgets describe their accepted commits.
   // New weapon code consumes only the explicit post-compaction payload reserve;
   // the live linked total remains reported below instead of being misclassified
   // as growth of either completed feature.
@@ -1637,12 +1637,12 @@ async function build() {
         priority: [
           "PLAYER_PROJECTILE",
           "PLAYER_CONTACT",
-          "CAPITAL_CYLON",
-          "CAPITAL_COLONIAL",
+          "CAPITAL_HOSTILE",
+          "CAPITAL_ALLIED",
           "ENEMY_PROJECTILE",
           "CLEANUP",
         ],
-        scoreAwarding: ["PLAYER_PROJECTILE", "PLAYER_CONTACT", "CAPITAL_CYLON"],
+        scoreAwarding: ["PLAYER_PROJECTILE", "PLAYER_CONTACT", "CAPITAL_HOSTILE"],
       },
       anchors: enemyRosterAsset.implemented.map((archetype) => ({
         id: archetype.id,
@@ -1662,8 +1662,8 @@ async function build() {
       viewport: fighterWeaponsAsset.viewport,
       dynamicGlyphBase: fighterWeaponsAsset.dynamicGlyphBase,
       poolSlots: {
-        viper: fighterWeaponsAsset.viper.poolSlots,
-        raider: fighterWeaponsAsset.raider.poolSlots,
+        player_fighter: fighterWeaponsAsset.player_fighter.poolSlots,
+        interceptor: fighterWeaponsAsset.interceptor.poolSlots,
         total: fighterWeaponsAsset.totalSlots,
       },
       runtimeStateBytes: fighterWeaponsAsset.stateBytes,
@@ -1677,8 +1677,8 @@ async function build() {
         artBytes: fighterWeaponsAsset.sharedFighterExplosion.outerBytes.length +
           fighterWeaponsAsset.sharedFighterExplosion.coreMasks.length,
       },
-      viper: fighterWeaponsAsset.viper,
-      raider: fighterWeaponsAsset.raider,
+      player_fighter: fighterWeaponsAsset.player_fighter,
+      interceptor: fighterWeaponsAsset.interceptor,
     },
     starfield: {
       source: "assets/graphics/starfield.json",
@@ -1771,14 +1771,14 @@ async function build() {
       reportSha256: candidateBuild ? null : sha256(fs.readFileSync(wallTracePath)),
     },
     artifacts: {
-      "dark-fighter-boot.bin": { bytes: transportPayload.length, sha256: sha256(transportPayload) },
-      "dark-fighter.xex": { bytes: xex.length, sha256: sha256(xex) },
-      "dark-fighter.atr": { bytes: atr.length, sha256: sha256(atr) },
+      "void-strike-65-boot.bin": { bytes: transportPayload.length, sha256: sha256(transportPayload) },
+      "void-strike-65.xex": { bytes: xex.length, sha256: sha256(xex) },
+      "void-strike-65.atr": { bytes: atr.length, sha256: sha256(atr) },
     },
   };
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
 
-  writeFile(path.join(buildDirectory, "dark-fighter.bin"), transportPayload);
+  writeFile(path.join(buildDirectory, "void-strike-65.bin"), transportPayload);
   writeFile(path.join(buildDirectory, "initial-boot.bin"), initialBoot.bytes);
   writeFile(path.join(buildDirectory, "broadside-extension.bin"), broadsideChunk.bytes);
   writeFile(path.join(buildDirectory, "weapon-pickup-extension.bin"), pickupPhaseChunk.bytes);
@@ -1821,8 +1821,8 @@ async function build() {
   writeFile(path.join(buildDirectory, "pickup-code-runtime.bin"), pickupCodeRuntime);
   writeFile(path.join(buildDirectory, "weapon-pickup-phase-runtime.bin"), weaponPickupPhaseRuntime);
   writeFile(path.join(buildDirectory, "weapon-pickup-phase-runtime-packed.bin"), packedWeaponPickupPhaseBank);
-  writeFile(path.join(buildDirectory, "dark-fighter.map"), mapFile);
-  writeFile(path.join(buildDirectory, "dark-fighter.lbl"), labelFile);
+  writeFile(path.join(buildDirectory, "void-strike-65.map"), mapFile);
+  writeFile(path.join(buildDirectory, "void-strike-65.lbl"), labelFile);
   writeFile(path.join(buildDirectory, "manifest.json"), manifestBytes);
   const artifactDirectory = enemyReviewHarness
     ? path.join(buildDirectory, "enemy-review")
@@ -1831,17 +1831,17 @@ async function build() {
       : paletteCandidate
         ? path.join(buildDirectory, `enemy-palette-${enemyPaletteSlug}`)
         : distDirectory;
-  writeFile(path.join(artifactDirectory, "dark-fighter-boot.bin"), transportPayload);
-  writeFile(path.join(artifactDirectory, "dark-fighter.xex"), xex);
-  writeFile(path.join(artifactDirectory, "dark-fighter.atr"), atr);
-  writeFile(path.join(artifactDirectory, "dark-fighter-manifest.json"), manifestBytes);
+  writeFile(path.join(artifactDirectory, "void-strike-65-boot.bin"), transportPayload);
+  writeFile(path.join(artifactDirectory, "void-strike-65.xex"), xex);
+  writeFile(path.join(artifactDirectory, "void-strike-65.atr"), atr);
+  writeFile(path.join(artifactDirectory, "void-strike-65-manifest.json"), manifestBytes);
 
   if (!isReviewVariant) validateBuildDirectory(rootDirectory);
 
   if (!quiet) {
     console.log(candidateBuild
-      ? `Dark Fighter ${gameVersion} candidate artifacts built; runtime evidence pending`
-      : `Dark Fighter ${gameVersion} built successfully`);
+      ? `Void Strike 65 ${gameVersion} candidate artifacts built; runtime evidence pending`
+      : `Void Strike 65 ${gameVersion} built successfully`);
     console.log(`  boot    : ${initialBoot.bytes.length} bytes / ${bootSectors} sectors @ $${loadAddress.toString(16)}`);
     console.log(`  chunks  : ${transportPayload.length - initialBoot.bytes.length} bytes / ${extensionSectors} sectors`);
     console.log(`  total   : ${transportPayload.length} bytes / ${totalTransportSectors} occupied sectors`);
@@ -1853,7 +1853,7 @@ async function build() {
       console.log(`  variant : compile-time enemy review harness`);
       console.log(`  output  : ${path.relative(rootDirectory, artifactDirectory)}`);
     } else if (enemyCombatReviewHarness) {
-      console.log(`  variant : deterministic Raider combat review`);
+      console.log(`  variant : deterministic Interceptor combat review`);
       console.log(`  output  : ${path.relative(rootDirectory, artifactDirectory)}`);
     } else if (paletteCandidate) {
       console.log(`  variant : enemy palette ${paletteCandidate.id} ($${paletteCandidate.value.toString(16).padStart(2, "0")})`);

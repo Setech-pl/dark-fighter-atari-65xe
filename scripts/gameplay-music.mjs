@@ -40,7 +40,7 @@ export function compileGameplayMusic(definition, menuMusicAsset) {
   invariant(Array.isArray(definition.channelAllocation) &&
     definition.channelAllocation.length === CHANNEL_COUNT,
   "Gameplay music must document exactly two POKEY music channels");
-  assertChannel(definition.channelAllocation[0], 1, "Viper shot");
+  assertChannel(definition.channelAllocation[0], 1, "Player Fighter shot");
   assertChannel(definition.channelAllocation[1], 2, "hit effect");
   invariant(Array.isArray(definition.reservedSfxChannels) &&
     definition.reservedSfxChannels.length === 2,

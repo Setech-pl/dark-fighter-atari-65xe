@@ -131,8 +131,8 @@ function snapshot(memory, labels, { phase, frame, eraseCycles, updateCycles, ren
 }
 
 export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "xex" } = {}) {
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "dark-fighter-manifest.json")));
-  const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "void-strike-65-manifest.json")));
+  const labels = labelsFromFile(path.join(root, "build", "void-strike-65.lbl"));
   const memory = new Uint8Array(0x10000);
   const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
   if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
@@ -213,9 +213,9 @@ export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "
   };
 }
 
-export function executeRaiderBreakupTrace({ root = defaultRoot, artifact = "xex" } = {}) {
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "dark-fighter-manifest.json")));
-  const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
+export function executeInterceptorBreakupTrace({ root = defaultRoot, artifact = "xex" } = {}) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "void-strike-65-manifest.json")));
+  const labels = labelsFromFile(path.join(root, "build", "void-strike-65.lbl"));
   const memory = new Uint8Array(0x10000);
   const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
   if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
@@ -240,7 +240,7 @@ export function executeRaiderBreakupTrace({ root = defaultRoot, artifact = "xex"
   initialiseRows(memory, labels);
   memory.fill(0, 0x3800, 0x4000);
   memory.fill(0, 0x4000, 0x4400);
-  // Keep this Raider-only visual trace independent from the normal neutral
+  // Keep this Interceptor-only visual trace independent from the normal neutral
   // entity scheduler, whose first legal spawn occurs after the same 32-frame
   // window used to prove complete effect expiry.
   memory[requiredLabel(labels, "ENTITY_SPAWN_TIMER_LO")] = 0xff;
@@ -331,9 +331,9 @@ export function debrisDestructionTraceCsv(trace) {
   return `${rows.join("\n")}\n`;
 }
 
-export function raiderBreakupTraceCsv(trace) {
+export function interceptorBreakupTraceCsv(trace) {
   const header = [
-    "artifact", "phase", "frame", "raider_hp", "raider_active",
+    "artifact", "phase", "frame", "interceptor_hp", "interceptor_active",
     "fighter_explosion_timer", "colbk", "effects_active_mask", "effects_active_count",
     "effect_pending", "slot", "type", "x", "y", "ttl", "render_id", "screen_address", "screen_code",
     "erase", "update", "render", "score",
@@ -385,6 +385,6 @@ export function assertDebrisDestructionTraceParity(left, right) {
   return true;
 }
 
-export function assertRaiderBreakupTraceParity(left, right) {
+export function assertInterceptorBreakupTraceParity(left, right) {
   return assertDebrisDestructionTraceParity(left, right);
 }

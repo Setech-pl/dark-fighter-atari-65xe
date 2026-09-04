@@ -2,25 +2,25 @@
   "schema_version": 2,
   "generated_by": "scripts/runtime-wall-trace.mjs --capital-player-collision-only",
   "artifacts": {
-    "dark-fighter-boot.bin": {
-      "path": "dist/dark-fighter-boot.bin",
+    "void-strike-65-boot.bin": {
+      "path": "dist/void-strike-65-boot.bin",
       "bytes": 20608,
-      "sha256": "3f7f1a9682c6dd80757cec020da8de6aff7165ea52dd354f10f2a54273f7d913"
+      "sha256": "4e2c0042e9420b1a76da638640de16a507b975c021f63c42d88580a104fcdbb0"
     },
-    "dark-fighter.xex": {
-      "path": "dist/dark-fighter.xex",
+    "void-strike-65.xex": {
+      "path": "dist/void-strike-65.xex",
       "bytes": 21399,
-      "sha256": "a90bee1db299f75e2faa0f69a07f1a2674d6c2c31cc6adef0ad2edd2bf4777e3"
+      "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
     },
-    "dark-fighter.atr": {
-      "path": "dist/dark-fighter.atr",
+    "void-strike-65.atr": {
+      "path": "dist/void-strike-65.atr",
       "bytes": 92176,
-      "sha256": "0cf4bd874465573cac888050e8639c783a6de95b60891e0984b735e5043700e7"
+      "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
     },
-    "dark-fighter-manifest.json": {
-      "path": "dist/dark-fighter-manifest.json",
-      "bytes": 821945,
-      "sha256": "ae316bcaed2a95033a8fba2a7e3a5796810999a6e23dd3b8bd05b6e8554678a6"
+    "void-strike-65-manifest.json": {
+      "path": "dist/void-strike-65-manifest.json",
+      "bytes": 833915,
+      "sha256": "15666031630325b82ff85520134de881dd805b4383725d1f8463ad0ed6f5e821"
     }
   },
   "geometry": {
@@ -40,7 +40,7 @@
     }
   },
   "checkpoint_counterexample": {
-    "artifact": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-hitboxes.png",
+    "artifact": "build/runtime-wall-trace/capital-player-xex-1-allied-top-hitboxes.png",
     "player_logical_y": 110,
     "player_pmg_dma_rows": [
       110,
@@ -64,14 +64,14 @@
       113,
       116
     ],
-    "conclusion": "the former top label was a four-scanline lower-Viper contact"
+    "conclusion": "the former top label was a four-scanline lower-Player Fighter contact"
   },
   "sessions": [
     {
-      "session": "capital-player-xex-1-colonial-top",
+      "session": "capital-player-xex-1-allied-top",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "top",
       "expected_hit": true,
       "collision_decision": {
@@ -229,9 +229,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-allied-top-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-allied-top-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -248,14 +248,14 @@
         "bytes": 7544,
         "sha256": "53bc0074bb1561166fe323b5d831a24a1bcb13f469b4f0971364ae07ae8d36d8"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-top.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-colonial-middle",
+      "session": "capital-player-xex-1-allied-middle",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
@@ -413,9 +413,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-allied-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-allied-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -432,14 +432,14 @@
         "bytes": 7545,
         "sha256": "5014b35ee4752d6db05ace0caae27384c006418fb775d8ad4982ff960dc4e840"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-middle-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-colonial-bottom",
+      "session": "capital-player-xex-1-allied-bottom",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "bottom",
       "expected_hit": true,
       "collision_decision": {
@@ -597,9 +597,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-allied-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-allied-bottom-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -616,14 +616,14 @@
         "bytes": 7555,
         "sha256": "ffad7304d59a085e9db8a2b28ddcee8286183c1bd7efebe5596f3dcc3e1ffa9e"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-bottom-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-colonial-near",
+      "session": "capital-player-xex-1-allied-near",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "near",
       "expected_hit": false,
       "collision_decision": {
@@ -776,9 +776,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-allied-near-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-allied-near-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -795,14 +795,14 @@
         "bytes": 5873,
         "sha256": "ec9dd5813ad7fc8d2dc58c4c24114b13b0480597905c2fb3b0af8634c30a2b6b"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-near.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-allied-near-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-cylon-top",
+      "session": "capital-player-xex-1-hostile-top",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "top",
       "expected_hit": true,
       "collision_decision": {
@@ -960,9 +960,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-hostile-top-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-hostile-top-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -979,14 +979,14 @@
         "bytes": 7403,
         "sha256": "2fca5d3e89574169dfa884b0d79ce67228a60abd4349eb5b6f52ddf33c4374aa"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-top.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-cylon-middle",
+      "session": "capital-player-xex-1-hostile-middle",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
@@ -1144,9 +1144,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-hostile-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-hostile-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -1163,14 +1163,14 @@
         "bytes": 7438,
         "sha256": "ddeee8396124e73949e1f6a978420d60f348e82c6219485014c013b8eb6ce89f"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-middle-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-cylon-bottom",
+      "session": "capital-player-xex-1-hostile-bottom",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "bottom",
       "expected_hit": true,
       "collision_decision": {
@@ -1328,9 +1328,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-hostile-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-hostile-bottom-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -1347,14 +1347,14 @@
         "bytes": 7442,
         "sha256": "4b550c22767c7a1c7b55170eed6c309986068bc09280dc410c087d0c3e564e88"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-bottom-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-cylon-near",
+      "session": "capital-player-xex-1-hostile-near",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "near",
       "expected_hit": false,
       "collision_decision": {
@@ -1507,9 +1507,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-hostile-near-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-hostile-near-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -1526,14 +1526,14 @@
         "bytes": 6307,
         "sha256": "6df1d2145ffe92fab589a34562110ee1cb8317d48396e682489db631e73a7ba1"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-near.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-hostile-near-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-colonial-top",
+      "session": "capital-player-atr-2-allied-top",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "top",
       "expected_hit": true,
       "collision_decision": {
@@ -1691,9 +1691,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-allied-top-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-allied-top-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -1710,14 +1710,14 @@
         "bytes": 7622,
         "sha256": "e636458993e0b2de28c15003d7c8a284cef2dbf7dd272e24df8a345815a46df8"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-top.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-colonial-middle",
+      "session": "capital-player-atr-2-allied-middle",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
@@ -1875,9 +1875,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-allied-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-allied-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -1894,14 +1894,14 @@
         "bytes": 7611,
         "sha256": "e54c5bcae56c07634f63c1b301de072011343c738797e49b4447c8a18a0091e2"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-middle-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-colonial-bottom",
+      "session": "capital-player-atr-2-allied-bottom",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "bottom",
       "expected_hit": true,
       "collision_decision": {
@@ -2059,9 +2059,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-allied-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-allied-bottom-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -2078,14 +2078,14 @@
         "bytes": 7647,
         "sha256": "f6c6054d87cbb2c62fd103deb22770577ff5732a7e2f9d4dec4ac3ba8aa40c73"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-bottom-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-colonial-near",
+      "session": "capital-player-atr-2-allied-near",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Colonial",
+      "owner": "Allied",
       "contact": "near",
       "expected_hit": false,
       "collision_decision": {
@@ -2238,9 +2238,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-allied-near-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-allied-near-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -2257,14 +2257,14 @@
         "bytes": 6339,
         "sha256": "f469c32af5dbaadaec2d918360ba7682b6f6944365dafd773916fd15a105500b"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-near.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-allied-near-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-cylon-top",
+      "session": "capital-player-atr-2-hostile-top",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "top",
       "expected_hit": true,
       "collision_decision": {
@@ -2422,9 +2422,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-hostile-top-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-hostile-top-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -2441,14 +2441,14 @@
         "bytes": 7236,
         "sha256": "6932df7200d8216550c9aa6c75d395045594826a134da1ca675177c75acf27d6"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-top.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-cylon-middle",
+      "session": "capital-player-atr-2-hostile-middle",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
@@ -2606,9 +2606,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-hostile-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-hostile-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -2625,14 +2625,14 @@
         "bytes": 7578,
         "sha256": "c72fe4ab49abc835f7e7c3cf0361041049527714239147f47bd89578a573b9fe"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-middle-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-cylon-bottom",
+      "session": "capital-player-atr-2-hostile-bottom",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "bottom",
       "expected_hit": true,
       "collision_decision": {
@@ -2790,9 +2790,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-hostile-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-hostile-bottom-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -2809,14 +2809,14 @@
         "bytes": 7577,
         "sha256": "57f5d904907f966d4d47d5ac1ca95f9ffad8dca85d7a7b3576cfbe22a196c333"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-bottom-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-cylon-near",
+      "session": "capital-player-atr-2-hostile-near",
       "artifact": "ATR",
       "difficulty": "HARD",
-      "owner": "Cylon",
+      "owner": "Hostile",
       "contact": "near",
       "expected_hit": false,
       "collision_decision": {
@@ -2969,9 +2969,9 @@
       "orphan_pmg_scanlines": 0,
       "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-hostile-near-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-hostile-near-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -2988,12 +2988,38 @@
         "bytes": 6171,
         "sha256": "1e3c1c6f3ab7dd9951d252d7429d588f1fd5c148a647c4215bac103465ecf472"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-near.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-hostile-near-broadside-compositor.jsonl"
     }
   ],
   "passed": true,
   "durable_evidence": true,
   "source_report_sha256": "8cd1de2834bc6cabdcc1611984d2af84768a1b5e7004ebb4dddaf7c771abdbbb",
-  "provenance": "independent physical oracle; not a byte copy of the build report"
+  "provenance": "independent physical oracle; not a byte copy of the build report",
+  "brand_transfer": {
+    "runtime_sessions_regenerated": false,
+    "basis": "The linked collision module and every executable gameplay module are byte-identical to the pre-rebrand checkpoint.",
+    "previous_artifacts": {
+      "void-strike-65-boot.bin": {
+        "path": "dist/void-strike-65-boot.bin",
+        "bytes": 20608,
+        "sha256": "3f7f1a9682c6dd80757cec020da8de6aff7165ea52dd354f10f2a54273f7d913"
+      },
+      "void-strike-65.xex": {
+        "path": "dist/void-strike-65.xex",
+        "bytes": 21399,
+        "sha256": "a90bee1db299f75e2faa0f69a07f1a2674d6c2c31cc6adef0ad2edd2bf4777e3"
+      },
+      "void-strike-65.atr": {
+        "path": "dist/void-strike-65.atr",
+        "bytes": 92176,
+        "sha256": "0cf4bd874465573cac888050e8639c783a6de95b60891e0984b735e5043700e7"
+      },
+      "void-strike-65-manifest.json": {
+        "path": "dist/void-strike-65-manifest.json",
+        "bytes": 821945,
+        "sha256": "ae316bcaed2a95033a8fba2a7e3a5796810999a6e23dd3b8bd05b6e8554678a6"
+      }
+    }
+  }
 }

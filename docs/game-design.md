@@ -1,4 +1,4 @@
-# Dark Fighter game design
+# Void Strike 65 game design
 
 This document defines the current player-visible rules. Technical implementation
 belongs in [architecture.md](architecture.md), numeric memory ownership in
@@ -6,9 +6,9 @@ belongs in [architecture.md](architecture.md), numeric memory ownership in
 
 ## Implemented game
 
-Dark Fighter is an unofficial, non-commercial Battlestar Galactica fan-art
-vertical shooter for a stock PAL Atari 65XE. It runs at 50 frames per second.
-The player flies a Viper with joystick port 1 and fires with one button.
+Void Strike 65 is an unofficial, non-commercial vertical shooter for a stock
+PAL Atari 65XE. It runs at 50 frames per second.
+The player flies a Player Fighter with joystick port 1 and fires with one button.
 
 The frontend contains the title loader, main menu, options, top scores, exit
 screen, menu music, and a gameplay-music option. Gameplay can be paused and
@@ -34,21 +34,21 @@ eight-frame visible/eight-frame hidden rhythm. Expiry restores all ten cells
 to their prior blank contents. The optional type glyph is omitted because the
 40-column HUD has exactly ten unclaimed cells and one active booster at a time.
 
-- A new game starts with three playable Vipers and a full 100% hull.
-- The hull has ten health units. An ordinary Raider pulse removes one unit
+- A new game starts with three playable Player Fighters and a full 100% hull.
+- The hull has ten health units. An ordinary Interceptor pulse removes one unit
   (10%), while capital-ship fire removes two units (20%). Debris contact removes
   a fixed two, five, or seven units on Easy, Medium, or Hard (20%/50%/70% of
   maximum HULL); it never computes a percentage of remaining HULL. Debris
-  contact tests the Viper's complete double-width 16-HPOS visible envelope;
+  contact tests the Player Fighter's complete double-width 16-HPOS visible envelope;
   its vertical contract and the debris 8x8 hitbox remain unchanged.
-- An accepted direct Raider collision destroys the current Viper at any HULL
+- An accepted direct Interceptor collision destroys the current Player Fighter at any HULL
   from one through ten. Shield absorbs it; respawn invulnerability, the shared
   post-hit cooldown, and an earlier same-frame damage event retain their normal
-  gates. The Raider still follows its established scored breakup lifecycle.
-- Losing a Viper plays a 24-frame breakup. If a life remains, the replacement
-  Viper receives 250 active frames (5 seconds) of invulnerability and blinks in
+  gates. The Interceptor still follows its established scored breakup lifecycle.
+- Losing a Player Fighter plays a 24-frame breakup. If a life remains, the replacement
+  Player Fighter receives 250 active frames (5 seconds) of invulnerability and blinks in
   an 8-frame visible/8-frame hidden rhythm.
-- Losing the final Viper enters Game Over. New Game resets score, lives, hull,
+- Losing the final Player Fighter enters Game Over. New Game resets score, lives, hull,
   sector state, active projectiles, entities, effects, and boosters.
 - TOP SCORES keeps ten packed-BCD results in RAM, ordered from highest to
   lowest. A completed non-zero game is inserted once on the Game Over
@@ -57,30 +57,30 @@ to their prior blank contents. The optional type glyph is omitted because the
 
 ### Combat and scoring
 
-The normal Viper weapon fires an eight-projectile burst at one projectile every
+The normal Player Fighter weapon fires an eight-projectile burst at one projectile every
 three active frames, followed by a 12-frame pause. Projectiles travel upward by
-six scanlines per active frame. The physical Viper pool has ten slots.
+six scanlines per active frame. The physical Player Fighter pool has ten slots.
 
-The implemented Raider has one hit point. It uses soft horizontal pursuit with
-a readable weave and moves at 80% of the Viper's maximum horizontal speed. Its
+The implemented Interceptor has one hit point. It uses soft horizontal pursuit with
+a readable weave and moves at 80% of the Player Fighter's maximum horizontal speed. Its
 single-pulse weapon fires ten shots at four-frame intervals, then waits 60, 50,
-or 40 frames on Easy, Medium, or Hard. Raider pulses travel five scanlines per
+or 40 frames on Easy, Medium, or Hard. Interceptor pulses travel five scanlines per
 frame, live for at most 96 frames, and use a separate nine-slot pool.
 
-A Raider is worth 10 points when destroyed by a Viper projectile, player
-contact, or Cylon friendly fire. A capital-ship hit or lifecycle cleanup awards
+An Interceptor is worth 10 points when destroyed by a Player Fighter projectile, player
+contact, or Hostile friendly fire. A capital-ship hit or lifecycle cleanup awards
 no points. Debris has three hit points, causes fixed 20%/50%/70% maximum-hull
 damage on Easy/Medium/Hard contact, and never awards score when destroyed.
 
-Raider and debris destruction use the implemented entity/effects foundation.
-Raider breakup has a core, two wing fragments, a central fragment, and a red
+Interceptor and debris destruction use the implemented entity/effects foundation.
+Interceptor breakup has a core, two wing fragments, a central fragment, and a red
 eye fragment. Debris destruction has one core plus four fragments. These are
 transient effects, not interactive enemies.
 
 ### World and difficulty
 
 The world alternates between open space and a broadside corridor formed by a
-Colonial capital ship and a Cylon capital ship. The corridor scrolls through
+Allied capital ship and a Hostile capital ship. The corridor scrolls through
 engines, aft, combat, forward, and prow sections, followed by drain, complete,
 and open-space transition states. Capital-ship engines alternate between dim
 and bright phases, each lasting eight active frames.
@@ -109,21 +109,21 @@ above at the ordinary world rate. This moves the original encounter rather than
 adding another one at its former phase boundary. Later encounters,
 `BOSS_HANDOFF`, and level timing remain at their established rows.
 
-The provisional Cylon firing schedule exposes at least three evenly spaced
+The provisional Hostile firing schedule exposes at least three evenly spaced
 legal warning/flash/launch opportunities during that full hull pass. Each warning is
 still 25 frames and each attached launch flash is still four frames. Admission
 continues to obey the existing EASY/MEDIUM/HARD intensity ceilings (3/4/5) and
 the three-slot heavy-projectile pool; final placement and difficulty balance
 remain deferred to the level gauntlet.
 
-Every BROADSIDE projectile is a hazard to the Viper, including fire from the
-Colonial/BSG hull; affiliation does not disable friendly fire in this encounter.
-Colonial and Cylon BROADSIDE projectiles do not collide with one another: they
+Every BROADSIDE projectile is a hazard to the Player Fighter, including fire from the
+Allied hull; affiliation does not disable friendly fire in this encounter.
+Allied and Hostile BROADSIDE projectiles do not collide with one another: they
 pass through on independent trajectories, using only deterministic visual
 z-order while their footprints overlap.
 The final character-aligned 8-HPOS shell raster is swept symmetrically between
 its previous and current positions. Gameplay uses one inclusive AABB test: the
-Viper owns the complete 16-HPOS by 15-scanline rectangle reconstructed from
+Player Fighter owns the complete 16-HPOS by 15-scanline rectangle reconstructed from
 the final P0/P3 PMG DMA rows, including transparent PMG corners and internal
 gaps. The bolt owns eight HPOS and the six occupied scanlines of glyphs
 126/127 at the cached physical screen row selected by the active gameplay
@@ -138,7 +138,7 @@ one-damage-event-per-frame latch retain their existing precedence.
 ## Implemented boosters
 
 Only one pickup capsule may exist at a time. A qualifying kill is specifically
-a Raider destroyed by a consumed Viper projectile. Broadside fire, player
+an Interceptor destroyed by a consumed Player Fighter projectile. Broadside fire, player
 collision, debris destruction, and lifecycle cleanup do not advance the drop
 counter.
 
@@ -159,7 +159,7 @@ Its shifted 8x16 source occupies a 2x2 footprint at phase zero and a 2x3
 footprint between character rows. HARD moves it exactly two scanlines per PAL
 frame; EASY and MEDIUM retain their slower fractional rates without an
 eight-scanline jump. The collection hitbox follows the same effective visual
-Y. During contact the Viper's opaque hull/engine pixels remain in front, while
+Y. During contact the Player Fighter's opaque hull/engine pixels remain in front, while
 transparent PMG pixels reveal the capsule until the single accepted collection
 removes it. Picking up the same active type
 refreshes it. Picking up another type
@@ -170,7 +170,7 @@ replaces it, so Rapid Fire, Spread Shot, and Shield are mutually exclusive.
 `assets/graphics/playfield.json` is the single source for the PAL gameplay
 boundary. The HUD occupies scanlines 8-15, the fixed divider 16-23, and the
 rotating entity field 24-239; gameplay therefore ends exclusively at Y=240.
-The Viper may move from PMG Y=32 through Y=225. Its body/engine union has
+The Player Fighter may move from PMG Y=32 through Y=225. Its body/engine union has
 non-transparent rows 0-14, so the lowest legal opaque pixel is exactly Y=239.
 Stars, fighter and capital projectiles, pickups, debris, ordinary enemies,
 rendering, collision, and culling all consume this same boundary. No transient
@@ -190,7 +190,7 @@ phase.
 
 Rapid Fire lasts exactly 500 active PAL frames (10 seconds). It expands the
 burst to ten projectiles, keeps the 12-frame post-burst pause, and reduces the
-in-burst interval from three frames to two. Its projectiles retain the Viper's established
+in-burst interval from three frames to two. Its projectiles retain the Player Fighter's established
 yellow/gold. The 2x2 capsule uses a steel/yellow casing with a black `RF` symbol.
 
 ### Spread Shot — implemented
@@ -202,15 +202,15 @@ free slots a salvo creates centre, left, and right together. Under transitional
 saturation the centre has priority, while the side pair is created together or
 not at all. Continuous FIRE produces 49 salvos and 147 projectiles during the
 500-frame boost, with no rejected full salvo in steady state and at most nine
-simultaneous Spread projectiles in the ten-slot Viper pool.
+simultaneous Spread projectiles in the ten-slot Player Fighter pool.
 
 The volley begins as a compact formation. The centre projectile travels
 vertically; the side projectiles start four horizontal-position units from the
 centre and move symmetrically left or right by one unit every two active frames.
 The phase comes from the existing projectile lifetime, so no extra timer or
 projectile-state array is required. All
-three travel upward at the normal Viper speed, use the yellow Viper weapon
-colour, collide with Raider and debris, and obey ordinary score rules. The 2x2
+three travel upward at the normal Player Fighter speed, use the yellow Player Fighter weapon
+colour, collide with Interceptor and debris, and obey ordinary score rules. The 2x2
 capsule has a bright red casing and a black three-shot fan symbol.
 
 ### Shield Booster — implemented
@@ -221,7 +221,7 @@ invulnerability. It absorbs at most one valid damage event per frame without
 changing HULL, LIFE, SCORE, the ordinary damage cooldown, hit flash, or HULL-hit
 SFX. The steel-blue/white capsule has a black shield symbol. Its continuous HUD
 bar uses a dense cross-core pattern and exact thresholds 188, 126, and 63; the
-last segment uses the shared timer's 8+8 blink phase. A solid steel/white Viper
+last segment uses the shared timer's 8+8 blink phase. A solid steel/white Player Fighter
 colour pulse is derived from the same timer and never makes the craft disappear.
 
 ## Encounter Director Level 1
@@ -233,7 +233,7 @@ phase boundaries:
 | Phase | World rows | EASY time | MEDIUM time | HARD time |
 | --- | ---: | ---: | ---: | ---: |
 | Intro | 0-128 | 0.0-6.4 s | 0.0-5.7 s | 0.0-5.1 s |
-| Raider training | 128-576 | 6.4-28.8 s | 5.7-25.6 s | 5.1-23.0 s |
+| Interceptor training | 128-576 | 6.4-28.8 s | 5.7-25.6 s | 5.1-23.0 s |
 | Debris field | 576-1056 | 28.8-52.8 s | 25.6-46.9 s | 23.0-42.2 s |
 | Mixed pressure | 1056-1664 | 52.8-83.2 s | 46.9-74.0 s | 42.2-66.6 s |
 | Recovery | 1664-1856 | 83.2-92.8 s | 74.0-82.5 s | 66.6-74.2 s |
@@ -243,7 +243,7 @@ phase boundaries:
 
 The intensity budgets are 3/4/5 for EASY/MEDIUM/HARD. The Director has a
 private deterministic RNG and does not consume the game's existing random
-state. It owns admission policy and budgets while the existing Raider, debris,
+state. It owns admission policy and budgets while the existing Interceptor, debris,
 broadside, pickup, object-pool, and destruction lifecycles retain object
 ownership. With no boss consumer, `BOSS_HANDOFF` closes admissions and pickup
 state, enters DRAIN, lets active objects expire, and emits exactly one
@@ -262,12 +262,12 @@ objects until their normal cleanup, and leaves the single COMPLETE state termina
 Nova Missile is a future boss-only special-weapon pickup, not a member of the
 planned Rapid Fire / Spread Shot / Shield drop rotation. It may appear only
 during a boss encounter, never in standard sectors or through the qualifying
-Raider-kill counter. Its capsule is planned as a large, readable 2x2 missile.
+Interceptor-kill counter. Its capsule is planned as a large, readable 2x2 missile.
 
 Collecting it arms exactly one missile independently of the current weapon
 booster and Shield. A held FIRE input at collection must not launch it: the
 player must release FIRE and press it again. That next new press launches Nova
-Missile instead of the normal shot, after which the Viper returns to its
+Missile instead of the normal shot, after which the Player Fighter returns to its
 preserved normal, Rapid Fire, or Spread Shot weapon state.
 
 A boss hit is planned to trigger a large multi-phase space-detonation: a bright
@@ -281,4 +281,4 @@ runtime.
 
 Additional enemy archetypes, longer level structures, bosses, and further
 audio/visual polish remain future work. They are not implied by the current
-Raider descriptors or review-only asset records.
+Interceptor descriptors or review-only asset records.

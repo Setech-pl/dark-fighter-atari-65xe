@@ -45,14 +45,14 @@ test("wall trace is artifact-bound and adds no guest timing work", () => {
   assert.equal(report.evidence.status, "complete");
   assert.equal(report.evidence.partial, false);
   assert.equal(report.evidence.required_sessions, report.evidence.completed_sessions);
-  for (const name of ["dark-fighter-boot.bin", "dark-fighter.xex", "dark-fighter.atr"]) {
+  for (const name of ["void-strike-65-boot.bin", "void-strike-65.xex", "void-strike-65.atr"]) {
     assert.deepEqual(report.artifacts[name], {
       path: `dist/${name}`,
       bytes: manifest.artifacts[name].bytes,
       sha256: manifest.artifacts[name].sha256,
     });
   }
-  assert.equal(report.artifact.sha256, report.artifacts["dark-fighter.xex"].sha256);
+  assert.equal(report.artifact.sha256, report.artifacts["void-strike-65.xex"].sha256);
   assert.equal(report.instrumentation.start_label, "main_loop_option_poll");
   assert.equal(report.instrumentation.end_label, "main_loop");
   assert.equal(report.instrumentation.guest_instructions_added, 0);
@@ -308,7 +308,7 @@ test("Spread Shot passes PAL wall budget with a legal capsule and projectile-hea
   assert.ok(feature.spread_volley_frames > 0);
   assert.ok(feature.active_capsule_three_projectile_frames > 0);
   assert.ok(feature.active_capsule_during_booster_frames > 0);
-  assert.ok(feature.worst_legal_capsule_three_projectiles.state.viper_projectiles >= 3);
+  assert.ok(feature.worst_legal_capsule_three_projectiles.state.player_fighter_projectiles >= 3);
   assert.equal(feature.worst_legal_capsule_three_projectiles.state.weapon_pickup.state, 2);
   assert.deepEqual([
     feature.target_overrun_frames,
@@ -321,7 +321,7 @@ test("Spread Shot passes PAL wall budget with a legal capsule and projectile-hea
   assert.equal(report.coverage.weapon_pickup_spread_shot.logical_three_projectile_volley.observed,
     true);
   assert.equal(report.coverage.weapon_pickup_spread_shot
-    .active_capsule_with_three_viper_projectiles.observed, true);
+    .active_capsule_with_three_player_fighter_projectiles.observed, true);
   assert.equal(report.coverage.weapon_pickup_spread_shot
     .active_capsule_during_booster.observed, true);
   assert.deepEqual(manifest.entityEffects.runtimeBudget.weaponPickupSpreadShot, {
@@ -344,7 +344,7 @@ test("wall trace records the required legal runtime coverage without incoherent 
     "world_near_with_far_erase",
     "hull_event",
     "active_muzzles",
-    "live_raider",
+    "live_interceptor",
     "fighter_explosion",
     "broadside_projectiles",
     "capital_explosion",
@@ -357,12 +357,12 @@ test("wall trace records the required legal runtime coverage without incoherent 
   }
   const pool = report.coverage.maximum_projectile_pool;
   assert.equal(pool.scope,
-    "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays");
+    "combined active PlayerFighter and Interceptor fighter-projectile slots in legal Atari800 replays");
   assert.deepEqual([pool.combined_physical_capacity, pool.maximum_combined_active_observed,
     pool.full_combined_capacity_observed], [19, 13, false]);
   assert.equal(pool.full_combined_capacity_matching_frames, 0);
   assert.equal(pool.heaviest_at_full_combined_capacity, null);
-  assert.deepEqual(pool.component_physical_capacities, { viper: 10, raider: 9 });
+  assert.deepEqual(pool.component_physical_capacities, { player_fighter: 10, interceptor: 9 });
   assert.match(pool.evidence_note, /does not claim a full state/);
   assert.equal(report.coverage.broadside_projectiles.pool_capacity, 3);
   assert.equal(report.coverage.broadside_projectiles.release_source_turrets, 2);
@@ -545,7 +545,7 @@ test("destructible debris passes PAL, inactive-path and linked-code budgets", ()
   assert.equal(feature.target_overrun_frames, 0);
   assert.equal(feature.hard_overrun_frames, 0);
   assert.ok(feature.no_active_debris_path_delta_cpu_cycles <= 32);
-  assert.equal(feature.no_active_viper_projectile_path_delta_cpu_cycles, 0);
+  assert.equal(feature.no_active_player_fighter_projectile_path_delta_cpu_cycles, 0);
   assert.equal(feature.passed, true);
   assert.ok(feature.debris_shot_path.events.includes("debris-shot"));
   assert.deepEqual(manifest.entityEffects.runtimeBudget.destructibleDebris, {
@@ -596,14 +596,14 @@ test("enemy breakup passes the hard PAL gate and executes the five-slot runtime 
   assert.equal(report.gate.deadline_overrun_frames, 0);
   assert.equal(report.gate.extra_vbi_boundaries, 0);
   assert.deepEqual([
-    report.coverage.raider_breakup_effects.observed,
-    report.coverage.raider_breakup_effects.active_mask,
-    report.coverage.raider_breakup_effects.active_count,
-    report.coverage.raider_breakup_effects.spawn_updated_and_rendered,
-    report.coverage.raider_breakup_effects.full_screen_flash_preserved,
+    report.coverage.interceptor_breakup_effects.observed,
+    report.coverage.interceptor_breakup_effects.active_mask,
+    report.coverage.interceptor_breakup_effects.active_count,
+    report.coverage.interceptor_breakup_effects.spawn_updated_and_rendered,
+    report.coverage.interceptor_breakup_effects.full_screen_flash_preserved,
   ], [true, 0x1f, 5, true, true]);
-  assert.ok(report.coverage.raider_breakup_effects.spawner_frames > 0);
-  assert.ok(report.coverage.raider_breakup_effects.yellow_death_then_red_materialisation_frames > 0);
+  assert.ok(report.coverage.interceptor_breakup_effects.spawner_frames > 0);
+  assert.ok(report.coverage.interceptor_breakup_effects.yellow_death_then_red_materialisation_frames > 0);
   assert.deepEqual(manifest.entityEffects.runtimeBudget.enemyBreakupEffects, {
     baselineWallCycles: 32_719,
     baselinePhysicalHeadroomCycles: 2_849,
@@ -670,7 +670,7 @@ test("current frontend maximum, subsystem profile and accepted PAL-recovery base
   assert.equal(Object.values(profile.subsystem_cycles)
     .reduce((sum, cycles) => sum + cycles, 0), profile.wall_cycles);
   for (const name of ["vbi_and_synchronization", "world_ring_playfield", "broadside",
-    "viper_projectiles", "raider_projectiles", "enemy_update_collision",
+    "player_fighter_projectiles", "interceptor_projectiles", "enemy_update_collision",
     "entity_debris", "effects", "capsule_interactive_entity", "music_sound",
     "remaining_runtime"]) assert.ok(Number.isInteger(profile.subsystem_cycles[name]));
   assert.equal(profile.synchronization_wait_cycles, 0);

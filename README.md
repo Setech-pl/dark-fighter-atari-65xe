@@ -1,15 +1,15 @@
-# Dark Fighter
+# Void Strike 65
 
 ### A complete vertical space-combat game for the Atari 65XE, built for PAL in NMOS 6502 assembly
 
-![Dark Fighter gameplay with the Viper, capital ships, and the Rapid Fire HUD indicator](docs/media/gameplay/06-rapid-fire-active.png)
+![Void Strike 65 gameplay with the Player Fighter, capital ships, and the Rapid Fire HUD indicator](docs/media/gameplay/06-rapid-fire-active.png)
 
 **Atari 65XE · 64 KB · PAL · 50 FPS · NMOS 6502 assembly**
 
-[Download the XEX](dist/dark-fighter.xex) · [Boot the ATR](dist/dark-fighter.atr)
+[Download the XEX](dist/void-strike-65.xex) · [Boot the ATR](dist/void-strike-65.atr)
 
-Pilot a Colonial Viper through open space and the narrow crossfire corridor
-between opposing capital ships. Fight Cylon Raiders, dodge or destroy drifting
+Pilot an Allied Player Fighter through open space and the narrow crossfire corridor
+between opposing capital ships. Fight Hostile Interceptors, dodge or destroy drifting
 debris, survive heavy broadside fire, and collect Rapid Fire, Spread Shot, and
 Shield capsules. Successful capsules rotate deterministically through all three
 boosters. The current release is fully playable in an emulator and on an Atari through
@@ -27,12 +27,12 @@ artifact hashes are recorded in [`docs/media/manifest.json`](docs/media/manifest
 
 | | |
 |---|---|
-| ![The Dark Fighter loader with its Galactica illustration and five-second PAL presentation](docs/media/gameplay/01-title-loader.png) | ![Standard Dark Fighter combat between the blue and red capital hulls](docs/media/gameplay/02-standard-combat.png) |
-| **Loader and title art** — the boot handoff begins with a timed PAL presentation. | **Standard combat** — Viper, Raider, projectiles, starfield, and scrolling capital hulls. |
-| ![A Cylon Raider breaking into local explosion fragments](docs/media/gameplay/03-raider-breakup.png) | ![Neutral debris breaking into four transient fragments](docs/media/gameplay/04-debris-breakup.png) |
-| **Raider breakup** — a local core and four deterministic fragments accompany the yellow-red screen flash. | **Destructible debris** — three hits break a neutral obstacle apart without awarding points. |
-| ![The static yellow and steel-blue RF weapon capsule in active gameplay](docs/media/gameplay/05-rapid-fire-pickup.png) | ![Rapid Fire active with the BOOST HUD field and yellow Viper projectiles](docs/media/gameplay/06-rapid-fire-active.png) |
-| **Rapid Fire pickup** — a large 2×2 ANTIC 4 capsule appears after three qualifying Raider kills. | **Rapid Fire active** — the full `BOOST` label and four tall segments show remaining energy while newly fired Viper shots stay yellow and use the faster firing cadence. |
+| ![The Void Strike 65 loader with its capital-ship illustration and five-second PAL presentation](docs/media/gameplay/01-title-loader.png) | ![Standard Void Strike 65 combat between the blue and red capital hulls](docs/media/gameplay/02-standard-combat.png) |
+| **Loader and title art** — the boot handoff begins with a timed PAL presentation. | **Standard combat** — Player Fighter, Interceptor, projectiles, starfield, and scrolling capital hulls. |
+| ![A Hostile Interceptor breaking into local explosion fragments](docs/media/gameplay/03-interceptor-breakup.png) | ![Neutral debris breaking into four transient fragments](docs/media/gameplay/04-debris-breakup.png) |
+| **Interceptor breakup** — a local core and four deterministic fragments accompany the yellow-red screen flash. | **Destructible debris** — three hits break a neutral obstacle apart without awarding points. |
+| ![The static yellow and steel-blue RF weapon capsule in active gameplay](docs/media/gameplay/05-rapid-fire-pickup.png) | ![Rapid Fire active with the BOOST HUD field and yellow Player Fighter projectiles](docs/media/gameplay/06-rapid-fire-active.png) |
+| **Rapid Fire pickup** — a large 2×2 ANTIC 4 capsule appears after three qualifying Interceptor kills. | **Rapid Fire active** — the full `BOOST` label and four tall segments show remaining energy while newly fired Player Fighter shots stay yellow and use the faster firing cadence. |
 | ![Capital-ship corridor combat with broadside fire](docs/media/gameplay/07-capital-broadside.png) | ![Animated capital-ship engine modules in the scrolling corridor](docs/media/gameplay/08-capital-engines.png) |
 | **Capital broadside** — opposing hulls exchange deterministic heavy fire around the player. | **Capital engines** — the existing two engine phases pulse at an exact 8+8-frame cadence. |
 | ![Spread Shot active with the BOOST HUD field and an all-yellow three-projectile fan](docs/media/gameplay/09-spread-shot-active.png) | |
@@ -40,7 +40,7 @@ artifact hashes are recorded in [`docs/media/manifest.json`](docs/media/manifest
 
 ## The story
 
-Dark Fighter began in 1990, when I started creating a space-combat game for the
+Void Strike 65 began in 1990, when I started creating a space-combat game for the
 Atari 65XE. Decades later, I recovered the surviving project material from
 5¼-inch floppy disks using an Atari computer and SIO2SD, transferred it to a
 modern cross-development environment, and completed a full playable release
@@ -49,7 +49,7 @@ with AI-assisted engineering.
 The tools changed. The target did not: real 6502 code, real PAL timing, real XEX
 and ATR images, and validation on Atari hardware.
 
-> Dark Fighter is a return to programming for the joy of making a machine do
+> Void Strike 65 is a return to programming for the joy of making a machine do
 > something that initially seemed impossible.
 
 The original vision, gameplay decisions, constraints, and Definition of Done
@@ -57,7 +57,7 @@ remain owner-led. Codex assists with implementation, testing, analysis, and
 documentation. Every feature is validated automatically and then played by the
 owner; commit and push happen only after owner acceptance.
 
-![AI-assisted concept art connecting a 1990 Atari computer and floppy disk with Dark Fighter's present-day space-combat release](docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg)
+![AI-assisted concept art connecting a 1990 Atari computer and floppy disk with Void Strike 65's present-day space-combat release](docs/media/concepts/void-strike-65-concept-from-floppy-to-stars.jpg)
 
 *Concept art — From Floppy to the Stars. An AI-assisted visualization of the project’s journey from its 1990 origins to the current release. Not an in-game screenshot.*
 
@@ -69,7 +69,7 @@ owner; commit and push happen only after owner acceptance.
   bursts from the single fire button.
 - Three exact world-speed settings: EASY at 20 rows/s, MEDIUM at 22.5 rows/s,
   and HARD at 25 rows/s.
-- A PMG Viper and Cylon Raider with deterministic movement, firing, collision,
+- A PMG Player Fighter and Hostile Interceptor with deterministic movement, firing, collision,
   scoring, sound, and yellow-red destruction flashes.
 - Open-space and capital-ship corridor sectors with two independently scrolling
   hulls, animated engine banks, turrets, warning phases, and M1–M3 broadside
@@ -77,14 +77,14 @@ owner; commit and push happen only after owner acceptance.
 - Neutral armour-shard and truss-fragment debris with three HP, deterministic
   trajectories, local hit feedback, a breakup core, and four non-colliding
   fragments.
-- Local Raider breakup effects that reuse the fixed transient-effects system.
+- Local Interceptor breakup effects that reuse the fixed transient-effects system.
 - Rotating 2×2 Rapid Fire, Spread Shot, and Shield capsules earned after every
-  third qualifying Raider projectile kill. Weapon boosters last 500 active PAL
+  third qualifying Interceptor projectile kill. Weapon boosters last 500 active PAL
   frames and Shield lasts 250; every pickup replaces or refreshes the current
   booster. Rapid uses ten-shot bursts with
   two-frame spacing, while Spread uses eight salvos with a ten-frame cooldown
   and emits an all-yellow centre plus an atomic symmetric side pair. Shield
-  absorbs damage while retaining the normal weapon cadence. Every Viper projectile stays
+  absorbs damage while retaining the normal weapon cadence. Every Player Fighter projectile stays
   yellow. The full `BOOST` label precedes a shared four-segment HUD energy bar
   that tracks the exact remaining fraction; only its final segment blinks in
   an 8+8 PAL-frame rhythm. Four permanent low HULL plates use a separate shape.
@@ -94,7 +94,7 @@ owner; commit and push happen only after owner acceptance.
 
 ## Engineering an Atari game today
 
-Dark Fighter is not a browser reimplementation. The distributed files contain
+Void Strike 65 is not a browser reimplementation. The distributed files contain
 the same NMOS 6502 runtime that is assembled, linked, packed, booted, traced,
 and tested by the repository.
 
@@ -190,7 +190,7 @@ These sheets are generated from the current PMG, ANTIC 4, projectile, effect,
 and capital-hull source data. They show assets used by the release; no new art
 is invented for the sheets.
 
-![Compiled PMG Viper and Cylon Raider assets used by the release](docs/media/assets/fighter-and-enemies.png)
+![Compiled PMG Player Fighter and Hostile Interceptor assets used by the release](docs/media/assets/fighter-and-enemies.png)
 
 ![Actual projectile glyphs and local explosion masks used by the release](docs/media/assets/weapons-and-effects.png)
 
@@ -216,7 +216,7 @@ bright weapon accents against deep space. Future illustrations may be added to
 this section, but every such image will be explicitly labeled **concept art**.
 Concept art will never be presented as a gameplay screenshot.
 
-![AI-assisted concept art of a Viper flying through a vast capital-ship gauntlet toward a Cylon adversary](docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg)
+![AI-assisted concept art of a Player Fighter flying through a vast capital-ship gauntlet toward a Hostile adversary](docs/media/concepts/void-strike-65-concept-gauntlet-run.jpg)
 
 *Concept art — Gauntlet Run. An AI-assisted visualization of the intended scale, atmosphere and future battlefield composition. Not an in-game screenshot.*
 
@@ -248,13 +248,13 @@ belong in `build/` and `dist/`; source assets remain under `assets/`.
 ### Run the XEX in Atari800
 
 ```bash
-atari800 -xe -pal -nobasic -run dist/dark-fighter.xex
+atari800 -xe -pal -nobasic -run dist/void-strike-65.xex
 ```
 
 ### Boot the ATR in Atari800
 
 ```bash
-atari800 -xe -pal -nobasic dist/dark-fighter.atr
+atari800 -xe -pal -nobasic dist/void-strike-65.atr
 ```
 
 Map the host joystick to Atari port 1. Use the joystick to move, FIRE to shoot
@@ -263,7 +263,7 @@ in-game pause menu.
 
 ### Run on an Atari through SIO2SD
 
-1. Copy `dist/dark-fighter.atr` to the SD card.
+1. Copy `dist/void-strike-65.atr` to the SD card.
 2. Mount the image as `D1:` in SIO2SD.
 3. Connect a joystick to port 1.
 4. Power on the Atari while holding `OPTION` to disable BASIC.
@@ -304,9 +304,7 @@ dist/                   generated XEX, ATR, boot payload, and manifest
 **AI-assisted engineering:** Codex, supporting implementation, testing,
 analysis, and documentation under owner direction and acceptance
 
-Dark Fighter is an unofficial, non-commercial Battlestar Galactica fan-art
-project. It is not affiliated with, endorsed by, or presented as an official
-product of the owners of Battlestar Galactica. Referenced names, ships,
-silhouettes, factions, and lore remain the property of their respective owners.
-All Atari program code, runtime data, graphics, animation, and audio in this
-repository are created or rebuilt for this project.
+Void Strike 65 is an unofficial, non-commercial hobby project. It is not
+affiliated with, endorsed by, or presented as an official product of any third
+party. All Atari program code, runtime data, graphics, animation, and audio in
+this repository are created or rebuilt for this project.

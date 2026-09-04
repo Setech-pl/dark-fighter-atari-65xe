@@ -1,6 +1,6 @@
 .setcpu "6502"
 
-; Dark Fighter 0.1 vertical slice
+; Void Strike 65 0.1 vertical slice
 ; Target: stock Atari 65XE PAL, 64 KB
 
 .export start
@@ -30,7 +30,7 @@ DIRECTOR_STATE_ADMISSION_FRAME = $80FF
 DIRECTOR_FLAG_COMPLETE = $01
 DIRECTOR_FLAG_FIRST_CAPITAL_ADMITTED = $40
 DIRECTOR_FLAG_FIRST_CAPITAL_DUE = $80
-DIRECTOR_HAZARD_RAIDER = 0
+DIRECTOR_HAZARD_INTERCEPTOR = 0
 DIRECTOR_HAZARD_DEBRIS = 1
 DIRECTOR_HAZARD_BROADSIDE = 2
 DIRECTOR_HAZARD_PICKUP = 3
@@ -215,8 +215,8 @@ CAPITAL_EXPLOSION_SOUND_TIMER = CAPITAL_EXPLOSION_BACKUP+$12
 ENGINE_ANIMATION_TIMER      = CAPITAL_EXPLOSION_SOUND_TIMER+$01
 ENGINE_ANIMATION_PHASE      = ENGINE_ANIMATION_TIMER+$01
 ENEMY_ARCHETYPE             = ENGINE_ANIMATION_PHASE+$01
-RAIDER_MOVE_ACCUMULATOR     = ENEMY_ARCHETYPE+$01
-ENEMY_ACTIVE                = RAIDER_MOVE_ACCUMULATOR+$01
+INTERCEPTOR_MOVE_ACCUMULATOR     = ENEMY_ARCHETYPE+$01
+ENEMY_ACTIVE                = INTERCEPTOR_MOVE_ACCUMULATOR+$01
 ENEMY_HP                    = ENEMY_ACTIVE+$01
 ENEMY_PENDING_DAMAGE        = ENEMY_HP+$01
 ENEMY_PENDING_SOURCE        = ENEMY_PENDING_DAMAGE+$01
@@ -337,7 +337,7 @@ BROAD_FREE    = 0
 BROAD_WARNING = 1
 BROAD_FLYING  = 2
 BROAD_IMPACT  = 3
-BROAD_RAIDER_PULSE = 4
+BROAD_INTERCEPTOR_PULSE = 4
 MUZZLE_DOMAIN_FIXED = 0
 MUZZLE_DOMAIN_RING  = 1
 PLAYER_ALIVE                = 0
@@ -346,24 +346,24 @@ PLAYER_RESPAWN_INVULNERABLE = 2
 PLAYER_GAME_OVER            = 3
 OWNER_ALLIED  = 0
 OWNER_ENEMY   = 1
-OWNER_RAIDER  = 2
+OWNER_INTERCEPTOR  = 2
 DAMAGE_PLAYER_PROJECTILE = 0
 DAMAGE_PLAYER_CONTACT    = 1
-DAMAGE_CAPITAL_CYLON     = 2
-DAMAGE_CAPITAL_COLONIAL  = 3
+DAMAGE_CAPITAL_HOSTILE     = 2
+DAMAGE_CAPITAL_ALLIED  = 3
 DAMAGE_ENEMY_PROJECTILE  = 4
 DAMAGE_CLEANUP           = 5
 FIGHTER_PROJECTILE_FREE   = 0
-FIGHTER_PROJECTILE_VIPER  = 1
-FIGHTER_PROJECTILE_RAIDER = 2
+FIGHTER_PROJECTILE_PLAYER_FIGHTER  = 1
+FIGHTER_PROJECTILE_INTERCEPTOR = 2
 FIGHTER_PROJECTILE_SPREAD_CENTER = $10
 FIGHTER_PROJECTILE_SPREAD_RIGHT = $20
 FIGHTER_PROJECTILE_SPREAD_LEFT = $40
 FIGHTER_PROJECTILE_SPREAD_DIRECTION_MASK = FIGHTER_PROJECTILE_SPREAD_LEFT|FIGHTER_PROJECTILE_SPREAD_RIGHT
 FIGHTER_PROJECTILE_SPREAD_TYPE_MASK = FIGHTER_PROJECTILE_SPREAD_CENTER|FIGHTER_PROJECTILE_SPREAD_DIRECTION_MASK
-FIGHTER_PROJECTILE_RENDER_ID_SPREAD_CENTER = FIGHTER_PROJECTILE_VIPER|FIGHTER_PROJECTILE_SPREAD_CENTER
-FIGHTER_PROJECTILE_RENDER_ID_SPREAD_LEFT = FIGHTER_PROJECTILE_VIPER|FIGHTER_PROJECTILE_SPREAD_LEFT
-FIGHTER_PROJECTILE_RENDER_ID_SPREAD_RIGHT = FIGHTER_PROJECTILE_VIPER|FIGHTER_PROJECTILE_SPREAD_RIGHT
+FIGHTER_PROJECTILE_RENDER_ID_SPREAD_CENTER = FIGHTER_PROJECTILE_PLAYER_FIGHTER|FIGHTER_PROJECTILE_SPREAD_CENTER
+FIGHTER_PROJECTILE_RENDER_ID_SPREAD_LEFT = FIGHTER_PROJECTILE_PLAYER_FIGHTER|FIGHTER_PROJECTILE_SPREAD_LEFT
+FIGHTER_PROJECTILE_RENDER_ID_SPREAD_RIGHT = FIGHTER_PROJECTILE_PLAYER_FIGHTER|FIGHTER_PROJECTILE_SPREAD_RIGHT
 DIFFICULTY_EASY   = 0
 DIFFICULTY_MEDIUM = 1
 DIFFICULTY_HARD   = 2
@@ -389,7 +389,7 @@ ENEMY_SLOT_INDEX = 0
 ENEMY_INACTIVE = 0
 ENEMY_ACTIVE_STATE = 1
 ENEMY_EXPLODING_STATE = 2
-FIGHTER_EXPLOSION_VIPER_SLOT = 0
+FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT = 0
 FIGHTER_EXPLOSION_ENEMY_SLOT = 1
 PLAYER_HEALTH_UNITS = 10
 CAPITAL_DAMAGE_UNITS = 2
@@ -401,7 +401,7 @@ ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = GAMEPLAY_BOTTOM
 
 PLAYER_H    = 16
 PLAYER_COLLISION_WIDTH = 8
-; The Viper's eight PMG bits are rendered double-width, so player/debris and
+; The PlayerFighter's eight PMG bits are rendered double-width, so player/debris and
 ; capital-shell contact own the complete visible 16-HPOS horizontal envelope.
 ; Narrow legacy contracts retain PLAYER_COLLISION_WIDTH where explicitly used.
 PLAYER_VISIBLE_WIDTH_HPOS = 16
@@ -442,8 +442,8 @@ STAR_GENERATE_FAR  = $02
 KAWASAKI_GREEN = $D8
 GAMEPLAY_COLPF0 = $0E
 GAMEPLAY_COLPF1 = $84
-GAMEPLAY_COLPF2 = VIPER_PROJECTILE_COLOR
-GAMEPLAY_COLPF3 = RAIDER_PROJECTILE_COLOR
+GAMEPLAY_COLPF2 = PLAYER_FIGHTER_PROJECTILE_COLOR
+GAMEPLAY_COLPF3 = INTERCEPTOR_PROJECTILE_COLOR
 GAMEPLAY_BACKGROUND_COLOR = $00
 HUD_COLPF1 = $0E
 HUD_COLPF2 = $00
@@ -478,17 +478,17 @@ CH_HUD_BOOSTER_FULL = CH_PANEL_STRIPE
 HUD_BOOSTER_BACKING = $5E06
 hud_booster_backing = HUD_BOOSTER_BACKING
 HUD_BOOSTER_BLINK_HALF_PERIOD = 8
-HUD_BOOSTER_QUARTER = VIPER_RAPID_FIRE_DURATION/4
+HUD_BOOSTER_QUARTER = PLAYER_FIGHTER_RAPID_FIRE_DURATION/4
 HUD_BOOSTER_THREE_SEGMENT_MIN = HUD_BOOSTER_QUARTER*2+1
 HUD_BOOSTER_FOUR_SEGMENT_MIN = HUD_BOOSTER_QUARTER*3+1
 HUD_SHIELD_TWO_SEGMENT_MIN = 63
 HUD_SHIELD_THREE_SEGMENT_MIN = 126
 HUD_SHIELD_FOUR_SEGMENT_MIN = 188
-.assert VIPER_RAPID_FIRE_DURATION = VIPER_SPREAD_SHOT_DURATION, error, "weapon boosters must share one HUD duration"
-.assert VIPER_SPREAD_COOLDOWN = 10, error, "Spread cooldown must retain one reserve projectile slot"
-.assert VIPER_SPREAD_LATERAL_STEP = 1, error, "Spread side step must be one HPOS unit"
-.assert VIPER_SPREAD_LATERAL_PERIOD = 2, error, "Spread side step must occur every two active frames"
-.assert HUD_BOOSTER_QUARTER*4 = VIPER_RAPID_FIRE_DURATION, error, "weapon-booster duration must divide into four exact HUD quarters"
+.assert PLAYER_FIGHTER_RAPID_FIRE_DURATION = PLAYER_FIGHTER_SPREAD_SHOT_DURATION, error, "weapon boosters must share one HUD duration"
+.assert PLAYER_FIGHTER_SPREAD_COOLDOWN = 10, error, "Spread cooldown must retain one reserve projectile slot"
+.assert PLAYER_FIGHTER_SPREAD_LATERAL_STEP = 1, error, "Spread side step must be one HPOS unit"
+.assert PLAYER_FIGHTER_SPREAD_LATERAL_PERIOD = 2, error, "Spread side step must occur every two active frames"
+.assert HUD_BOOSTER_QUARTER*4 = PLAYER_FIGHTER_RAPID_FIRE_DURATION, error, "weapon-booster duration must divide into four exact HUD quarters"
 .assert HUD_HULL_LABEL_GAP_OFFSET-HUD_HULL_LABEL_OFFSET = HUD_HULL_LABEL_CELLS, error, "HULL label width changed"
 .assert HUD_HULL_SEGMENTS_OFFSET-HUD_HULL_LABEL_GAP_OFFSET = 1, error, "HULL label requires one blank separator"
 .assert HUD_BOOSTER_OFFSET-HUD_HULL_BOOST_GAP_OFFSET = 1, error, "HULL and BOOST require one blank separator"
@@ -497,8 +497,8 @@ HUD_SHIELD_FOUR_SEGMENT_MIN = 188
 .assert HUD_BOOSTER_SEGMENTS_OFFSET+HUD_BOOSTER_SEGMENTS = GAMEPLAY_SCREEN_COLUMNS, error, "BOOST energy segments must end at HUD column 39"
 .assert HUD_BOOSTER_BACKING+HUD_BOOSTER_CELLS = __BROADSIDE_RUN__, error, "BOOST HUD backing must occupy the final ten STARFIELD-reservation bytes"
 .assert HUD_BOOSTER_BLINK_HALF_PERIOD = 8, error, "weapon-booster warning must use an 8+8 PAL-frame phase"
-.assert VIPER_SHIELD_DURATION = 250, error, "Shield must last exactly 250 active PAL frames"
-.assert HUD_SHIELD_FOUR_SEGMENT_MIN = VIPER_SHIELD_DURATION-HUD_SHIELD_TWO_SEGMENT_MIN+1, error, "Shield four-segment threshold changed"
+.assert PLAYER_FIGHTER_SHIELD_DURATION = 250, error, "Shield must last exactly 250 active PAL frames"
+.assert HUD_SHIELD_FOUR_SEGMENT_MIN = PLAYER_FIGHTER_SHIELD_DURATION-HUD_SHIELD_TWO_SEGMENT_MIN+1, error, "Shield four-segment threshold changed"
 .assert CH_HUD_BOOSTER_SHIELD = CH_HUD_BOOSTER_FULL+1, error, "Shield HUD glyph must own the formally reserved code 8"
 .assert CH_HUD_BOOSTER_SHIELD+1 = CH_SEPARATOR, error, "Shield HUD glyph must not overlap structural screen codes"
 .export HUD_HULL_LABEL_OFFSET, HUD_HULL_LABEL_GAP_OFFSET, HUD_HULL_SEGMENTS_OFFSET
@@ -516,7 +516,7 @@ HUD_SHIELD_FOUR_SEGMENT_MIN = 188
 .assert BROAD_WORK_COUNT = $4E63, error, "integration prow glue scratch ABI moved"
 
 ; The final two gameplay glyphs form the left/right halves of one continuous
-; 8x6 bolt. Bit 7 still selects the Cylon PF3 bank without changing its shape.
+; 8x6 bolt. Bit 7 still selects the Hostile PF3 bank without changing its shape.
 CAPITAL_SHELL_LEFT_GLYPH  = 126
 CAPITAL_SHELL_RIGHT_GLYPH = 127
 
@@ -581,8 +581,8 @@ MAIN_MENU_DMA = $22
 ; consume screen RAM. ANTIC 6/7 rows use 20 B and ANTIC 2/4 rows use 40 B.
 MAIN_MENU_TITLE_OFFSET = 0
 MAIN_MENU_LINE_TOP_OFFSET = 20
-MAIN_MENU_VIPER_TOP_OFFSET = 60
-MAIN_MENU_VIPER_BOTTOM_OFFSET = 100
+MAIN_MENU_PLAYER_FIGHTER_TOP_OFFSET = 60
+MAIN_MENU_PLAYER_FIGHTER_BOTTOM_OFFSET = 100
 MAIN_MENU_LINE_BOTTOM_OFFSET = 140
 MAIN_MENU_OPTION_0_OFFSET = 180
 MAIN_MENU_OPTION_1_OFFSET = 200
@@ -623,7 +623,7 @@ GAME_OVER_SCORE_DIGITS = SCREEN+GAME_OVER_SCORE_ROW_OFFSET+14
 GAME_OVER_TOP_DIGITS   = SCREEN+GAME_OVER_TOP_ROW_OFFSET+14
 
 CH_FRONT_LINE = 48
-CH_FRONT_VIPER_TOP_LEFT = 58
+CH_FRONT_PLAYER_FIGHTER_TOP_LEFT = 58
 
 CORRIDOR_ALLIED_COLUMNS = 8
 CORRIDOR_CENTRAL_FIRST = 8
@@ -646,7 +646,7 @@ ENTITY_CORRIDOR_LEFT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_CORRIDOR_FIRST_COLUMN*4
 ENTITY_CORRIDOR_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_CORRIDOR_END_COLUMN*4
 ENTITY_SAFE_SPAWN_LEFT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_FIRST_COLUMN*4
 ENTITY_SAFE_SPAWN_RIGHT_HPOS = GAMEPLAY_LEFT_HPOS+ENTITY_SAFE_SPAWN_END_COLUMN*4
-ENTITY_DEBRIS_GLYPH_BASE = RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT
+ENTITY_DEBRIS_GLYPH_BASE = INTERCEPTOR_PROJECTILE_GLYPH_BASE+INTERCEPTOR_PROJECTILE_GLYPH_COUNT
 EFFECT_FRAGMENT_GLYPH_BASE = ENTITY_DEBRIS_GLYPH_BASE+ENTITY_DEBRIS_GLYPH_COUNT
 WEAPON_PICKUP_GLYPH_BASE = EFFECT_FRAGMENT_GLYPH_BASE+EFFECT_FRAGMENT_GLYPH_COUNT
 WEAPON_PICKUP_SPREAD_GLYPH_BASE = WEAPON_PICKUP_GLYPH_BASE
@@ -654,7 +654,7 @@ WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE
 WEAPON_PICKUP_PHASE_BANK = $8800
 WEAPON_PICKUP_PACKED_STAGING = $8C80
 WEAPON_PICKUP_COLD_STAGING = $4801
-VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT
+PLAYER_FIGHTER_COMPOSITE_GLYPH_BASE = PLAYER_FIGHTER_PROJECTILE_GLYPH_BASE+PLAYER_FIGHTER_PROJECTILE_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
 .assert BROAD_RASTER_TOP+BROADSIDE_SLOT_COUNT <= BROAD_TURRET_FIRED, error, "capital-shell raster cache exceeds compatibility state hole"
@@ -667,14 +667,14 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert STAR_FAR_SCREEN_END <= $9000, error, "far-star screen cache overlaps A2 kernel"
 .assert STAR_FAR_FIRST > CH_SPACE, error, "star codes must not alias blank space"
 .assert GAMEPLAY_TOP & $07 = 0, error, "projectile row reduction requires an eight-scanline gameplay origin"
-.assert STAR_NEAR_END <= VIPER_PROJECTILE_GLYPH_BASE, error, "star glyphs overlap Viper projectile glyphs"
+.assert STAR_NEAR_END <= PLAYER_FIGHTER_PROJECTILE_GLYPH_BASE, error, "star glyphs overlap PlayerFighter projectile glyphs"
 .assert PLAYER_RESPAWN_X = 124, error, "player respawn must center the eight-HPOS envelope in the 24-column corridor"
-.assert PLAYER_VISIBLE_WIDTH_HPOS = 16, error, "double-width Viper must expose sixteen HPOS to debris contact"
+.assert PLAYER_VISIBLE_WIDTH_HPOS = 16, error, "double-width PlayerFighter must expose sixteen HPOS to debris contact"
 .assert ENEMY_X_MIN = 80, error, "enemy left edge must begin at the central corridor"
 .assert ENEMY_X_MAX = 160, error, "double-width enemy must end before the enemy hull"
 .assert ENEMY_X_MAX+ENEMY_RELEASE_VISIBLE_WIDTH = CORRIDOR_RIGHT_HPOS, error, "enemy envelope must fit the corridor exactly"
 .assert ENTITY_CORRIDOR_LEFT_HPOS = CORRIDOR_LEFT_HPOS+4, error, "entity corridor must exclude the allied boundary column"
-.assert ENTITY_CORRIDOR_RIGHT_HPOS = CORRIDOR_RIGHT_HPOS-4, error, "entity corridor must exclude the Cylon boundary column"
+.assert ENTITY_CORRIDOR_RIGHT_HPOS = CORRIDOR_RIGHT_HPOS-4, error, "entity corridor must exclude the Hostile boundary column"
 .assert ENTITY_CORRIDOR_COLUMNS = CORRIDOR_CENTRAL_END-CORRIDOR_CENTRAL_FIRST-2, error, "entity spawn columns must derive from the central corridor"
 .assert ENTITY_CORRIDOR_COLUMNS = 22, error, "debris RNG reduction assumes 22 interior corridor columns"
 .assert ENTITY_CORRIDOR_FIRST_COLUMN = ENTITY_CORRIDOR_SOURCE_FIRST_COLUMN, error, "entity source corridor left edge diverged"
@@ -701,7 +701,7 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert WEAPON_PICKUP_SPREAD_GLYPH_BASE = 120, error, "all pickup types must share the phased glyph bank"
 .assert WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE, error, "all pickup types must share the phased glyph bank"
 .assert WEAPON_PICKUP_SHIELD_GLYPH_BYTES = WEAPON_PICKUP_SPREAD_GLYPH_BYTES, error, "Shared pickup glyph banks must have identical footprints"
-.assert VIPER_COMPOSITE_GLYPH_BASE+VIPER_PROJECTILE_SLOT_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "slot-owned Viper composite glyphs overlap capital hulls"
+.assert PLAYER_FIGHTER_COMPOSITE_GLYPH_BASE+PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "slot-owned PlayerFighter composite glyphs overlap capital hulls"
 .assert ENTITY_ACTIVE_LIMIT = 2, error, "debris and the fixed weapon-pickup slot must coexist"
 .assert EFFECT_ACTIVE_LIMIT = 5, error, "debris destruction requires one core and four fragments"
 .assert HUD_TOP = 8, error, "HUD must begin at the first active ANTIC scanline"
@@ -712,43 +712,43 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert GAMEPLAY_DIVIDER_SCREEN = $4028, error, "divider LMS address changed"
 .assert GAMEPLAY_RING_SCREEN = $8140, error, "expanded ring must reuse reviewed post-loader RAM"
 .assert GAMEPLAY_RING_SCREEN+PLAYFIELD_RING_ROWS*40 = GAMEPLAY_RING_SCREEN_END, error, "27-row ring extent changed"
-.assert PLAYER_RESPAWN_Y = 225, error, "respawn must place the final opaque Viper row at scanline 239"
-.assert VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "Viper phase glyphs overlap capital hulls"
-.assert RAIDER_PROJECTILE_GLYPH_BASE >= CAPITAL_HULL_GLYPH_BASE+CAPITAL_HULL_GLYPH_COUNT, error, "Raider phase glyphs overlap capital hulls"
-.assert RAIDER_PROJECTILE_GLYPH_BASE+RAIDER_PROJECTILE_GLYPH_COUNT <= 128, error, "Raider phase glyphs exceed the charset"
+.assert PLAYER_RESPAWN_Y = 225, error, "respawn must place the final opaque PlayerFighter row at scanline 239"
+.assert PLAYER_FIGHTER_PROJECTILE_GLYPH_BASE+PLAYER_FIGHTER_PROJECTILE_GLYPH_COUNT <= CAPITAL_HULL_GLYPH_BASE, error, "PlayerFighter phase glyphs overlap capital hulls"
+.assert INTERCEPTOR_PROJECTILE_GLYPH_BASE >= CAPITAL_HULL_GLYPH_BASE+CAPITAL_HULL_GLYPH_COUNT, error, "Interceptor phase glyphs overlap capital hulls"
+.assert INTERCEPTOR_PROJECTILE_GLYPH_BASE+INTERCEPTOR_PROJECTILE_GLYPH_COUNT <= 128, error, "Interceptor phase glyphs exceed the charset"
 .assert RESPAWN_INVULNERABLE_FRAMES = 250, error, "respawn invulnerability must be exactly five PAL seconds"
 .assert RESPAWN_BLINK_HALF_PERIOD_FRAMES = 8, error, "respawn blink must toggle every eight PAL frames"
 .assert BROADSIDE_WARNING_PULSE_FRAMES = 2, error, "warning pulse routine requires two-frame groups"
 .assert CAPITAL_HULL_CONTACT_DAMAGE = BROADSIDE_PLAYER_DAMAGE, error, "contact damage must use shared 20-point path"
 .assert CAPITAL_HULL_CONTACT_COOLDOWN = BROADSIDE_DAMAGE_COOLDOWN, error, "contact cooldown must use shared damage gate"
 .assert BROADSIDE_PLAYER_DAMAGE = 20, error, "capital and hull contact damage must remain 20"
-.assert ENEMY_SINGLE_PULSE_DAMAGE = 10, error, "Raider single-pulse damage must remain 10"
+.assert ENEMY_SINGLE_PULSE_DAMAGE = 10, error, "Interceptor single-pulse damage must remain 10"
 .assert CAPITAL_DAMAGE_UNITS*10 = BROADSIDE_PLAYER_DAMAGE, error, "capital damage scale changed"
 .assert ENEMY_PULSE_DAMAGE_UNITS*10 = ENEMY_SINGLE_PULSE_DAMAGE, error, "pulse damage scale changed"
 .assert DEBRIS_DAMAGE_EASY = 2, error, "EASY debris contact must remove two HULL units"
 .assert DEBRIS_DAMAGE_MEDIUM = 5, error, "MEDIUM debris contact must remove five HULL units"
 .assert DEBRIS_DAMAGE_HARD = 7, error, "HARD debris contact must remove seven HULL units"
-.assert ENEMY_PULSE_POOL_SLOTS = RAIDER_PROJECTILE_SLOT_COUNT, error, "Raider pool definitions diverged"
-.assert ENEMY_PULSE_BURST_COUNT = RAIDER_BURST_COUNT, error, "Raider burst definitions diverged"
-.assert ENEMY_PULSE_BURST_INTERVAL = RAIDER_BURST_INTERVAL, error, "Raider interval definitions diverged"
-.assert ENEMY_PULSE_SPEED = RAIDER_PROJECTILE_SPEED, error, "Raider projectile speeds diverged"
-.assert ENEMY_PULSE_COLOR = RAIDER_PROJECTILE_COLOR, error, "Raider playfield colours diverged"
+.assert ENEMY_PULSE_POOL_SLOTS = INTERCEPTOR_PROJECTILE_SLOT_COUNT, error, "Interceptor pool definitions diverged"
+.assert ENEMY_PULSE_BURST_COUNT = INTERCEPTOR_BURST_COUNT, error, "Interceptor burst definitions diverged"
+.assert ENEMY_PULSE_BURST_INTERVAL = INTERCEPTOR_BURST_INTERVAL, error, "Interceptor interval definitions diverged"
+.assert ENEMY_PULSE_SPEED = INTERCEPTOR_PROJECTILE_SPEED, error, "Interceptor projectile speeds diverged"
+.assert ENEMY_PULSE_COLOR = INTERCEPTOR_PROJECTILE_COLOR, error, "Interceptor playfield colours diverged"
 .assert SHARED_FIGHTER_EXPLOSION_FRAME_COUNT = 6, error, "shared fighter explosion needs six phases"
 .assert SHARED_FIGHTER_EXPLOSION_FRAME_DURATION = 4, error, "fighter explosion phase must last four PAL frames"
 .assert SHARED_FIGHTER_EXPLOSION_TOTAL = 24, error, "fighter explosion must last exactly 24 PAL frames"
-.assert RAIDER_HORIZONTAL_ACCELERATION = 1, error, "Raider acceleration hot path assumes one HPOS unit"
-.assert RAIDER_MAX_HORIZONTAL_VELOCITY = 1, error, "Raider velocity state is bounded to -1/0/+1"
-.assert VIPER_HORIZONTAL_STEP_HPOS = 2, error, "Viper lateral reference must remain two HPOS per PAL frame"
-.assert RAIDER_HORIZONTAL_STEP_HPOS = VIPER_HORIZONTAL_STEP_HPOS, error, "fighter step units diverged"
-.assert RAIDER_SPEED_NUMERATOR*5 = RAIDER_SPEED_DENOMINATOR*4, error, "Raider maximum speed must remain exactly 4/5 of Viper"
-.assert RAIDER_SPEED_NUMERATOR < RAIDER_SPEED_DENOMINATOR, error, "Raider fractional rate must skip at least one frame"
+.assert INTERCEPTOR_HORIZONTAL_ACCELERATION = 1, error, "Interceptor acceleration hot path assumes one HPOS unit"
+.assert INTERCEPTOR_MAX_HORIZONTAL_VELOCITY = 1, error, "Interceptor velocity state is bounded to -1/0/+1"
+.assert PLAYER_FIGHTER_HORIZONTAL_STEP_HPOS = 2, error, "PlayerFighter lateral reference must remain two HPOS per PAL frame"
+.assert INTERCEPTOR_HORIZONTAL_STEP_HPOS = PLAYER_FIGHTER_HORIZONTAL_STEP_HPOS, error, "fighter step units diverged"
+.assert INTERCEPTOR_SPEED_NUMERATOR*5 = INTERCEPTOR_SPEED_DENOMINATOR*4, error, "Interceptor maximum speed must remain exactly 4/5 of PlayerFighter"
+.assert INTERCEPTOR_SPEED_NUMERATOR < INTERCEPTOR_SPEED_DENOMINATOR, error, "Interceptor fractional rate must skip at least one frame"
 .assert WORLD_SCROLL_RATE_EASY = HULL_SCROLL_RATE_EASY, error, "world/hull easy cadence must remain phase-aligned"
 .assert WORLD_SCROLL_RATE_MEDIUM = HULL_SCROLL_RATE_MEDIUM, error, "world/hull medium cadence must remain phase-aligned"
 .assert WORLD_SCROLL_RATE_HARD = HULL_SCROLL_RATE_HARD, error, "world/hull hard cadence must remain phase-aligned"
 .assert WORLD_SCROLL_RATE_HARD*2 <= WORLD_SCROLL_RATE_DENOMINATOR, error, "hard cadence must leave one light frame for LMS prebuild"
-.assert RAIDER_WEAVE_PERIOD_FRAMES = 32, error, "Raider weave hot path assumes a 32-frame period"
-.assert RAIDER_ATTACK_ACTIVE_TOP = GAMEPLAY_TOP, error, "Raider pursuit begins at the gameplay viewport"
-.assert RAIDER_ATTACK_ACTIVE_BOTTOM = GAMEPLAY_BOTTOM, error, "Raider pursuit ends at the gameplay viewport"
+.assert INTERCEPTOR_WEAVE_PERIOD_FRAMES = 32, error, "Interceptor weave hot path assumes a 32-frame period"
+.assert INTERCEPTOR_ATTACK_ACTIVE_TOP = GAMEPLAY_TOP, error, "Interceptor pursuit begins at the gameplay viewport"
+.assert INTERCEPTOR_ATTACK_ACTIVE_BOTTOM = GAMEPLAY_BOTTOM, error, "Interceptor pursuit ends at the gameplay viewport"
 
 .segment "ZEROPAGE"
 
@@ -798,12 +798,12 @@ FIGHTER_PROJECTILE_SCREEN_LO:     .res FIGHTER_PROJECTILE_SLOT_COUNT
 FIGHTER_PROJECTILE_SCREEN_HI:     .res FIGHTER_PROJECTILE_SLOT_COUNT
 FIGHTER_PROJECTILE_BACKUP_TOP:    .res FIGHTER_PROJECTILE_SLOT_COUNT
 FIGHTER_PROJECTILE_BACKUP_BOTTOM: .res FIGHTER_PROJECTILE_SLOT_COUNT
-VIPER_BURST_STATE:                .res 1
-VIPER_BURST_REMAINING:            .res 1
-VIPER_BURST_TIMER:                .res 1
-RAIDER_BURST_STATE:               .res 1
-RAIDER_BURST_REMAINING:           .res 1
-RAIDER_BURST_TIMER:               .res 1
+PLAYER_FIGHTER_BURST_STATE:                .res 1
+PLAYER_FIGHTER_BURST_REMAINING:            .res 1
+PLAYER_FIGHTER_BURST_TIMER:                .res 1
+INTERCEPTOR_BURST_STATE:               .res 1
+INTERCEPTOR_BURST_REMAINING:           .res 1
+INTERCEPTOR_BURST_TIMER:               .res 1
 FIGHTER_EXPLOSION_TIMER:          .res SHARED_FIGHTER_EXPLOSION_SLOT_COUNT
 FIGHTER_EXPLOSION_X:              .res SHARED_FIGHTER_EXPLOSION_SLOT_COUNT
 FIGHTER_EXPLOSION_Y:              .res SHARED_FIGHTER_EXPLOSION_SLOT_COUNT
@@ -1685,7 +1685,7 @@ render_frontend_state:
 
 .segment "ENTITY_CODE"
 
-; Static H3.1 structure and six-glyph ANTIC 4 Viper. This runs once with DMA
+; Static H3.1 structure and six-glyph ANTIC 4 PlayerFighter. This runs once with DMA
 ; disabled and never enters the gameplay hot path.
 draw_main_menu_scene:
     lda #CH_FRONT_LINE
@@ -1696,17 +1696,17 @@ draw_main_menu_scene:
     dex
     bpl @line
     ldx #$00
-@viper:
+@player_fighter:
     txa
     clc
-    adc #CH_FRONT_VIPER_TOP_LEFT
-    sta SCREEN+MAIN_MENU_VIPER_TOP_OFFSET+18,x
+    adc #CH_FRONT_PLAYER_FIGHTER_TOP_LEFT
+    sta SCREEN+MAIN_MENU_PLAYER_FIGHTER_TOP_OFFSET+18,x
     clc
     adc #$03
-    sta SCREEN+MAIN_MENU_VIPER_BOTTOM_OFFSET+18,x
+    sta SCREEN+MAIN_MENU_PLAYER_FIGHTER_BOTTOM_OFFSET+18,x
     inx
     cpx #$03
-    bne @viper
+    bne @player_fighter
     rts
 
 .segment "ENTITY_CODE"
@@ -2306,10 +2306,10 @@ profile_after_enemy = *
     sta BROAD_DAMAGE_APPLIED
     jsr handle_collisions
 profile_after_collisions = *
-    jsr update_viper_weapon
-profile_after_viper_weapon = *
+    jsr update_player_fighter_weapon
+profile_after_player_fighter_weapon = *
     jsr integration_update_enemy_weapon
-profile_after_raider_weapon = *
+profile_after_interceptor_weapon = *
     jsr update_starfield
     jsr tick_star_twinkle
     jsr render_far_star_overlays_if_needed
@@ -2353,8 +2353,8 @@ main_loop_active = main_loop+14
 .export frontend_input_poll, main_loop_option_poll, main_loop_active
 .export profile_after_entity_erase, profile_after_projectile_erase
 .export profile_after_capsule, profile_after_frame_visuals, profile_after_player
-.export profile_after_enemy, profile_after_collisions, profile_after_viper_weapon
-.export profile_after_raider_weapon, profile_after_world, profile_after_hull_contact
+.export profile_after_enemy, profile_after_collisions, profile_after_player_fighter_weapon
+.export profile_after_interceptor_weapon, profile_after_world, profile_after_hull_contact
 .export profile_after_entity_update, profile_after_effect_visuals
 .export profile_after_broadside_render, profile_after_projectile_render
 .export profile_after_entity_render, profile_after_sector, profile_after_audio
@@ -2877,7 +2877,7 @@ init_state:
 
     lda #$00
     sta enemy_velocity_x
-    sta RAIDER_MOVE_ACCUMULATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
     lda #$A7
     sta rng_state
     lda #STAR_GENERATION_SEED
@@ -3405,7 +3405,7 @@ read_input:
     rts
 @fire_ready:
     ; The burst controller samples held FIRE after collision/movement updates.
-    ; Released shots never inherit later Viper motion.
+    ; Released shots never inherit later PlayerFighter motion.
 @done:
     rts
 
@@ -3455,13 +3455,13 @@ begin_player_fighter_explosion:
     lda player_x
     sec
     sbc #((SHARED_FIGHTER_EXPLOSION_WIDTH_BITS*2-PLAYER_COLLISION_WIDTH)/2)
-    sta FIGHTER_EXPLOSION_X+FIGHTER_EXPLOSION_VIPER_SLOT
+    sta FIGHTER_EXPLOSION_X+FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT
     lda player_y
     clc
     adc #((PLAYER_H-SHARED_FIGHTER_EXPLOSION_HEIGHT)/2)
-    sta FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_VIPER_SLOT
+    sta FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT
     lda #SHARED_FIGHTER_EXPLOSION_TOTAL
-    sta FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_VIPER_SLOT
+    sta FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT
     rts
 
 tick_shared_fighter_explosions:
@@ -3475,7 +3475,7 @@ tick_shared_fighter_explosions:
     cpx #FIGHTER_EXPLOSION_ENEMY_SLOT
     bne @tick
     lda #ENEMY_RUNTIME_BODY_COLOR
-    sta COLPM1                 ; restore the Raider body as its explosion expires
+    sta COLPM1                 ; restore the Interceptor body as its explosion expires
 @tick:
     dec FIGHTER_EXPLOSION_TIMER,x
 @next:
@@ -3483,11 +3483,11 @@ tick_shared_fighter_explosions:
     bpl @slot
     rts
 
-fire_bullet = allocate_viper_projectile
+fire_bullet = allocate_player_fighter_projectile
 update_bullet = update_fighter_projectiles
 
 erase_bullet:
-    jmp clear_viper_projectiles
+    jmp clear_player_fighter_projectiles
 
 ; Nineteen fixed playfield slots provide independent launch positions without
 ; consuming M0 or the three capital-warning missiles. Shared precomputed phase
@@ -3505,43 +3505,43 @@ init_fighter_projectiles:
     inx
     cpx #(FIGHTER_PROJECTILE_STATE_END-FIGHTER_PROJECTILE_ACTIVE)
     bne @state
-    ; Glyphs 16-46 already contain Viper phases 5-35 in the canonical charset
+    ; Glyphs 16-46 already contain PlayerFighter phases 5-35 in the canonical charset
     ; image. Preserve frontend graphics 11-15 by copying their five replacement
     ; phases from otherwise unused source glyphs 47-51 after frontend setup.
     ldx #(5*8-1)
-@viper_glyph_head:
-    lda viper_projectile_glyph_head,x
-    sta CHARSET+VIPER_PROJECTILE_GLYPH_BASE*8,x
+@player_fighter_glyph_head:
+    lda player_fighter_projectile_glyph_head,x
+    sta CHARSET+PLAYER_FIGHTER_PROJECTILE_GLYPH_BASE*8,x
     dex
-    bpl @viper_glyph_head
-    jsr build_raider_projectile_glyphs
+    bpl @player_fighter_glyph_head
+    jsr build_interceptor_projectile_glyphs
     jmp build_star_glyphs
 
 clear_fighter_projectiles:
     ; Teardown composes the two owner-specific clears. The first reverse erase
     ; restores every backed slot; the second sees zero rendered latches, while
     ; both burst controllers retain their former byte-exact reset semantics.
-    jsr clear_viper_projectiles
-    jsr clear_raider_projectiles
+    jsr clear_player_fighter_projectiles
+    jsr clear_interceptor_projectiles
     lda #$00
-    sta RAIDER_MOVE_ACCUMULATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
     rts
 
-clear_viper_projectiles:
+clear_player_fighter_projectiles:
     jsr erase_fighter_projectile_overlays
     lda #$00
-    ldx #(VIPER_PROJECTILE_SLOT_COUNT-1)
+    ldx #(PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT-1)
 @slot:
     sta FIGHTER_PROJECTILE_ACTIVE,x
     sta FIGHTER_PROJECTILE_RENDERED,x
     dex
     bpl @slot
-    sta VIPER_BURST_STATE
-    sta VIPER_BURST_REMAINING
-    sta VIPER_BURST_TIMER
+    sta PLAYER_FIGHTER_BURST_STATE
+    sta PLAYER_FIGHTER_BURST_REMAINING
+    sta PLAYER_FIGHTER_BURST_TIMER
     rts
 
-clear_raider_projectiles:
+clear_interceptor_projectiles:
     jsr erase_fighter_projectile_overlays
     lda #$00
     ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
@@ -3549,15 +3549,15 @@ clear_raider_projectiles:
     sta FIGHTER_PROJECTILE_ACTIVE,x
     sta FIGHTER_PROJECTILE_RENDERED,x
     dex
-    cpx #(RAIDER_PROJECTILE_SLOT_BASE-1)
+    cpx #(INTERCEPTOR_PROJECTILE_SLOT_BASE-1)
     bne @slot
-    sta RAIDER_BURST_STATE
-    sta RAIDER_BURST_REMAINING
-    sta RAIDER_BURST_TIMER
+    sta INTERCEPTOR_BURST_STATE
+    sta INTERCEPTOR_BURST_REMAINING
+    sta INTERCEPTOR_BURST_TIMER
     rts
 
 erase_fighter_projectile_overlays:
-    lda #(9-RAIDER_PROJECTILE_HEIGHT)
+    lda #(9-INTERCEPTOR_PROJECTILE_HEIGHT)
     sta loader_repeat_value
     ldx #(FIGHTER_PROJECTILE_SLOT_COUNT-1)
 erase_fighter_projectile_slot = *
@@ -3588,9 +3588,9 @@ erase_fighter_projectile_slot = *
 @next:
     dex
     bmi @done
-    cpx #(RAIDER_PROJECTILE_SLOT_BASE-1)
+    cpx #(INTERCEPTOR_PROJECTILE_SLOT_BASE-1)
     bne @slot
-    lda #(9-VIPER_PROJECTILE_HEIGHT)
+    lda #(9-PLAYER_FIGHTER_PROJECTILE_HEIGHT)
     sta loader_repeat_value
     bne @slot
 @done:
@@ -3600,91 +3600,91 @@ erase_fighter_projectile_slot = *
 
 update_fighter_projectiles:
     ldx #$00
-@viper_slot:
+@player_fighter_slot:
     lda FIGHTER_PROJECTILE_ACTIVE,x
-    beq @viper_next
+    beq @player_fighter_next
     dec FIGHTER_PROJECTILE_LIFETIME,x
-    beq @viper_free
+    beq @player_fighter_free
     lda FIGHTER_PROJECTILE_Y,x
     sta FIGHTER_PROJECTILE_PREV_Y,x
-    cmp #(GAMEPLAY_TOP+VIPER_PROJECTILE_SPEED)
-    bcc @viper_free
+    cmp #(GAMEPLAY_TOP+PLAYER_FIGHTER_PROJECTILE_SPEED)
+    bcc @player_fighter_free
     sec
-    sbc #VIPER_PROJECTILE_SPEED
+    sbc #PLAYER_FIGHTER_PROJECTILE_SPEED
     sta FIGHTER_PROJECTILE_Y,x
     lda FIGHTER_PROJECTILE_ACTIVE,x
     and #FIGHTER_PROJECTILE_SPREAD_DIRECTION_MASK
-    beq @viper_target
+    beq @player_fighter_target
     lda FIGHTER_PROJECTILE_LIFETIME,x
-    and #(VIPER_SPREAD_LATERAL_PERIOD-1)
-    bne @viper_target
+    and #(PLAYER_FIGHTER_SPREAD_LATERAL_PERIOD-1)
+    bne @player_fighter_target
     lda FIGHTER_PROJECTILE_ACTIVE,x
     and #FIGHTER_PROJECTILE_SPREAD_DIRECTION_MASK
     cmp #FIGHTER_PROJECTILE_SPREAD_LEFT
-    bne @viper_spread_right
+    bne @player_fighter_spread_right
     lda FIGHTER_PROJECTILE_X,x
-    cmp #(GAMEPLAY_LEFT_HPOS+VIPER_SPREAD_LATERAL_STEP)
-    bcc @viper_free
-    sbc #VIPER_SPREAD_LATERAL_STEP
+    cmp #(GAMEPLAY_LEFT_HPOS+PLAYER_FIGHTER_SPREAD_LATERAL_STEP)
+    bcc @player_fighter_free
+    sbc #PLAYER_FIGHTER_SPREAD_LATERAL_STEP
     sta FIGHTER_PROJECTILE_X,x
-    bcs @viper_target
-@viper_spread_right:
+    bcs @player_fighter_target
+@player_fighter_spread_right:
     lda FIGHTER_PROJECTILE_X,x
-    cmp #(GAMEPLAY_LEFT_HPOS+GAMEPLAY_SCREEN_COLUMNS*4-VIPER_SPREAD_LATERAL_STEP)
-    bcs @viper_free
-    adc #VIPER_SPREAD_LATERAL_STEP
+    cmp #(GAMEPLAY_LEFT_HPOS+GAMEPLAY_SCREEN_COLUMNS*4-PLAYER_FIGHTER_SPREAD_LATERAL_STEP)
+    bcs @player_fighter_free
+    adc #PLAYER_FIGHTER_SPREAD_LATERAL_STEP
     sta FIGHTER_PROJECTILE_X,x
-@viper_target:
-    jsr entity_viper_projectile_target
-    bcc @viper_next
+@player_fighter_target:
+    jsr entity_player_fighter_projectile_target
+    bcc @player_fighter_next
     lda #$01
     ldy #DAMAGE_PLAYER_PROJECTILE
     jsr queue_enemy_damage
-@viper_free:
+@player_fighter_free:
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
-@viper_next:
+@player_fighter_next:
     inx
-    cpx #VIPER_PROJECTILE_SLOT_COUNT
-    bne @viper_slot
+    cpx #PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT
+    bne @player_fighter_slot
 
-profile_raider_projectile_update_begin = *
-    ldx #RAIDER_PROJECTILE_SLOT_BASE
-@raider_slot:
+profile_interceptor_projectile_update_begin = *
+    ldx #INTERCEPTOR_PROJECTILE_SLOT_BASE
+@interceptor_slot:
     lda FIGHTER_PROJECTILE_ACTIVE,x
-    beq @raider_next
+    beq @interceptor_next
     dec FIGHTER_PROJECTILE_LIFETIME,x
-    beq @raider_free
+    beq @interceptor_free
     lda FIGHTER_PROJECTILE_Y,x
     sta FIGHTER_PROJECTILE_PREV_Y,x
     clc
-    adc #RAIDER_PROJECTILE_SPEED
+    adc #INTERCEPTOR_PROJECTILE_SPEED
     sta FIGHTER_PROJECTILE_Y,x
     clc
-    adc #RAIDER_PROJECTILE_HEIGHT
+    adc #INTERCEPTOR_PROJECTILE_HEIGHT
     cmp #(GAMEPLAY_BOTTOM+1)
-    bcs @raider_free
-    jsr raider_projectile_hits_player
-    bcc @raider_next
+    bcs @interceptor_free
+    jsr interceptor_projectile_hits_player
+    bcc @interceptor_next
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
     lda #ENEMY_PULSE_DAMAGE_UNITS
     stx BROAD_WORK_SLOT
     jsr apply_player_damage
     ldx BROAD_WORK_SLOT
-    jmp @raider_next
-@raider_free:
+    jmp @interceptor_next
+@interceptor_free:
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
-@raider_next:
+@interceptor_next:
     inx
     cpx #FIGHTER_PROJECTILE_SLOT_COUNT
-    bne @raider_slot
+    bne @interceptor_slot
     rts
 
-.export profile_raider_projectile_update_begin
+.export profile_interceptor_projectile_update_begin
 
-viper_projectile_hits_enemy:
+player_fighter_projectile_hits_enemy:
     lda ENEMY_ACTIVE
     cmp #ENEMY_ACTIVE_STATE
     bne @miss
@@ -3699,7 +3699,7 @@ viper_projectile_hits_enemy:
     sbc enemy_y
     cmp enemy_frame_heights,y
     bcc @hit
-    cmp #(256-(VIPER_PROJECTILE_SPEED+VIPER_PROJECTILE_HEIGHT-1))
+    cmp #(256-(PLAYER_FIGHTER_PROJECTILE_SPEED+PLAYER_FIGHTER_PROJECTILE_HEIGHT-1))
     bcc @miss
 @hit:
     sec
@@ -3708,13 +3708,13 @@ viper_projectile_hits_enemy:
     clc
     rts
 
-raider_projectile_hits_player:
+interceptor_projectile_hits_player:
     lda FIGHTER_PROJECTILE_X,x
     sec
     sbc player_x
     cmp #PLAYER_COLLISION_WIDTH
     bcc @horizontal_overlap
-    cmp #(256-(RAIDER_PROJECTILE_WIDTH_HPOS-1))
+    cmp #(256-(INTERCEPTOR_PROJECTILE_WIDTH_HPOS-1))
     bcc @miss
 @horizontal_overlap:
     lda FIGHTER_PROJECTILE_PREV_Y,x
@@ -3722,7 +3722,7 @@ raider_projectile_hits_player:
     sbc player_y
     cmp #(PLAYER_COLLISION_LAST_ROW+1)
     bcc @hit
-    cmp #(256-(RAIDER_PROJECTILE_SPEED+RAIDER_PROJECTILE_HEIGHT-1))
+    cmp #(256-(INTERCEPTOR_PROJECTILE_SPEED+INTERCEPTOR_PROJECTILE_HEIGHT-1))
     bcc @miss
 @hit:
     sec
@@ -3731,7 +3731,7 @@ raider_projectile_hits_player:
     clc
     rts
 
-update_viper_weapon:
+update_player_fighter_weapon:
     lda PLAYER_LIFECYCLE
     cmp #PLAYER_DYING
     beq @released
@@ -3741,72 +3741,72 @@ update_viper_weapon:
     beq @released
     lda TRIG0
     bne @released
-    lda VIPER_BURST_STATE
+    lda PLAYER_FIGHTER_BURST_STATE
     cmp #WEAPON_BURST_FIRING
     beq @firing
     cmp #WEAPON_BURST_POST
     beq @post
 @begin:
     lda #WEAPON_BURST_FIRING
-    sta VIPER_BURST_STATE
+    sta PLAYER_FIGHTER_BURST_STATE
     lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
-    and #(VIPER_RAPID_FIRE_BURST_COUNT-VIPER_NORMAL_BURST_COUNT)
-    ora #VIPER_NORMAL_BURST_COUNT
-    sta VIPER_BURST_REMAINING
+    and #(PLAYER_FIGHTER_RAPID_FIRE_BURST_COUNT-PLAYER_FIGHTER_NORMAL_BURST_COUNT)
+    ora #PLAYER_FIGHTER_NORMAL_BURST_COUNT
+    sta PLAYER_FIGHTER_BURST_REMAINING
     lda #$00
-    sta VIPER_BURST_TIMER
+    sta PLAYER_FIGHTER_BURST_TIMER
 @firing:
-    lda VIPER_BURST_TIMER
+    lda PLAYER_FIGHTER_BURST_TIMER
     beq @emit
-    dec VIPER_BURST_TIMER
+    dec PLAYER_FIGHTER_BURST_TIMER
     bne @done
 @emit:
-    jsr allocate_viper_projectile
+    jsr allocate_player_fighter_projectile
     bcc @done                   ; rejected allocation is retried, not counted
-    dec VIPER_BURST_REMAINING
+    dec PLAYER_FIGHTER_BURST_REMAINING
     beq @finish
     ldy ENTITY_STATE+WEAPON_BOOSTER_SLOT
-    lda viper_fire_intervals,y
-    sta VIPER_BURST_TIMER
+    lda player_fighter_fire_intervals,y
+    sta PLAYER_FIGHTER_BURST_TIMER
     rts
 @finish:
     lda #WEAPON_BURST_POST
-    sta VIPER_BURST_STATE
-    lda #VIPER_POST_BURST_PAUSE
-    sta VIPER_BURST_TIMER
+    sta PLAYER_FIGHTER_BURST_STATE
+    lda #PLAYER_FIGHTER_POST_BURST_PAUSE
+    sta PLAYER_FIGHTER_BURST_TIMER
     rts
 @post:
-    dec VIPER_BURST_TIMER
+    dec PLAYER_FIGHTER_BURST_TIMER
     bne @done
     jmp @begin
 @released:
     lda #WEAPON_BURST_WAITING
-    sta VIPER_BURST_STATE
+    sta PLAYER_FIGHTER_BURST_STATE
     lda #$00
-    sta VIPER_BURST_REMAINING
-    sta VIPER_BURST_TIMER
+    sta PLAYER_FIGHTER_BURST_REMAINING
+    sta PLAYER_FIGHTER_BURST_TIMER
 @done:
     rts
 
-viper_fire_intervals:
-    .byte VIPER_BURST_INTERVAL,VIPER_BURST_INTERVAL,VIPER_BURST_INTERVAL
-    .byte VIPER_RAPID_FIRE_INTERVAL,VIPER_SPREAD_COOLDOWN,VIPER_BURST_INTERVAL
+player_fighter_fire_intervals:
+    .byte PLAYER_FIGHTER_BURST_INTERVAL,PLAYER_FIGHTER_BURST_INTERVAL,PLAYER_FIGHTER_BURST_INTERVAL
+    .byte PLAYER_FIGHTER_RAPID_FIRE_INTERVAL,PLAYER_FIGHTER_SPREAD_COOLDOWN,PLAYER_FIGHTER_BURST_INTERVAL
 
-allocate_viper_projectile:
+allocate_player_fighter_projectile:
     ldy ENTITY_STATE+WEAPON_BOOSTER_SLOT
     cpy #WEAPON_PICKUP_STATE_SPREAD
     bne :+
-    jmp allocate_viper_spread_projectiles
+    jmp allocate_player_fighter_spread_projectiles
 :
-    lda #FIGHTER_PROJECTILE_VIPER
-    jsr allocate_viper_projectile_one
+    lda #FIGHTER_PROJECTILE_PLAYER_FIGHTER
+    jsr allocate_player_fighter_projectile_one
     bcs :+
     rts
 :
-    jmp play_viper_projectile_sound
+    jmp play_player_fighter_projectile_sound
 
 .segment "CODE"
-allocate_viper_spread_projectiles:
+allocate_player_fighter_spread_projectiles:
     ldy #$00
     ldx #$00
 @find:
@@ -3815,51 +3815,51 @@ allocate_viper_spread_projectiles:
     txa
     sta ENTITY_SCRATCH0,y
     iny
-    cpy #VIPER_SPREAD_PROJECTILE_COUNT
+    cpy #PLAYER_FIGHTER_SPREAD_PROJECTILE_COUNT
     beq @allocate_full
 @next:
     inx
-    cpx #VIPER_PROJECTILE_SLOT_COUNT
+    cpx #PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT
     bne @find
     cpy #$00
-    beq allocate_viper_projectile_rejected
+    beq allocate_player_fighter_projectile_rejected
     ; Transitional saturation always admits the centre. Two remaining slots
     ; are useful only as an atomic pair, so one unpaired side slot stays free.
     ldx ENTITY_SCRATCH0
     lda #FIGHTER_PROJECTILE_RENDER_ID_SPREAD_CENTER
-    jsr allocate_viper_projectile_at_slot
-    jmp play_viper_projectile_sound
+    jsr allocate_player_fighter_projectile_at_slot
+    jmp play_player_fighter_projectile_sound
 @allocate_full:
     ldx ENTITY_SCRATCH0
     lda #FIGHTER_PROJECTILE_RENDER_ID_SPREAD_CENTER
-    jsr allocate_viper_projectile_at_slot
+    jsr allocate_player_fighter_projectile_at_slot
     ldx ENTITY_SCRATCH1
     lda #FIGHTER_PROJECTILE_RENDER_ID_SPREAD_LEFT
-    jsr allocate_viper_projectile_at_slot
+    jsr allocate_player_fighter_projectile_at_slot
     ldx ENTITY_SCRATCH2
     lda #FIGHTER_PROJECTILE_RENDER_ID_SPREAD_RIGHT
-    jsr allocate_viper_projectile_at_slot
-    jmp play_viper_projectile_sound
+    jsr allocate_player_fighter_projectile_at_slot
+    jmp play_player_fighter_projectile_sound
 
-allocate_viper_projectile_rejected:
+allocate_player_fighter_projectile_rejected:
     clc
     rts
 
 .segment "CODE"
-allocate_viper_projectile_one:
+allocate_player_fighter_projectile_one:
     sta ENTITY_SCRATCH0
     ldx #$00
 @find:
     lda FIGHTER_PROJECTILE_ACTIVE,x
     beq @allocate
     inx
-    cpx #VIPER_PROJECTILE_SLOT_COUNT
+    cpx #PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT
     bne @find
     clc
     rts
 @allocate:
     lda ENTITY_SCRATCH0
-allocate_viper_projectile_at_slot:
+allocate_player_fighter_projectile_at_slot:
     sta FIGHTER_PROJECTILE_ACTIVE,x
     tay
     lda player_x
@@ -3867,17 +3867,17 @@ allocate_viper_projectile_at_slot:
     adc #(PLAYER_COLLISION_WIDTH/2)
     cpy #FIGHTER_PROJECTILE_RENDER_ID_SPREAD_LEFT
     bne :+
-    sbc #VIPER_SPREAD_INITIAL_OFFSET
+    sbc #PLAYER_FIGHTER_SPREAD_INITIAL_OFFSET
 :
     cpy #FIGHTER_PROJECTILE_RENDER_ID_SPREAD_RIGHT
     bne :+
     clc
-    adc #VIPER_SPREAD_INITIAL_OFFSET
+    adc #PLAYER_FIGHTER_SPREAD_INITIAL_OFFSET
 :
     sta FIGHTER_PROJECTILE_X,x
     lda player_y
     sec
-    sbc #VIPER_PROJECTILE_HEIGHT
+    sbc #PLAYER_FIGHTER_PROJECTILE_HEIGHT
     sta FIGHTER_PROJECTILE_Y,x
     sta FIGHTER_PROJECTILE_PREV_Y,x
     lda #$FF
@@ -3886,7 +3886,7 @@ allocate_viper_projectile_at_slot:
     rts
 
 .segment "CODE"
-play_viper_projectile_sound:
+play_player_fighter_projectile_sound:
     lda sound_enabled
     beq @accepted
     lda #$32
@@ -3903,7 +3903,7 @@ update_enemy_weapon_runtime:
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
     bne @player_state
-    jmp clear_raider_projectiles
+    jmp clear_interceptor_projectiles
 @player_state:
     lda PLAYER_LIFECYCLE
     cmp #PLAYER_DYING
@@ -3924,53 +3924,53 @@ update_enemy_weapon_runtime:
     adc enemy_frame_heights,x
     cmp #(GAMEPLAY_BOTTOM+1)
     bcs @stop
-    lda RAIDER_BURST_STATE
+    lda INTERCEPTOR_BURST_STATE
     cmp #WEAPON_BURST_FIRING
     beq @firing
     cmp #WEAPON_BURST_POST
     beq @post
 @begin:
     lda #WEAPON_BURST_FIRING
-    sta RAIDER_BURST_STATE
-    lda #RAIDER_BURST_COUNT
-    sta RAIDER_BURST_REMAINING
+    sta INTERCEPTOR_BURST_STATE
+    lda #INTERCEPTOR_BURST_COUNT
+    sta INTERCEPTOR_BURST_REMAINING
     lda #$00
-    sta RAIDER_BURST_TIMER
+    sta INTERCEPTOR_BURST_TIMER
 @firing:
-    lda RAIDER_BURST_TIMER
+    lda INTERCEPTOR_BURST_TIMER
     beq @emit
-    dec RAIDER_BURST_TIMER
+    dec INTERCEPTOR_BURST_TIMER
     bne @done
 @emit:
-    jsr allocate_raider_projectile
+    jsr allocate_interceptor_projectile
     bcc @done
-    dec RAIDER_BURST_REMAINING
+    dec INTERCEPTOR_BURST_REMAINING
     beq @finish
-    lda #RAIDER_BURST_INTERVAL
-    sta RAIDER_BURST_TIMER
+    lda #INTERCEPTOR_BURST_INTERVAL
+    sta INTERCEPTOR_BURST_TIMER
     rts
 @finish:
     lda #WEAPON_BURST_POST
-    sta RAIDER_BURST_STATE
+    sta INTERCEPTOR_BURST_STATE
     ldx DIFFICULTY_SETTING
-    lda raider_post_burst_frames,x
-    sta RAIDER_BURST_TIMER
+    lda interceptor_post_burst_frames,x
+    sta INTERCEPTOR_BURST_TIMER
     rts
 @post:
-    dec RAIDER_BURST_TIMER
+    dec INTERCEPTOR_BURST_TIMER
     bne @done
     jmp @begin
 @stop:
     lda #WEAPON_BURST_WAITING
-    sta RAIDER_BURST_STATE
+    sta INTERCEPTOR_BURST_STATE
     lda #$00
-    sta RAIDER_BURST_REMAINING
-    sta RAIDER_BURST_TIMER
+    sta INTERCEPTOR_BURST_REMAINING
+    sta INTERCEPTOR_BURST_TIMER
 @done:
     rts
 
-allocate_raider_projectile:
-    ldx #RAIDER_PROJECTILE_SLOT_BASE
+allocate_interceptor_projectile:
+    ldx #INTERCEPTOR_PROJECTILE_SLOT_BASE
 @find:
     lda FIGHTER_PROJECTILE_ACTIVE,x
     beq @allocate
@@ -3980,7 +3980,7 @@ allocate_raider_projectile:
     clc
     rts
 @allocate:
-    lda #FIGHTER_PROJECTILE_RAIDER
+    lda #FIGHTER_PROJECTILE_INTERCEPTOR
     sta FIGHTER_PROJECTILE_ACTIVE,x
     stx BROAD_WORK_SLOT
     ldy ENEMY_ARCHETYPE
@@ -3989,7 +3989,7 @@ allocate_raider_projectile:
     clc
     adc enemy_x
     sec
-    sbc #(RAIDER_PROJECTILE_WIDTH_HPOS/2)
+    sbc #(INTERCEPTOR_PROJECTILE_WIDTH_HPOS/2)
     and #$FE                    ; two-pixel red core stays inside one ANTIC cell
     ldx BROAD_WORK_SLOT
     sta FIGHTER_PROJECTILE_X,x
@@ -3999,7 +3999,7 @@ allocate_raider_projectile:
     adc enemy_projectile_spawn_y_offsets,y
     sta FIGHTER_PROJECTILE_Y,x
     sta FIGHTER_PROJECTILE_PREV_Y,x
-    lda #RAIDER_PROJECTILE_LIFETIME
+    lda #INTERCEPTOR_PROJECTILE_LIFETIME
     sta FIGHTER_PROJECTILE_LIFETIME,x
     sec
     rts
@@ -4019,16 +4019,16 @@ render_fighter_projectile_slot_loop:
     lda FIGHTER_PROJECTILE_Y,x
     and #$07
     sta row_counter
-    cpx #RAIDER_PROJECTILE_SLOT_BASE
-    bcs @raider_code
+    cpx #INTERCEPTOR_PROJECTILE_SLOT_BASE
+    bcs @interceptor_code
     lda FIGHTER_PROJECTILE_X,x
     and #$02                    ; allocation and two-HPOS movement keep even X
     beq :+
-    lda #(VIPER_PROJECTILE_GLYPH_STRIDE*2)
+    lda #(PLAYER_FIGHTER_PROJECTILE_GLYPH_STRIDE*2)
 :
     clc
     adc row_counter
-    adc #VIPER_PROJECTILE_GLYPH_BASE
+    adc #PLAYER_FIGHTER_PROJECTILE_GLYPH_BASE
     sta loader_repeat_value
     lda #$00
     sta src_ptr+1
@@ -4040,15 +4040,15 @@ render_fighter_projectile_slot_loop:
     adc #$01
     sta src_ptr+1
     bne @code_ready
-@raider_code:
+@interceptor_code:
     lda FIGHTER_PROJECTILE_X,x
-    and #$02                    ; Raider allocation explicitly masks bit zero
+    and #$02                    ; Interceptor allocation explicitly masks bit zero
     beq :+
-    lda #RAIDER_PROJECTILE_GLYPH_STRIDE
+    lda #INTERCEPTOR_PROJECTILE_GLYPH_STRIDE
 :
     clc
     adc row_counter
-    adc #RAIDER_PROJECTILE_GLYPH_BASE
+    adc #INTERCEPTOR_PROJECTILE_GLYPH_BASE
     ora #$80
     sta loader_repeat_value
     lda #$00
@@ -4107,7 +4107,7 @@ profile_projectile_pointer_end = *
     ldy #$00
     lda (dst_ptr),y
     sta FIGHTER_PROJECTILE_BACKUP_TOP,x
-    cpx #RAIDER_PROJECTILE_SLOT_BASE
+    cpx #INTERCEPTOR_PROJECTILE_SLOT_BASE
     bcs @draw_top
     cmp #CH_SPACE
     beq @draw_top
@@ -4115,7 +4115,7 @@ profile_projectile_pointer_end = *
     and #FIGHTER_PROJECTILE_SPREAD_TYPE_MASK
     beq @draw_top
     lda FIGHTER_PROJECTILE_BACKUP_TOP,x
-    jsr compose_viper_projectile_glyph
+    jsr compose_player_fighter_projectile_glyph
     lda FIGHTER_PROJECTILE_SCREEN_LO,x
     sta dst_ptr
     lda FIGHTER_PROJECTILE_SCREEN_HI,x
@@ -4155,28 +4155,28 @@ render_fighter_projectile_next:
 ; The red pulse bank is a regular three-scanline shape at two horizontal
 ; phases. Building its twenty glyphs once saves 160 resident source bytes while
 ; producing the exact same charset bytes consumed by the release renderer.
-build_raider_projectile_glyphs:
+build_interceptor_projectile_glyphs:
     lda #$00
     ldx #$00
 @clear:
-    sta CHARSET+RAIDER_PROJECTILE_GLYPH_BASE*8,x
+    sta CHARSET+INTERCEPTOR_PROJECTILE_GLYPH_BASE*8,x
     inx
-    cpx #(RAIDER_PROJECTILE_GLYPH_COUNT*8)
+    cpx #(INTERCEPTOR_PROJECTILE_GLYPH_COUNT*8)
     bne @clear
-    lda #<(CHARSET+RAIDER_PROJECTILE_GLYPH_BASE*8)
+    lda #<(CHARSET+INTERCEPTOR_PROJECTILE_GLYPH_BASE*8)
     sta dst_ptr
-    lda #>(CHARSET+RAIDER_PROJECTILE_GLYPH_BASE*8)
+    lda #>(CHARSET+INTERCEPTOR_PROJECTILE_GLYPH_BASE*8)
     sta dst_ptr+1
     lda #$00
     sta BROAD_WORK_SLOT
 @group:
     ldy BROAD_WORK_SLOT
-    lda raider_projectile_group_masks,y
+    lda interceptor_projectile_group_masks,y
     sta BROAD_WORK_VALUE
     ldx #$00
 @glyph:
-    ldy raider_projectile_start_rows,x
-    lda raider_projectile_row_counts,x
+    ldy interceptor_projectile_start_rows,x
+    lda interceptor_projectile_row_counts,x
     sta row_counter
 @paint:
     lda BROAD_WORK_VALUE
@@ -4200,11 +4200,11 @@ build_raider_projectile_glyphs:
     bne @group
     rts
 
-raider_projectile_group_masks:
+interceptor_projectile_group_masks:
     .byte $F0,$0F
-raider_projectile_start_rows:
+interceptor_projectile_start_rows:
     .byte 0,1,2,3,4,5,6,7,0,0
-raider_projectile_row_counts:
+interceptor_projectile_row_counts:
     .byte 3,3,3,3,3,3,2,1,1,2
 
 begin_enemy_fighter_explosion:
@@ -4237,7 +4237,7 @@ erase_shared_fighter_explosion_slot:
     cpy #GAMEPLAY_BOTTOM
     bcs @advance
     lda #$00
-    cpx #FIGHTER_EXPLOSION_VIPER_SLOT
+    cpx #FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT
     bne @enemy
     sta PLAYER0,y
     sta PLAYER3,y
@@ -4274,7 +4274,7 @@ render_shared_fighter_explosions:
     tax
     ldy BROAD_WORK_SLOT
     lda FIGHTER_EXPLOSION_X,y
-    cpy #FIGHTER_EXPLOSION_VIPER_SLOT
+    cpy #FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT
     bne @enemy_hpos
     sta HPOSP0
     sta HPOSP3
@@ -4330,7 +4330,7 @@ update_enemy:
     beq @reset
     rts
 @reset:
-    jmp integration_raider_recycle
+    jmp integration_interceptor_recycle
 @active:
     cmp #ENEMY_ACTIVE_STATE
     beq @live
@@ -4342,10 +4342,10 @@ update_enemy:
     lda enemy_y
     cmp #GAMEPLAY_BOTTOM
     bcc @horizontal
-    jmp integration_raider_recycle
+    jmp integration_interceptor_recycle
 
 @horizontal:
-    jsr update_raider_soft_pursuit
+    jsr update_interceptor_soft_pursuit
 
 @scanner:
     jsr update_enemy_animation
@@ -4452,7 +4452,7 @@ reset_enemy:
     sta enemy_x
     lda #$00
     sta enemy_velocity_x
-    sta RAIDER_MOVE_ACCUMULATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
     lda #ENEMY_ACTIVE_STATE
     sta ENEMY_ACTIVE
     ldx ENEMY_ARCHETYPE
@@ -4463,17 +4463,17 @@ reset_enemy:
 
 reset_enemy_fire_cooldown:
     lda #WEAPON_BURST_WAITING
-    sta RAIDER_BURST_STATE
+    sta INTERCEPTOR_BURST_STATE
     lda #$00
-    sta RAIDER_BURST_REMAINING
-    sta RAIDER_BURST_TIMER
+    sta INTERCEPTOR_BURST_REMAINING
+    sta INTERCEPTOR_BURST_TIMER
     rts
 
 ; Public lifecycle/tracing names are direct aliases; callers do not need a
 ; three-byte trampoline before the canonical implementations.
 update_enemy_weapon = update_enemy_weapon_runtime
-clear_raider_pulses = clear_raider_projectiles
-.export update_enemy_weapon, clear_raider_pulses
+clear_interceptor_pulses = clear_interceptor_projectiles
+.export update_enemy_weapon, clear_interceptor_pulses
 
 ; The logical coordinate is the first visible HPOS unit, not necessarily the
 ; PMG byte origin. Per-archetype insets and widths keep transparent padding
@@ -4487,7 +4487,7 @@ clamp_enemy_x:
     sta enemy_x
     lda #$00
     sta enemy_velocity_x
-    sta RAIDER_MOVE_ACCUMULATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
     rts
 @right:
     cmp enemy_logical_x_maxs,x
@@ -4497,28 +4497,28 @@ clamp_enemy_x:
     sta enemy_x
     lda #$00
     sta enemy_velocity_x
-    sta RAIDER_MOVE_ACCUMULATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
 @done:
     rts
 
-; The release Raider samples a Viper-centred target every eight PAL frames,
+; The release Interceptor samples a PlayerFighter-centred target every eight PAL frames,
 ; retaining a small deterministic weave. Signed velocity is bounded to
 ; -1/0/+1 direction. Reversal passes through zero for one sample period. The
 ; fractional movement clock advances two HPOS on exactly four of five active
-; frames, giving a maximum 8/10 = 4/5 of Viper lateral speed.
-update_raider_soft_pursuit:
+; frames, giving a maximum 8/10 = 4/5 of PlayerFighter lateral speed.
+update_interceptor_soft_pursuit:
     lda frame_counter
-    and #(RAIDER_TARGET_SAMPLE_INTERVAL-1)
+    and #(INTERCEPTOR_TARGET_SAMPLE_INTERVAL-1)
     bne @move
 
-    ; Signed target delta: Viper centre minus Raider centre, plus weave.
+    ; Signed target delta: PlayerFighter centre minus Interceptor centre, plus weave.
     lda frame_counter
-    and #(RAIDER_WEAVE_PERIOD_FRAMES/2)
+    and #(INTERCEPTOR_WEAVE_PERIOD_FRAMES/2)
     beq @weave_left
-    lda #RAIDER_WEAVE_AMPLITUDE
+    lda #INTERCEPTOR_WEAVE_AMPLITUDE
     bne @have_weave
 @weave_left:
-    lda #($100-RAIDER_WEAVE_AMPLITUDE)
+    lda #($100-INTERCEPTOR_WEAVE_AMPLITUDE)
 @have_weave:
     clc
     adc player_x
@@ -4526,11 +4526,11 @@ update_raider_soft_pursuit:
     sbc enemy_x
     sbc #((ENEMY_RELEASE_VISIBLE_WIDTH-PLAYER_COLLISION_WIDTH)/2)
 @classify:
-    cmp #(RAIDER_TARGET_DEAD_ZONE+1)
+    cmp #(INTERCEPTOR_TARGET_DEAD_ZONE+1)
     bcc @stop
     cmp #$80
     bcc @right
-    cmp #($100-RAIDER_TARGET_DEAD_ZONE)
+    cmp #($100-INTERCEPTOR_TARGET_DEAD_ZONE)
     bcs @stop
 @left:
     lda enemy_velocity_x
@@ -4550,19 +4550,19 @@ update_raider_soft_pursuit:
 @move:
     lda enemy_velocity_x
     bne @accumulate
-    sta RAIDER_MOVE_ACCUMULATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
     rts
 @accumulate:
-    lda RAIDER_MOVE_ACCUMULATOR
+    lda INTERCEPTOR_MOVE_ACCUMULATOR
     clc
-    adc #RAIDER_SPEED_NUMERATOR
-    cmp #RAIDER_SPEED_DENOMINATOR
+    adc #INTERCEPTOR_SPEED_NUMERATOR
+    cmp #INTERCEPTOR_SPEED_DENOMINATOR
     bcs @advance
-    sta RAIDER_MOVE_ACCUMULATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
     rts
 @advance:
-    sbc #RAIDER_SPEED_DENOMINATOR
-    sta RAIDER_MOVE_ACCUMULATOR
+    sbc #INTERCEPTOR_SPEED_DENOMINATOR
+    sta INTERCEPTOR_MOVE_ACCUMULATOR
     lda enemy_velocity_x
     bmi @move_left
     inc enemy_x
@@ -4610,7 +4610,7 @@ update_enemy_review_harness:
     sta enemy_y
     lda frame_counter
     cmp #80
-    bcc @raider
+    bcc @interceptor
     cmp #160
     bcc @talon
     cmp #240
@@ -4618,8 +4618,8 @@ update_enemy_review_harness:
     and #$03                    ; rapid, safely erased type changes
     cmp #ENEMY_IMPLEMENTED_COUNT
     bcc @select
-@raider:
-    lda #ENEMY_ARCHETYPE_RAIDER
+@interceptor:
+    lda #ENEMY_ARCHETYPE_INTERCEPTOR
     jmp @select
 @talon:
     lda #ENEMY_ARCHETYPE_TALON
@@ -4742,10 +4742,10 @@ resolve_enemy_damage:
     sta HITCLR
     lda #ENEMY_EXPLOSION_CORE_COLOR ; preserve the accepted $84/$46 explosion
     sta COLPM1
-    jsr spawn_raider_breakup_effects
+    jsr spawn_interceptor_breakup_effects
     jsr reset_enemy_fire_cooldown
     pla
-    cmp #(DAMAGE_CAPITAL_CYLON+1)
+    cmp #(DAMAGE_CAPITAL_HOSTILE+1)
     bcs @no_score
     pha
     jsr add_archetype_score
@@ -4760,7 +4760,7 @@ resolve_enemy_damage:
 @done:
     rts
 
-; The score is descriptor data, not a Raider collision constant. A is the
+; The score is descriptor data, not a Interceptor collision constant. A is the
 ; already-arbitrated lethal source; all score-awarding sources share this path.
 add_archetype_score:
     ldx ENEMY_ARCHETYPE
@@ -6548,9 +6548,9 @@ update_sound:
 
 @damage:
     ; The independent fighter explosion timers are also the colour-flash
-    ; phases. Viper death wins deterministic same-frame arbitration; neither
+    ; phases. PlayerFighter death wins deterministic same-frame arbitration; neither
     ; sequence can be restarted by the other while its craft remains exploding.
-    lda FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_VIPER_SLOT
+    lda FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT
     beq @enemy_fighter_flash
     cmp #(SHARED_FIGHTER_EXPLOSION_TOTAL-PLAYER_DEATH_FLASH_FRAMES+1)
     bcc @player_death_restore
@@ -6562,7 +6562,7 @@ update_sound:
     bne @store_background        ; every named fighter flash colour is nonzero
 @player_death_restore:
     lda #GAMEPLAY_BACKGROUND_COLOR
-    beq @store_background        ; Viper lifecycle suppresses a later enemy flash
+    beq @store_background        ; PlayerFighter lifecycle suppresses a later enemy flash
 @enemy_fighter_flash:
     lda FIGHTER_EXPLOSION_TIMER+FIGHTER_EXPLOSION_ENEMY_SLOT
     cmp #(SHARED_FIGHTER_EXPLOSION_TOTAL-ENEMY_FIGHTER_FLASH_FRAMES+1)
@@ -6620,8 +6620,8 @@ frontend_screen_data:
     .word ended_screen_data, game_over_screen_data ; gameplay is never rendered here
     .word pause_screen_data, pause_quit_screen_data
 
-raider_post_burst_frames:
-    .byte RAIDER_POST_BURST_EASY,RAIDER_POST_BURST_MEDIUM,RAIDER_POST_BURST_HARD
+interceptor_post_burst_frames:
+    .byte INTERCEPTOR_POST_BURST_EASY,INTERCEPTOR_POST_BURST_MEDIUM,INTERCEPTOR_POST_BURST_HARD
 .segment "RODATA"
 shared_fighter_explosion_masks:
     EMIT_SHARED_FIGHTER_EXPLOSION_MASKS
@@ -6820,15 +6820,15 @@ charset_data:
     .byte $01,$01,$04,$04,$10,$10,$40,$40
 charset_fixed_frontend_end:
 
-    ; 16-46: Viper projectile phases 5-35. Gameplay uses a dedicated HUD
+    ; 16-46: PlayerFighter projectile phases 5-35. Gameplay uses a dedicated HUD
     ; charset, so these former font cells can be canonical projectile storage.
-    EMIT_VIPER_PROJECTILE_GLYPHS_TAIL
+    EMIT_PLAYER_FIGHTER_PROJECTILE_GLYPHS_TAIL
     ; 47-51: five preserved source phases copied over frontend graphics 11-15
     ; only after the frontend charset has captured those accepted glyphs.
-viper_projectile_glyph_head:
-    EMIT_VIPER_PROJECTILE_GLYPHS_HEAD
-viper_projectile_glyph_head_end:
-    .assert viper_projectile_glyph_head_end-viper_projectile_glyph_head = 5*8, error, "Viper projectile head source changed"
+player_fighter_projectile_glyph_head:
+    EMIT_PLAYER_FIGHTER_PROJECTILE_GLYPHS_HEAD
+player_fighter_projectile_glyph_head_end:
+    .assert player_fighter_projectile_glyph_head_end-player_fighter_projectile_glyph_head = 5*8, error, "PlayerFighter projectile head source changed"
     ; 52-58: compact loader-display-list stream plus unused tail. It is decoded
     ; over the consumed bitmap source before loader DMA is enabled.
 loader_display_list_lzss:
@@ -6876,7 +6876,7 @@ charset_data_end:
 frontend_screen_records:
 main_menu_screen_data:
     .word SCREEN+MAIN_MENU_TITLE_OFFSET+4
-    .byte "DARK FIGHTER",0
+    .byte "VOID STRIKE 65",0
     .word SCREEN+MAIN_MENU_OPTION_0_OFFSET+4
     .byte "START GAME",0
     .word SCREEN+MAIN_MENU_OPTION_1_OFFSET+6
@@ -6886,7 +6886,7 @@ main_menu_screen_data:
     .word SCREEN+MAIN_MENU_OPTION_3_OFFSET+8
     .byte "EXIT",0
     .word SCREEN+MAIN_MENU_HINT_OFFSET+7
-    .byte "UP/DOWN MOVE   FIRE SELECT",0
+    .byte "UP/DOWN MOVE FIRE SELECT",0
     .byte $FF
 
 options_screen_data:
@@ -6918,9 +6918,9 @@ exit_screen_data:
 
 ended_screen_data:
     .word SCREEN+9*40+11
-    .byte "DARK FIGHTER ENDED",0
+    .byte "VOID STRIKE 65 ENDED",0
     .word SCREEN+13*40+9
-    .byte "PRESS RESET TO RESTART",0
+    .byte "PRESS RESET: RESTART",0
     .byte $FF
 
 game_over_screen_data:
@@ -7308,7 +7308,7 @@ update_broadside:
     ; Opposite-owner capital shells share only the painter's z-order. They do
     ; not collide, change lifecycle, or suppress either slot's world targets.
     jmp @world_targets
-; A player hit already owns the full-frame Viper damage flash. Keep the
+; A player hit already owns the full-frame PlayerFighter damage flash. Keep the
 ; canonical FLYING->IMPACT timer without drawing the world-space PMG square
 ; retained for hull/fighter impacts.
 @player_impact:
@@ -7321,19 +7321,19 @@ update_broadside:
 @world_targets:
     jsr capital_shell_collision_flags
     lda BROAD_COLLISION,x
-    and #$02                    ; first target is the ordinary Cylon fighter
+    and #$02                    ; first target is the ordinary Hostile fighter
     beq @player_target
     jsr begin_broadside_impact
     lda BROAD_OWNER,x
     eor #$01
-    ora #DAMAGE_CAPITAL_CYLON
+    ora #DAMAGE_CAPITAL_HOSTILE
     tay
     lda #CAPITAL_DAMAGE_UNITS
     jsr queue_enemy_damage
     jmp @next
 @player_target:
     lda BROAD_COLLISION,x
-    and #$01                    ; Cylon shell reaches the Viper first
+    and #$01                    ; Hostile shell reaches the PlayerFighter first
     beq @hull
     jsr @player_impact
     jsr apply_broadside_player_damage
@@ -7841,8 +7841,8 @@ update_sector_completion:
 apply_broadside_player_damage:
     lda #CAPITAL_DAMAGE_UNITS
 
-; A is damage in ten-point units. Direct Raider contact passes the full ten;
-; capital shells and hull contact pass two; the ordinary Raider pulse passes
+; A is damage in ten-point units. Direct Interceptor contact passes the full ten;
+; capital shells and hull contact pass two; the ordinary Interceptor pulse passes
 ; one. Every damage source retains the same lifecycle, cooldown,
 ; one-event-per-frame, death and respawn gate.
 apply_player_damage:
@@ -7893,7 +7893,7 @@ apply_player_damage:
     lda #SHARED_FIGHTER_EXPLOSION_TOTAL
     sta BROAD_DEATH_TIMER
     jsr erase_bullet
-    jsr clear_raider_pulses
+    jsr clear_interceptor_pulses
     jsr begin_player_fighter_explosion
 @update_hud:
     jmp update_hud_status
@@ -8273,8 +8273,8 @@ render_capital_explosion:
     ldx BROAD_WORK_SLOT
     rts
 
-; Returns one spatially first target flag in BROAD_COLLISION,x: bit 0 Viper,
-; bit 1 Cylon fighter. The swept rectangle includes the previous and current
+; Returns one spatially first target flag in BROAD_COLLISION,x: bit 0 PlayerFighter,
+; bit 1 Hostile fighter. The swept rectangle includes the previous and current
 ; positions and the full eight-HPOS by six-scanline visible playfield slug.
 capital_shell_collision_flags:
     jmp capital_shell_collision_flags_shared
@@ -8348,7 +8348,7 @@ capital_shell_hits_player:
 .segment "PICKUP_CODE"
 ; Both capital factions share one final-raster collision compositor. The shell
 ; sweep is derived from the two character-aligned positions actually rendered,
-; and the Viper target is its complete double-width PMG envelope. OWNER selects
+; and the PlayerFighter target is its complete double-width PMG envelope. OWNER selects
 ; travel direction and spatial-first arbitration only; it never filters player
 ; friendly fire.
 capital_shell_collision_flags_shared:
@@ -8831,7 +8831,7 @@ broadside_erase_end:
 
 ; Capital shells are two-cell ANTIC 4 overlays using fixed runtime glyphs.
 ; Their amber/crimson bodies avoid every COLPM coupling while preserving
-; P0-P3, M0, the Raider body/scanner, and simultaneous enemy capacity.
+; P0-P3, M0, the Interceptor body/scanner, and simultaneous enemy capacity.
 .segment "CODE"
 render_capital_shell_overlays:
     ldx #$00
@@ -9256,20 +9256,20 @@ weapon_pickup_collect:
     lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
     cmp #WEAPON_PICKUP_STATE_SHIELD
     bne :+
-    jsr restore_viper_normal_colors
+    jsr restore_player_fighter_normal_colors
 :
     lda ENTITY_TYPE+WEAPON_PICKUP_SLOT
     cmp #WEAPON_PICKUP_TYPE_SHIELD
     beq @shield_duration
-    lda #<VIPER_SPREAD_SHOT_DURATION
+    lda #<PLAYER_FIGHTER_SPREAD_SHOT_DURATION
     sta ENTITY_TIMER+WEAPON_BOOSTER_SLOT
-    lda #>VIPER_SPREAD_SHOT_DURATION
+    lda #>PLAYER_FIGHTER_SPREAD_SHOT_DURATION
     sta ENTITY_MOVE_ACCUMULATOR+WEAPON_BOOSTER_SLOT
     bne @activate
 @shield_duration:
-    lda #<VIPER_SHIELD_DURATION
+    lda #<PLAYER_FIGHTER_SHIELD_DURATION
     sta ENTITY_TIMER+WEAPON_BOOSTER_SLOT
-    lda #>VIPER_SHIELD_DURATION
+    lda #>PLAYER_FIGHTER_SHIELD_DURATION
     sta ENTITY_MOVE_ACCUMULATOR+WEAPON_BOOSTER_SLOT
 @activate:
     lda ENTITY_TYPE+WEAPON_PICKUP_SLOT
@@ -9282,7 +9282,7 @@ weapon_pickup_collect:
     lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
     cmp #WEAPON_PICKUP_STATE_SHIELD
     bne :+
-    jsr update_shield_viper_colors
+    jsr update_shield_player_fighter_colors
 :
     jmp show_weapon_booster_hud
 weapon_pickup_collision_done:
@@ -9305,7 +9305,7 @@ weapon_pickup_rapid_tick:
     beq @expired
     cpx #WEAPON_PICKUP_STATE_SHIELD
     bne @hud
-    jsr update_shield_viper_colors
+    jsr update_shield_player_fighter_colors
 @hud:
     jmp update_weapon_booster_hud
 @expired:
@@ -9335,7 +9335,7 @@ integration_pickup_reveal_body:
     inc ENTITY_ACTIVE_COUNT
     rts
 
-; Called only after the authoritative score path has accepted a lethal Viper
+; Called only after the authoritative score path has accepted a lethal PlayerFighter
 ; projectile source. Other deaths never reach this counter.
 weapon_pickup_record_qualified_kill:
     inc ENTITY_HP+WEAPON_PICKUP_SLOT
@@ -9426,7 +9426,7 @@ weapon_booster_release:
     lda ENTITY_STATE+WEAPON_BOOSTER_SLOT
     cmp #WEAPON_PICKUP_STATE_SHIELD
     bne :+
-    jsr restore_viper_normal_colors
+    jsr restore_player_fighter_normal_colors
 :
     lda #$00
     sta ENTITY_STATE+WEAPON_BOOSTER_SLOT
@@ -9459,7 +9459,7 @@ weapon_pickup_clear_sector:
 
 ; Debris allocation is intentionally fixed to slot zero even though the
 ; physical SoA reserves four slots and slot one can host a capsule independently.
-; The entity LFSR cannot perturb Raider, starfield, broadside or weapon cadence.
+; The entity LFSR cannot perturb Interceptor, starfield, broadside or weapon cadence.
 entity_spawn_debris:
     lda ENTITY_ACTIVE_MASK
     and #$01
@@ -9549,33 +9549,33 @@ entity_complete_scroll_tick:
 
 .segment "ENTITY_CODE"
 
-; Viper projectiles remain the owners of their existing ascending slot scan.
+; PlayerFighter projectiles remain the owners of their existing ascending slot scan.
 ; A destroyed debris keeps its coordinates until the end of the frame so a
 ; higher slot remains active after the lowest matching slot wins. Carry set is
 ; reserved for the existing enemy damage path; debris is consumed here and
 ; returns carry clear.
-entity_viper_projectile_target:
+entity_player_fighter_projectile_target:
     lda ENTITY_ACTIVE_MASK
     and #$01
     bne @active
     lda ENTITY_SPAWN_TIMER_LO
     cmp #ENTITY_SHOT_RESPAWN_DELAY
-    bne entity_viper_projectile_enemy_target
+    bne entity_player_fighter_projectile_enemy_target
     ; Once the lowest matching slot has destroyed debris, every higher slot
     ; stays active for the remainder of this deterministic ascending scan.
     clc
     rts
 @active:
-    jsr entity_viper_projectile_hits_debris
-    bcc entity_viper_projectile_enemy_target
+    jsr entity_player_fighter_projectile_hits_debris
+    bcc entity_player_fighter_projectile_enemy_target
     ; Consult the per-frame shootable latch only after the cheap swept
     ; geometry says this slot could hit. Ordinary misses therefore retain the
     ; bounded active-debris path without paying the category test repeatedly.
     lda ENTITY_FLAGS
     and #ENTITY_FLAG_SHOOTABLE
-    beq entity_viper_projectile_enemy_target
-    jsr viper_projectile_hits_enemy
-    bcc entity_viper_projectile_debris_target
+    beq entity_player_fighter_projectile_enemy_target
+    jsr player_fighter_projectile_hits_enemy
+    bcc entity_player_fighter_projectile_debris_target
     ; Both targets intersect the swept path. Upward fire meets the target with
     ; the greater bottom edge first; the BCS equality case gives debris the tie.
     ; Both targets intersect the same seven-scanline upward sweep, so the
@@ -9585,11 +9585,11 @@ entity_viper_projectile_target:
     sbc enemy_y
     bmi @enemy_first
     cmp #(ENEMY_RELEASE_FRAME_HEIGHT-ENTITY_DEBRIS_HEIGHT_SCANLINES)
-    bcs entity_viper_projectile_debris_target
+    bcs entity_player_fighter_projectile_debris_target
 @enemy_first:
     sec
     rts
-entity_viper_projectile_debris_target:
+entity_player_fighter_projectile_debris_target:
     lda #FIGHTER_PROJECTILE_FREE
     sta FIGHTER_PROJECTILE_ACTIVE,x
 entity_debris_hit:
@@ -9609,14 +9609,14 @@ entity_debris_destroyed:
     inc ENTITY_SPAWN_TIMER_LO
     clc
     rts
-entity_viper_projectile_enemy_target:
-    jmp viper_projectile_hits_enemy
-entity_debris_shot = entity_viper_projectile_debris_target
+entity_player_fighter_projectile_enemy_target:
+    jmp player_fighter_projectile_hits_enemy
+entity_debris_shot = entity_player_fighter_projectile_debris_target
 
 ; The projectile is one HPOS unit wide. Its two-scanline previous/current
 ; positions form the same inclusive swept interval already used for fighters.
 .segment "CODE"
-entity_viper_projectile_hits_debris:
+entity_player_fighter_projectile_hits_debris:
     lda FIGHTER_PROJECTILE_X,x
     sec
     sbc ENTITY_X
@@ -9627,7 +9627,7 @@ entity_viper_projectile_hits_debris:
     sbc ENTITY_Y
     cmp #ENTITY_DEBRIS_HEIGHT_SCANLINES
     bcc @hit
-    cmp #(256-(VIPER_PROJECTILE_SPEED+VIPER_PROJECTILE_HEIGHT-1))
+    cmp #(256-(PLAYER_FIGHTER_PROJECTILE_SPEED+PLAYER_FIGHTER_PROJECTILE_HEIGHT-1))
     bcc @miss
 @hit:
     sec
@@ -9697,7 +9697,7 @@ entity_despawn_debris:
 ; overlap; the sixth physical slot remains reserved and inactive.
 .segment "CODE"
 spawn_debris_destruction_effects:
-    ; A debris event later than a deferred Raider event wins. In the released
+    ; A debris event later than a deferred Interceptor event wins. In the released
     ; frame order all old backing is already erased; clear its state before the
     ; five admitted slots are reused. The reset preserves projectile-slot X.
     jsr clear_transient_effects
@@ -9752,21 +9752,21 @@ spawn_breakup_effects_at:
 ; the frame-start reverse erase, so a prior event has no valid backing left;
 ; a same-frame debris event has not rendered yet and is atomically replaced.
 .segment "CODE"
-spawn_raider_breakup_effects:
+spawn_interceptor_breakup_effects:
     jsr clear_transient_effects
     lda #$02
     sta EFFECT_ALLOCATION_RESULT
     jmp begin_enemy_fighter_explosion
 
-materialize_raider_breakup_effects:
+materialize_interceptor_breakup_effects:
     lda FIGHTER_EXPLOSION_X+FIGHTER_EXPLOSION_ENEMY_SLOT
     ; The releasing LSR enters with C=1; fold it into the centred offset.
-    adc #(EFFECT_RAIDER_CORE_X_OFFSET-1)
+    adc #(EFFECT_INTERCEPTOR_CORE_X_OFFSET-1)
     ldy FIGHTER_EXPLOSION_Y+FIGHTER_EXPLOSION_ENEMY_SLOT
     jsr spawn_breakup_effects_at
     ldx #(EFFECT_ACTIVE_LIMIT-1)
 @render_id:
-    lda entity_raider_fragment_render_ids,x
+    lda entity_interceptor_fragment_render_ids,x
     sta EFFECT_RENDER_ID,x
     dex
     bpl @render_id
@@ -9777,13 +9777,13 @@ materialize_raider_breakup_effects:
 ; therefore visually dominant while the fragments still inherit world travel.
 ; The core is stationary and all TTLs are frozen automatically while paused.
 update_transient_effects:
-    ; The two-step pending latch isolates a Raider kill from materialising five
+    ; The two-step pending latch isolates a Interceptor kill from materialising five
     ; backed overlays in the same world/hull-copy frame. A set carry calls the
     ; materialiser on the following PAL frame, then the ordinary update
     ; gives all four fragments their first radial step before the first draw.
     lsr EFFECT_ALLOCATION_RESULT
     bcc :+
-    jsr materialize_raider_breakup_effects
+    jsr materialize_interceptor_breakup_effects
 :
     lda EFFECT_ACTIVE_MASK
     beq @done
@@ -10272,7 +10272,7 @@ update_shield_booster_hud:
     sta SCREEN+HUD_BOOSTER_SEGMENTS_OFFSET+1
     rts
 
-restore_viper_normal_colors:
+restore_player_fighter_normal_colors:
     lda #PLAYER_NORMAL_HULL_COLOR
     sta COLPM0
     lda #PLAYER_NORMAL_ENGINE_COLOR
@@ -10281,10 +10281,10 @@ restore_viper_normal_colors:
 
 ; The authoritative Shield timer doubles as the 8+8 PAL-frame pulse phase.
 ; No phase advances while pause bypasses the active gameplay update.
-update_shield_viper_colors:
+update_shield_player_fighter_colors:
     lda ENTITY_TIMER+WEAPON_BOOSTER_SLOT
     and #HUD_BOOSTER_BLINK_HALF_PERIOD
-    beq restore_viper_normal_colors
+    beq restore_player_fighter_normal_colors
     lda #PLAYER_SHIELD_HULL_COLOR
     sta COLPM0
     lda #PLAYER_SHIELD_ENGINE_COLOR
@@ -10307,12 +10307,12 @@ entity_debris_glyph_end:
 effect_fragment_glyph:
     EMIT_EFFECT_FRAGMENT_GLYPHS
 effect_fragment_glyph_end:
-entity_raider_fragment_render_ids:
+entity_interceptor_fragment_render_ids:
     ; Complete physical-pool template: core, two wings, red eye, central
     ; fragment, then the mandatory inactive sixth-slot sentinel.
     .byte ENTITY_DEBRIS_GLYPH_BASE
     .byte ENTITY_DEBRIS_GLYPH_BASE,ENTITY_DEBRIS_GLYPH_BASE+2
-    .byte RAIDER_PROJECTILE_GLYPH_BASE|$80,EFFECT_FRAGMENT_GLYPH_BASE,$00
+    .byte INTERCEPTOR_PROJECTILE_GLYPH_BASE|$80,EFFECT_FRAGMENT_GLYPH_BASE,$00
 
 ; The bootstrap restores the packed resident suffix before the loader display
 ; starts. Finish the byte-exact cold initialisation from ENTITY_CODE afterwards
@@ -10400,14 +10400,14 @@ finish_startup_after_loader:
 .endif
 
 ; Character projectiles normally draw over empty space with the fixed phase
-; bank. If a Viper shot meets any lower character layer (hull, shell, star or
+; bank. If a PlayerFighter shot meets any lower character layer (hull, shell, star or
 ; an earlier projectile), build one slot-owned glyph from the current backing
 ; and merge the two-scanline yellow/red mask into it. This preserves the exact
 ; lower silhouette without a broadside redraw. At phase seven only the top
 ; scanline is merged; rendered flag $FF tells reverse erase that no bottom cell
 ; was touched. Codes 47..56 are the ten already-reserved gap glyphs between the
-; fixed Viper phase bank and the capital-hull bank.
-compose_viper_projectile_glyph:
+; fixed PlayerFighter phase bank and the capital-hull bank.
+compose_player_fighter_projectile_glyph:
     and #$7F
     sta ENTITY_SCRATCH0
     asl
@@ -10426,13 +10426,13 @@ compose_viper_projectile_glyph:
 
     txa
     clc
-    adc #VIPER_COMPOSITE_GLYPH_BASE
+    adc #PLAYER_FIGHTER_COMPOSITE_GLYPH_BASE
     sta ENTITY_SCRATCH1
     asl
     asl
     asl
     sta dst_ptr
-    lda #>(CHARSET+VIPER_COMPOSITE_GLYPH_BASE*8)
+    lda #>(CHARSET+PLAYER_FIGHTER_COMPOSITE_GLYPH_BASE*8)
     sta dst_ptr+1
 
     lda FIGHTER_PROJECTILE_BACKUP_TOP,x
@@ -10445,7 +10445,7 @@ compose_viper_projectile_glyph:
     bpl @copy_normal
     bmi @copied
 @copy_inverse:
-    ; A positive screen code is required for the Viper's COLPF2 yellow. Cylon
+    ; A positive screen code is required for the PlayerFighter's COLPF2 yellow. Hostile
     ; hull cells use D7/COLPF3, so retain every occupied 2-bit pixel while
     ; normalising selector 3 to selector 2; the merged selector-3 shot then
     ; remains yellow without punching a hole through the red hull silhouette.
@@ -10533,41 +10533,41 @@ retry_first_capital_admission:
 .segment "CODE"
 integration_update_enemy:
     lda ENEMY_ACTIVE
-    beq integration_raider_retry
+    beq integration_interceptor_retry
     jmp update_enemy
 
-integration_raider_recycle:
-    ldx #DIRECTOR_HAZARD_RAIDER
+integration_interceptor_recycle:
+    ldx #DIRECTOR_HAZARD_INTERCEPTOR
     jsr DIRECTOR_RELEASE
-    ; DIRECTOR_RELEASE preserves X. Hazard Raider is zero, so make the ended
+    ; DIRECTOR_RELEASE preserves X. Hazard Interceptor is zero, so make the ended
     ; lifecycle explicitly inactive before a retry may be deferred by capital
     ; ownership or by the Director budget.
     stx ENEMY_ACTIVE
-integration_raider_retry:
+integration_interceptor_retry:
     ; The finite capital corridor owns new admissions while its hull is live.
-    ; An already active Raider keeps its ordinary lifecycle, but an inactive
+    ; An already active Interceptor keeps its ordinary lifecycle, but an inactive
     ; slot cannot reserve the small EASY/MEDIUM budget ahead of ship-to-ship
     ; fire and starve every naturally visible muzzle.
     lda CAPITAL_SECTOR_STATE
     cmp #CAPITAL_HULL_STATE_DRAIN
     bcc @blocked
-    lda RAIDER_BURST_TIMER
+    lda INTERCEPTOR_BURST_TIMER
     beq @request
-    dec RAIDER_BURST_TIMER
+    dec INTERCEPTOR_BURST_TIMER
 @blocked:
     rts
 @request:
-    ldx #DIRECTOR_HAZARD_RAIDER
+    ldx #DIRECTOR_HAZARD_INTERCEPTOR
     jsr DIRECTOR_REQUEST
     bcs @admitted
     lda #DIRECTOR_RETRY_FRAMES
-    sta RAIDER_BURST_TIMER
+    sta INTERCEPTOR_BURST_TIMER
     rts
 @admitted:
     jmp reset_enemy
 
 integration_update_enemy_weapon:
-    lda RAIDER_BURST_STATE
+    lda INTERCEPTOR_BURST_STATE
     cmp #WEAPON_BURST_FIRING
     beq @continue
     lda DIRECTOR_STATE_REACTION
@@ -10627,7 +10627,7 @@ integration_broadside_glue_accounting_pad:
 .segment "BROADSIDE"
 ; The moved development encounter spans the ordinary phase-0/1 boundary.
 ; Admit only its legal ship-to-ship cycles locally so later phase policy,
-; Raider/debris/pickup budgets and the Director event timetable stay frozen.
+; Interceptor/debris/pickup budgets and the Director event timetable stay frozen.
 provisional_capital_broadside_request:
     bit DIRECTOR_STATE_FLAGS
     bvc @normal_policy
@@ -10684,7 +10684,7 @@ integration_pickup_pending_tick:
 @reveal:
     jmp integration_pickup_reveal_body
 
-.export integration_update_enemy, integration_raider_recycle, integration_raider_retry
+.export integration_update_enemy, integration_interceptor_recycle, integration_interceptor_retry
 .export integration_update_enemy_weapon, integration_update_player_death
 .export integration_update_sector_completion
 .export integration_broadside_due, integration_broadside_release
@@ -10708,18 +10708,18 @@ integration_pickup_pending_tick:
 .export weapon_pickup_collide_player, weapon_pickup_collect
 .export weapon_pickup_record_qualified_kill, weapon_pickup_release, weapon_booster_release
 .export weapon_pickup_clear_lifecycle, weapon_pickup_clear_sector
-.export entity_viper_projectile_target, entity_viper_projectile_hits_debris
+.export entity_player_fighter_projectile_target, entity_player_fighter_projectile_hits_debris
 .export entity_debris_shot
 .export entity_debris_hit, entity_debris_destroyed
 .export clear_transient_effects, spawn_debris_destruction_effects
-.export spawn_breakup_effects_at, spawn_raider_breakup_effects
-.export materialize_raider_breakup_effects
+.export spawn_breakup_effects_at, spawn_interceptor_breakup_effects
+.export materialize_interceptor_breakup_effects
 .export update_transient_effects, render_transient_effect_overlays
 .export erase_transient_effect_overlays, erase_interactive_entity_overlays
 .export erase_weapon_pickup_overlay
 .export render_interactive_entity_overlays
 .export entity_archetype_descriptors, entity_debris_glyph, effect_fragment_glyph
-.export entity_raider_fragment_render_ids, entity_trajectory_vx
+.export entity_interceptor_fragment_render_ids, entity_trajectory_vx
 
 ; -----------------------------------------------------------------------------
 ; Transient second-stage disk loader. The linker gives this segment the run

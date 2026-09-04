@@ -1,5 +1,5 @@
 {
-  "format": "dark-fighter-frontend-h31-v1",
+  "format": "void-strike-65-frontend-h31-v1",
   "description": "Accepted H3.1 frontend font and ANTIC 4 structures.",
   "fontRowsHex": [
     "7cc6ced6e6c67c", "307030303030fc", "7cc6061c70c0fe", "fc06067c0606fc",
@@ -17,7 +17,7 @@
   "extendedGlyphBase": 48,
   "extendedGlyphsHex": "fffffffffffffffffcc0c0c0c0c0c0fc0000000000000000000000000000000001010515165659594040505494956565565615050a12100095955450a084040000000000000000000000000000000000000000011454541414555555555555550000004014151514010000010505000055555541000028284000004050500000",
   "maximumAntic67Glyph": 63,
-  "viperGlyphs": [58, 59, 60, 61, 62, 63],
+  "player_fighterGlyphs": [58, 59, 60, 61, 62, 63],
   "palette": {
     "background": 0,
     "white": 14,

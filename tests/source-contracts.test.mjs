@@ -31,11 +31,11 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.match(source, /main_menu_display_list:[\s\S]+\.byte \$70,\$70,\$70,\$47,<SCREEN,>SCREEN/);
   assert.match(source, /\.byte \$42,<\(SCREEN\+300\),>\(SCREEN\+300\)/);
   assert.match(source, /lda #\$3E\s+; normal playfield, single-line PMG DMA/);
-  assert.match(source, /lda #\$70\s*\n@wait_for_line:/);
+  assert.match(source, /ldx #\$70\s*\nwait_frame_at_line:\s*\n@wait_for_line:/);
 });
 
 test("accepted gameplay screen reference and its mapping decision are versioned", () => {
-  assert.ok(fs.existsSync(path.join(rootDirectory, "assets", "graphics", "dark-fighter-screen-concept-v1.png")));
+  assert.ok(fs.existsSync(path.join(rootDirectory, "assets", "graphics", "void-strike-65-screen-concept-v1.png")));
   assert.ok(fs.existsSync(path.join(rootDirectory, "docs", "decisions", "ADR-002-gameplay-screen.md")));
 });
 
@@ -64,16 +64,16 @@ test("current documentation keeps implemented, planned and historical state dist
   assert.match(gameDesign, /Shield Booster — implemented/);
   assert.doesNotMatch(currentSources, /\$8100-\$99A3/);
   assert.doesNotMatch(currentSources, /\$8100-\$(?:9AA3|9A3D)/);
-  assert.match(architecture, /stage it at\s+`\$8100-\$9AFA`/);
-  assert.match(architecture, /packs them to \*\*1,997 bytes\*\*/);
+  assert.match(architecture, /stage it at\s+`\$8100-\$9ACE`/);
+  assert.match(architecture, /packs them to \*\*1,929 bytes\*\*/);
   assert.doesNotMatch(currentSources, /\b2,?027[- ]bytes\b/i);
   assert.doesNotMatch(artDirection, /\bresidual\b/i);
   assert.doesNotMatch(roadmap, /next[^\n]*entity\/effects foundation/i);
   assert.doesNotMatch(runtimeHeadroom, /feature\/runtime-headroom/);
   assert.match(gameDesign,
-    /Rapid Fire[\s\S]+projectiles retain the Viper's established\s+yellow\/gold/);
+    /Rapid Fire[\s\S]+projectiles retain the Player Fighter's established\s+yellow\/gold/);
   assert.match(gameDesign,
-    /normal Viper weapon fires an eight-projectile burst[\s\S]+Rapid Fire[\s\S]+burst to ten projectiles[\s\S]+normal eight-salvo burst/);
-  assert.doesNotMatch(gameDesign, /normal Viper weapon fires a ten-projectile burst/);
+    /normal Player Fighter weapon fires an eight-projectile burst[\s\S]+Rapid Fire[\s\S]+burst to ten projectiles[\s\S]+normal eight-salvo burst/);
+  assert.doesNotMatch(gameDesign, /normal Player Fighter weapon fires a ten-projectile burst/);
   assert.doesNotMatch(currentSources, /Rapid Fire projectile:[^\n]*red/i);
 });

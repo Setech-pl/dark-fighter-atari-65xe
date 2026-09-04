@@ -1,7 +1,7 @@
 # Current memory map
 
 This is one current snapshot. Addresses and linked sizes come from
-`build/dark-fighter.map`; packed sizes, staging ranges, artifacts, and reserves
+`build/void-strike-65.map`; packed sizes, staging ranges, artifacts, and reserves
 come from `build/manifest.json`. Overlapping ranges below have different
 lifetime phases and are not additive free memory.
 
@@ -20,7 +20,7 @@ lifetime phases and are not additive free memory.
 | `$8000-$80FF` | 256 B | `ENTITY_STATE` BSS |
 | `$8800-$8C7F` | 1,152 B | immutable three-type/eight-phase pickup glyph source bank |
 | `$8C80-$8E60` | 481 B | late phased pickup compositor, size helpers, exact reverse-erase support, and provisional active-gameplay capital admission gate |
-| `$8E61-$8E81` | 33 B | shared inclusive final-raster swept-AABB capital-bolt/Viper collision module |
+| `$8E61-$8E81` | 33 B | shared inclusive final-raster swept-AABB capital-bolt/Player Fighter collision module |
 | `$9000-$90FE` | 255 B | relocated A2 kernel; one byte reserved through `$90FF` |
 | `$9100-$9D27` | 3,112 B | relocated `ENTITY_CODE`, including H3.1 display lists and frontend helpers; reserved through `$9D74` |
 | `$9D75-$9FF9` | 645 B | Hybrid Encounter Director code/common/Level 1 data |
@@ -41,18 +41,18 @@ are unchanged.
 
 The production Encounter Director transport is 20,608 bytes in 161 occupied
 sectors. BRCNT loads the 12,928-byte/101-sector initial block at `$2000-$527F`;
-the entry point remains `$201E`. Initial content is exactly 12,901 B and ends
-at `$5264`; the rest of the last sector is transport padding.
+the entry point remains `$201E`. Initial content is exactly 12,842 B and ends
+at `$5229`; the rest of the last sector is transport padding.
 
 | Initial address / ATR sectors | Size | Stored form and startup destination |
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
 | `$21C1-$2667` | 1,191 B | stage-2 SIO/CRC/per-record-end/manifest overlay |
-| `$2668-$4071` | 6,666 B | packed resident suffix; staged at `$8100` |
-| `$4072-$4772` | 1,793 B | packed 2,252-byte starfield/music runtime; stages at `$7810` and expands to `$552A-$5DF5` |
-| `$4773-$4871` | 255 B | A2 source; staged at `$7F16`, then copied to `$9000-$90FE` before entity/effects clear |
-| `$4872-$5260` | 2,543 B | packed 3,112-byte ENTITY_CODE; staged at `$534B-$5D39`, expands to `$9100-$9D27` |
-| `$5261-$5264` | 4 B | source-owned `DFB1` trailer; consumed before the GLUE chunk reuses `$5261` |
+| `$2668-$4036` | 6,607 B | packed resident suffix; staged at `$8100` |
+| `$4037-$4737` | 1,793 B | packed 2,252-byte starfield/music runtime; stages at `$7810` and expands to `$552A-$5DF5` |
+| `$4738-$4836` | 255 B | A2 source; staged at `$7F16`, then copied to `$9000-$90FE` before entity/effects clear |
+| `$4837-$5225` | 2,543 B | packed 3,112-byte ENTITY_CODE; staged at `$534B-$5D39`, expands to `$9100-$9D27` |
+| `$5226-$5229` | 4 B | source-owned `DFB1` trailer; consumed before the GLUE chunk reuses `$5261` |
 | ATR sectors 102-146 | 5,760 B | external BROADSIDE record: 5,660 B packed / 6,643 B raw to `$5E10-$7802` |
 | ATR sectors 147-154 | 1,024 B | pickup/code/collision record: 921 B prepacked at cold `$8C80-$9018`; after preservation at `$4801-$4B99`, it expands 1,666 B to `$8800-$8E81` |
 | ATR sectors 155-156 | 256 B | GLUE record: 229 B packed / 234 B raw to staging `$5261-$534A` |
@@ -72,7 +72,7 @@ and its explicit simultaneous-residency accounting.
 | Range | Size | Loader role |
 | --- | ---: | --- |
 | `$3315-$3337` | 35 B | packed 202-byte loader display-list source |
-| `$37B8-$3F84` | 1,997 B | packed loader-bitmap source |
+| `$3821-$3FA9` | 1,929 B | packed loader-bitmap source; `$3FAA-$3FED` preserves its fixed residency with zero padding |
 | `$3C00-$3CC9` | 202 B | expanded loader display list after its overlapping source has been consumed; PMG DMA is disabled for this boot-only lifetime and `clear_pmg` reclaims the range afterwards |
 | `$4010-$4FFF` | 4,080 B | bitmap lines 0-101 |
 | `$5000-$5E0F` | 3,600 B | bitmap lines 102-191 via second LMS at `$5000` |
@@ -91,11 +91,11 @@ this lifetime.
 | `$4050-$43FF` | 944 B | frontend screen RAM; not used by the expanded gameplay ring |
 | `$4400-$47FF` | 1,024 B | gameplay charset |
 | `$4800-$4BFF` | 1,024 B | frontend charset; `$4801-$4B99` temporarily preserves the 921-byte pickup/code/collision transport stream before frontend construction |
-| `$4C00-$4D1F` | 288 B | expanded Colonial hull map, 32x9 |
-| `$4D20-$4E3F` | 288 B | expanded Cylon hull map, 32x9 |
+| `$4C00-$4D1F` | 288 B | expanded Allied hull map, 32x9 |
+| `$4D20-$4E3F` | 288 B | expanded Hostile hull map, 32x9 |
 | `$4E40-$4E70` | 49 B | persistent runtime state through difficulty setting |
 | `$4E71-$4ECA` | 90 B | hull scroll, three cached final-raster bolt tops at `$4E72-$4E74`, backing, sector, lifecycle, music, muzzle, score, and two-phase engine state |
-| `$4ECB-$4ED6` | 12 B | Raider, damage, and starfield scalar state |
+| `$4ECB-$4ED6` | 12 B | Interceptor, damage, and starfield scalar state |
 | `$4ED7-$4ED8` | 2 B | allied/enemy fixed-divider versus ring muzzle-domain state; consumes the former compatibility pad without shifting later state |
 | `$4ED9-$4EE9` | 17 B | menu/gameplay music and tracked-muzzle state |
 | `$4EEA-$4EFD` | 20 B | ten TOP SCORES records as parallel packed-BCD low/high arrays |
@@ -120,7 +120,7 @@ this lifetime.
 | `$8060-$807F` | 32 B | initialized alignment/reserve |
 | `$8080-$80F3` | 116 B | six physical effect slots plus global state; release active limit 5 |
 | `$80F4-$80FF` | 12 B | persistent Encounter Director state, initialized after the entity/effects clear |
-| `$8100-$9A53` | 6,484 B | cold-start resident-suffix staging only |
+| `$8100-$9ACE` | 6,607 B | cold-start resident-suffix staging only |
 | `$8100-$8139` | 58 B | exact physical-screen pointers for 29 rendered far stars after cold startup |
 | `$813A-$813F` | 6 B | unowned after cold startup |
 | `$8140-$8577` | 1,080 B | 27-row physical gameplay ring, 40 bytes per row |
@@ -162,13 +162,13 @@ ENTITY_CODE source. Loader-resident RAM after startup remains 0 B.
 | Range | Owner after loader |
 | --- | --- |
 | `$3B00-$3BFF` | missiles: M0 reserved for player weapon; M1-M3 broadside warning/impact |
-| `$3C00-$3CFF` | P0 Viper hull |
-| `$3D00-$3DFF` | P1 Raider |
-| `$3E00-$3EFF` | P2 Raider scanner |
-| `$3F00-$3FFF` | P3 Viper engine |
+| `$3C00-$3CFF` | P0 Player Fighter hull |
+| `$3D00-$3DFF` | P1 Interceptor |
+| `$3E00-$3EFF` | P2 Interceptor scanner |
+| `$3F00-$3FFF` | P3 Player Fighter engine |
 
-Current Viper projectiles are ANTIC 4 overlays. The shared fighter allocation is
-ten Viper slots plus nine Raider slots; broadside owns a separate three-slot
+Current Player Fighter projectiles are ANTIC 4 overlays. The shared fighter allocation is
+ten Player Fighter slots plus nine Interceptor slots; broadside owns a separate three-slot
 pool.
 
 ## Gameplay charset allocation
@@ -179,16 +179,16 @@ Glyphs 126-127 are the left/right halves of the connected BROADSIDE bolt.
 | --- | --- |
 | 0 | blank |
 | 1-6 | far/near stars |
-| 7-10 | Viper body helpers |
-| 11-46 | Viper projectile phases |
+| 7-10 | Player Fighter body helpers |
+| 11-46 | Player Fighter projectile phases |
 | 47-56 | Spread Shot overlap-composite scratch |
 | 57-58 | gameplay helpers |
 | 59-89 | capital hulls |
-| 90-109 | Raider and Raider-projectile phases |
+| 90-109 | Interceptor and Interceptor-projectile phases |
 | 110-117 | debris |
 | 118-119 | transient fragments |
 | 120-125 | dynamic six-glyph compositor bank for the selected Rapid, Spread, or Shield vertical phase |
-| 126-127 | connected BROADSIDE bolt (left/right halves; bit 7 selects the Cylon colour bank) |
+| 126-127 | connected BROADSIDE bolt (left/right halves; bit 7 selects the Hostile colour bank) |
 
 Build-time range assertions, linker overlap checks, payload parity tests, and
 cold-RAM tests are the enforcement mechanism for this snapshot.

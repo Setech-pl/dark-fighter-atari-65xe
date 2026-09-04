@@ -83,12 +83,12 @@ report below.
 
 Three cold-start Atari800 7.1.2 PAL/XL replays measure 1,100 active gameplay
 frames each on EASY, MEDIUM, and HARD. All three admit the moved, single
-capital encounter at gameplay frame 50. The first Colonial pixels appear at
+capital encounter at gameplay frame 50. The first Allied pixels appear at
 frames 52/53/51 and the first frame containing visible pixels from both hulls
 is 72/71/67 respectively; entry remains tied to the normal 20/22.5/25 row/s
 world cadence.
 
-The complete Cylon warning/flash/launch counts are 3/3/3 on EASY, 4/4/4 on
+The complete Hostile warning/flash/launch counts are 3/3/3 on EASY, 4/4/4 on
 MEDIUM, and 3/3/3 on HARD. Warning starts are separated by 80, 71-78, and 64
 active frames respectively. Across the 3,300 measured frames, maximum wall
 intervals are 22,760/23,741/24,639 cycles, leaving at least 10,929 cycles of
@@ -130,8 +130,8 @@ instructions or cycles.
 | Gameplay DLI service and VBI/synchronization; wait is outside the interval | 246 |
 | World, ring playfield, hull, starfield and Director tick | 11,117 |
 | Broadside update and render | 318 |
-| Viper projectile erase, update, weapon control, and render | 4,968 |
-| Raider projectile erase, update, weapon control, and render | 806 |
+| Player Fighter projectile erase, update, weapon control, and render | 4,968 |
+| Interceptor projectile erase, update, weapon control, and render | 806 |
 | Enemy update and collision resolution | 2,781 |
 | Entity/debris | 103 |
 | Effects | 1,513 |
@@ -161,8 +161,8 @@ must not be added to the wall total.
 
 | Pool | Physical capacity | Maximum evidenced state |
 | --- | ---: | --- |
-| Viper projectiles | 10 | Rapid 10/10; Spread steady state 9/10 |
-| Raider projectiles | 9 | exercised by lifecycle tests; legal replay contributes to a 13-projectile combined maximum |
+| Player Fighter projectiles | 10 | Rapid 10/10; Spread steady state 9/10 |
+| Interceptor projectiles | 9 | exercised by lifecycle tests; legal replay contributes to a 13-projectile combined maximum |
 | Combined fighter projectiles | 19 | 13 observed in the legal D.2 replay; forced-pool behavior is tested separately |
 | Broadside projectiles | 3 | 1 observed through the natural first capital-section pass on every difficulty |
 | Interactive entities | 4 physical / 2 active | active limit exercised |
@@ -176,7 +176,7 @@ COMPLETE remains terminal.
 
 ## Weapon-mode balance and isolated cost
 
-The packed-XEX 500-frame held-FIRE trace executes the complete Viper erase,
+The packed-XEX 500-frame held-FIRE trace executes the complete Player Fighter erase,
 update/collision, control, render/backing path and the booster timer where
 applicable. Counts include the established eight/ten-shot burst controller and
 12-frame post-burst pause.
@@ -200,7 +200,7 @@ The candidate-only lower-playfield replay extends the safe gameplay raster to
 scanline 239 without running the full release gauntlet. A 420-frame native XEX
 joystick replay reaches PMG Y=32 and Y=225, shows far stars and the capital
 encounter throughout the recovered rows, and peaks at 24,569 wall cycles
-(10,999 cycles PAL headroom). A separate 1,200-frame lower Cylon-contact replay
+(10,999 cycles PAL headroom). A separate 1,200-frame lower Hostile-contact replay
 records a real hit with player PMG Y=199 and peaks at 24,734 cycles (10,834
 headroom). The 1,800-frame native pickup traversal covers two complete Y=24 to
 Y=238 passes and release at Y=240; its focused maximum is 29,216 cycles (6,352

@@ -26,9 +26,9 @@ import {
   executeWeaponPickupRingWrapTrace,
   executeWeaponPickupTrace,
   executeWeaponPickupTraversalTrace,
-  executeViperBurstBalanceTrace,
-  executeViperProjectileColourTrace,
-  executeViperProjectileColourLifecycleTrace,
+  executePlayerFighterBurstBalanceTrace,
+  executePlayerFighterProjectileColourTrace,
+  executePlayerFighterProjectileColourLifecycleTrace,
   weaponPickupTraceCsv,
 } from "../scripts/weapon-pickup-runtime.mjs";
 
@@ -169,7 +169,7 @@ test("three eight-phase banks preserve one tapered 8x16 capsule through 2x2/2x3 
   assert.doesNotMatch(renderer, /@render_pickup_pair/);
 });
 
-test("release XEX and ATR execute 0→1→2→pending only for consumed Viper kills", () => {
+test("release XEX and ATR execute 0→1→2→pending only for consumed PlayerFighter kills", () => {
   const xex = executeWeaponPickupTrace({ root, artifact: "xex" });
   const atr = executeWeaponPickupTrace({ root, artifact: "atr" });
   assert.equal(assertWeaponPickupTraceParity(xex, atr), true);
@@ -198,7 +198,7 @@ test("non-projectile causes and repeated resolution never advance the drop count
   assert.deepEqual(causes.map(({ first }) => first.scoreLo), [0x10, 0x10, 0, 0, 0]);
 });
 
-test("pending is hidden and non-colliding for thirty full frames after Raider breakup", () => {
+test("pending is hidden and non-colliding for thirty full frames after Interceptor breakup", () => {
   const trace = executeWeaponPickupTrace({ root, artifact: "xex" });
   const pending = trace.records.filter(({ phase }) => phase === "PENDING");
   assert.equal(pending.length, 30);
@@ -211,7 +211,7 @@ test("pending is hidden and non-colliding for thirty full frames after Raider br
   assert.deepEqual([
     firstActive.state, firstActive.activeMask, firstActive.activeCount,
     firstActive.effectActiveMask, firstActive.effectActiveCount, firstActive.y,
-  ], [2, 2, 1, 0, 0, 24], "Raider fragments must expire before the capsule enters at the top");
+  ], [2, 2, 1, 0, 0, 24], "Interceptor fragments must expire before the capsule enters at the top");
 });
 
 test("every booster type enters at the top, crosses the full playfield once and releases below it", () => {
@@ -395,7 +395,7 @@ test("player PMG transparency preserves every pickup phase at nose side and rear
           if (capsulePixel !== 0 && (bodyPixel || enginePixel)) {
             opaquePlayerPixels += 1;
             assert.equal(typeof composed, "string",
-              `${contact} phase ${phase}: opaque Viper pixel lost foreground priority`);
+              `${contact} phase ${phase}: opaque PlayerFighter pixel lost foreground priority`);
           }
         }
       }
@@ -621,17 +621,17 @@ test("Rapid Fire lasts 500 active frames and keeps its ten-shot accelerated burs
   assert.deepEqual([expired.state, expired.timer], [0, 0]);
   const { weapons } = assets();
   assert.deepEqual([
-    weapons.viper.burstCount, weapons.viper.rapidFireBurstCount,
-    weapons.viper.spreadShotBurstCount, weapons.viper.burstIntervalFrames,
-    weapons.viper.rapidFireIntervalFrames, weapons.viper.rapidFireDurationFrames,
-    weapons.viper.poolSlots, weapons.viper.speedScanlines,
-    weapons.viper.widthHpos, weapons.viper.heightScanlines,
+    weapons.player_fighter.burstCount, weapons.player_fighter.rapidFireBurstCount,
+    weapons.player_fighter.spreadShotBurstCount, weapons.player_fighter.burstIntervalFrames,
+    weapons.player_fighter.rapidFireIntervalFrames, weapons.player_fighter.rapidFireDurationFrames,
+    weapons.player_fighter.poolSlots, weapons.player_fighter.speedScanlines,
+    weapons.player_fighter.widthHpos, weapons.player_fighter.heightScanlines,
   ], [8, 10, 8, 3, 2, 500, 10, 6, 1, 2]);
 });
 
 test("packed runtime distinguishes 8-shot normal, 10-shot Rapid and 8-salvo Spread", () => {
-  const xex = executeViperBurstBalanceTrace({ root, artifact: "xex" });
-  const atr = executeViperBurstBalanceTrace({ root, artifact: "atr" });
+  const xex = executePlayerFighterBurstBalanceTrace({ root, artifact: "xex" });
+  const atr = executePlayerFighterBurstBalanceTrace({ root, artifact: "atr" });
   assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
   const summary = xex.traces.map((mode) => [
     mode.mode, mode.expectedBurst, mode.intervalFrames, mode.postBurstFrames,
@@ -654,9 +654,9 @@ test("packed runtime distinguishes 8-shot normal, 10-shot Rapid and 8-salvo Spre
   assert.deepEqual(firstBurstFrames(xex.traces[2]), [0, 10, 20, 30, 40, 50, 60, 70]);
 });
 
-test("Normal and Rapid projectiles render through the Viper yellow bank", () => {
-  const xex = executeViperProjectileColourTrace({ root, artifact: "xex" });
-  const atr = executeViperProjectileColourTrace({ root, artifact: "atr" });
+test("Normal and Rapid projectiles render through the PlayerFighter yellow bank", () => {
+  const xex = executePlayerFighterProjectileColourTrace({ root, artifact: "xex" });
+  const atr = executePlayerFighterProjectileColourTrace({ root, artifact: "atr" });
   assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
   assert.deepEqual([
     xex.normalAtSpawn, xex.normalAfterPickup, xex.rapidAtSpawn,
@@ -672,26 +672,26 @@ test("Normal and Rapid projectiles render through the Viper yellow bank", () => 
   assert.equal(xex.rendered.every(({ colourRegister, colourValue }) =>
     colourRegister === "COLPF2" && colourValue === 0x1e), true);
   assert.deepEqual([
-    xex.raiderRendered.activeRenderId, xex.raiderRendered.inverse,
-    xex.raiderRendered.colourRegister, xex.raiderRendered.colourValue,
+    xex.interceptorRendered.activeRenderId, xex.interceptorRendered.inverse,
+    xex.interceptorRendered.colourRegister, xex.interceptorRendered.colourValue,
   ], [2, 1, "COLPF3", 0x46]);
   const { weapons } = assets();
   assert.deepEqual([
-    weapons.viper.widthHpos, weapons.viper.heightScanlines,
-    weapons.viper.speedScanlines, weapons.viper.poolSlots,
+    weapons.player_fighter.widthHpos, weapons.player_fighter.heightScanlines,
+    weapons.player_fighter.speedScanlines, weapons.player_fighter.poolSlots,
   ], [1, 2, 6, 10]);
   const collisionPath = source.slice(source.indexOf("update_fighter_projectiles:"),
-    source.indexOf("allocate_viper_projectile:"));
-  assert.match(collisionPath, /lda FIGHTER_PROJECTILE_ACTIVE,x\s+beq @viper_next/);
+    source.indexOf("allocate_player_fighter_projectile:"));
+  assert.match(collisionPath, /lda FIGHTER_PROJECTILE_ACTIVE,x\s+beq @player_fighter_next/);
   assert.doesNotMatch(collisionPath, /FIGHTER_PROJECTILE_RAPID_COLOR|and #\$7F/);
 });
 
-test("packed XEX and ATR keep every implemented Viper lifecycle path yellow under cold RAM", () => {
+test("packed XEX and ATR keep every implemented PlayerFighter lifecycle path yellow under cold RAM", () => {
   for (const coldFill of [0xa5, 0x5a]) {
-    const xex = executeViperProjectileColourLifecycleTrace({
+    const xex = executePlayerFighterProjectileColourLifecycleTrace({
       root, artifact: "xex", coldFill,
     });
-    const atr = executeViperProjectileColourLifecycleTrace({
+    const atr = executePlayerFighterProjectileColourLifecycleTrace({
       root, artifact: "atr", coldFill,
     });
     assert.deepEqual({ ...xex, artifact: "release" }, { ...atr, artifact: "release" });
@@ -715,8 +715,8 @@ test("packed XEX and ATR keep every implemented Viper lifecycle path yellow unde
       ["NEW_GAME", 0, 1, true],
     ]);
     assert.deepEqual([
-      xex.raider.activeRenderId, xex.raider.inverse,
-      xex.raider.colourRegister, xex.raider.colourValue,
+      xex.interceptor.activeRenderId, xex.interceptor.inverse,
+      xex.interceptor.colourRegister, xex.interceptor.colourValue,
     ], [2, 1, "COLPF3", 0x46]);
   }
 });

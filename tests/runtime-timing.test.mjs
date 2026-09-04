@@ -17,7 +17,7 @@ test("linked release replay covers every reviewed runtime timing scenario", () =
     "hullEvent",
     "maximumProjectilePool",
     "threeBroadside",
-    "liveRaider",
+    "liveInterceptor",
     "activeExplosion",
     "musicWithSfx",
   ]) {
@@ -30,14 +30,14 @@ test("linked release replay covers every reviewed runtime timing scenario", () =
   assert.ok(timing.scenarios.musicWithSfx.events.includes("music+sfx"));
   assert.ok(timing.scenarios.debrisShotPath.events.includes("active-debris"));
   assert.ok(timing.scenarios.debrisShotPath.events.includes("debris-shot"));
-  assert.ok(timing.scenarios.debrisShotPath.viperProjectileOccupancy > 0);
-  assert.equal(timing.scenarios.noViperProjectilePath.viperProjectileOccupancy, 0);
-  assert.equal(timing.scenarios.noViperProjectilePath.procedureCallCounts
-    .entity_viper_projectile_target ?? 0, 0);
+  assert.ok(timing.scenarios.debrisShotPath.player_fighterProjectileOccupancy > 0);
+  assert.equal(timing.scenarios.noPlayerFighterProjectilePath.player_fighterProjectileOccupancy, 0);
+  assert.equal(timing.scenarios.noPlayerFighterProjectilePath.procedureCallCounts
+    .entity_player_fighter_projectile_target ?? 0, 0);
   assert.ok(timing.destructibleDebris.noActiveDebrisPathDeltaCpuCycles <=
     timing.destructibleDebris.noActiveDebrisPathLimitCpuCycles);
-  assert.ok(timing.destructibleDebris.noActiveViperProjectilePathDeltaCpuCycles <=
-    timing.destructibleDebris.noActiveViperProjectilePathLimitCpuCycles);
+  assert.ok(timing.destructibleDebris.noActivePlayerFighterProjectilePathDeltaCpuCycles <=
+    timing.destructibleDebris.noActivePlayerFighterProjectilePathLimitCpuCycles);
 });
 
 test("DMA-off CPU comparison stays below its executable comparison gate", () => {
@@ -69,7 +69,7 @@ test("measured DMA-on fields come only from an artifact-matched Atari800 trace",
     trace.semantics.measured_wall_cycles_dma_on);
   assert.equal(timing.measured_physical_headroom,
     timing.palFrameCycles - timing.measured_wall_cycles_dma_on);
-  assert.equal(trace.artifact.sha256, manifest.artifacts["dark-fighter.xex"].sha256);
+  assert.equal(trace.artifact.sha256, manifest.artifacts["void-strike-65.xex"].sha256);
   assert.equal(trace.instrumentation.guest_cycles_added, 0);
   assert.equal(trace.instrumentation.production_dma_ctl, 0x3e);
   assert.equal(trace.instrumentation.production_nmi_en, 0x80);

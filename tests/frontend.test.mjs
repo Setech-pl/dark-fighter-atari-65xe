@@ -14,10 +14,10 @@ const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 const residentSource = source.slice(0, source.indexOf('.segment "BOOT_STAGE2"'));
-const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
+const map = fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.map"), "utf8");
 const labels = new Map(
   fs
-    .readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+    .readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -71,7 +71,7 @@ test("main menu labels are exact, ordered, and default to START GAME", () => {
   const title = frontend.mainMenuRecords.find(({ mode }) => mode === 7);
   assert.deepEqual(
     [title.text, title.column, title.y],
-    ["DARK FIGHTER", 4, 24],
+    ["VOID STRIKE 65", 4, 24],
   );
   assert.equal(frontend.defaultSelection, 0);
   assert.equal(frontend.markerAddresses.length, 13);
@@ -171,7 +171,7 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   ]) {
     assert.match(silence, new RegExp(`sta ${register}`));
   }
-  assert.match(routine("play_viper_projectile_sound"), /lda sound_enabled\s+beq @accepted/);
+  assert.match(routine("play_player_fighter_projectile_sound"), /lda sound_enabled\s+beq @accepted/);
   assert.match(routine("play_hit_sound"), /lda sound_enabled\s+beq @done/);
   assert.match(
     routine("update_sound"),
@@ -336,8 +336,8 @@ test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => 
   const exited = routine("enter_exited_state");
   assert.match(exited, /jsr music_stop/);
   assert.match(exited, /@wait:\s+jsr wait_frame\s+jmp @wait/);
-  assert.match(source, /\.byte "DARK FIGHTER ENDED",0/);
-  assert.match(source, /\.byte "PRESS RESET TO RESTART",0/);
+  assert.match(source, /\.byte "VOID STRIKE 65 ENDED",0/);
+  assert.match(source, /\.byte "PRESS RESET: RESTART",0/);
   assert.doesNotMatch(exited, /DOSVEC|SIOV/);
   assert.doesNotMatch(residentSource, /jmp \(DOSVEC\)|jsr SIOV/);
 });
@@ -432,8 +432,8 @@ test("mixed display list, screen offsets, title, menu, and hint are bounded", ()
     [9],
   );
 
-  const title = state.graphics.mainMenuRecords.find(({ text }) => text === "DARK FIGHTER");
-  assert.deepEqual([title.mode, title.column, title.text.length, title.y], [7, 4, 12, 24]);
+  const title = state.graphics.mainMenuRecords.find(({ text }) => text === "VOID STRIKE 65");
+  assert.deepEqual([title.mode, title.column, title.text.length, title.y], [7, 4, 14, 24]);
   const menuRecords = state.graphics.mainMenuRecords.filter(({ mode }) => mode === 6);
   assert.equal(menuRecords.length, 4);
   assert.deepEqual(menuRecords.map(({ column }) => column), [4,6,4,8]);
@@ -441,7 +441,7 @@ test("mixed display list, screen offsets, title, menu, and hint are bounded", ()
   const hint = state.graphics.mainMenuRecords.find(({ mode }) => mode === 2);
   assert.deepEqual(
     [hint.text, hint.column, hint.text.length],
-    ["UP/DOWN MOVE   FIRE SELECT", 7, 26],
+    ["UP/DOWN MOVE FIRE SELECT", 7, 24],
   );
   const visibleColors = (record, cellWidth, height) => {
     const colors = new Set();
@@ -459,13 +459,13 @@ test("mixed display list, screen offsets, title, menu, and hint are bounded", ()
   assert.deepEqual(visibleColors(title, 16, 16), new Set([0x00, 0x1e]));
   assert.deepEqual(visibleColors(hint, 8, 8), new Set([0x00, 0x0e]));
   assert.deepEqual(
-    [...state.screen.subarray(constants.get("MAIN_MENU_VIPER_TOP_OFFSET") + 18,
-      constants.get("MAIN_MENU_VIPER_TOP_OFFSET") + 21)],
+    [...state.screen.subarray(constants.get("MAIN_MENU_PLAYER_FIGHTER_TOP_OFFSET") + 18,
+      constants.get("MAIN_MENU_PLAYER_FIGHTER_TOP_OFFSET") + 21)],
     [58,59,60],
   );
   assert.deepEqual(
-    [...state.screen.subarray(constants.get("MAIN_MENU_VIPER_BOTTOM_OFFSET") + 18,
-      constants.get("MAIN_MENU_VIPER_BOTTOM_OFFSET") + 21)],
+    [...state.screen.subarray(constants.get("MAIN_MENU_PLAYER_FIGHTER_BOTTOM_OFFSET") + 18,
+      constants.get("MAIN_MENU_PLAYER_FIGHTER_BOTTOM_OFFSET") + 21)],
     [61,62,63],
   );
 
@@ -489,10 +489,10 @@ test("mixed display list, screen offsets, title, menu, and hint are bounded", ()
   );
 });
 
-test("menu Viper is charset-only, frontend PMG stays disabled, and gameplay setup is restored", () => {
+test("menu PlayerFighter is charset-only, frontend PMG stays disabled, and gameplay setup is restored", () => {
   const state = readStartMenuRuntimeState(source);
   const { constants, hardwareState } = state.graphics;
-  assert.equal(constants.get("CH_FRONT_VIPER_TOP_LEFT"), 58);
+  assert.equal(constants.get("CH_FRONT_PLAYER_FIGHTER_TOP_LEFT"), 58);
   assert.equal(constants.get("FRONTEND_GLYPH_COUNT"), 43);
   assert.doesNotMatch(routine("draw_main_menu_scene"), /PLAYER[0-3]|HPOSP|SIZEP/);
 

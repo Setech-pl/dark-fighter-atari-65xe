@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 
 export const runtimeArtifactNames = [
-  "dark-fighter-boot.bin",
-  "dark-fighter.xex",
-  "dark-fighter.atr",
+  "void-strike-65-boot.bin",
+  "void-strike-65.xex",
+  "void-strike-65.atr",
 ];
 
 export function runtimeEvidencePhase(argumentsList) {
@@ -24,9 +24,9 @@ export function runtimeArtifactDescriptor(path, bytes) {
 
 export function runtimeArtifactSet({ boot, xex, atr }) {
   return {
-    "dark-fighter-boot.bin": runtimeArtifactDescriptor("dist/dark-fighter-boot.bin", boot),
-    "dark-fighter.xex": runtimeArtifactDescriptor("dist/dark-fighter.xex", xex),
-    "dark-fighter.atr": runtimeArtifactDescriptor("dist/dark-fighter.atr", atr),
+    "void-strike-65-boot.bin": runtimeArtifactDescriptor("dist/void-strike-65-boot.bin", boot),
+    "void-strike-65.xex": runtimeArtifactDescriptor("dist/void-strike-65.xex", xex),
+    "void-strike-65.atr": runtimeArtifactDescriptor("dist/void-strike-65.atr", atr),
   };
 }
 
@@ -49,7 +49,7 @@ export function validateRuntimeEvidenceBinding(report, artifacts, options = {}) 
       throw new Error(`Runtime wall trace binding mismatch for ${name}`);
     }
   }
-  const xex = artifacts["dark-fighter.xex"];
+  const xex = artifacts["void-strike-65.xex"];
   if (report.artifact?.path !== xex.path || report.artifact?.bytes !== xex.bytes ||
       report.artifact?.sha256 !== xex.sha256) {
     throw new Error("Runtime wall trace compatibility XEX binding is inconsistent");

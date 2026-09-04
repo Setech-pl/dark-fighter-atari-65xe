@@ -28,7 +28,7 @@ test("generated artifact set is internally consistent", () => {
 
 test("XEX contains a payload segment and RUNAD", () => {
   const { manifest } = validateBuildDirectory(rootDirectory);
-  const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
+  const xex = fs.readFileSync(path.join(rootDirectory, "dist", "void-strike-65.xex"));
   const { segments } = parseXex(xex);
   assert.equal(segments.length, 6);
   assert.equal(segments[0].start, 0x2000);
@@ -49,7 +49,7 @@ test("XEX contains a payload segment and RUNAD", () => {
 
 test("ATR uses standard single-density geometry", () => {
   const { manifest } = validateBuildDirectory(rootDirectory);
-  const atr = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.atr"));
+  const atr = fs.readFileSync(path.join(rootDirectory, "dist", "void-strike-65.atr"));
   const parsed = parseAtr(atr);
   assert.equal(parsed.magic, atrConstants.magic);
   assert.equal(parsed.sectorSize, 128);
@@ -85,7 +85,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     layout.suffixRawBytes - layout.suffixPackedBytes,
   ], [8192, 449, layout.suffixRawBytes, layout.suffixPackedBytes,
     layout.suffixRawBytes - layout.suffixPackedBytes]);
-  assert.equal(layout.suffixRawBytes - layout.suffixPackedBytes, 1077);
+  assert.equal(layout.suffixRawBytes - layout.suffixPackedBytes, 1136);
   assert.deepEqual(unpackBroadsideLzss(packed), suffix);
   assert.deepEqual(resident.subarray(layout.prefixBytes), suffix);
   assert.deepEqual(
@@ -94,7 +94,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     packed,
   );
   assert.equal(reserve.recoveredReserveBytes, 1097);
-  assert.equal(reserve.residentSuffixGrossSavingsBytes, 1077);
+  assert.equal(reserve.residentSuffixGrossSavingsBytes, 1136);
   assert.equal(reserve.minimumRecoveredReserveBytes, 1024);
   assert.ok(reserve.reserveBytes >= 64);
   assert.deepEqual(manifest.payloadBudget.weaponPickupRapidFire, {
@@ -134,7 +134,7 @@ test("resident compaction proof survives and Spread Shot leaves at least 64 sour
     manifest.broadsideRuntime.runAddress,
     manifest.entityEffects.sourceToStagingMarginBytes,
     manifest.entityEffects.stagingToBroadsideMarginBytes,
-  ], [0x5261, 0x534b, 0x5d3a, 0x5e10, 234, 214]);
+  ], [0x5226, 0x534b, 0x5d3a, 0x5e10, 293, 214]);
 
   const lifecycle = manifest.entityEffects.stagingLifecycle;
   assert.equal(lifecycle.stagingReleasedBeforeStarfieldExpansion, true);

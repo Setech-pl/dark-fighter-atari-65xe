@@ -19,11 +19,11 @@ import {
 import {
   compileFighterWeapons,
   createSharedFighterExplosion,
-  createViperBurstState,
+  createPlayerFighterBurstState,
   loadFighterWeaponsDefinition,
-  simulateViperBurst,
+  simulatePlayerFighterBurst,
   stepSharedFighterExplosion,
-  stepViperBurst,
+  stepPlayerFighterBurst,
 } from "./fighter-weapons.mjs";
 import {
   compileStarfield,
@@ -42,11 +42,11 @@ import {
 } from "./entity-effects.mjs";
 import {
   assertDebrisDestructionTraceParity,
-  assertRaiderBreakupTraceParity,
+  assertInterceptorBreakupTraceParity,
   debrisDestructionTraceCsv,
   executeDebrisDestructionTrace,
-  executeRaiderBreakupTrace,
-  raiderBreakupTraceCsv,
+  executeInterceptorBreakupTrace,
+  interceptorBreakupTraceCsv,
 } from "./debris-destruction-runtime.mjs";
 import {
   assertSpreadShotTraceParity,
@@ -55,13 +55,13 @@ import {
   executeShieldBoosterTrace,
   executeSpreadShotHullVolleyTrace,
   executeSpreadShotTrace,
-  executeViperBurstBalanceTrace,
+  executePlayerFighterBurstBalanceTrace,
   executeWeaponPickupTrace,
   executeWeaponPickupBackingTrace,
-  executeViperProjectileColourTrace,
-  executeViperProjectileColourLifecycleTrace,
+  executePlayerFighterProjectileColourTrace,
+  executePlayerFighterProjectileColourLifecycleTrace,
   spreadShotTraceCsv,
-  viperBurstBalanceTraceCsv,
+  player_fighterBurstBalanceTraceCsv,
   weaponPickupTraceCsv,
 } from "./weapon-pickup-runtime.mjs";
 import {
@@ -73,7 +73,7 @@ import {
   projectileVisualMetrics,
   queueEnemyDamage,
   resolveEnemyDamage,
-  simulateNaturalRaiderFire,
+  simulateNaturalInterceptorFire,
   stepEnemyCombatFrame,
   sweptHorizontalProjectileTargets,
 } from "./enemy-combat.mjs";
@@ -281,25 +281,25 @@ export const DEFAULT_ENEMY_BEFORE_AFTER_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-raider-before-after.png",
+  "enemy-interceptor-before-after.png",
 );
-export const DEFAULT_ENEMY_PALETTE_CYLON_OXBLOOD_PREVIEW_PATH = path.join(
+export const DEFAULT_ENEMY_PALETTE_HOSTILE_OXBLOOD_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-palette-cylon-oxblood.png",
+  "enemy-palette-hostile-oxblood.png",
 );
-export const DEFAULT_ENEMY_PALETTE_CYLON_BURGUNDY_PREVIEW_PATH = path.join(
+export const DEFAULT_ENEMY_PALETTE_HOSTILE_BURGUNDY_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-raider-cylon-burgundy-comparison.png",
+  "enemy-interceptor-hostile-burgundy-comparison.png",
 );
-export const DEFAULT_ENEMY_PALETTE_CYLON_SCARLET_PREVIEW_PATH = path.join(
+export const DEFAULT_ENEMY_PALETTE_HOSTILE_SCARLET_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-palette-cylon-scarlet.png",
+  "enemy-palette-hostile-scarlet.png",
 );
 export const DEFAULT_ENEMY_COMBAT_SEQUENCE_PREVIEW_PATH = path.join(
   rootDirectory,
@@ -319,11 +319,11 @@ export const DEFAULT_PROJECTILE_COLLISION_SCORING_PREVIEW_PATH = path.join(
   "previews",
   "projectile-collision-scoring-sequence.png",
 );
-export const DEFAULT_RAIDER_NATURAL_FIRE_TRACE_PATH = path.join(
+export const DEFAULT_INTERCEPTOR_NATURAL_FIRE_TRACE_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "raider-natural-fire-trace.csv",
+  "interceptor-natural-fire-trace.csv",
 );
 export const DEFAULT_FIGHTER_BURST_RUNTIME_TRACE_PATH = path.join(
   rootDirectory,
@@ -391,17 +391,17 @@ export const DEFAULT_DESTRUCTIBLE_DEBRIS_TRACE_PATH = path.join(
   "previews",
   "destructible-debris-trace.csv",
 );
-export const DEFAULT_RAIDER_BREAKUP_PREVIEW_PATH = path.join(
+export const DEFAULT_INTERCEPTOR_BREAKUP_PREVIEW_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-raider-breakup-review.png",
+  "enemy-interceptor-breakup-review.png",
 );
-export const DEFAULT_RAIDER_BREAKUP_TRACE_PATH = path.join(
+export const DEFAULT_INTERCEPTOR_BREAKUP_TRACE_PATH = path.join(
   rootDirectory,
   "build",
   "previews",
-  "enemy-raider-breakup-trace.csv",
+  "enemy-interceptor-breakup-trace.csv",
 );
 export const DEFAULT_WEAPON_PICKUP_PREVIEW_PATH = path.join(
   rootDirectory,
@@ -451,16 +451,16 @@ export const DEFAULT_PROJECTILE_COLOUR_XEX_PREVIEW_PATH = path.join(
 export const DEFAULT_PROJECTILE_COLOUR_ATR_PREVIEW_PATH = path.join(
   rootDirectory, "build", "previews", "weapon-projectile-colour-regression-atr.png",
 );
-export const DEFAULT_VIPER_BURST_BALANCE_XEX_PREVIEW_PATH = path.join(
+export const DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_XEX_PREVIEW_PATH = path.join(
   rootDirectory, "build", "previews", "weapon-burst-balance-xex.png",
 );
-export const DEFAULT_VIPER_BURST_BALANCE_ATR_PREVIEW_PATH = path.join(
+export const DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_ATR_PREVIEW_PATH = path.join(
   rootDirectory, "build", "previews", "weapon-burst-balance-atr.png",
 );
-export const DEFAULT_VIPER_BURST_BALANCE_XEX_TRACE_PATH = path.join(
+export const DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_XEX_TRACE_PATH = path.join(
   rootDirectory, "build", "previews", "weapon-burst-balance-xex.csv",
 );
-export const DEFAULT_VIPER_BURST_BALANCE_ATR_TRACE_PATH = path.join(
+export const DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_ATR_TRACE_PATH = path.join(
   rootDirectory, "build", "previews", "weapon-burst-balance-atr.csv",
 );
 export const DEFAULT_SPREAD_SHOT_HULL_XEX_PREVIEW_PATH = path.join(
@@ -836,11 +836,11 @@ export function readGameGraphicsSource(
     ["GAMEPLAY_TOP", fighterWeapons.viewport.gameplayTop],
     ["GAMEPLAY_BOTTOM", fighterWeapons.viewport.gameplayBottom],
     ["PLAYER_RESPAWN_Y", fighterWeapons.viewport.gameplayBottom - 15],
-    ["VIPER_PROJECTILE_COLOR", fighterWeapons.viper.colourValue],
-    ["RAIDER_PROJECTILE_COLOR", fighterWeapons.raider.colourValue],
+    ["PLAYER_FIGHTER_PROJECTILE_COLOR", fighterWeapons.player_fighter.colourValue],
+    ["INTERCEPTOR_PROJECTILE_COLOR", fighterWeapons.interceptor.colourValue],
     ["SHARED_FIGHTER_EXPLOSION_TOTAL", fighterWeapons.sharedFighterExplosion.totalFrames],
-    ["GAMEPLAY_COLPF2", fighterWeapons.viper.colourValue],
-    ["GAMEPLAY_COLPF3", fighterWeapons.raider.colourValue],
+    ["GAMEPLAY_COLPF2", fighterWeapons.player_fighter.colourValue],
+    ["GAMEPLAY_COLPF3", fighterWeapons.interceptor.colourValue],
     ["STAR_FAR_CAPACITY", starfield.farLayer.population],
     ["STAR_FAR_STEP_RATIO", starfield.farLayer.stepRatio],
     ["STAR_NEAR_STEP_RATIO", starfield.nearLayer.stepRatio],
@@ -917,8 +917,8 @@ export function readGameGraphicsSource(
   );
   const sourceCharset = Uint8Array.from(charset);
   charset.set(
-    fighterWeapons.glyphs.viper.flat(),
-    fighterWeapons.glyphLayout.viperBase * CHARACTER_HEIGHT,
+    fighterWeapons.glyphs.player_fighter.flat(),
+    fighterWeapons.glyphLayout.player_fighterBase * CHARACTER_HEIGHT,
   );
   charset.set(starfield.glyphBytes, starfield.glyphs[0].screenCode * CHARACTER_HEIGHT);
 
@@ -1419,12 +1419,12 @@ function createStartMenuScreen(graphics, selection) {
     const offset = requireValue(graphics.constants, base);
     screen.fill(line, offset + 7, offset + 33);
   }
-  const viper = requireValue(graphics.constants, "CH_FRONT_VIPER_TOP_LEFT");
+  const player_fighter = requireValue(graphics.constants, "CH_FRONT_PLAYER_FIGHTER_TOP_LEFT");
   for (let x = 0; x < 3; x += 1) {
-    screen[requireValue(graphics.constants, "MAIN_MENU_VIPER_TOP_OFFSET") + 18 + x] = viper + x;
-    screen[requireValue(graphics.constants, "MAIN_MENU_VIPER_BOTTOM_OFFSET") + 18 + x] = viper + 3 + x;
+    screen[requireValue(graphics.constants, "MAIN_MENU_PLAYER_FIGHTER_TOP_OFFSET") + 18 + x] = player_fighter + x;
+    screen[requireValue(graphics.constants, "MAIN_MENU_PLAYER_FIGHTER_BOTTOM_OFFSET") + 18 + x] = player_fighter + 3 + x;
   }
-  const title = graphics.mainMenuRecords.find(({ text }) => text === "DARK FIGHTER");
+  const title = graphics.mainMenuRecords.find(({ text }) => text === "VOID STRIKE 65");
   for (let index = 0; index < title.text.length; index += 1) {
     screen[title.address - screenAddress + index] |=
       requireValue(graphics.constants, "ANTIC67_COLOR_PF1");
@@ -2189,10 +2189,10 @@ export function createExplosionFlashNativePreview(
     })),
     { label: "ENEMY RESTORE BASE", color: runtime.baseColor },
     ...runtime.playerSequence.map((color, index) => ({
-      label: `VIPER F${index + 1} ${displayName(runtime.nameByValue.get(color))} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
+      label: `PLAYER_FIGHTER F${index + 1} ${displayName(runtime.nameByValue.get(color))} GTIA ${color.toString(16).padStart(2, "0").toUpperCase()}`,
       color,
     })),
-    { label: "VIPER RESTORE BASE", color: runtime.baseColor },
+    { label: "PLAYER_FIGHTER RESTORE BASE", color: runtime.baseColor },
   ];
   const frames = [...paletteFrames, ...sequenceFrames];
   const columns = 3;
@@ -2255,7 +2255,7 @@ export function createExplosionFlashComparisonPreview(
     });
   };
   drawTimeline("ENEMY 4F", runtime.enemySequence, 132, 100);
-  drawTimeline("VIPER 6F", runtime.playerSequence, 188, 72);
+  drawTimeline("PLAYER_FIGHTER 6F", runtime.playerSequence, 188, 72);
   return encodePng(
     scaleAndConvertToRgb(registerPixels, width, height, 2),
     width * 2,
@@ -2267,7 +2267,7 @@ export function createExplosionFlashTrace(source) {
   const runtime = readExplosionFlashRuntimeState(source);
   const hex = (value) => `$${value.toString(16).padStart(2, "0").toUpperCase()}`;
   const lines = ["profile,frame,timer,COLBK,symbol,active,elapsed_ms"];
-  for (const [profile, sequence] of [["ENEMY", runtime.enemySequence], ["VIPER", runtime.playerSequence]]) {
+  for (const [profile, sequence] of [["ENEMY", runtime.enemySequence], ["PLAYER_FIGHTER", runtime.playerSequence]]) {
     sequence.forEach((color, index) => lines.push([
       profile,
       index + 1,
@@ -3116,7 +3116,7 @@ export function createEnemyReviewHarnessPreview(source, definition) {
 export function createEnemyScannerComparisonPreview(source) {
   const roster = loadEnemyRosterPreviewAsset();
   const frontend = readFrontendGraphicsSource(source);
-  const raider = roster.implemented[0];
+  const interceptor = roster.implemented[0];
   const width = 720;
   const height = 150;
   const registers = new Uint8Array(width * height);
@@ -3128,7 +3128,7 @@ export function createEnemyScannerComparisonPreview(source) {
   panels.forEach(([label, accent, phase], index) => {
     const originX = index * 240;
     drawComparisonLabel(registers, width, label, originX + 12, 10, frontend);
-    drawEnemyRaster(registers, width, height, raider, originX + 74, 42, phase, {
+    drawEnemyRaster(registers, width, height, interceptor, originX + 74, 42, phase, {
       scale: 6,
       accent,
     });
@@ -3136,12 +3136,12 @@ export function createEnemyScannerComparisonPreview(source) {
   return encodePng(scaleAndConvertToRgb(registers, width, height, 1), width, height);
 }
 
-export function createEnemyRaiderBeforeAfterPreview(source) {
+export function createEnemyInterceptorBeforeAfterPreview(source) {
   const roster = loadEnemyRosterPreviewAsset();
   const frontend = readFrontendGraphicsSource(source);
-  const raider = roster.implemented[0];
+  const interceptor = roster.implemented[0];
   const legacy = {
-    ...raider,
+    ...interceptor,
     height: 12,
     frames: 1,
     bodyRows: Uint8Array.of(0x81, 0xc3, 0xe7, 0x7e, 0x3c, 0x7e, 0xff, 0x7e, 0xdb, 0xc3, 0x81, 0x81),
@@ -3154,9 +3154,9 @@ export function createEnemyRaiderBeforeAfterPreview(source) {
   const height = 150;
   const registers = new Uint8Array(width * height);
   drawComparisonLabel(registers, width, "SCHEMATIC BASELINE", 28, 10, frontend);
-  drawComparisonLabel(registers, width, "FINAL NATIVE RAIDER", 274, 10, frontend);
+  drawComparisonLabel(registers, width, "FINAL NATIVE INTERCEPTOR", 274, 10, frontend);
   drawEnemyRaster(registers, width, height, legacy, 68, 42, 0, { scale: 6 });
-  drawEnemyRaster(registers, width, height, raider, 306, 42, 2, { scale: 6 });
+  drawEnemyRaster(registers, width, height, interceptor, 306, 42, 2, { scale: 6 });
   return encodePng(scaleAndConvertToRgb(registers, width, height, 1), width, height);
 }
 
@@ -3170,13 +3170,13 @@ export function readEnemyPaletteCandidateRuntimeState(
     ({ id }) => id === candidateId,
   );
   if (!candidate) throw new Error(`Unknown enemy palette candidate ${candidateId}`);
-  const raider = graphics.releaseEnemy;
+  const interceptor = graphics.releaseEnemy;
   const enemyY = 96;
   const pulsePolicy = graphics.enemyRoster.runtime.weaponPolicy.singlePulse;
   const positionSpecs = [
-    ["LEFT BOUND BESIDE ALLIED HULL", raider.logicalBounds[0]],
-    ["CENTER WITH VIPER AND M0", Math.floor((raider.logicalBounds[0] + raider.logicalBounds[1]) / 2)],
-    ["RIGHT BOUND BESIDE ENEMY HULL", raider.logicalBounds[1]],
+    ["LEFT BOUND BESIDE ALLIED HULL", interceptor.logicalBounds[0]],
+    ["CENTER WITH PLAYER_FIGHTER AND M0", Math.floor((interceptor.logicalBounds[0] + interceptor.logicalBounds[1]) / 2)],
+    ["RIGHT BOUND BESIDE ENEMY HULL", interceptor.logicalBounds[1]],
   ];
   const panelDefinitions = [];
 
@@ -3187,7 +3187,7 @@ export function readEnemyPaletteCandidateRuntimeState(
     enemyBodyColor: candidate.value,
     enemyAccentColor: graphics.enemyRoster.runtime.colourPolicy.accentValue,
   });
-  drawEnemyRaster(blackPixels, SOURCE_WIDTH, SOURCE_HEIGHT, raider, 186, 58, 2, {
+  drawEnemyRaster(blackPixels, SOURCE_WIDTH, SOURCE_HEIGHT, interceptor, 186, 58, 2, {
     scale: 4,
     bodyColor: candidate.value,
     accentColor: graphics.enemyRoster.runtime.colourPolicy.accentValue,
@@ -3209,7 +3209,7 @@ export function readEnemyPaletteCandidateRuntimeState(
       enemyBodyColor: candidate.value,
       enemyAccentColor: graphics.enemyRoster.runtime.colourPolicy.accentValue,
     });
-    const pulse = enemyPulseSpawnPosition(raider, enemyX, enemyY, pulsePolicy);
+    const pulse = enemyPulseSpawnPosition(interceptor, enemyX, enemyY, pulsePolicy);
     drawTopAnchoredMissileSpan(
       pixels,
       pulse.x,
@@ -3258,22 +3258,22 @@ export function readEnemyCombatSequenceRuntimeState(
 ) {
   const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
   const roster = graphics.enemyRoster;
-  const raider = graphics.releaseEnemy;
+  const interceptor = graphics.releaseEnemy;
   const policy = roster.runtime.weaponPolicy.singlePulse;
-  const enemyX = Math.floor((raider.logicalBounds[0] + raider.logicalBounds[1]) / 2);
+  const enemyX = Math.floor((interceptor.logicalBounds[0] + interceptor.logicalBounds[1]) / 2);
   const enemyY = 72;
-  const origin = enemyPulseSpawnPosition(raider, enemyX, enemyY, policy);
+  const origin = enemyPulseSpawnPosition(interceptor, enemyX, enemyY, policy);
   const playerX = requireValue(graphics.initialState, "player_x");
   const playerY = requireValue(graphics.initialState, "player_y");
   const panelSpecs = [
-    { label: "RAIDER READY  RED SCANNER", pulse: null },
+    { label: "INTERCEPTOR READY  RED SCANNER", pulse: null },
     { label: "RED BURST SHOT 1  PLAYFIELD", pulse: { ...origin } },
-    { label: "RED BURST PLUS YELLOW VIPER FIRE", pulse: { x: origin.x, y: origin.y + 20 }, playerShot: true },
+    { label: "RED BURST PLUS YELLOW PLAYER_FIGHTER FIRE", pulse: { x: origin.x, y: origin.y + 20 }, playerShot: true },
     { label: "PULSE APPROACH  FIVE LINES PER FRAME", pulse: { x: origin.x, y: playerY - 12 } },
-    { label: "VIPER HIT  10 DAMAGE  HEALTH 090", pulse: { x: playerX + 3, y: playerY }, health: 90 },
+    { label: "PLAYER_FIGHTER HIT  10 DAMAGE  HEALTH 090", pulse: { x: playerX + 3, y: playerY }, health: 90 },
     { label: "INVULNERABLE INTERSECTION  NO DAMAGE", pulse: { x: playerX + 3, y: playerY + 4 }, hidePlayer: true },
-    { label: "CAPITAL SHELL PLUS RAIDER BURST", pulse: { x: origin.x, y: 132 }, capital: true },
-    { label: "ALLIED CAPITAL SHELL DESTROYS RAIDER", capitalHit: true },
+    { label: "CAPITAL SHELL PLUS INTERCEPTOR BURST", pulse: { x: origin.x, y: 132 }, capital: true },
+    { label: "ALLIED CAPITAL SHELL DESTROYS INTERCEPTOR", capitalHit: true },
     { label: "CLEAN POOL  NO GHOST PIXELS", cleanup: true },
   ];
   const panelDefinitions = panelSpecs.map((spec) => {
@@ -3325,7 +3325,7 @@ export function readEnemyCombatSequenceRuntimeState(
   });
 
   let simulation = { ...createEnemyCombatState(roster, { difficulty: 1 }), fireTimer: 0 };
-  simulation = stepEnemyCombatFrame(roster, simulation, { archetype: raider, enemyX, enemyY });
+  simulation = stepEnemyCombatFrame(roster, simulation, { archetype: interceptor, enemyX, enemyY });
   const spawnedPulse = simulation.pool.find(Boolean);
   return {
     graphics,
@@ -3348,17 +3348,17 @@ export function createEnemyCombatSequencePreview(
   );
 }
 
-export function createRaiderNaturalFireTrace(
+export function createInterceptorNaturalFireTrace(
   source,
   capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
 ) {
   const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
   const scenarios = [
-    ["OPEN_MEDIUM", simulateNaturalRaiderFire(graphics.enemyRoster, {
+    ["OPEN_MEDIUM", simulateNaturalInterceptorFire(graphics.enemyRoster, {
       difficulty: 1,
       frameCount: 120,
     })],
-    ["BROADSIDE_HARD", simulateNaturalRaiderFire(graphics.enemyRoster, {
+    ["BROADSIDE_HARD", simulateNaturalInterceptorFire(graphics.enemyRoster, {
       difficulty: 2,
       frameCount: 100,
       initialSizeM: 0x44,
@@ -3404,12 +3404,12 @@ export function createFighterBurstRuntimeTrace(
   capitalHullsDefinition = loadCapitalHullsDefinition(DEFAULT_CAPITAL_HULLS_DEFINITION_PATH),
 ) {
   const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
-  const viper = simulateViperBurst(graphics.fighterWeapons, 70, {
+  const player_fighter = simulatePlayerFighterBurst(graphics.fighterWeapons, 70, {
     fireHeld: true,
     playerX: requireValue(graphics.initialState, "player_x"),
     playerY: requireValue(graphics.initialState, "player_y"),
   });
-  const raider = simulateNaturalRaiderFire(graphics.enemyRoster, {
+  const interceptor = simulateNaturalInterceptorFire(graphics.enemyRoster, {
     difficulty: 1,
     frameCount: 100,
     enemyX: 120,
@@ -3420,31 +3420,31 @@ export function createFighterBurstRuntimeTrace(
     "burst_interval", "post_burst_timer", "allocation_result", "projectile_slot",
     "previous_x", "previous_y", "current_x", "current_y", "visible_width",
     "visible_height", "colour_source", "colour_value", "collision_result",
-    "viper_energy_before", "viper_energy_after",
+    "player_fighter_energy_before", "player_fighter_energy_after",
   ].join(",");
   const rows = [header];
-  for (const entry of viper.trace) {
+  for (const entry of player_fighter.trace) {
     const allocated = entry.allocationResult === "ALLOCATED";
     const shot = allocated ? entry.active.at(-1) : null;
     rows.push([
-      "VIPER", entry.frame, 0, entry.burstState, entry.shotsEmitted,
-      graphics.fighterWeapons.viper.burstIntervalFrames, entry.timer,
+      "PLAYER_FIGHTER", entry.frame, 0, entry.burstState, entry.shotsEmitted,
+      graphics.fighterWeapons.player_fighter.burstIntervalFrames, entry.timer,
       entry.allocationResult, shot ? entry.active.length - 1 : "",
       shot?.x ?? "", shot?.previousY ?? "", shot?.x ?? "", shot?.y ?? "",
       shot?.width ?? "", shot?.height ?? "", "COLPF2",
-      `$${graphics.fighterWeapons.viper.colourValue.toString(16).padStart(2, "0").toUpperCase()}`,
+      `$${graphics.fighterWeapons.player_fighter.colourValue.toString(16).padStart(2, "0").toUpperCase()}`,
       "NONE", 100, 100,
     ].join(","));
   }
-  for (const entry of raider.trace) {
+  for (const entry of interceptor.trace) {
     const pulse = entry.activePlayfieldProjectiles.at(-1);
     rows.push([
-      "RAIDER", entry.frame, entry.enemySlot, entry.burstState, entry.shotIndex,
-      graphics.fighterWeapons.raider.burstIntervalFrames, entry.cooldown,
+      "INTERCEPTOR", entry.frame, entry.enemySlot, entry.burstState, entry.shotIndex,
+      graphics.fighterWeapons.interceptor.burstIntervalFrames, entry.cooldown,
       entry.allocationResult, pulse?.renderSlot ?? "", pulse?.x ?? "",
       pulse?.previousY ?? "", pulse?.x ?? "", pulse?.y ?? "", pulse?.width ?? "",
       pulse?.height ?? "", "COLPF3",
-      `$${graphics.fighterWeapons.raider.colourValue.toString(16).padStart(2, "0").toUpperCase()}`,
+      `$${graphics.fighterWeapons.interceptor.colourValue.toString(16).padStart(2, "0").toUpperCase()}`,
       entry.collisionResult, entry.playerHealthBefore, entry.playerHealth,
     ].join(","));
   }
@@ -3461,7 +3461,7 @@ export function createFighterWeaponTransitionTrace(
     "sector_state", "player_lifecycle", "invulnerability_frames", "raw_fire",
     "previous_fire", "fire_interpretation", "weapon_controller_calls",
     "burst_state", "shot_index", "interval_timer", "reload_cooldown_timer",
-    "projectile_pool_occupancy", "viper_projectile_slots_occupied",
+    "projectile_pool_occupancy", "player_fighter_projectile_slots_occupied",
     "render_slot_owner", "allocation_requested", "allocation_result",
     "rejection_reason", "projectile_created", "projectile_rendered",
   ].join(",");
@@ -3493,14 +3493,14 @@ export function createFighterWeaponTransitionTrace(
     ["TRANSITION_HELD", true],
     ["TRANSITION_FRESH", true],
   ]) {
-    let state = createViperBurstState(graphics.fighterWeapons);
+    let state = createPlayerFighterBurstState(graphics.fighterWeapons);
     let previousFire = 1;
     for (let frame = -60; frame <= 120; frame += 1) {
       const phase = phaseAt(frame, transition);
       const fireHeld = fireFor(scenario, frame);
       const before = state;
       const shotsBefore = state.shotsEmitted;
-      state = stepViperBurst(graphics.fighterWeapons, state, {
+      state = stepPlayerFighterBurst(graphics.fighterWeapons, state, {
         fireHeld,
         drain: phase.drain,
         sectorComplete: phase.complete,
@@ -3515,7 +3515,7 @@ export function createFighterWeaponTransitionTrace(
         : "RELEASED";
       const shotIndex = state.burstState === "WAITING"
         ? 0
-        : graphics.fighterWeapons.viper.burstCount - state.burstRemaining;
+        : graphics.fighterWeapons.player_fighter.burstCount - state.burstRemaining;
       rows.push([
         scenario, frame, phase.sectorType, phase.sectorPosition, phase.broadsidePhase,
         phase.sectorState, "ALIVE", 0, fireHeld ? 0 : 1, previousFire,
@@ -3542,7 +3542,7 @@ export function createSharedFighterExplosionTrace(
     "owner", "visible_frame", "animation_frame", "timer", "x", "y",
     "outer_mask", "core_mask", "active",
   ].join(",")];
-  for (const [owner, x, y] of [["VIPER", 124, 188], ["RAIDER", 120, 91]]) {
+  for (const [owner, x, y] of [["PLAYER_FIGHTER", 124, 188], ["INTERCEPTOR", 120, 91]]) {
     let state = createSharedFighterExplosion(graphics.fighterWeapons, { owner, x, y });
     for (let visibleFrame = 0; visibleFrame < explosion.totalFrames; visibleFrame += 1) {
       const offset = state.frame * explosion.heightScanlines;
@@ -3578,8 +3578,8 @@ export function createSharedFighterExplosionPreview(
   const registerPixels = new Uint8Array(width * height);
   const frontend = readFrontendGraphicsSource(source);
   const owners = [
-    { label: "VIPER", outer: 0x28, core: 0x0e },
-    { label: "RAIDER", outer: 0x46, core: 0x84 },
+    { label: "PLAYER_FIGHTER", outer: 0x28, core: 0x0e },
+    { label: "INTERCEPTOR", outer: 0x46, core: 0x84 },
   ];
   for (const [ownerIndex, owner] of owners.entries()) {
     for (let frame = 0; frame < explosion.frameCount; frame += 1) {
@@ -3977,8 +3977,8 @@ export function createDestructibleDebrisPreview(
       ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
       ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
       ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
-      ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
-      ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+      ["COLPF2", trace.manifest.fighterWeapons.player_fighter.colourValue],
+      ["COLPF3", trace.manifest.fighterWeapons.interceptor.colourValue],
     ]),
   };
   const frontend = readFrontendGraphicsSource(source);
@@ -4038,23 +4038,23 @@ export function createDestructibleDebrisPreview(
   return encodePng(rgb, width, height);
 }
 
-export function createRaiderBreakupTrace(
+export function createInterceptorBreakupTrace(
   _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
 ) {
-  const xex = executeRaiderBreakupTrace({ artifact: "xex" });
-  const atr = executeRaiderBreakupTrace({ artifact: "atr" });
-  assertRaiderBreakupTraceParity(xex, atr);
-  const atrRows = raiderBreakupTraceCsv(atr).trimEnd().split("\n").slice(1);
-  return `${raiderBreakupTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
+  const xex = executeInterceptorBreakupTrace({ artifact: "xex" });
+  const atr = executeInterceptorBreakupTrace({ artifact: "atr" });
+  assertInterceptorBreakupTraceParity(xex, atr);
+  const atrRows = interceptorBreakupTraceCsv(atr).trimEnd().split("\n").slice(1);
+  return `${interceptorBreakupTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
 }
 
-function runtimeRaiderFrameRgb(record, trace, graphics, scale) {
+function runtimeInterceptorFrameRgb(record, trace, graphics, scale) {
   const registers = new Map([
     ["COLBK", record.colbk],
     ["COLPF0", requireValue(graphics.hardwareState, "COLPF0")],
     ["COLPF1", requireValue(graphics.hardwareState, "COLPF1")],
-    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
-    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+    ["COLPF2", trace.manifest.fighterWeapons.player_fighter.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.interceptor.colourValue],
   ]);
   const registerPixels = drawAnticScreen(registers, record.screen,
     { charset: trace.charset }, undefined, 22);
@@ -4065,17 +4065,17 @@ function runtimeRaiderFrameRgb(record, trace, graphics, scale) {
   return scaleAndConvertToRgb(registerPixels, SOURCE_WIDTH, 22 * CHARACTER_HEIGHT, scale);
 }
 
-export function createRaiderBreakupPreview(
+export function createInterceptorBreakupPreview(
   source,
   _definition = loadEntityEffectsDefinition(DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH),
 ) {
-  const trace = executeRaiderBreakupTrace({ artifact: "xex" });
-  const atrTrace = executeRaiderBreakupTrace({ artifact: "atr" });
-  assertRaiderBreakupTraceParity(trace, atrTrace);
+  const trace = executeInterceptorBreakupTrace({ artifact: "xex" });
+  const atrTrace = executeInterceptorBreakupTrace({ artifact: "atr" });
+  assertInterceptorBreakupTraceParity(trace, atrTrace);
   const graphics = readGameGraphicsSource(source);
   const frontend = readFrontendGraphicsSource(source);
   const selected = [
-    ["PRE_HIT", 0, "1 RAIDER"],
+    ["PRE_HIT", 0, "1 INTERCEPTOR"],
     ["BREAKUP", 0, "2 FINAL HIT"],
     ["BREAKUP", 1, "3 YELLOW CORE"],
     ["BREAKUP", 3, "4 RED CORE"],
@@ -4087,7 +4087,7 @@ export function createRaiderBreakupPreview(
     label,
     record: trace.records.find((candidate) => candidate.phase === phase && candidate.frame === frame),
   }));
-  if (selected.some(({ record }) => !record)) throw new Error("Runtime Raider preview frame is missing");
+  if (selected.some(({ record }) => !record)) throw new Error("Runtime Interceptor preview frame is missing");
 
   const nativeWidth = SOURCE_WIDTH;
   const nativeHeight = 22 * CHARACTER_HEIGHT;
@@ -4101,7 +4101,7 @@ export function createRaiderBreakupPreview(
   const steel = atariPalRegisterToRgb(0x84);
   const yellow = atariPalRegisterToRgb(0x1e);
   fillRgb(rgb, background);
-  drawRgbLabel(rgb, width, "RAIDER BREAKUP  EXECUTED XEX BYTES  50 FPS", 24, 16,
+  drawRgbLabel(rgb, width, "INTERCEPTOR BREAKUP  EXECUTED XEX BYTES  50 FPS", 24, 16,
     frontend, white);
   drawRgbLabel(rgb, width,
     "FULL SCREEN FLASH UNCHANGED  LOCAL CORE 5  FOUR FRAGMENTS 30", 24, 34,
@@ -4113,7 +4113,7 @@ export function createRaiderBreakupPreview(
     fillRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, panel);
     strokeRgbRect(rgb, width, height, x - 2, 78, nativeWidth + 4, nativeHeight + 24, steel);
     drawRgbLabel(rgb, width, label, x + 4, 84, frontend, white);
-    const frameRgb = runtimeRaiderFrameRgb(record, trace, graphics, 1);
+    const frameRgb = runtimeInterceptorFrameRgb(record, trace, graphics, 1);
     copyRgbPanel(rgb, width, height, frameRgb, nativeWidth, nativeHeight, x, 102);
   });
   drawRgbLabel(rgb, width, "ENLARGED 2X  SAME XEX GLYPHS PMG COLORS AND TIMINGS", 24, 306,
@@ -4122,7 +4122,7 @@ export function createRaiderBreakupPreview(
     const panelWidth = nativeWidth * 2;
     const x = panelGap + index * (panelWidth + panelGap);
     drawRgbLabel(rgb, width, label, x + 4, 330, frontend, white);
-    const frameRgb = runtimeRaiderFrameRgb(record, trace, graphics, 2);
+    const frameRgb = runtimeInterceptorFrameRgb(record, trace, graphics, 2);
     copyRgbPanel(rgb, width, height, frameRgb, panelWidth, nativeHeight * 2, x, 350);
   });
   return encodePng(rgb, width, height);
@@ -4272,7 +4272,7 @@ export function createShieldBoosterPreview(source) {
     hudCharset: capsule.hudCharset,
   }, capsuleRegisters, 1);
   const panels = [capsuleFrame, gameplayFrame(48), gameplayFrame(124), gameplayFrame(200)];
-  const labels = ["SHIELD CAPSULE", "VIPER LEFT", "VIPER CENTRE", "VIPER RIGHT"];
+  const labels = ["SHIELD CAPSULE", "PLAYER_FIGHTER LEFT", "PLAYER_FIGHTER CENTRE", "PLAYER_FIGHTER RIGHT"];
   const gap = 12;
   const width = panels.length * SOURCE_WIDTH + (panels.length + 1) * gap;
   const height = SOURCE_HEIGHT + 76;
@@ -4283,7 +4283,7 @@ export function createShieldBoosterPreview(source) {
   drawRgbLabel(rgb, width, "SHIELD BOOSTER  EXECUTED XEX ATR VISUAL STATE", 16, 10,
     frontend, white);
   drawRgbLabel(rgb, width,
-    "STEEL WHITE CAPSULE  DISTINCT CONTINUOUS HUD BAR  SOLID VIPER PULSE", 16, 28,
+    "STEEL WHITE CAPSULE  DISTINCT CONTINUOUS HUD BAR  SOLID PLAYER_FIGHTER PULSE", 16, 28,
     frontend, steel);
   panels.forEach((panel, index) => {
     const x = gap + index * (SOURCE_WIDTH + gap);
@@ -4319,8 +4319,8 @@ function runtimeWeaponPickupFrameRgb(record, trace, registers, scale) {
 export function createWeaponPickupRapidFirePreview(source) {
   const trace = executeWeaponPickupTrace({ artifact: "xex" });
   const atr = executeWeaponPickupTrace({ artifact: "atr" });
-  const colours = executeViperProjectileColourTrace({ artifact: "xex" });
-  const atrColours = executeViperProjectileColourTrace({ artifact: "atr" });
+  const colours = executePlayerFighterProjectileColourTrace({ artifact: "xex" });
+  const atrColours = executePlayerFighterProjectileColourTrace({ artifact: "atr" });
   assertWeaponPickupTraceParity(trace, atr);
   if (JSON.stringify({ ...colours, artifact: "release" }) !==
       JSON.stringify({ ...atrColours, artifact: "release" })) {
@@ -4331,8 +4331,8 @@ export function createWeaponPickupRapidFirePreview(source) {
     ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
     ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
     ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
-    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
-    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+    ["COLPF2", trace.manifest.fighterWeapons.player_fighter.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.interceptor.colourValue],
   ]);
   const frontend = readFrontendGraphicsSource(source);
   const select = (phase, frame) => trace.records.find((record) =>
@@ -4387,7 +4387,7 @@ export function createWeaponPickupRapidFirePreview(source) {
     copyRgbPanel(rgb, width, height, frame, panelWidth, nativeHeight * 2, x, 368);
   });
 
-  drawRgbLabel(rgb, width, "EXECUTED VIPER BURST EMISSION FRAMES", 24, 778, frontend, white);
+  drawRgbLabel(rgb, width, "EXECUTED PLAYER_FIGHTER BURST EMISSION FRAMES", 24, 778, frontend, white);
   drawRgbLabel(rgb, width, "NORMAL YELLOW  0 3 6 9 12 15 18 21", 24, 798, frontend, yellow);
   drawRgbLabel(rgb, width, "RAPID YELLOW   0 2 4 6 8 10 12 14 16 18", 24, 816, frontend, yellow);
   for (const frame of trace.normalBurstFrames) {
@@ -4407,14 +4407,14 @@ export function createSpreadShotTrace() {
   return `${spreadShotTraceCsv(xex).trimEnd()}\n${atrRows.join("\n")}\n`;
 }
 
-export function createViperProjectileColourPreview(source, artifact = "xex") {
-  const trace = executeViperProjectileColourLifecycleTrace({ artifact, coldFill: 0xa5 });
-  const parity = executeViperProjectileColourLifecycleTrace({
+export function createPlayerFighterProjectileColourPreview(source, artifact = "xex") {
+  const trace = executePlayerFighterProjectileColourLifecycleTrace({ artifact, coldFill: 0xa5 });
+  const parity = executePlayerFighterProjectileColourLifecycleTrace({
     artifact: artifact === "xex" ? "atr" : "xex", coldFill: 0xa5,
   });
   if (JSON.stringify({ ...trace, artifact: "release" }) !==
       JSON.stringify({ ...parity, artifact: "release" })) {
-    throw new Error("Viper projectile colour preview differs between packed XEX and ATR");
+    throw new Error("PlayerFighter projectile colour preview differs between packed XEX and ATR");
   }
   const constants = parseConstants(source);
   const registers = new Map([
@@ -4431,8 +4431,8 @@ export function createViperProjectileColourPreview(source, artifact = "xex") {
     ["2 RAPID YELLOW", capture("RAPID")],
     ["3 SPREAD YELLOW", capture("SPREAD")],
     ["4 AFTER EXPIRY", capture("RAPID_EXPIRED")],
-    ["5 VIPER AND RAIDER", { display: trace.mixedDisplay }],
-    ["6 RAIDER COLPF3", trace.raider],
+    ["5 PLAYER_FIGHTER AND INTERCEPTOR", { display: trace.mixedDisplay }],
+    ["6 INTERCEPTOR COLPF3", trace.interceptor],
   ].map(([label, record]) => ({ label, record }));
   if (selected.some(({ record }) => !record)) throw new Error("Projectile colour frame missing");
 
@@ -4451,7 +4451,7 @@ export function createViperProjectileColourPreview(source, artifact = "xex") {
     "PROJECTILE COLOUR REGRESSION  PACKED XEX AND ATR PARITY  COLD RAM A5",
     24, 14, frontend, white);
   drawRgbLabel(rgb, width,
-    "VIPER NORMAL RAPID SPREAD COLPF2 $1E    RAIDER COLPF3 $46", 24, 34,
+    "PLAYER_FIGHTER NORMAL RAPID SPREAD COLPF2 $1E    INTERCEPTOR COLPF3 $46", 24, 34,
     frontend, yellow);
   selected.forEach(({ label, record }, index) => {
     const x = gap + index * (panelWidth + gap);
@@ -4462,20 +4462,20 @@ export function createViperProjectileColourPreview(source, artifact = "xex") {
   return encodePng(rgb, width, height);
 }
 
-export function createViperBurstBalancePreview(source, artifact = "xex") {
-  const trace = executeViperBurstBalanceTrace({ artifact });
-  const parity = executeViperBurstBalanceTrace({ artifact: artifact === "xex" ? "atr" : "xex" });
+export function createPlayerFighterBurstBalancePreview(source, artifact = "xex") {
+  const trace = executePlayerFighterBurstBalanceTrace({ artifact });
+  const parity = executePlayerFighterBurstBalanceTrace({ artifact: artifact === "xex" ? "atr" : "xex" });
   if (JSON.stringify({ ...trace, artifact: "release" }) !==
       JSON.stringify({ ...parity, artifact: "release" })) {
-    throw new Error("Viper burst-balance preview differs between packed XEX and ATR");
+    throw new Error("PlayerFighter burst-balance preview differs between packed XEX and ATR");
   }
   const constants = parseConstants(source);
   const registers = new Map([
     ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
     ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
     ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
-    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
-    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+    ["COLPF2", trace.manifest.fighterWeapons.player_fighter.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.interceptor.colourValue],
   ]);
   const frontend = readFrontendGraphicsSource(source);
   const scale = 2;
@@ -4490,7 +4490,7 @@ export function createViperBurstBalancePreview(source, artifact = "xex") {
   const yellow = atariPalRegisterToRgb(0x1e);
   fillRgb(rgb, [3, 5, 9]);
   drawRgbLabel(rgb, width,
-    `VIPER BURST BALANCE  EXECUTED ${artifact.toUpperCase()}  80 PAL FRAMES HELD FIRE`,
+    `PLAYER_FIGHTER BURST BALANCE  EXECUTED ${artifact.toUpperCase()}  80 PAL FRAMES HELD FIRE`,
     24, 14, frontend, white);
   drawRgbLabel(rgb, width,
     "NORMAL 8 AT I3    RAPID 10 AT I2    SPREAD 8 FULL SALVOS AT I10    POST 12",
@@ -4525,8 +4525,8 @@ export function createViperBurstBalancePreview(source, artifact = "xex") {
   return encodePng(rgb, width, height);
 }
 
-export function createViperBurstBalanceTrace(artifact = "xex") {
-  return viperBurstBalanceTraceCsv(executeViperBurstBalanceTrace({ artifact }));
+export function createPlayerFighterBurstBalanceTrace(artifact = "xex") {
+  return player_fighterBurstBalanceTraceCsv(executePlayerFighterBurstBalanceTrace({ artifact }));
 }
 
 export function createSpreadShotPreview(source) {
@@ -4538,8 +4538,8 @@ export function createSpreadShotPreview(source) {
     ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
     ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
     ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
-    ["COLPF2", trace.manifest.fighterWeapons.viper.colourValue],
-    ["COLPF3", trace.manifest.fighterWeapons.raider.colourValue],
+    ["COLPF2", trace.manifest.fighterWeapons.player_fighter.colourValue],
+    ["COLPF3", trace.manifest.fighterWeapons.interceptor.colourValue],
   ]);
   const frontend = readFrontendGraphicsSource(source);
   const selected = [
@@ -4570,7 +4570,7 @@ export function createSpreadShotPreview(source) {
   drawRgbLabel(rgb, width, "SPREAD SHOT  EXECUTED RELEASE XEX AND ATR", 24, 16,
     frontend, white);
   drawRgbLabel(rgb, width,
-    "RED 2X2 FAN CAPSULE  FULL BOOST LABEL  THREE YELLOW VIPER SHOTS  50 FPS", 24, 34,
+    "RED 2X2 FAN CAPSULE  FULL BOOST LABEL  THREE YELLOW PLAYER_FIGHTER SHOTS  50 FPS", 24, 34,
     frontend, red);
   drawRgbLabel(rgb, width, "NATIVE 1 TO 1  ACTUAL CONSECUTIVE RUNTIME FRAMES", 24, 58,
     frontend, steel);
@@ -4602,12 +4602,12 @@ export function createSpreadShotPreview(source) {
 
 function spreadShotHullCases(artifact) {
   return [
-    ["COL ENG", "colonial", "engines", 32],
-    ["COL MID", "colonial", "midship", 128],
-    ["COL PROW", "colonial", "prow", 224],
-    ["CYL ENG", "cylon", "engines", 32],
-    ["CYL MID", "cylon", "midship", 128],
-    ["CYL PROW", "cylon", "prow", 224],
+    ["COL ENG", "allied", "engines", 32],
+    ["COL MID", "allied", "midship", 128],
+    ["COL PROW", "allied", "prow", 224],
+    ["CYL ENG", "hostile", "engines", 32],
+    ["CYL MID", "hostile", "midship", 128],
+    ["CYL PROW", "hostile", "prow", 224],
   ].map(([label, faction, section, topPhase]) => ({
     label,
     faction,
@@ -4650,8 +4650,8 @@ export function createSpreadShotHullPreview(source, artifact = "xex") {
     ["COLBK", requireValue(constants, "GAMEPLAY_BACKGROUND_COLOR")],
     ["COLPF0", requireValue(constants, "GAMEPLAY_COLPF0")],
     ["COLPF1", requireValue(constants, "GAMEPLAY_COLPF1")],
-    ["COLPF2", activation.manifest.fighterWeapons.viper.colourValue],
-    ["COLPF3", activation.manifest.fighterWeapons.raider.colourValue],
+    ["COLPF2", activation.manifest.fighterWeapons.player_fighter.colourValue],
+    ["COLPF3", activation.manifest.fighterWeapons.interceptor.colourValue],
   ]);
   const frontend = readFrontendGraphicsSource(source);
   const panels = [
@@ -4682,7 +4682,7 @@ export function createSpreadShotHullPreview(source, artifact = "xex") {
     `SPREAD SHOT HULL RESTORE  EXECUTED ${artifact.toUpperCase()} BYTES`, 24, 14,
     frontend, white);
   drawRgbLabel(rgb, width,
-    "THREE YELLOW VIPER SHOTS  ENGINES MIDSHIP PROW  A2 HEAD 21 WRAP", 24, 32,
+    "THREE YELLOW PLAYER_FIGHTER SHOTS  ENGINES MIDSHIP PROW  A2 HEAD 21 WRAP", 24, 32,
     frontend, yellow);
   drawRgbLabel(rgb, width,
     "TWELVE CONSECUTIVE FRAMES PER SECTION  CURRENT BACKING  NO REDRAW MODEL", 24, 50,
@@ -4710,17 +4710,17 @@ export function readProjectileVisualLanguageRuntimeState(
   const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
   const asset = graphics.capitalHulls;
   const metrics = projectileVisualMetrics(asset);
-  const raider = graphics.releaseEnemy;
+  const interceptor = graphics.releaseEnemy;
   const playerX = requireValue(graphics.initialState, "player_x");
   const playerY = requireValue(graphics.initialState, "player_y");
   const enemyX = requireValue(graphics.initialState, "enemy_x");
   const enemyY = 72;
   const projectileY = 124;
   const specs = [
-    { label: "VIPER PLAYFIELD  BRIGHT YELLOW  1X2", playerShot: true },
-    { label: "RAIDER PLAYFIELD  SATURATED RED  2X3", raiderPulse: true },
-    { label: "COLONIAL CAPITAL  YELLOW GOLD  8X6", capitalOwner: "allied", phase: 0 },
-    { label: "CYLON CAPITAL  CRIMSON  8X6", capitalOwner: "enemy", phase: 1 },
+    { label: "PLAYER_FIGHTER PLAYFIELD  BRIGHT YELLOW  1X2", playerShot: true },
+    { label: "INTERCEPTOR PLAYFIELD  SATURATED RED  2X3", interceptorPulse: true },
+    { label: "ALLIED CAPITAL  YELLOW GOLD  8X6", capitalOwner: "allied", phase: 0 },
+    { label: "HOSTILE CAPITAL  CRIMSON  8X6", capitalOwner: "enemy", phase: 1 },
     { label: "ALL FOUR  SAME NATIVE SCALE", all: true },
     { label: "MONO FORM  FIGHTER SHORT  CAPITAL HEAVY", all: true, monochrome: true },
   ];
@@ -4758,9 +4758,9 @@ export function readProjectileVisualLanguageRuntimeState(
       drawTopAnchoredMissileSpan(pixels, playerX + 8, playerY - 28,
         metrics.player.height, spec.monochrome ? 0x0e : metrics.player.color);
     }
-    if (spec.raiderPulse || spec.all) {
+    if (spec.interceptorPulse || spec.all) {
       drawTopAnchoredMissileSpan(pixels, enemyX + 7, projectileY,
-        metrics.raider.height, spec.monochrome ? 0x0e : metrics.raider.color);
+        metrics.interceptor.height, spec.monochrome ? 0x0e : metrics.interceptor.color);
     }
     return { ...spec, pixels, screen: screenState.screen, capitalVisuals };
   });
@@ -4790,14 +4790,14 @@ export function readProjectileCollisionScoringRuntimeState(
 ) {
   const graphics = readGameGraphicsSource(source, capitalHullsDefinition);
   const asset = graphics.capitalHulls;
-  const raider = graphics.releaseEnemy;
+  const interceptor = graphics.releaseEnemy;
   const enemyX = 124;
   const enemyY = 104;
   const playerY = requireValue(graphics.initialState, "player_y");
   const resolved = (sourceId) => {
-    const enemy = createEnemyDamageState(raider);
+    const enemy = createEnemyDamageState(interceptor);
     beginEnemyDamageFrame(enemy);
-    queueEnemyDamage(enemy, raider.hitPoints, sourceId);
+    queueEnemyDamage(enemy, interceptor.hitPoints, sourceId);
     return resolveEnemyDamage(enemy);
   };
   const firstTarget = sweptHorizontalProjectileTargets({
@@ -4808,23 +4808,23 @@ export function readProjectileCollisionScoringRuntimeState(
     height: asset.broadside.projectileVisuals.capital.height,
     velocityX: -2,
   }, [
-    { id: "RAIDER", active: true, x: enemyX, y: enemyY,
-      width: raider.visibleWidth, height: raider.height, priority: 0 },
-    { id: "VIPER", active: true, x: 104, y: enemyY,
+    { id: "INTERCEPTOR", active: true, x: enemyX, y: enemyY,
+      width: interceptor.visibleWidth, height: interceptor.height, priority: 0 },
+    { id: "PLAYER_FIGHTER", active: true, x: 104, y: enemyY,
       width: 8, height: 16, priority: 1 },
   ]);
   const specs = [
-    { label: "M0 DESTROYS RAIDER  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE,
+    { label: "M0 DESTROYS INTERCEPTOR  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE,
       playerShot: true },
-    { label: "VIPER CONTACT  DAMAGE AND SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
+    { label: "PLAYER_FIGHTER CONTACT  DAMAGE AND SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
       contact: true },
-    { label: "LETHAL CONTACT  VIPER ZERO  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
+    { label: "LETHAL CONTACT  PLAYER_FIGHTER ZERO  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
       contact: true, lethalPlayer: true },
-    { label: "COLONIAL SHELL KILL  SCORE UNCHANGED", source: ENEMY_DAMAGE_SOURCES.CAPITAL_COLONIAL,
+    { label: "ALLIED SHELL KILL  SCORE UNCHANGED", source: ENEMY_DAMAGE_SOURCES.CAPITAL_ALLIED,
       capitalOwner: "allied" },
-    { label: "CYLON FRIENDLY FIRE  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON,
+    { label: "HOSTILE FRIENDLY FIRE  SCORE PLUS 10", source: ENEMY_DAMAGE_SOURCES.CAPITAL_HOSTILE,
       capitalOwner: "enemy" },
-    { label: "CYLON SHELL STOPS AT FIRST RAIDER", source: ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON,
+    { label: "HOSTILE SHELL STOPS AT FIRST INTERCEPTOR", source: ENEMY_DAMAGE_SOURCES.CAPITAL_HOSTILE,
       capitalOwner: "enemy", firstTarget: firstTarget?.id },
     { label: "CLEANUP AND DRAIN  SCORE UNCHANGED", source: ENEMY_DAMAGE_SOURCES.CLEANUP,
       cleanup: true },
@@ -4837,7 +4837,7 @@ export function readProjectileCollisionScoringRuntimeState(
     });
     const result = resolved(spec.source);
     const secondResult = spec.resolveTwice
-      ? resolveEnemyDamage({ ...createEnemyDamageState(raider), alive: false })
+      ? resolveEnemyDamage({ ...createEnemyDamageState(interceptor), alive: false })
       : null;
     if (result.score > 0) {
       const zero = requireValue(graphics.constants, "CH_ZERO");
@@ -6126,25 +6126,25 @@ export function generateDestructibleDebrisTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
-export function generateRaiderBreakupPreview({
+export function generateInterceptorBreakupPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
-  outputPath = DEFAULT_RAIDER_BREAKUP_PREVIEW_PATH,
+  outputPath = DEFAULT_INTERCEPTOR_BREAKUP_PREVIEW_PATH,
 } = {}) {
   return writeEnemyReviewPreview(
     outputPath,
-    createRaiderBreakupPreview(
+    createInterceptorBreakupPreview(
       fs.readFileSync(sourcePath, "utf8"),
       loadEntityEffectsDefinition(definitionPath),
     ),
   );
 }
 
-export function generateRaiderBreakupTrace({
+export function generateInterceptorBreakupTrace({
   definitionPath = DEFAULT_ENTITY_EFFECTS_DEFINITION_PATH,
-  outputPath = DEFAULT_RAIDER_BREAKUP_TRACE_PATH,
+  outputPath = DEFAULT_INTERCEPTOR_BREAKUP_TRACE_PATH,
 } = {}) {
-  const trace = createRaiderBreakupTrace(loadEntityEffectsDefinition(definitionPath));
+  const trace = createInterceptorBreakupTrace(loadEntityEffectsDefinition(definitionPath));
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, trace);
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
@@ -6218,7 +6218,7 @@ export function generateSpreadShotTrace({
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
 }
 
-export function generateViperProjectileColourPreview({
+export function generatePlayerFighterProjectileColourPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   artifact = "xex",
   outputPath = artifact === "xex" ? DEFAULT_PROJECTILE_COLOUR_XEX_PREVIEW_PATH :
@@ -6226,28 +6226,28 @@ export function generateViperProjectileColourPreview({
 } = {}) {
   return writeEnemyReviewPreview(
     outputPath,
-    createViperProjectileColourPreview(fs.readFileSync(sourcePath, "utf8"), artifact),
+    createPlayerFighterProjectileColourPreview(fs.readFileSync(sourcePath, "utf8"), artifact),
   );
 }
 
-export function generateViperBurstBalancePreview({
+export function generatePlayerFighterBurstBalancePreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   artifact = "xex",
-  outputPath = artifact === "xex" ? DEFAULT_VIPER_BURST_BALANCE_XEX_PREVIEW_PATH :
-    DEFAULT_VIPER_BURST_BALANCE_ATR_PREVIEW_PATH,
+  outputPath = artifact === "xex" ? DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_XEX_PREVIEW_PATH :
+    DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_ATR_PREVIEW_PATH,
 } = {}) {
   return writeEnemyReviewPreview(
     outputPath,
-    createViperBurstBalancePreview(fs.readFileSync(sourcePath, "utf8"), artifact),
+    createPlayerFighterBurstBalancePreview(fs.readFileSync(sourcePath, "utf8"), artifact),
   );
 }
 
-export function generateViperBurstBalanceTrace({
+export function generatePlayerFighterBurstBalanceTrace({
   artifact = "xex",
-  outputPath = artifact === "xex" ? DEFAULT_VIPER_BURST_BALANCE_XEX_TRACE_PATH :
-    DEFAULT_VIPER_BURST_BALANCE_ATR_TRACE_PATH,
+  outputPath = artifact === "xex" ? DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_XEX_TRACE_PATH :
+    DEFAULT_PLAYER_FIGHTER_BURST_BALANCE_ATR_TRACE_PATH,
 } = {}) {
-  const trace = createViperBurstBalanceTrace(artifact);
+  const trace = createPlayerFighterBurstBalanceTrace(artifact);
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, trace);
   return { outputPath, bytes: Buffer.byteLength(trace), rows: trace.trimEnd().split("\n").length - 1 };
@@ -6330,13 +6330,13 @@ export function generateEnemyScannerComparisonPreview({
   );
 }
 
-export function generateEnemyRaiderBeforeAfterPreview({
+export function generateEnemyInterceptorBeforeAfterPreview({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   outputPath = DEFAULT_ENEMY_BEFORE_AFTER_PREVIEW_PATH,
 } = {}) {
   return writeEnemyReviewPreview(
     outputPath,
-    createEnemyRaiderBeforeAfterPreview(fs.readFileSync(sourcePath, "utf8")),
+    createEnemyInterceptorBeforeAfterPreview(fs.readFileSync(sourcePath, "utf8")),
   );
 }
 
@@ -6373,12 +6373,12 @@ export function generateEnemyCombatSequencePreview({
   );
 }
 
-export function generateRaiderNaturalFireTrace({
+export function generateInterceptorNaturalFireTrace({
   sourcePath = path.join(rootDirectory, "src", "main.s"),
   definitionPath = DEFAULT_CAPITAL_HULLS_DEFINITION_PATH,
-  outputPath = DEFAULT_RAIDER_NATURAL_FIRE_TRACE_PATH,
+  outputPath = DEFAULT_INTERCEPTOR_NATURAL_FIRE_TRACE_PATH,
 } = {}) {
-  const trace = createRaiderNaturalFireTrace(
+  const trace = createInterceptorNaturalFireTrace(
     fs.readFileSync(sourcePath, "utf8"),
     loadCapitalHullsDefinition(definitionPath),
   );
@@ -6650,18 +6650,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       ["Enemy native sprites", generateEnemyNativeSpritesPreview()],
       ["Enemy review harness", generateEnemyReviewHarnessPreview()],
       ["Enemy scanner comparison", generateEnemyScannerComparisonPreview()],
-      ["Enemy Raider before/after", generateEnemyRaiderBeforeAfterPreview()],
-      ["Enemy palette Cylon oxblood", generateEnemyPaletteCandidatePreview({
-        candidateId: "CYLON_OXBLOOD",
-        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_OXBLOOD_PREVIEW_PATH,
+      ["Enemy Interceptor before/after", generateEnemyInterceptorBeforeAfterPreview()],
+      ["Enemy palette Hostile oxblood", generateEnemyPaletteCandidatePreview({
+        candidateId: "HOSTILE_OXBLOOD",
+        outputPath: DEFAULT_ENEMY_PALETTE_HOSTILE_OXBLOOD_PREVIEW_PATH,
       })],
-      ["Enemy palette Cylon burgundy comparison", generateEnemyPaletteCandidatePreview({
-        candidateId: "CYLON_BURGUNDY",
-        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_BURGUNDY_PREVIEW_PATH,
+      ["Enemy palette Hostile burgundy comparison", generateEnemyPaletteCandidatePreview({
+        candidateId: "HOSTILE_BURGUNDY",
+        outputPath: DEFAULT_ENEMY_PALETTE_HOSTILE_BURGUNDY_PREVIEW_PATH,
       })],
-      ["Enemy palette Cylon scarlet", generateEnemyPaletteCandidatePreview({
-        candidateId: "CYLON_SCARLET",
-        outputPath: DEFAULT_ENEMY_PALETTE_CYLON_SCARLET_PREVIEW_PATH,
+      ["Enemy palette Hostile scarlet", generateEnemyPaletteCandidatePreview({
+        candidateId: "HOSTILE_SCARLET",
+        outputPath: DEFAULT_ENEMY_PALETTE_HOSTILE_SCARLET_PREVIEW_PATH,
       })],
       ["Enemy single-pulse combat", generateEnemyCombatSequencePreview()],
       ["Projectile visual language", generateProjectileVisualLanguagePreview()],
@@ -6672,10 +6672,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       console.log(`  size: ${result.width}x${result.height}, ${result.bytes} bytes`);
     }
 
-    const raiderNaturalFireTrace = generateRaiderNaturalFireTrace();
-    console.log(`Raider natural-fire runtime trace generated successfully`);
-    console.log(`  CSV : ${path.relative(rootDirectory, raiderNaturalFireTrace.outputPath)}`);
-    console.log(`  rows: ${raiderNaturalFireTrace.rows}, ${raiderNaturalFireTrace.bytes} bytes`);
+    const interceptorNaturalFireTrace = generateInterceptorNaturalFireTrace();
+    console.log(`Interceptor natural-fire runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, interceptorNaturalFireTrace.outputPath)}`);
+    console.log(`  rows: ${interceptorNaturalFireTrace.rows}, ${interceptorNaturalFireTrace.bytes} bytes`);
 
     const fighterBurstRuntimeTrace = generateFighterBurstRuntimeTrace();
     console.log(`Fighter burst runtime trace generated successfully`);
@@ -6738,16 +6738,16 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`  CSV : ${path.relative(rootDirectory, destructibleDebrisTrace.outputPath)}`);
     console.log(`  rows: ${destructibleDebrisTrace.rows}, ${destructibleDebrisTrace.bytes} bytes`);
 
-    const raiderBreakupResult = generateRaiderBreakupPreview();
-    console.log(`Enemy Raider-breakup owner review generated successfully`);
-    console.log(`  PNG : ${path.relative(rootDirectory, raiderBreakupResult.outputPath)}`);
+    const interceptorBreakupResult = generateInterceptorBreakupPreview();
+    console.log(`Enemy Interceptor-breakup owner review generated successfully`);
+    console.log(`  PNG : ${path.relative(rootDirectory, interceptorBreakupResult.outputPath)}`);
     console.log(
-      `  size: ${raiderBreakupResult.width}x${raiderBreakupResult.height}, ${raiderBreakupResult.bytes} bytes`,
+      `  size: ${interceptorBreakupResult.width}x${interceptorBreakupResult.height}, ${interceptorBreakupResult.bytes} bytes`,
     );
-    const raiderBreakupTrace = generateRaiderBreakupTrace();
-    console.log(`Enemy Raider-breakup runtime trace generated successfully`);
-    console.log(`  CSV : ${path.relative(rootDirectory, raiderBreakupTrace.outputPath)}`);
-    console.log(`  rows: ${raiderBreakupTrace.rows}, ${raiderBreakupTrace.bytes} bytes`);
+    const interceptorBreakupTrace = generateInterceptorBreakupTrace();
+    console.log(`Enemy Interceptor-breakup runtime trace generated successfully`);
+    console.log(`  CSV : ${path.relative(rootDirectory, interceptorBreakupTrace.outputPath)}`);
+    console.log(`  rows: ${interceptorBreakupTrace.rows}, ${interceptorBreakupTrace.bytes} bytes`);
 
     const hudPresentationResult = generateHudPresentationPreview();
     console.log(`HUD presentation review generated successfully`);
@@ -6790,19 +6790,19 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`  CSV : ${path.relative(rootDirectory, spreadShotTrace.outputPath)}`);
     console.log(`  rows: ${spreadShotTrace.rows}, ${spreadShotTrace.bytes} bytes`);
     for (const artifact of ["xex", "atr"]) {
-      const colourPreview = generateViperProjectileColourPreview({ artifact });
+      const colourPreview = generatePlayerFighterProjectileColourPreview({ artifact });
       console.log(`Projectile-colour ${artifact.toUpperCase()} owner review generated successfully`);
       console.log(`  PNG : ${path.relative(rootDirectory, colourPreview.outputPath)}`);
       console.log(
         `  size: ${colourPreview.width}x${colourPreview.height}, ${colourPreview.bytes} bytes`,
       );
-      const burstPreview = generateViperBurstBalancePreview({ artifact });
-      console.log(`Viper burst-balance ${artifact.toUpperCase()} owner review generated successfully`);
+      const burstPreview = generatePlayerFighterBurstBalancePreview({ artifact });
+      console.log(`PlayerFighter burst-balance ${artifact.toUpperCase()} owner review generated successfully`);
       console.log(`  PNG : ${path.relative(rootDirectory, burstPreview.outputPath)}`);
       console.log(
         `  size: ${burstPreview.width}x${burstPreview.height}, ${burstPreview.bytes} bytes`,
       );
-      const burstTrace = generateViperBurstBalanceTrace({ artifact });
+      const burstTrace = generatePlayerFighterBurstBalanceTrace({ artifact });
       console.log(`  CSV : ${path.relative(rootDirectory, burstTrace.outputPath)}`);
       console.log(`  rows: ${burstTrace.rows}, ${burstTrace.bytes} bytes`);
     }

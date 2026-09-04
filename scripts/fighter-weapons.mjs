@@ -67,7 +67,7 @@ export function loadFighterWeaponsDefinition(sourcePath) {
   invariant(viewport.screenColumns === 40, "Gameplay viewport must remain 40 columns");
   invariant(viewport.leftHpos === 48, "Gameplay HPOS origin must remain 48");
 
-  for (const [id, weapon] of [["viper", definition.viper]]) {
+  for (const [id, weapon] of [["player_fighter", definition.player_fighter]]) {
     integer(weapon?.poolSlots, `${id}.poolSlots`, 1, 16);
     invariant(weapon.burstCount === 8, `${id} normal burst must contain exactly eight shots`);
     integer(weapon.burstIntervalFrames, `${id}.burstIntervalFrames`, 1, 16);
@@ -76,35 +76,35 @@ export function loadFighterWeaponsDefinition(sourcePath) {
     integer(weapon.heightScanlines, `${id}.heightScanlines`, 1, 3);
     integer(weapon.colourValue, `${id}.colourValue`, 0, 255);
   }
-  invariant(definition.viper.postBurstFrames === 12,
-    "Viper post-burst pause must be 12 PAL frames");
-  invariant(definition.viper.rapidFireBurstCount === 10 &&
-    definition.viper.rapidFireBurstCount <= definition.viper.poolSlots &&
-    definition.viper.rapidFireIntervalFrames === 2 &&
-    definition.viper.rapidFireDurationFrames === 500,
+  invariant(definition.player_fighter.postBurstFrames === 12,
+    "PlayerFighter post-burst pause must be 12 PAL frames");
+  invariant(definition.player_fighter.rapidFireBurstCount === 10 &&
+    definition.player_fighter.rapidFireBurstCount <= definition.player_fighter.poolSlots &&
+    definition.player_fighter.rapidFireIntervalFrames === 2 &&
+    definition.player_fighter.rapidFireDurationFrames === 500,
   "Rapid Fire must use ten shots, a two-frame interval and exactly 500 active PAL frames");
-  invariant(definition.viper.spreadShotBurstCount === definition.viper.burstCount &&
-    definition.viper.spreadShotDurationFrames === 500,
+  invariant(definition.player_fighter.spreadShotBurstCount === definition.player_fighter.burstCount &&
+    definition.player_fighter.spreadShotDurationFrames === 500,
   "Spread Shot must use the eight-salvo normal burst for exactly 500 active PAL frames");
-  invariant(definition.viper.shieldDurationFrames === 250,
+  invariant(definition.player_fighter.shieldDurationFrames === 250,
     "Shield must last exactly 250 active PAL frames");
-  invariant(definition.viper.spreadShotProjectileCount === 3,
+  invariant(definition.player_fighter.spreadShotProjectileCount === 3,
     "Spread Shot must allocate exactly three logical projectiles");
-  invariant(definition.viper.spreadShotCooldownFrames === 10,
+  invariant(definition.player_fighter.spreadShotCooldownFrames === 10,
     "Spread Shot cooldown must preserve one reserve slot at maximum legal lifetime");
-  invariant(definition.viper.spreadShotInitialOffsetHpos === 4,
+  invariant(definition.player_fighter.spreadShotInitialOffsetHpos === 4,
     "Spread Shot side projectiles must start one character from the centre shot");
-  invariant(definition.viper.spreadShotLateralStepHpos === 1 &&
-    definition.viper.spreadShotLateralPeriodFrames === 2,
+  invariant(definition.player_fighter.spreadShotLateralStepHpos === 1 &&
+    definition.player_fighter.spreadShotLateralPeriodFrames === 2,
   "Spread Shot side projectiles must move one HPOS unit every two active frames");
-  invariant(definition.viper.colourRegister === "COLPF2" &&
-    definition.viper.colourValue === 0x1e,
-  "Viper projectiles must use genuine Atari yellow through COLPF2=$1E");
-  invariant(definition.viper.rapidFireColourRegister === definition.viper.colourRegister &&
-    definition.viper.rapidFireColourValue === definition.viper.colourValue,
-  "Rapid Fire projectiles must remain in the Viper's yellow COLPF2 bank");
-  integer(definition.glyphLayout?.viperBase, "glyphLayout.viperBase", 0, 127);
-  integer(definition.glyphLayout?.raiderBase, "glyphLayout.raiderBase", 0, 127);
+  invariant(definition.player_fighter.colourRegister === "COLPF2" &&
+    definition.player_fighter.colourValue === 0x1e,
+  "PlayerFighter projectiles must use genuine Atari yellow through COLPF2=$1E");
+  invariant(definition.player_fighter.rapidFireColourRegister === definition.player_fighter.colourRegister &&
+    definition.player_fighter.rapidFireColourValue === definition.player_fighter.colourValue,
+  "Rapid Fire projectiles must remain in the PlayerFighter's yellow COLPF2 bank");
+  integer(definition.glyphLayout?.player_fighterBase, "glyphLayout.player_fighterBase", 0, 127);
+  integer(definition.glyphLayout?.interceptorBase, "glyphLayout.interceptorBase", 0, 127);
   const explosion = definition.sharedFighterExplosion;
   invariant(explosion?.frameDurationFrames === 4,
     "Shared fighter explosion frames must last four PAL frames");
@@ -128,8 +128,8 @@ export function loadFighterWeaponsDefinition(sourcePath) {
 export function compileFighterWeapons(definition, enemyRoster) {
   const pulse = enemyRoster?.runtime?.weaponPolicy?.singlePulse;
   invariant(pulse?.renderer === "ANTIC4_GLYPH_POOL",
-    "Fighter weapons require the Raider ANTIC 4 glyph-pool policy");
-  const raider = Object.freeze({
+    "Fighter weapons require the Interceptor ANTIC 4 glyph-pool policy");
+  const interceptor = Object.freeze({
     poolSlots: pulse.poolSlots,
     burstCount: pulse.burstCount,
     burstIntervalFrames: pulse.burstIntervalFrames,
@@ -142,13 +142,13 @@ export function compileFighterWeapons(definition, enemyRoster) {
     colourRegister: pulse.colourRegister,
     colourValue: pulse.colourValue,
   });
-  const viper = definition.viper;
+  const player_fighter = definition.player_fighter;
   const activeImageTop = definition.viewport.activeImageTop;
   const hudTop = activeImageTop;
   const hudBottom = hudTop + definition.viewport.hudRows * 8;
   const gameplayTop = hudBottom;
   const gameplayBottom = gameplayTop + definition.viewport.gameplayRows * 8;
-  const totalSlots = definition.viper.poolSlots + raider.poolSlots;
+  const totalSlots = definition.player_fighter.poolSlots + interceptor.poolSlots;
   const explosion = Object.freeze({
     frameCount: definition.sharedFighterExplosion.outerMasks.length,
     frameDurationFrames: definition.sharedFighterExplosion.frameDurationFrames,
@@ -161,18 +161,18 @@ export function compileFighterWeapons(definition, enemyRoster) {
     coreMasks: Uint8Array.from(definition.sharedFighterExplosion.coreMasks),
     slots: 2,
   });
-  const viperGlyphs = projectileGlyphs(viper.widthHpos, [0, 1, 2, 3], viper.heightScanlines);
-  const raiderGlyphs = projectileGlyphs(raider.widthHpos, [0, 2], raider.heightScanlines);
-  invariant(viperGlyphs.length === 36 && raiderGlyphs.length === 20,
+  const player_fighterGlyphs = projectileGlyphs(player_fighter.widthHpos, [0, 1, 2, 3], player_fighter.heightScanlines);
+  const interceptorGlyphs = projectileGlyphs(interceptor.widthHpos, [0, 2], interceptor.heightScanlines);
+  invariant(player_fighterGlyphs.length === 36 && interceptorGlyphs.length === 20,
     "Fighter projectile phase glyph count changed");
-  invariant(definition.glyphLayout.viperBase + viperGlyphs.length <= 59,
-    "Viper projectile glyphs must remain below the capital-hull charset allocation");
-  invariant(definition.glyphLayout.raiderBase >= 90 &&
-    definition.glyphLayout.raiderBase + raiderGlyphs.length <= 128,
-  "Raider projectile glyphs must stay in the post-capital charset tail");
+  invariant(definition.glyphLayout.player_fighterBase + player_fighterGlyphs.length <= 59,
+    "PlayerFighter projectile glyphs must remain below the capital-hull charset allocation");
+  invariant(definition.glyphLayout.interceptorBase >= 90 &&
+    definition.glyphLayout.interceptorBase + interceptorGlyphs.length <= 128,
+  "Interceptor projectile glyphs must stay in the post-capital charset tail");
   return Object.freeze({
     ...definition,
-    raider,
+    interceptor,
     viewport: Object.freeze({
       ...definition.viewport,
       hudTop,
@@ -183,12 +183,12 @@ export function compileFighterWeapons(definition, enemyRoster) {
     totalSlots,
     stateBytes: totalSlots * 10 + 6 + explosion.slots * 3,
     sharedFighterExplosion: explosion,
-    glyphs: Object.freeze({ viper: viperGlyphs, raider: raiderGlyphs }),
+    glyphs: Object.freeze({ player_fighter: player_fighterGlyphs, interceptor: interceptorGlyphs }),
   });
 }
 
 export function renderFighterWeaponsCa65Include(asset) {
-  const { viewport, viper, raider, sharedFighterExplosion: explosion } = asset;
+  const { viewport, player_fighter, interceptor, sharedFighterExplosion: explosion } = asset;
   return [
     "; Generated from assets/graphics/fighter-weapons.json by scripts/fighter-weapons.mjs.",
     "; Do not edit this file by hand.",
@@ -199,49 +199,49 @@ export function renderFighterWeaponsCa65Include(asset) {
     `GAMEPLAY_SCREEN_ROWS = ${viewport.gameplayRows}`,
     `GAMEPLAY_SCREEN_COLUMNS = ${viewport.screenColumns}`,
     `GAMEPLAY_LEFT_HPOS = ${viewport.leftHpos}`,
-    `VIPER_PROJECTILE_GLYPH_BASE = ${asset.glyphLayout.viperBase}`,
-    `RAIDER_PROJECTILE_GLYPH_BASE = ${asset.glyphLayout.raiderBase}`,
-    "VIPER_PROJECTILE_GLYPH_STRIDE = 9",
-    "RAIDER_PROJECTILE_GLYPH_STRIDE = 10",
-    `VIPER_PROJECTILE_GLYPH_COUNT = ${asset.glyphs.viper.length}`,
-    `RAIDER_PROJECTILE_GLYPH_COUNT = ${asset.glyphs.raider.length}`,
-    `VIPER_PROJECTILE_SLOT_COUNT = ${viper.poolSlots}`,
-    `RAIDER_PROJECTILE_SLOT_COUNT = ${raider.poolSlots}`,
+    `PLAYER_FIGHTER_PROJECTILE_GLYPH_BASE = ${asset.glyphLayout.player_fighterBase}`,
+    `INTERCEPTOR_PROJECTILE_GLYPH_BASE = ${asset.glyphLayout.interceptorBase}`,
+    "PLAYER_FIGHTER_PROJECTILE_GLYPH_STRIDE = 9",
+    "INTERCEPTOR_PROJECTILE_GLYPH_STRIDE = 10",
+    `PLAYER_FIGHTER_PROJECTILE_GLYPH_COUNT = ${asset.glyphs.player_fighter.length}`,
+    `INTERCEPTOR_PROJECTILE_GLYPH_COUNT = ${asset.glyphs.interceptor.length}`,
+    `PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT = ${player_fighter.poolSlots}`,
+    `INTERCEPTOR_PROJECTILE_SLOT_COUNT = ${interceptor.poolSlots}`,
     `FIGHTER_PROJECTILE_SLOT_COUNT = ${asset.totalSlots}`,
-    `RAIDER_PROJECTILE_SLOT_BASE = ${viper.poolSlots}`,
+    `INTERCEPTOR_PROJECTILE_SLOT_BASE = ${player_fighter.poolSlots}`,
     "WEAPON_BURST_WAITING = 0",
     "WEAPON_BURST_FIRING = 1",
     "WEAPON_BURST_POST = 2",
-    `VIPER_NORMAL_BURST_COUNT = ${viper.burstCount}`,
-    `VIPER_RAPID_FIRE_BURST_COUNT = ${viper.rapidFireBurstCount}`,
-    `VIPER_SPREAD_BURST_COUNT = ${viper.spreadShotBurstCount}`,
-    `VIPER_SPREAD_COOLDOWN = ${viper.spreadShotCooldownFrames}`,
-    `VIPER_BURST_INTERVAL = ${viper.burstIntervalFrames}`,
-    `VIPER_RAPID_FIRE_INTERVAL = ${viper.rapidFireIntervalFrames}`,
-    `VIPER_RAPID_FIRE_DURATION = ${viper.rapidFireDurationFrames}`,
-    `VIPER_SPREAD_SHOT_DURATION = ${viper.spreadShotDurationFrames}`,
-    `VIPER_SHIELD_DURATION = ${viper.shieldDurationFrames}`,
-    `VIPER_SPREAD_PROJECTILE_COUNT = ${viper.spreadShotProjectileCount}`,
-    `VIPER_SPREAD_INITIAL_OFFSET = ${viper.spreadShotInitialOffsetHpos}`,
-    `VIPER_SPREAD_LATERAL_STEP = ${viper.spreadShotLateralStepHpos}`,
-    `VIPER_SPREAD_LATERAL_PERIOD = ${viper.spreadShotLateralPeriodFrames}`,
-    `VIPER_POST_BURST_PAUSE = ${viper.postBurstFrames}`,
-    `VIPER_PROJECTILE_SPEED = ${viper.speedScanlines}`,
-    `VIPER_PROJECTILE_WIDTH_HPOS = ${viper.widthHpos}`,
-    `VIPER_PROJECTILE_HEIGHT = ${viper.heightScanlines}`,
-    `VIPER_PROJECTILE_COLOR = ${byte(viper.colourValue)}`,
-    `VIPER_RAPID_FIRE_PROJECTILE_COLOR = ${byte(viper.rapidFireColourValue)}`,
-    `RAIDER_BURST_COUNT = ${raider.burstCount}`,
-    `RAIDER_BURST_INTERVAL = ${raider.burstIntervalFrames}`,
-    `RAIDER_POST_BURST_EASY = ${raider.postBurstFrames[0]}`,
-    `RAIDER_POST_BURST_MEDIUM = ${raider.postBurstFrames[1]}`,
-    `RAIDER_POST_BURST_HARD = ${raider.postBurstFrames[2]}`,
-    `RAIDER_PROJECTILE_SPEED = ${raider.speedScanlines}`,
-    `RAIDER_PROJECTILE_WIDTH_HPOS = ${raider.widthHpos}`,
-    `RAIDER_PROJECTILE_HEIGHT = ${raider.heightScanlines}`,
-    `RAIDER_PROJECTILE_DAMAGE = ${raider.damage}`,
-    `RAIDER_PROJECTILE_LIFETIME = ${raider.lifetimeFrames}`,
-    `RAIDER_PROJECTILE_COLOR = ${byte(raider.colourValue)}`,
+    `PLAYER_FIGHTER_NORMAL_BURST_COUNT = ${player_fighter.burstCount}`,
+    `PLAYER_FIGHTER_RAPID_FIRE_BURST_COUNT = ${player_fighter.rapidFireBurstCount}`,
+    `PLAYER_FIGHTER_SPREAD_BURST_COUNT = ${player_fighter.spreadShotBurstCount}`,
+    `PLAYER_FIGHTER_SPREAD_COOLDOWN = ${player_fighter.spreadShotCooldownFrames}`,
+    `PLAYER_FIGHTER_BURST_INTERVAL = ${player_fighter.burstIntervalFrames}`,
+    `PLAYER_FIGHTER_RAPID_FIRE_INTERVAL = ${player_fighter.rapidFireIntervalFrames}`,
+    `PLAYER_FIGHTER_RAPID_FIRE_DURATION = ${player_fighter.rapidFireDurationFrames}`,
+    `PLAYER_FIGHTER_SPREAD_SHOT_DURATION = ${player_fighter.spreadShotDurationFrames}`,
+    `PLAYER_FIGHTER_SHIELD_DURATION = ${player_fighter.shieldDurationFrames}`,
+    `PLAYER_FIGHTER_SPREAD_PROJECTILE_COUNT = ${player_fighter.spreadShotProjectileCount}`,
+    `PLAYER_FIGHTER_SPREAD_INITIAL_OFFSET = ${player_fighter.spreadShotInitialOffsetHpos}`,
+    `PLAYER_FIGHTER_SPREAD_LATERAL_STEP = ${player_fighter.spreadShotLateralStepHpos}`,
+    `PLAYER_FIGHTER_SPREAD_LATERAL_PERIOD = ${player_fighter.spreadShotLateralPeriodFrames}`,
+    `PLAYER_FIGHTER_POST_BURST_PAUSE = ${player_fighter.postBurstFrames}`,
+    `PLAYER_FIGHTER_PROJECTILE_SPEED = ${player_fighter.speedScanlines}`,
+    `PLAYER_FIGHTER_PROJECTILE_WIDTH_HPOS = ${player_fighter.widthHpos}`,
+    `PLAYER_FIGHTER_PROJECTILE_HEIGHT = ${player_fighter.heightScanlines}`,
+    `PLAYER_FIGHTER_PROJECTILE_COLOR = ${byte(player_fighter.colourValue)}`,
+    `PLAYER_FIGHTER_RAPID_FIRE_PROJECTILE_COLOR = ${byte(player_fighter.rapidFireColourValue)}`,
+    `INTERCEPTOR_BURST_COUNT = ${interceptor.burstCount}`,
+    `INTERCEPTOR_BURST_INTERVAL = ${interceptor.burstIntervalFrames}`,
+    `INTERCEPTOR_POST_BURST_EASY = ${interceptor.postBurstFrames[0]}`,
+    `INTERCEPTOR_POST_BURST_MEDIUM = ${interceptor.postBurstFrames[1]}`,
+    `INTERCEPTOR_POST_BURST_HARD = ${interceptor.postBurstFrames[2]}`,
+    `INTERCEPTOR_PROJECTILE_SPEED = ${interceptor.speedScanlines}`,
+    `INTERCEPTOR_PROJECTILE_WIDTH_HPOS = ${interceptor.widthHpos}`,
+    `INTERCEPTOR_PROJECTILE_HEIGHT = ${interceptor.heightScanlines}`,
+    `INTERCEPTOR_PROJECTILE_DAMAGE = ${interceptor.damage}`,
+    `INTERCEPTOR_PROJECTILE_LIFETIME = ${interceptor.lifetimeFrames}`,
+    `INTERCEPTOR_PROJECTILE_COLOR = ${byte(interceptor.colourValue)}`,
     `SHARED_FIGHTER_EXPLOSION_FRAME_COUNT = ${explosion.frameCount}`,
     `SHARED_FIGHTER_EXPLOSION_FRAME_DURATION = ${explosion.frameDurationFrames}`,
     `SHARED_FIGHTER_EXPLOSION_TOTAL = ${explosion.totalFrames}`,
@@ -249,13 +249,13 @@ export function renderFighterWeaponsCa65Include(asset) {
     `SHARED_FIGHTER_EXPLOSION_WIDTH_BITS = ${explosion.widthBits}`,
     `SHARED_FIGHTER_EXPLOSION_SLOT_COUNT = ${explosion.slots}`,
     "",
-    ...emitGlyphMacro("EMIT_VIPER_PROJECTILE_GLYPHS", asset.glyphs.viper),
+    ...emitGlyphMacro("EMIT_PLAYER_FIGHTER_PROJECTILE_GLYPHS", asset.glyphs.player_fighter),
     "",
-    ...emitGlyphMacro("EMIT_VIPER_PROJECTILE_GLYPHS_HEAD", asset.glyphs.viper.slice(0, 5)),
+    ...emitGlyphMacro("EMIT_PLAYER_FIGHTER_PROJECTILE_GLYPHS_HEAD", asset.glyphs.player_fighter.slice(0, 5)),
     "",
-    ...emitGlyphMacro("EMIT_VIPER_PROJECTILE_GLYPHS_TAIL", asset.glyphs.viper.slice(5)),
+    ...emitGlyphMacro("EMIT_PLAYER_FIGHTER_PROJECTILE_GLYPHS_TAIL", asset.glyphs.player_fighter.slice(5)),
     "",
-    ...emitGlyphMacro("EMIT_RAIDER_PROJECTILE_GLYPHS", asset.glyphs.raider),
+    ...emitGlyphMacro("EMIT_INTERCEPTOR_PROJECTILE_GLYPHS", asset.glyphs.interceptor),
     "",
     `.macro EMIT_SHARED_FIGHTER_EXPLOSION_MASKS\n    .byte ${[...explosion.outerBytes].map(byte).join(",")}\n.endmacro`,
     `.macro EMIT_SHARED_FIGHTER_EXPLOSION_CORE_MASKS\n    .byte ${[...explosion.coreMasks].map(byte).join(",")}\n.endmacro`,
@@ -263,7 +263,7 @@ export function renderFighterWeaponsCa65Include(asset) {
   ].join("\n");
 }
 
-export function createSharedFighterExplosion(asset, { x, y, owner = "RAIDER" }) {
+export function createSharedFighterExplosion(asset, { x, y, owner = "INTERCEPTOR" }) {
   const explosion = asset.sharedFighterExplosion;
   invariant(Number.isInteger(x) && Number.isInteger(y),
     "Shared fighter explosion requires a stable integer centre");
@@ -310,16 +310,16 @@ export function renderSharedFighterExplosionPmg(asset, state, {
   return { outer: nextOuter, core: nextCore };
 }
 
-export function buildRaiderProjectileGlyphBank(asset, initialBytes) {
-  const expectedLength = asset.glyphs.raider.length * 8;
+export function buildInterceptorProjectileGlyphBank(asset, initialBytes) {
+  const expectedLength = asset.glyphs.interceptor.length * 8;
   invariant(initialBytes.length === expectedLength,
-    `Raider projectile glyph bank must contain ${expectedLength} bytes`);
+    `Interceptor projectile glyph bank must contain ${expectedLength} bytes`);
   const bytes = Uint8Array.from(initialBytes);
   bytes.fill(0);
   for (let group = 0; group < 2; group += 1) {
     const mask = group === 0 ? 0xf0 : 0x0f;
     for (let glyph = 0; glyph < 10; glyph += 1) {
-      const rows = asset.glyphs.raider[group * 10 + glyph];
+      const rows = asset.glyphs.interceptor[group * 10 + glyph];
       for (let row = 0; row < 8; row += 1) {
         if (rows[row] !== 0) bytes[(group * 10 + glyph) * 8 + row] = mask;
       }
@@ -328,18 +328,18 @@ export function buildRaiderProjectileGlyphBank(asset, initialBytes) {
   return bytes;
 }
 
-export function createViperBurstState(asset) {
+export function createPlayerFighterBurstState(asset) {
   return {
     frame: 0,
     burstState: "WAITING",
     burstRemaining: 0,
     timer: 0,
     shotsEmitted: 0,
-    pool: Array(asset.viper.poolSlots).fill(null),
+    pool: Array(asset.player_fighter.poolSlots).fill(null),
   };
 }
 
-export function stepViperBurst(asset, state, {
+export function stepPlayerFighterBurst(asset, state, {
   fireHeld = true,
   weaponMode = "NORMAL",
   playerX = 124,
@@ -349,11 +349,11 @@ export function stepViperBurst(asset, state, {
   sectorComplete = false,
 } = {}) {
   invariant(["NORMAL", "RAPID"].includes(weaponMode),
-    "Viper burst simulation supports NORMAL or RAPID mode");
+    "PlayerFighter burst simulation supports NORMAL or RAPID mode");
   const burstCount = weaponMode === "RAPID"
-    ? asset.viper.rapidFireBurstCount : asset.viper.burstCount;
+    ? asset.player_fighter.rapidFireBurstCount : asset.player_fighter.burstCount;
   const burstInterval = weaponMode === "RAPID"
-    ? asset.viper.rapidFireIntervalFrames : asset.viper.burstIntervalFrames;
+    ? asset.player_fighter.rapidFireIntervalFrames : asset.player_fighter.burstIntervalFrames;
   const next = {
     ...state,
     frame: state.frame + 1,
@@ -363,7 +363,7 @@ export function stepViperBurst(asset, state, {
     const shot = next.pool[index];
     if (!shot) continue;
     shot.previousY = shot.y;
-    shot.y -= asset.viper.speedScanlines;
+    shot.y -= asset.player_fighter.speedScanlines;
     if (shot.y < asset.viewport.gameplayTop) next.pool[index] = null;
   }
   if (!gameplayActive) {
@@ -373,7 +373,7 @@ export function stepViperBurst(asset, state, {
     next.timer = 0;
     return next;
   }
-  // DRAIN and COMPLETE remain ordinary playable PAL frames for the Viper
+  // DRAIN and COMPLETE remain ordinary playable PAL frames for the PlayerFighter
   // weapon. They stop hull/cannon generation, not fighter fire. Keeping both
   // options explicit makes the natural transition test cover the release path.
   void drain;
@@ -399,31 +399,31 @@ export function stepViperBurst(asset, state, {
   const slot = next.pool.findIndex((shot) => shot === null);
   if (slot < 0) return next;
   next.pool[slot] = {
-    owner: "VIPER",
+    owner: "PLAYER_FIGHTER",
     x: playerX + 4,
-    y: playerY - asset.viper.heightScanlines,
-    previousY: playerY - asset.viper.heightScanlines,
-    width: asset.viper.widthHpos,
-    height: asset.viper.heightScanlines,
-    colour: asset.viper.colourValue,
+    y: playerY - asset.player_fighter.heightScanlines,
+    previousY: playerY - asset.player_fighter.heightScanlines,
+    width: asset.player_fighter.widthHpos,
+    height: asset.player_fighter.heightScanlines,
+    colour: asset.player_fighter.colourValue,
   };
   next.shotsEmitted += 1;
   next.burstRemaining -= 1;
   if (next.burstRemaining === 0) {
     next.burstState = "POST_BURST_COOLDOWN";
-    next.timer = asset.viper.postBurstFrames;
+    next.timer = asset.player_fighter.postBurstFrames;
   } else {
     next.timer = burstInterval;
   }
   return next;
 }
 
-export function simulateViperBurst(asset, frameCount, options = {}) {
-  let state = createViperBurstState(asset);
+export function simulatePlayerFighterBurst(asset, frameCount, options = {}) {
+  let state = createPlayerFighterBurstState(asset);
   const trace = [];
   for (let frame = 1; frame <= frameCount; frame += 1) {
     const before = state.shotsEmitted;
-    state = stepViperBurst(asset, state, options);
+    state = stepPlayerFighterBurst(asset, state, options);
     trace.push({
       frame,
       burstState: state.burstState,

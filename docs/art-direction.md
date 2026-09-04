@@ -1,49 +1,49 @@
-# Dark Fighter art direction
+# Void Strike 65 art direction
 
-Dark Fighter is worn military science fiction rendered within stock Atari
-65XE constraints. It is unofficial, non-commercial Battlestar Galactica fan
-art and must not imply official affiliation or endorsement.
+Void Strike 65 is worn military science fiction rendered within stock Atari
+65XE constraints. It is unofficial and non-commercial, and must not imply
+official affiliation or endorsement.
 
 ## Visual language
 
 - Space is black, with restrained star density and clear combat silhouettes.
-- Colonial machinery uses cold steel, pale highlights, dark seams, and warm
+- Allied machinery uses cold steel, pale highlights, dark seams, and warm
   engine accents.
-- Cylon machinery uses dark metal, burgundy/red hull accents, and a distinct red
+- Hostile machinery uses dark metal, burgundy/red hull accents, and a distinct red
   scanner and weapon language.
 - Damage uses short, local flashes and fragments; it must not repaint the global
   palette or obscure the HUD.
 - Pixel shapes favor readable mass, panel rhythm, and negative space over tiny
   lettering or decorative noise.
 
-The loader preserves the owner-approved Galactica profile, `BSG` marking,
-three engine groups, title, and studio footer. It uses mixed ANTIC F/E with two
+The loader preserves the owner-approved capital-ship profile, three engine
+groups, title, and studio footer. It uses mixed ANTIC F/E with two
 palette-zone DLIs. Gameplay does not add another DLI or PMG multiplexing merely
 for a local colour effect.
 
 The production frontend follows the accepted H3.1 Showcase Tactical Lite
-system. `DARK FIGHTER`, section headings, and score values use amber `$1E`;
+system. `VOID STRIKE 65`, section headings, and score values use amber `$1E`;
 ordinary data uses white `$0E`; structural accents use steel `$84`; active
 actions use green `$D8`; and the Game Over alert replaces steel with `$46`.
 No screen uses a fifth foreground colour. The custom angular font and 3x2 menu
-Viper share one `$4800` charset and remain readable at native Atari scale.
+Player Fighter share one `$4800` charset and remain readable at native Atari scale.
 
 ## Gameplay palette ownership
 
 The fixed HUD remains legible and visually separate from the ANTIC 4 gameplay
-field. Stars, hulls, Viper weapon pixels, Cylon weapon pixels, pickups, and
+field. Stars, hulls, Player Fighter weapon pixels, Hostile weapon pixels, pickups, and
 effects use existing playfield banks and PMG registers. A local object must not
 change the global palette in a way that recolours other objects.
 
-Viper weapon colours are:
+Player Fighter weapon colours are:
 
 - normal projectile: yellow (`$1E`);
-- Spread Shot centre, left, and right projectiles: the same yellow Viper colour;
-- Rapid Fire projectile: the established Viper yellow/gold (`$1E`).
+- Spread Shot centre, left, and right projectiles: the same yellow Player Fighter colour;
+- Rapid Fire projectile: the established Player Fighter yellow/gold (`$1E`).
 
-Cylon Raider pulses remain red (`$46`) and retain their wider shape. Spread
+Hostile Interceptor pulses remain red (`$46`) and retain their wider shape. Spread
 Shot side projectiles must be identified by their symmetric fan geometry, not
-by borrowing the Cylon weapon colour.
+by borrowing the Hostile weapon colour.
 
 ## Capital ships and engines
 
@@ -52,7 +52,7 @@ modules, aft modules, and engines. Overlays may not leave blank segments,
 vertical lines, stale glyphs, or wrap artifacts.
 
 The accepted H4 gameplay set keeps the existing PMG and character footprints:
-the Viper reads as a narrow top-down fighter, the Raider retains a crescent
+the Player Fighter reads as a narrow top-down fighter, the Interceptor retains a crescent
 silhouette and three scanner phases, and capital armour uses the fixed glyph
 range 59-89. H4.1 debris remains two characters by eight scanlines in glyphs
 110-117, with four asymmetric white/steel silhouettes. Fighter and capital
@@ -80,7 +80,7 @@ for several frames and then jump by eight scanlines.
   readable against space and either capital hull.
 - **Spread Shot:** bright red casing with a black fan/three-projectile symbol.
 - **Shield:** steel-blue `$84` outline, bright `$0E` fill, and a black shield
-  symbol. Its dense cross-core BOOST bar and solid steel/white Viper pulse must
+  symbol. Its dense cross-core BOOST bar and solid steel/white Player Fighter pulse must
   remain distinguishable from both weapon boosters and respawn blinking.
   The dark symbol is formed by the capsule interior, not white text.
 Pickup erase restores the exact physical cells and lower-layer bytes saved by
@@ -88,21 +88,21 @@ the previous frame, never a pointer recalculated from the new ring phase.
 Capsule glyph codes must not enter backing or wrap-copy sources. Visual review
 therefore covers empty space, both hulls, module boundaries, prow, engine banks,
 and display-list wrap.
-When the P0/P3 Viper overlaps a capsule, set hull or engine bits remain in the
-foreground. Zero bits in the Viper PMG masks are transparent and must leave the
+When the P0/P3 Player Fighter overlaps a capsule, set hull or engine bits remain in the
+foreground. Zero bits in the Player Fighter PMG masks are transparent and must leave the
 capsule visible; a restored black playfield rectangle or clipped capsule edge
 is never an acceptable substitute for pixel-level overlap.
 
 ## Motion and effects
 
-Spread Shot begins as a compact Viper salvo and opens into an immediately
+Spread Shot begins as a compact Player Fighter salvo and opens into an immediately
 readable medium-width, symmetric fan. Side shots move smoothly by equal and
 opposite horizontal increments while all three continue upward at the normal
 weapon speed. Normal and Spread use the normal eight-event burst envelope;
 Rapid uses a longer ten-shot burst as well as its faster in-burst cadence.
 
 Breakups are brief and local. Debris uses two shapes and two tumble phases;
-Raider breakup preserves the recognizable wings, central body, and red eye.
+Interceptor breakup preserves the recognizable wings, central body, and red eye.
 Transient effects are erased in reverse layer order and may not damage hulls,
 stars, HUD characters, or the gameplay charset.
 

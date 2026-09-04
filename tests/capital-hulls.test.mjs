@@ -42,9 +42,9 @@ const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8"
 const definition = loadCapitalHullsDefinition(definitionPath);
 const asset = compileCapitalHulls(definition);
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
-const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
+const map = fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.map"), "utf8");
 const labels = new Map(
-  fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -577,17 +577,17 @@ test("loader remains unchanged and the accepted H3.1 menu preview is source-deri
 });
 
 test("joystick, FIRE, projectile, enemy, and scoring routines remain connected", () => {
-  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr integration_update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_viper_weapon[\s\S]+jsr integration_update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
+  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr integration_update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_player_fighter_weapon[\s\S]+jsr integration_update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
   assert.match(source, /read_input:[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
   assert.match(source,
-    /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #VIPER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #RAIDER_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
+    /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #INTERCEPTOR_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
   assert.doesNotMatch(source, /\b(?:bullet_x|bullet_y|bullet_active|refresh_bullet_active)\b/);
   assert.match(source,
     /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jmp update_score_display/);
   assert.match(source,
     /update_player_death:[\s\S]+@game_over:[\s\S]+jsr insert_top_score/);
   assert.match(source,
-    /update_enemy:[\s\S]+jsr update_raider_soft_pursuit[\s\S]+update_enemy_animation/);
+    /update_enemy:[\s\S]+jsr update_interceptor_soft_pursuit[\s\S]+update_enemy_animation/);
   assert.match(source,
-    /update_raider_soft_pursuit:[\s\S]+enemy_velocity_x[\s\S]+jmp clamp_enemy_x/);
+    /update_interceptor_soft_pursuit:[\s\S]+enemy_velocity_x[\s\S]+jmp clamp_enemy_x/);
 });

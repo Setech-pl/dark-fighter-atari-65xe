@@ -110,8 +110,8 @@ function logicalDisplay(memory, labels) {
 
 function initialiseRuntime(root, artifact, coldFill = 0) {
   const manifest = JSON.parse(fs.readFileSync(
-    path.join(root, "dist", "dark-fighter-manifest.json"), "utf8"));
-  const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
+    path.join(root, "dist", "void-strike-65-manifest.json"), "utf8"));
+  const labels = labelsFromFile(path.join(root, "build", "void-strike-65.lbl"));
   const memory = new Uint8Array(0x10000);
   memory.fill(coldFill);
   const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
@@ -272,9 +272,9 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
     effectActiveCount: memory[requiredLabel(labels, "EFFECT_ACTIVE_COUNT")],
     projectileActiveCount: countActive(memory,
       requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE"), 10),
-    burstState: memory[requiredLabel(labels, "VIPER_BURST_STATE")],
-    burstRemaining: memory[requiredLabel(labels, "VIPER_BURST_REMAINING")],
-    burstTimer: memory[requiredLabel(labels, "VIPER_BURST_TIMER")],
+    burstState: memory[requiredLabel(labels, "PLAYER_FIGHTER_BURST_STATE")],
+    burstRemaining: memory[requiredLabel(labels, "PLAYER_FIGHTER_BURST_REMAINING")],
+    burstTimer: memory[requiredLabel(labels, "PLAYER_FIGHTER_BURST_TIMER")],
     scoreLo: memory[requiredLabel(labels, "score_bcd_lo")],
     scoreHi: memory[requiredLabel(labels, "score_bcd_hi")],
     playerHealth: memory[fixedStateAddress(labels, "BROAD_PLAYER_HEALTH")],
@@ -285,7 +285,7 @@ function pickupSnapshot(memory, labels, manifest, fields = {}) {
   };
 }
 
-function armLethalViperShot(memory, labels, y = 109) {
+function armLethalPlayerFighterShot(memory, labels, y = 109) {
   const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
   memory[active] = 1;
   memory[requiredLabel(labels, "FIGHTER_PROJECTILE_X")] = 127;
@@ -294,7 +294,7 @@ function armLethalViperShot(memory, labels, y = 109) {
   memory[requiredLabel(labels, "FIGHTER_PROJECTILE_LIFETIME")] = 10;
 }
 
-function killRaiderWithViper(memory, labels) {
+function killInterceptorWithPlayerFighter(memory, labels) {
   memory[requiredLabel(labels, "ENEMY_ARCHETYPE")] = 0;
   memory[requiredLabel(labels, "ENEMY_ACTIVE")] = 1;
   memory[requiredLabel(labels, "ENEMY_HP")] = 1;
@@ -302,7 +302,7 @@ function killRaiderWithViper(memory, labels) {
   memory[requiredLabel(labels, "ENEMY_PENDING_SOURCE")] = 5;
   memory[requiredLabel(labels, "enemy_x")] = 124;
   memory[requiredLabel(labels, "enemy_y")] = 40;
-  armLethalViperShot(memory, labels, 54);
+  armLethalPlayerFighterShot(memory, labels, 54);
   runRoutine(memory, labels, "update_fighter_projectiles");
   const damageSource = memory[requiredLabel(labels, "ENEMY_PENDING_SOURCE")];
   const projectileConsumed = memory[requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE")] === 0;
@@ -311,7 +311,7 @@ function killRaiderWithViper(memory, labels) {
 }
 
 function runBurst(memory, labels, { rapid, expectedCount, onFrame = () => {} }) {
-  runRoutine(memory, labels, "clear_viper_projectiles");
+  runRoutine(memory, labels, "clear_player_fighter_projectiles");
   const boosterState = memory[requiredLabel(labels, "ENTITY_STATE") + 2];
   if (rapid && boosterState !== 3) {
     throw new Error(`Rapid burst requires collected runtime state (state=${boosterState}, ` +
@@ -325,7 +325,7 @@ function runBurst(memory, labels, { rapid, expectedCount, onFrame = () => {} }) 
   const emissions = [];
   let previousCount = 0;
   for (let frame = 0; frame < 48 && emissions.length < expectedCount; frame += 1) {
-    runRoutine(memory, labels, "update_viper_weapon");
+    runRoutine(memory, labels, "update_player_fighter_weapon");
     const currentCount = countActive(memory, active, 10);
     if (currentCount > previousCount) emissions.push(frame);
     previousCount = currentCount;
@@ -346,7 +346,7 @@ export function executeWeaponPickupTrace({
   const records = [];
 
   for (let kill = 1; kill <= 3; kill += 1) {
-    const result = killRaiderWithViper(memory, labels);
+    const result = killInterceptorWithPlayerFighter(memory, labels);
     records.push(pickupSnapshot(memory, labels, manifest, {
       phase: `KILL_${kill}`, frame: 0, kill,
       damageSource: result.damageSource, projectileConsumed: result.projectileConsumed,
@@ -381,7 +381,7 @@ export function executeWeaponPickupTrace({
   }
 
   // Forty consecutive ACTIVE frames retain the original review duration. The
-  // deterministic Raider is destroyed near the safe top, so native A2 motion
+  // deterministic Interceptor is destroyed near the safe top, so native A2 motion
   // remains visible without reaching the despawn boundary before collection.
   for (let frame = 0; frame < 40; frame += 1) {
     runRoutine(memory, labels, "entity_effects_erase");
@@ -393,7 +393,7 @@ export function executeWeaponPickupTrace({
 
   const pickupX = memory[requiredLabel(labels, "ENTITY_X") + 1];
   const pickupY = memory[requiredLabel(labels, "ENTITY_Y") + 1];
-  armLethalViperShot(memory, labels);
+  armLethalPlayerFighterShot(memory, labels);
   memory[requiredLabel(labels, "FIGHTER_PROJECTILE_X")] = pickupX;
   memory[requiredLabel(labels, "FIGHTER_PROJECTILE_Y")] = pickupY + 6;
   memory[requiredLabel(labels, "FIGHTER_PROJECTILE_PREV_Y")] = pickupY + 6;
@@ -401,7 +401,7 @@ export function executeWeaponPickupTrace({
   runRoutine(memory, labels, "update_fighter_projectiles");
   records.push(pickupSnapshot(memory, labels, manifest,
     { phase: "PROJECTILE_IGNORED", frame: 0 }));
-  runRoutine(memory, labels, "clear_viper_projectiles");
+  runRoutine(memory, labels, "clear_player_fighter_projectiles");
   runRoutine(memory, labels, "entity_effects_erase");
   memory[requiredLabel(labels, "player_x")] = pickupX;
   memory[requiredLabel(labels, "player_y")] = pickupY;
@@ -413,7 +413,7 @@ export function executeWeaponPickupTrace({
   const rapidTimerFrames = [];
   const rapidBurstFrames = runBurst(memory, labels, {
     rapid: true,
-    expectedCount: manifest.fighterWeapons.viper.rapidFireBurstCount,
+    expectedCount: manifest.fighterWeapons.player_fighter.rapidFireBurstCount,
     onFrame: ({ frame, emitted }) => rapidTimerFrames.push(pickupSnapshot(
       memory, labels, manifest, { phase: "RAPID_TIMER", frame, projectileConsumed: emitted })),
   });
@@ -439,7 +439,7 @@ export function executeWeaponPickupTrace({
   const normal = initialiseRuntime(root, artifact);
   const normalBurstFrames = runBurst(normal.memory, normal.labels, {
     rapid: false,
-    expectedCount: normal.manifest.fighterWeapons.viper.burstCount,
+    expectedCount: normal.manifest.fighterWeapons.player_fighter.burstCount,
   });
 
   return {
@@ -614,7 +614,7 @@ export function executeWeaponPickupRingWrapTrace({
   };
 }
 
-export function executeViperBurstBalanceTrace({
+export function executePlayerFighterBurstBalanceTrace({
   root = defaultRoot, artifact = "xex", coldFill = 0xa5, windowFrames = 80,
 } = {}) {
   const modes = [
@@ -626,9 +626,9 @@ export function executeViperBurstBalanceTrace({
   const traces = modes.map(([mode, boosterState]) => {
     const { memory, labels, manifest } = initialiseRuntime(root, artifact, coldFill);
     const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
-    const burstState = requiredLabel(labels, "VIPER_BURST_STATE");
-    const burstRemaining = requiredLabel(labels, "VIPER_BURST_REMAINING");
-    const burstTimer = requiredLabel(labels, "VIPER_BURST_TIMER");
+    const burstState = requiredLabel(labels, "PLAYER_FIGHTER_BURST_STATE");
+    const burstRemaining = requiredLabel(labels, "PLAYER_FIGHTER_BURST_REMAINING");
+    const burstTimer = requiredLabel(labels, "PLAYER_FIGHTER_BURST_TIMER");
     const booster = requiredLabel(labels, "ENTITY_STATE") + 2;
     memory[requiredLabel(labels, "player_x")] = 124;
     memory[requiredLabel(labels, "player_y")] = playerMaximumY;
@@ -653,7 +653,7 @@ export function executeViperBurstBalanceTrace({
       const stateBefore = memory[burstState];
       const remainingBefore = memory[burstRemaining];
       const timerBefore = memory[burstTimer];
-      const controlCycles = runRoutine(memory, labels, "update_viper_weapon");
+      const controlCycles = runRoutine(memory, labels, "update_player_fighter_weapon");
       const after = Array.from(memory.subarray(active, active + 10));
       const allocatedSlots = after.flatMap((value, slot) =>
         before[slot] === 0 && value !== 0 ? [slot] : []);
@@ -682,7 +682,7 @@ export function executeViperBurstBalanceTrace({
         renderCycles + boosterCycles;
       maximumWeaponPipelineCycles = Math.max(maximumWeaponPipelineCycles,
         weaponPipelineCycles);
-      records.push(viperProjectileSnapshot(memory, labels, {
+      records.push(player_fighterProjectileSnapshot(memory, labels, {
         mode,
         frame,
         stateBefore,
@@ -704,18 +704,18 @@ export function executeViperBurstBalanceTrace({
       }));
     }
     memory[0xd010] = 1;
-    const expectedBurst = mode === "RAPID" ? manifest.fighterWeapons.viper.rapidFireBurstCount :
-      mode === "SPREAD" ? manifest.fighterWeapons.viper.spreadShotBurstCount :
-        manifest.fighterWeapons.viper.burstCount;
+    const expectedBurst = mode === "RAPID" ? manifest.fighterWeapons.player_fighter.rapidFireBurstCount :
+      mode === "SPREAD" ? manifest.fighterWeapons.player_fighter.spreadShotBurstCount :
+        manifest.fighterWeapons.player_fighter.burstCount;
     const intervalFrames = mode === "RAPID" ?
-      manifest.fighterWeapons.viper.rapidFireIntervalFrames : mode === "SPREAD" ?
-        manifest.fighterWeapons.viper.spreadShotCooldownFrames :
-        manifest.fighterWeapons.viper.burstIntervalFrames;
+      manifest.fighterWeapons.player_fighter.rapidFireIntervalFrames : mode === "SPREAD" ?
+        manifest.fighterWeapons.player_fighter.spreadShotCooldownFrames :
+        manifest.fighterWeapons.player_fighter.burstIntervalFrames;
     return {
       mode,
       expectedBurst,
       intervalFrames,
-      postBurstFrames: manifest.fighterWeapons.viper.postBurstFrames,
+      postBurstFrames: manifest.fighterWeapons.player_fighter.postBurstFrames,
       emittedProjectiles,
       emittedSalvos,
       maximumPoolOccupancy,
@@ -735,7 +735,7 @@ export function executeViperBurstBalanceTrace({
   };
 }
 
-export function viperBurstBalanceTraceCsv(trace) {
+export function player_fighterBurstBalanceTraceCsv(trace) {
   const rows = [[
     "artifact", "mode", "frame", "state_before", "state_after",
     "remaining_before", "remaining_after", "timer_before", "timer_after",
@@ -754,7 +754,7 @@ export function viperBurstBalanceTraceCsv(trace) {
   return `${rows.join("\n")}\n`;
 }
 
-export function executeViperProjectileColourTrace({
+export function executePlayerFighterProjectileColourTrace({
   root = defaultRoot, artifact = "xex", coldFill = 0,
 } = {}) {
   const { memory, labels, manifest } = initialiseRuntime(root, artifact, coldFill);
@@ -765,8 +765,8 @@ export function executeViperProjectileColourTrace({
   const lifetimeAddress = requiredLabel(labels, "FIGHTER_PROJECTILE_LIFETIME");
   const screenLow = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_LO");
   const screenHigh = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_HI");
-  memory[0xd018] = manifest.fighterWeapons.viper.colourValue;
-  memory[0xd019] = manifest.fighterWeapons.raider.colourValue;
+  memory[0xd018] = manifest.fighterWeapons.player_fighter.colourValue;
+  memory[0xd019] = manifest.fighterWeapons.interceptor.colourValue;
   const setProjectile = (slot, x) => {
     memory[xAddress + slot] = x;
     memory[yAddress + slot] = 100;
@@ -774,7 +774,7 @@ export function executeViperProjectileColourTrace({
     memory[lifetimeAddress + slot] = 10;
   };
 
-  runRoutine(memory, labels, "allocate_viper_projectile");
+  runRoutine(memory, labels, "allocate_player_fighter_projectile");
   const normalAtSpawn = memory[active];
   setProjectile(0, 100);
   runRoutine(memory, labels, "render_fighter_projectile_overlays");
@@ -785,7 +785,7 @@ export function executeViperProjectileColourTrace({
     memory[requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2] << 8;
   const normalAfterPickup = memory[active];
   const hudDuringRapid = Array.from(memory.subarray(0x4000 + 32, 0x4000 + 36));
-  runRoutine(memory, labels, "allocate_viper_projectile");
+  runRoutine(memory, labels, "allocate_player_fighter_projectile");
   const rapidAtSpawn = memory[active + 1];
   setProjectile(0, 100);
   setProjectile(1, 112);
@@ -799,7 +799,7 @@ export function executeViperProjectileColourTrace({
   memory[requiredLabel(labels, "ENTITY_HP") + 2] = 17;
   runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
   const rapidAfterExpiry = memory[active + 1];
-  runRoutine(memory, labels, "allocate_viper_projectile");
+  runRoutine(memory, labels, "allocate_player_fighter_projectile");
   const normalAfterExpiry = memory[active + 2];
 
   for (let slot = 0; slot < 3; slot += 1) setProjectile(slot, 100 + slot * 12);
@@ -828,19 +828,19 @@ export function executeViperProjectileColourTrace({
   });
   runRoutine(memory, labels, "erase_fighter_projectile_overlays");
   memory.fill(0, active, active + 19);
-  const raiderSlot = 10;
-  memory[active + raiderSlot] = 2;
-  setProjectile(raiderSlot, 100);
+  const interceptorSlot = 10;
+  memory[active + interceptorSlot] = 2;
+  setProjectile(interceptorSlot, 100);
   runRoutine(memory, labels, "render_fighter_projectile_overlays");
-  const raiderAddress = memory[screenLow + raiderSlot] | memory[screenHigh + raiderSlot] << 8;
-  const raiderCode = memory[raiderAddress];
-  const raiderRendered = {
-    activeRenderId: memory[active + raiderSlot],
-    code: raiderCode,
-    glyphCode: raiderCode & 0x7f,
-    inverse: raiderCode >> 7,
-    colourRegister: raiderCode & 0x80 ? "COLPF3" : "COLPF2",
-    colourValue: memory[raiderCode & 0x80 ? 0xd019 : 0xd018],
+  const interceptorAddress = memory[screenLow + interceptorSlot] | memory[screenHigh + interceptorSlot] << 8;
+  const interceptorCode = memory[interceptorAddress];
+  const interceptorRendered = {
+    activeRenderId: memory[active + interceptorSlot],
+    code: interceptorCode,
+    glyphCode: interceptorCode & 0x7f,
+    inverse: interceptorCode >> 7,
+    colourRegister: interceptorCode & 0x80 ? "COLPF3" : "COLPF2",
+    colourValue: memory[interceptorCode & 0x80 ? 0xd019 : 0xd018],
   };
   return {
     artifact,
@@ -855,7 +855,7 @@ export function executeViperProjectileColourTrace({
       memory[requiredLabel(labels, "PLAYFIELD_ROW_HI")] << 8) - ringBase) /
       canonicalPlayfield.screenColumns,
     rendered,
-    raiderRendered,
+    interceptorRendered,
     normalDisplay: Array.from(normalDisplay),
     rapidDisplay: Array.from(rapidDisplay),
     screen: logicalScreen(memory, labels),
@@ -863,13 +863,13 @@ export function executeViperProjectileColourTrace({
     charset: Array.from(memory.subarray(0x4400, 0x4800)),
     hudCharset: Array.from(memory.subarray(0x5000, 0x5400)),
     hudDuringRapid,
-    normalColour: manifest.fighterWeapons.viper.colourValue,
-    rapidColour: manifest.fighterWeapons.viper.rapidFireColourValue,
-    raiderColour: manifest.fighterWeapons.raider.colourValue,
+    normalColour: manifest.fighterWeapons.player_fighter.colourValue,
+    rapidColour: manifest.fighterWeapons.player_fighter.rapidFireColourValue,
+    interceptorColour: manifest.fighterWeapons.interceptor.colourValue,
   };
 }
 
-export function executeViperProjectileColourLifecycleTrace({
+export function executePlayerFighterProjectileColourLifecycleTrace({
   root = defaultRoot, artifact = "xex", coldFill = 0,
 } = {}) {
   const { memory, labels, manifest } = initialiseRuntime(root, artifact, coldFill);
@@ -883,13 +883,13 @@ export function executeViperProjectileColourLifecycleTrace({
   const boosterState = requiredLabel(labels, "ENTITY_STATE") + 2;
   const boosterTimerLow = requiredLabel(labels, "ENTITY_TIMER") + 2;
   const boosterTimerHigh = requiredLabel(labels, "ENTITY_MOVE_ACCUMULATOR") + 2;
-  memory[0xd018] = manifest.fighterWeapons.viper.colourValue;
-  memory[0xd019] = manifest.fighterWeapons.raider.colourValue;
+  memory[0xd018] = manifest.fighterWeapons.player_fighter.colourValue;
+  memory[0xd019] = manifest.fighterWeapons.interceptor.colourValue;
 
-  const captureViper = (phase) => {
+  const capturePlayerFighter = (phase) => {
     runRoutine(memory, labels, "erase_fighter_projectile_overlays");
-    runRoutine(memory, labels, "clear_viper_projectiles");
-    runRoutine(memory, labels, "allocate_viper_projectile");
+    runRoutine(memory, labels, "clear_player_fighter_projectiles");
+    runRoutine(memory, labels, "allocate_player_fighter_projectile");
     const slots = [];
     for (let slot = 0; slot < 10; slot += 1) {
       if (memory[active + slot] === 0) continue;
@@ -927,52 +927,52 @@ export function executeViperProjectileColourLifecycleTrace({
 
   const captures = [];
   memory[boosterState] = 0;
-  captures.push(captureViper("NORMAL"));
+  captures.push(capturePlayerFighter("NORMAL"));
   memory[boosterState] = 3;
-  captures.push(captureViper("RAPID"));
+  captures.push(capturePlayerFighter("RAPID"));
   memory[boosterState] = 4;
-  captures.push(captureViper("SPREAD"));
+  captures.push(capturePlayerFighter("SPREAD"));
 
   memory[boosterState] = 3;
-  captures.push(captureViper("PAUSE_BEFORE"));
-  captures.push(captureViper("PAUSE_RESUME"));
+  captures.push(capturePlayerFighter("PAUSE_BEFORE"));
+  captures.push(capturePlayerFighter("PAUSE_RESUME"));
 
   memory[boosterState] = 4;
   runRoutine(memory, labels, "weapon_pickup_clear_sector");
-  captures.push(captureViper("SECTOR_TRANSITION"));
+  captures.push(capturePlayerFighter("SECTOR_TRANSITION"));
 
   memory[boosterState] = 3;
   memory[boosterTimerLow] = 1;
   memory[boosterTimerHigh] = 0;
   runRoutine(memory, labels, "update_weapon_booster_active", { x: 3 });
-  captures.push(captureViper("RAPID_EXPIRED"));
+  captures.push(capturePlayerFighter("RAPID_EXPIRED"));
 
   memory[boosterState] = 4;
   memory[boosterTimerLow] = 1;
   memory[boosterTimerHigh] = 0;
   runRoutine(memory, labels, "update_weapon_booster_active", { x: 4 });
-  captures.push(captureViper("SPREAD_EXPIRED"));
+  captures.push(capturePlayerFighter("SPREAD_EXPIRED"));
 
   memory[boosterState] = 3;
   runRoutine(memory, labels, "weapon_pickup_clear_lifecycle");
-  captures.push(captureViper("LIFE_LOSS"));
+  captures.push(capturePlayerFighter("LIFE_LOSS"));
 
   memory[boosterState] = 4;
   runRoutine(memory, labels, "init_entity_effects");
-  captures.push(captureViper("NEW_GAME"));
+  captures.push(capturePlayerFighter("NEW_GAME"));
 
-  runRoutine(memory, labels, "clear_viper_projectiles");
-  const raiderSlot = 10;
-  memory[active + raiderSlot] = 2;
-  memory[xAddress + raiderSlot] = 124;
-  memory[yAddress + raiderSlot] = 100;
-  memory[previousYAddress + raiderSlot] = 100;
-  memory[lifetimeAddress + raiderSlot] = 10;
+  runRoutine(memory, labels, "clear_player_fighter_projectiles");
+  const interceptorSlot = 10;
+  memory[active + interceptorSlot] = 2;
+  memory[xAddress + interceptorSlot] = 124;
+  memory[yAddress + interceptorSlot] = 100;
+  memory[previousYAddress + interceptorSlot] = 100;
+  memory[lifetimeAddress + interceptorSlot] = 10;
   runRoutine(memory, labels, "render_fighter_projectile_overlays");
-  const raiderAddress = memory[screenLow + raiderSlot] |
-    memory[screenHigh + raiderSlot] << 8;
-  const raiderScreenCode = memory[raiderAddress];
-  const raiderDisplay = Array.from(logicalDisplay(memory, labels));
+  const interceptorAddress = memory[screenLow + interceptorSlot] |
+    memory[screenHigh + interceptorSlot] << 8;
+  const interceptorScreenCode = memory[interceptorAddress];
+  const interceptorDisplay = Array.from(logicalDisplay(memory, labels));
 
   runRoutine(memory, labels, "erase_fighter_projectile_overlays");
   memory.fill(0, active, active + 19);
@@ -981,26 +981,26 @@ export function executeViperProjectileColourLifecycleTrace({
   memory[yAddress] = 100;
   memory[previousYAddress] = 100;
   memory[lifetimeAddress] = 10;
-  memory[active + raiderSlot] = 2;
-  memory[xAddress + raiderSlot] = 132;
-  memory[yAddress + raiderSlot] = 100;
-  memory[previousYAddress + raiderSlot] = 100;
-  memory[lifetimeAddress + raiderSlot] = 10;
+  memory[active + interceptorSlot] = 2;
+  memory[xAddress + interceptorSlot] = 132;
+  memory[yAddress + interceptorSlot] = 100;
+  memory[previousYAddress + interceptorSlot] = 100;
+  memory[lifetimeAddress + interceptorSlot] = 10;
   runRoutine(memory, labels, "render_fighter_projectile_overlays");
 
   return {
     artifact,
     coldFill,
     captures,
-    raider: {
-      activeRenderId: memory[active + raiderSlot],
-      address: raiderAddress,
-      screenCode: raiderScreenCode,
-      glyphCode: raiderScreenCode & 0x7f,
-      inverse: raiderScreenCode >> 7,
-      colourRegister: raiderScreenCode & 0x80 ? "COLPF3" : "COLPF2",
-      colourValue: memory[raiderScreenCode & 0x80 ? 0xd019 : 0xd018],
-      display: raiderDisplay,
+    interceptor: {
+      activeRenderId: memory[active + interceptorSlot],
+      address: interceptorAddress,
+      screenCode: interceptorScreenCode,
+      glyphCode: interceptorScreenCode & 0x7f,
+      inverse: interceptorScreenCode >> 7,
+      colourRegister: interceptorScreenCode & 0x80 ? "COLPF3" : "COLPF2",
+      colourValue: memory[interceptorScreenCode & 0x80 ? 0xd019 : 0xd018],
+      display: interceptorDisplay,
     },
     mixedDisplay: Array.from(logicalDisplay(memory, labels)),
     charset: Array.from(memory.subarray(0x4400, 0x4800)),
@@ -1366,7 +1366,7 @@ export function executeHudPresentationTrace({ root = defaultRoot, artifact = "xe
   };
 }
 
-function viperProjectileSnapshot(memory, labels, fields = {}) {
+function player_fighterProjectileSnapshot(memory, labels, fields = {}) {
   const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
   const x = requiredLabel(labels, "FIGHTER_PROJECTILE_X");
   const y = requiredLabel(labels, "FIGHTER_PROJECTILE_Y");
@@ -1429,7 +1429,7 @@ export function executeSpreadShotTrace({
   const killRecords = [];
   const triggerDrop = (cycle) => {
     for (let kill = 1; kill <= 3; kill += 1) {
-      const result = killRaiderWithViper(memory, labels);
+      const result = killInterceptorWithPlayerFighter(memory, labels);
       memory[requiredLabel(labels, "frame_counter")] += 1;
       memory[requiredLabel(labels, "ENTITY_FRAME_EVENTS")] = 0;
       runRoutine(memory, labels, "entity_effects_update");
@@ -1479,9 +1479,9 @@ export function executeSpreadShotTrace({
 
   memory[requiredLabel(labels, "player_x")] = 124;
   memory[requiredLabel(labels, "player_y")] = playerMaximumY;
-  runRoutine(memory, labels, "clear_viper_projectiles");
-  runRoutine(memory, labels, "allocate_viper_projectile");
-  const trajectoryFrames = [viperProjectileSnapshot(memory, labels,
+  runRoutine(memory, labels, "clear_player_fighter_projectiles");
+  runRoutine(memory, labels, "allocate_player_fighter_projectile");
+  const trajectoryFrames = [player_fighterProjectileSnapshot(memory, labels,
     { phase: "SPREAD_VOLLEY", frame: 0 })];
   const spreadTimerFrames = [];
   for (let frame = 0; frame < 51; frame += 1) {
@@ -1489,12 +1489,12 @@ export function executeSpreadShotTrace({
     runRoutine(memory, labels, "update_fighter_projectiles");
     runRoutine(memory, labels, "render_fighter_projectile_overlays");
     runRoutine(memory, labels, "update_weapon_booster_active", { x: 4 });
-    if (frame < 8) trajectoryFrames.push(viperProjectileSnapshot(memory, labels,
+    if (frame < 8) trajectoryFrames.push(player_fighterProjectileSnapshot(memory, labels,
       { phase: "SPREAD_VOLLEY", frame: frame + 1 }));
     spreadTimerFrames.push(pickupSnapshot(memory, labels, manifest,
       { phase: "SPREAD_TIMER", frame }));
   }
-  const projectilesAfterCleanup = viperProjectileSnapshot(memory, labels,
+  const projectilesAfterCleanup = player_fighterProjectileSnapshot(memory, labels,
     { phase: "SPREAD_CLEAN", frame: 51 });
   const frozenTimer = spreadTimerFrames.at(-1).timer;
   const pauseFrames = Array.from({ length: 10 }, (_, frame) =>
@@ -1537,14 +1537,14 @@ export function executeSpreadShotPoolTrace({ root = defaultRoot, artifact = "xex
     memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
     for (let slot = 0; slot < occupied; slot += 1) memory[active + slot] = 1;
     const before = Array.from(memory.subarray(active, active + 10));
-    runRoutine(memory, labels, "allocate_viper_projectile");
+    runRoutine(memory, labels, "allocate_player_fighter_projectile");
     const after = Array.from(memory.subarray(active, active + 10));
     return {
       occupied,
       before,
       after,
       activeCount: after.filter(Boolean).length,
-      projectiles: viperProjectileSnapshot(memory, labels).slots,
+      projectiles: player_fighterProjectileSnapshot(memory, labels).slots,
     };
   };
   return {
@@ -1572,7 +1572,7 @@ export function executeSpreadShotCooldownSafetyTrace({
       runRoutine(memory, labels, "update_fighter_projectiles");
       if (frame % cooldown === 0) {
         const before = countActive(memory, active, 10);
-        runRoutine(memory, labels, "allocate_viper_projectile");
+        runRoutine(memory, labels, "allocate_player_fighter_projectile");
         const after = countActive(memory, active, 10);
         allocationSizes.push(after - before);
       }
@@ -1604,7 +1604,7 @@ export function executeSpreadShotMotionTrace({ root = defaultRoot, artifact = "x
   memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
   memory[requiredLabel(labels, "player_x")] = 124;
   memory[requiredLabel(labels, "player_y")] = playerMaximumY;
-  runRoutine(memory, labels, "allocate_viper_projectile");
+  runRoutine(memory, labels, "allocate_player_fighter_projectile");
   const initial = Array.from(memory.subarray(xAddress, xAddress + 3));
   for (let frame = 0; frame < 100; frame += 1) {
     memory.fill(100, yAddress, yAddress + 3);
@@ -1644,13 +1644,13 @@ export function executeSpreadShotMotionTrace({ root = defaultRoot, artifact = "x
 }
 
 export function executeSpreadShotCollisionTrace({ root = defaultRoot, artifact = "xex" } = {}) {
-  const raider = (() => {
+  const interceptor = (() => {
     const { memory, labels } = initialiseRuntime(root, artifact);
     const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
     memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
     memory[requiredLabel(labels, "player_x")] = 124;
     memory[requiredLabel(labels, "player_y")] = playerMaximumY;
-    runRoutine(memory, labels, "allocate_viper_projectile");
+    runRoutine(memory, labels, "allocate_player_fighter_projectile");
     memory[requiredLabel(labels, "ENEMY_ACTIVE")] = 1;
     memory[requiredLabel(labels, "ENEMY_ARCHETYPE")] = 0;
     memory[requiredLabel(labels, "ENEMY_HP")] = 3;
@@ -1682,7 +1682,7 @@ export function executeSpreadShotCollisionTrace({ root = defaultRoot, artifact =
     memory[requiredLabel(labels, "ENTITY_STATE") + 2] = 4;
     memory[requiredLabel(labels, "player_x")] = 124;
     memory[requiredLabel(labels, "player_y")] = playerMaximumY;
-    runRoutine(memory, labels, "allocate_viper_projectile");
+    runRoutine(memory, labels, "allocate_player_fighter_projectile");
     for (let slot = 0; slot < 3; slot += 1) {
       if (slot !== selectedSlot) memory[active + slot] = 0;
     }
@@ -1705,12 +1705,12 @@ export function executeSpreadShotCollisionTrace({ root = defaultRoot, artifact =
       score: memory[requiredLabel(labels, "score_bcd_lo")],
     };
   });
-  return { artifact, raider, debris };
+  return { artifact, interceptor, debris };
 }
 
 export function executeSpreadShotHullArtifactTrace({
   root = defaultRoot, artifact = "xex", head = 0, topPhase = 128,
-  faction = "colonial", selectedSlot = 0, frames = 12,
+  faction = "allied", selectedSlot = 0, frames = 12,
 } = {}) {
   const { memory, labels, manifest } = initialiseRuntime(root, artifact);
   runRoutine(memory, labels, "unpack_capital_hull_maps");
@@ -1727,7 +1727,7 @@ export function executeSpreadShotHullArtifactTrace({
   const screenLow = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_LO");
   const screenHigh = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_HI");
   const directionIds = [0x41, 0x11, 0x21];
-  const startColumns = faction === "colonial" ? [7, 6, 5] : [36, 35, 34];
+  const startColumns = faction === "allied" ? [7, 6, 5] : [36, 35, 34];
   const startX = 48 + startColumns[selectedSlot] * 4 + 2;
   memory[active + selectedSlot] = directionIds[selectedSlot];
   memory[projectileX + selectedSlot] = startX;
@@ -1794,7 +1794,7 @@ export function executeSpreadShotHullArtifactTrace({
     topPhase,
     faction,
     selectedSlot,
-    manifestArtifact: manifest.artifacts[`dark-fighter.${artifact}`],
+    manifestArtifact: manifest.artifacts[`void-strike-65.${artifact}`],
     initialCharset,
     finalCharset: Array.from(memory.subarray(0x4400, 0x4800)),
     records,
@@ -1803,7 +1803,7 @@ export function executeSpreadShotHullArtifactTrace({
 
 export function executeSpreadShotHullVolleyTrace({
   root = defaultRoot, artifact = "xex", head = 21, topPhase = 128,
-  faction = "colonial", frames = 12,
+  faction = "allied", frames = 12,
 } = {}) {
   const { memory, labels, manifest } = initialiseRuntime(root, artifact);
   runRoutine(memory, labels, "unpack_capital_hull_maps");
@@ -1820,7 +1820,7 @@ export function executeSpreadShotHullVolleyTrace({
   const screenLow = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_LO");
   const screenHigh = requiredLabel(labels, "FIGHTER_PROJECTILE_SCREEN_HI");
   const directionIds = [0x41, 0x11, 0x21];
-  const startColumns = faction === "colonial" ? [7, 6, 5] : [36, 35, 34];
+  const startColumns = faction === "allied" ? [7, 6, 5] : [36, 35, 34];
   for (let slot = 0; slot < 3; slot += 1) {
     memory[active + slot] = directionIds[slot];
     memory[projectileX + slot] = 48 + startColumns[slot] * 4 + 2;
@@ -1874,7 +1874,7 @@ export function executeSpreadShotHullVolleyTrace({
     topPhase,
     faction,
     manifest,
-    manifestArtifact: manifest.artifacts[`dark-fighter.${artifact}`],
+    manifestArtifact: manifest.artifacts[`void-strike-65.${artifact}`],
     records,
   };
 }
@@ -1898,7 +1898,7 @@ export function executeSpreadShotOverlapTrace({
       }
     }
   }
-  if (displayOffset < 0) throw new Error("Overlap trace could not find a Cylon hull cell");
+  if (displayOffset < 0) throw new Error("Overlap trace could not find a Hostile hull cell");
   const row = Math.floor(displayOffset / 40);
   const column = displayOffset % 40;
   const active = requiredLabel(labels, "FIGHTER_PROJECTILE_ACTIVE");
@@ -2088,11 +2088,11 @@ export function executeShieldBoosterTrace({
     }),
   };
 
-  const raiderProjectile = initialiseRuntime(root, artifact, coldFill);
-  let raiderProjectileCycles = 0;
+  const interceptorProjectile = initialiseRuntime(root, artifact, coldFill);
+  let interceptorProjectileCycles = 0;
   {
-    const m = raiderProjectile.memory;
-    const l = raiderProjectile.labels;
+    const m = interceptorProjectile.memory;
+    const l = interceptorProjectile.labels;
     const slot = 10;
     m[requiredLabel(l, "ENTITY_STATE") + 2] = 5;
     m[requiredLabel(l, "BROAD_DAMAGE_APPLIED")] = 0;
@@ -2105,14 +2105,14 @@ export function executeShieldBoosterTrace({
     m[requiredLabel(l, "FIGHTER_PROJECTILE_Y") + slot] = 178;
     m[requiredLabel(l, "FIGHTER_PROJECTILE_PREV_Y") + slot] = 178;
     m[requiredLabel(l, "FIGHTER_PROJECTILE_LIFETIME") + slot] = 10;
-    raiderProjectileCycles = runRoutine(m, l, "update_fighter_projectiles");
+    interceptorProjectileCycles = runRoutine(m, l, "update_fighter_projectiles");
   }
-  damage.raiderProjectile = {
-    active: raiderProjectile.memory[requiredLabel(raiderProjectile.labels,
+  damage.interceptorProjectile = {
+    active: interceptorProjectile.memory[requiredLabel(interceptorProjectile.labels,
       "FIGHTER_PROJECTILE_ACTIVE") + 10],
-    health: raiderProjectile.memory[fixedStateAddress(raiderProjectile.labels,
+    health: interceptorProjectile.memory[fixedStateAddress(interceptorProjectile.labels,
       "BROAD_PLAYER_HEALTH")],
-    applied: raiderProjectile.memory[requiredLabel(raiderProjectile.labels,
+    applied: interceptorProjectile.memory[requiredLabel(interceptorProjectile.labels,
       "BROAD_DAMAGE_APPLIED")],
   };
 
@@ -2217,7 +2217,7 @@ export function executeShieldBoosterTrace({
       activeNoContactMax: Math.max(...activeUpdateCycles.slice(0, -1)),
       expiry: activeUpdateCycles.at(-1),
       directAbsorption: damage.ordinary.cycles,
-      raiderProjectileAbsorption: raiderProjectileCycles,
+      interceptorProjectileAbsorption: interceptorProjectileCycles,
       broadsideImpactAbsorption: broadsideImpactCycles,
       pickupThenDebrisAbsorption: debrisSameFrameCycles,
       replacements: replacements.map(({ name, cycles }) => ({ name, cycles })),

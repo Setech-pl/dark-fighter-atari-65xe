@@ -31,8 +31,8 @@ flight.
 
 The 34,132-cycle frame was legal, deterministic, and repeatable in the pickup
 hunt replay and in both XEX and ATR memory-integrity hunts at frame 1,087. It
-was not a host boundary or instrumentation error. The state combined nine Viper
-and seven Raider projectiles, a live Raider, one debris entity, active Spread
+was not a host boundary or instrumentation error. The state combined nine Player Fighter
+and seven Interceptor projectiles, a live Interceptor, one debris entity, active Spread
 Shot, world/far/hull work, broadside update, music, sound, and both production
 DLIs. Missed synchronization, deadline overruns, and extra VBI boundaries were
 all zero.
@@ -52,8 +52,8 @@ The pre-optimization host-only profile summed exactly to the measured wall:
 | Broadside update | 214 |
 | Damage resolution | 949 |
 | Collision return | 12 |
-| Viper weapon control | 1,036 |
-| Raider weapon control | 70 |
+| Player Fighter weapon control | 1,036 |
+| Interceptor weapon control | 70 |
 | World/ring/hull/starfield, including 236 DLI cycles | 13,775 |
 | Hull contact | 586 |
 | Entity/effect update | 549 |

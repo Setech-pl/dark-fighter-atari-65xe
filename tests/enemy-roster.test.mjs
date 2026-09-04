@@ -15,7 +15,7 @@ import { readRuntimeBytes as readAssembledRuntimeBytes } from "../scripts/runtim
 import {
   createEnemyAnchorComparisonPreview,
   createEnemyNativeSpritesPreview,
-  createEnemyRaiderBeforeAfterPreview,
+  createEnemyInterceptorBeforeAfterPreview,
   createEnemyReferenceInventoryPreview,
   createEnemyReviewHarnessPreview,
   createEnemyScannerComparisonPreview,
@@ -34,7 +34,7 @@ const asset = compileEnemyRoster(definition, rootDirectory);
 const hulls = loadCapitalHullsDefinition(hullsPath);
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
 const labels = new Map(
-  fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -98,7 +98,7 @@ test("roster conversion is deterministic and runtime never contains PNG data or 
   );
 });
 
-test("only three anchors are renderable and unimplemented identities cannot alias Raider", () => {
+test("only three anchors are renderable and unimplemented identities cannot alias Interceptor", () => {
   assert.equal(asset.implemented.length, 3);
   assert.deepEqual(asset.implemented.map(({ releaseEnabled }) => releaseEnabled), [true, false, false]);
   for (const entry of asset.inventory.slice(3)) {
@@ -114,15 +114,15 @@ test("only three anchors are renderable and unimplemented identities cannot alia
 });
 
 test("anchor masks are non-empty, structurally distinct, and preserve player-facing orientation", () => {
-  const [raider, talon, bomber] = asset.implemented;
-  assert.equal(raider.visibleWidth, 16);
+  const [interceptor, talon, bomber] = asset.implemented;
+  assert.equal(interceptor.visibleWidth, 16);
   assert.equal(talon.visibleWidth, 6);
   assert.equal(bomber.visibleWidth, 16);
-  assert.ok(talon.visibleWidth < raider.visibleWidth);
+  assert.ok(talon.visibleWidth < interceptor.visibleWidth);
   assert.ok(bomber.occupiedArea > talon.occupiedArea * 1.5);
-  assert.ok(raider.occupiedArea > talon.occupiedArea);
-  assert.ok(hammingDistance(raider.bodyRows, talon.bodyRows) >= 30);
-  assert.ok(hammingDistance(raider.bodyRows, bomber.bodyRows) >= 20);
+  assert.ok(interceptor.occupiedArea > talon.occupiedArea);
+  assert.ok(hammingDistance(interceptor.bodyRows, talon.bodyRows) >= 30);
+  assert.ok(hammingDistance(interceptor.bodyRows, bomber.bodyRows) >= 20);
   assert.ok(hammingDistance(talon.bodyRows, bomber.bodyRows) >= 35);
   for (const archetype of asset.implemented) {
     assert.ok(archetype.occupiedArea > 0);
@@ -221,9 +221,9 @@ test("generic erase and rapid type changes leave no stale P1/P2 bytes", () => {
   }
 });
 
-test("release gameplay remains one Raider with the accepted behaviour and score contract", () => {
-  assert.equal(asset.runtime.releaseArchetype, "RAIDER");
-  assert.equal(asset.implemented[0].movementProfile, "CURRENT_RAIDER");
+test("release gameplay remains one Interceptor with the accepted behaviour and score contract", () => {
+  assert.equal(asset.runtime.releaseArchetype, "INTERCEPTOR");
+  assert.equal(asset.implemented[0].movementProfile, "CURRENT_INTERCEPTOR");
   assert.equal(asset.implemented[0].weaponProfile, "SINGLE_PULSE");
   assert.deepEqual(asset.implemented.slice(1).map(({ weaponProfile }) => weaponProfile),
     ["NONE", "NONE"]);
@@ -271,7 +271,7 @@ test("review sheets are deterministic and consume the same compiled runtime mask
     () => createEnemyNativeSpritesPreview(source),
     () => createEnemyReviewHarnessPreview(source, hulls),
     () => createEnemyScannerComparisonPreview(source),
-    () => createEnemyRaiderBeforeAfterPreview(source),
+    () => createEnemyInterceptorBeforeAfterPreview(source),
   ];
   for (const create of creators) {
     const first = create();
@@ -292,7 +292,7 @@ test("enemy foundation stays inside the accepted payload and relocated-memory ga
   assert.deepEqual(
     [manifest.enemyRoster.inventoryCount, manifest.enemyRoster.implementedCount,
       manifest.enemyRoster.releaseArchetype],
-    [10, 3, "RAIDER"],
+    [10, 3, "INTERCEPTOR"],
   );
   assert.deepEqual(
     [manifest.enemyRoster.runtimeArtBytes, manifest.enemyRoster.descriptorBytes],

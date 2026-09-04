@@ -1,6 +1,6 @@
 .setcpu "6502"
 
-; Final-raster BROADSIDE bolt versus Viper collision.
+; Final-raster BROADSIDE bolt versus PlayerFighter collision.
 ; Entry: X is the BROADSIDE slot; src_ptr is the inclusive swept bolt L/R,
 ; dst_ptr is the inclusive 16-HPOS player L/R, frontend_data_ptr is the
 ; inclusive player raster T/B, and BROAD_RASTER_TOP is cached by the physical

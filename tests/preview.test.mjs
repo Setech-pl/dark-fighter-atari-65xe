@@ -14,8 +14,8 @@ import {
   createDebrisReviewTrace,
   createDestructibleDebrisPreview,
   createDestructibleDebrisTrace,
-  createRaiderBreakupPreview,
-  createRaiderBreakupTrace,
+  createInterceptorBreakupPreview,
+  createInterceptorBreakupTrace,
   createHudPresentationNativePreview,
   createHudPresentationPreview,
   createWeaponPickupRapidFirePreview,
@@ -23,9 +23,9 @@ import {
   createSpreadShotPreview,
   createShieldBoosterPreview,
   createSpreadShotTrace,
-  createViperProjectileColourPreview,
-  createViperBurstBalancePreview,
-  createViperBurstBalanceTrace,
+  createPlayerFighterProjectileColourPreview,
+  createPlayerFighterBurstBalancePreview,
+  createPlayerFighterBurstBalanceTrace,
   createSpreadShotHullPreview,
   createSpreadShotHullTrace,
   PREVIEW_HEIGHT,
@@ -86,7 +86,7 @@ test("start-menu preview is deterministic, 640x384, and source-derived", () => {
     ["START GAME", "OPTIONS", "TOP SCORES", "EXIT"],
   );
   assert.equal(frontend.mainMenuRecords.at(-1).text, "UP/DOWN MOVE   FIRE SELECT");
-  assert.equal(frontend.mainMenuRecords[0].text, "DARK FIGHTER");
+  assert.equal(frontend.mainMenuRecords[0].text, "VOID STRIKE 65");
   assert.equal(frontend.mainMenuRecords[0].mode, 7);
   assert.equal(frontend.mainMenuRecords.at(-1).mode, 2);
   assert.equal(frontend.mainMenuRecords.some(({ text }) => text.includes("SETECH")), false);
@@ -111,8 +111,8 @@ test("start-menu preview is deterministic, 640x384, and source-derived", () => {
   assert.notDeepEqual(createStartMenuPreview(changedHangar), first);
   const changedCraft = replaceOnce(
     source,
-    "CH_FRONT_VIPER_TOP_LEFT = 58",
-    "CH_FRONT_VIPER_TOP_LEFT = 57",
+    "CH_FRONT_PLAYER_FIGHTER_TOP_LEFT = 58",
+    "CH_FRONT_PLAYER_FIGHTER_TOP_LEFT = 57",
   );
   assert.notDeepEqual(createStartMenuPreview(changedCraft), first);
 });
@@ -174,7 +174,7 @@ test("capital-hulls strip preview is deterministic and shows all 32 rows", () =>
   assert.deepEqual([info.width, info.height], [640, 512]);
 });
 
-test("fighter burst trace is runtime-derived for both weapons and records the Viper hit", () => {
+test("fighter burst trace is runtime-derived for both weapons and records the PlayerFighter hit", () => {
   const trace = createFighterBurstRuntimeTrace(source, capitalHullsDefinition);
   const lines = trace.trimEnd().split("\n");
   assert.equal(lines[0], [
@@ -182,13 +182,13 @@ test("fighter burst trace is runtime-derived for both weapons and records the Vi
     "burst_interval", "post_burst_timer", "allocation_result", "projectile_slot",
     "previous_x", "previous_y", "current_x", "current_y", "visible_width",
     "visible_height", "colour_source", "colour_value", "collision_result",
-    "viper_energy_before", "viper_energy_after",
+    "player_fighter_energy_before", "player_fighter_energy_after",
   ].join(","));
-  assert.ok(lines.some((line) => line.startsWith("VIPER,") && line.includes(",ALLOCATED,")));
-  assert.ok(lines.some((line) => line.startsWith("RAIDER,") && line.includes(",ALLOCATED,")));
-  assert.ok(lines.some((line) => line.startsWith("RAIDER,") && line.includes(",VIPER_HIT,100,90")));
-  assert.ok(lines.some((line) => line.startsWith("VIPER,") && line.includes(",COLPF2,$1E,")));
-  assert.ok(lines.some((line) => line.startsWith("RAIDER,") && line.includes(",COLPF3,$46,")));
+  assert.ok(lines.some((line) => line.startsWith("PLAYER_FIGHTER,") && line.includes(",ALLOCATED,")));
+  assert.ok(lines.some((line) => line.startsWith("INTERCEPTOR,") && line.includes(",ALLOCATED,")));
+  assert.ok(lines.some((line) => line.startsWith("INTERCEPTOR,") && line.includes(",PLAYER_FIGHTER_HIT,100,90")));
+  assert.ok(lines.some((line) => line.startsWith("PLAYER_FIGHTER,") && line.includes(",COLPF2,$1E,")));
+  assert.ok(lines.some((line) => line.startsWith("INTERCEPTOR,") && line.includes(",COLPF3,$46,")));
 });
 
 test("weapon-transition trace covers every PAL frame and preserves held/fresh fire through exit", () => {
@@ -224,7 +224,7 @@ test("shared fighter-explosion preview and trace use all six runtime phases", ()
   const trace = createSharedFighterExplosionTrace(source, capitalHullsDefinition);
   const lines = trace.trimEnd().split("\n");
   assert.equal(lines.length, 49);
-  for (const owner of ["VIPER", "RAIDER"]) {
+  for (const owner of ["PLAYER_FIGHTER", "INTERCEPTOR"]) {
     const frames = lines.filter((line) => line.startsWith(`${owner},`))
       .map((line) => Number(line.split(",")[2]));
     assert.deepEqual(frames,
@@ -273,13 +273,13 @@ test("destructible debris owner preview is an XEX/ATR-executed eight-frame break
     "runtime preview trace changed score");
 });
 
-test("Raider owner preview is the XEX/ATR-executed eight-frame local breakup", () => {
-  const first = createRaiderBreakupPreview(source, entityEffectsDefinition);
-  const second = createRaiderBreakupPreview(source, entityEffectsDefinition);
+test("Interceptor owner preview is the XEX/ATR-executed eight-frame local breakup", () => {
+  const first = createInterceptorBreakupPreview(source, entityEffectsDefinition);
+  const second = createInterceptorBreakupPreview(source, entityEffectsDefinition);
   assert.deepEqual(first, second);
   assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [5228, 720]);
-  const trace = createRaiderBreakupTrace(entityEffectsDefinition);
-  assert.equal(trace, createRaiderBreakupTrace(entityEffectsDefinition));
+  const trace = createInterceptorBreakupTrace(entityEffectsDefinition);
+  assert.equal(trace, createInterceptorBreakupTrace(entityEffectsDefinition));
   const rows = trace.trimEnd().split("\n");
   assert.equal(rows.filter((row) => row.startsWith("xex,BREAKUP,")).length, 127);
   assert.equal(rows.filter((row) => row.startsWith("atr,BREAKUP,")).length, 127);
@@ -290,7 +290,7 @@ test("Raider owner preview is the XEX/ATR-executed eight-frame local breakup", (
   assert.ok(rows.slice(1).filter((row) => row.includes(",PRE_HIT,")).every((row) =>
     row.endsWith(",0742")));
   assert.ok(rows.slice(1).filter((row) => row.includes(",BREAKUP,")).every((row) =>
-    row.endsWith(",0752")), "Raider score policy must remain byte-exact");
+    row.endsWith(",0752")), "Interceptor score policy must remain byte-exact");
 });
 
 test("Rapid Fire owner preview executes the packed XEX/ATR pickup lifecycle", () => {
@@ -344,21 +344,21 @@ test("HUD presentation preview covers four requested states at native and enlarg
 });
 
 test("projectile colour owner previews use identical packed XEX and ATR runtime frames", () => {
-  const xex = createViperProjectileColourPreview(source, "xex");
-  const atr = createViperProjectileColourPreview(source, "atr");
+  const xex = createPlayerFighterProjectileColourPreview(source, "xex");
+  const atr = createPlayerFighterProjectileColourPreview(source, "atr");
   assert.deepEqual(xex, atr);
   assert.deepEqual([inspectPng(xex).width, inspectPng(xex).height], [3924, 476]);
 });
 
 test("burst-balance owner previews compare identical 80-frame XEX and ATR executions", () => {
-  const xex = createViperBurstBalancePreview(source, "xex");
-  const atr = createViperBurstBalancePreview(source, "atr");
-  assert.deepEqual(xex, createViperBurstBalancePreview(source, "xex"));
-  assert.deepEqual(atr, createViperBurstBalancePreview(source, "atr"));
+  const xex = createPlayerFighterBurstBalancePreview(source, "xex");
+  const atr = createPlayerFighterBurstBalancePreview(source, "atr");
+  assert.deepEqual(xex, createPlayerFighterBurstBalancePreview(source, "xex"));
+  assert.deepEqual(atr, createPlayerFighterBurstBalancePreview(source, "atr"));
   assert.deepEqual([inspectPng(xex).width, inspectPng(xex).height], [2620, 620]);
   assert.deepEqual([inspectPng(atr).width, inspectPng(atr).height], [2620, 620]);
-  const xexRows = createViperBurstBalanceTrace("xex").trimEnd().split("\n");
-  const atrRows = createViperBurstBalanceTrace("atr").trimEnd().split("\n");
+  const xexRows = createPlayerFighterBurstBalanceTrace("xex").trimEnd().split("\n");
+  const atrRows = createPlayerFighterBurstBalanceTrace("atr").trimEnd().split("\n");
   assert.equal(xexRows.length, 321);
   assert.deepEqual(atrRows.slice(1).map((row) => row.replace(/^atr,/, "xex,")),
     xexRows.slice(1));
@@ -395,7 +395,7 @@ test("Spread Shot owner preview is deterministic executed XEX/ATR gameplay", () 
     row.split(",")[11] === "0"));
 });
 
-test("Shield Booster preview is deterministic and covers capsule plus three Viper positions", () => {
+test("Shield Booster preview is deterministic and covers capsule plus three PlayerFighter positions", () => {
   const first = createShieldBoosterPreview(source);
   assert.deepEqual(createShieldBoosterPreview(source), first);
   assert.deepEqual([inspectPng(first).width, inspectPng(first).height], [1340, 268]);

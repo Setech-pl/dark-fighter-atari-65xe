@@ -1,4 +1,4 @@
-# Dark Fighter documentation map
+# Void Strike 65 documentation map
 
 Start here before making a technical or gameplay decision. Current sources of
 truth are intentionally separated from historical records.
@@ -37,5 +37,5 @@ specification.
 | Runtime capture provenance | [media/manifest.json](media/manifest.json) |
 
 Generated values must be checked against `build/manifest.json`,
-`build/dark-fighter.map`, and the current packed artifacts. Do not promote a
+`build/void-strike-65.map`, and the current packed artifacts. Do not promote a
 historical number into a current document without regenerating or verifying it.

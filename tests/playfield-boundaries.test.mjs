@@ -42,7 +42,7 @@ import { installRuntimeSegments } from "../scripts/runtime-image.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = fs.readFileSync(path.join(root, "src/main.s"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build/manifest.json"), "utf8"));
-const labels = new Map(fs.readFileSync(path.join(root, "build/dark-fighter.lbl"), "utf8")
+const labels = new Map(fs.readFileSync(path.join(root, "build/void-strike-65.lbl"), "utf8")
   .split(/\r?\n/)
   .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
   .filter(Boolean)
@@ -86,7 +86,7 @@ test("one canonical PAL boundary model feeds every gameplay asset compiler", () 
     entities.coordinateSystem.gameplayBottomExclusive,
     entities.coordinateSystem.logicalRows,
     entities.weaponPickupRapidFire.releaseTopScanline,
-    roster.runtime.movementPolicy.raiderSoftPursuit.attackActiveBottomExclusive,
+    roster.runtime.movementPolicy.interceptorSoftPursuit.attackActiveBottomExclusive,
     hulls.sector.visibleRows,
     ENEMY_VISIBLE_BOTTOM_EXCLUSIVE,
     GAMEPLAY_HULL_ROWS,
@@ -94,7 +94,7 @@ test("one canonical PAL boundary model feeds every gameplay asset compiler", () 
   ], [24, 240, 27, 240, 240, 28, 240, 28, 231]);
 });
 
-test("Viper lower clamp derives from its real 15-scanline opaque union", () => {
+test("PlayerFighter lower clamp derives from its real 15-scanline opaque union", () => {
   const body = [0x18, 0x18, 0x18, 0x3c, 0x7e, 0xdb, 0xff, 0xdb,
     0xff, 0x7e, 0x3c, 0x24, 0x66, 0x42, 0x42, 0x00];
   const engine = [0, 0, 0, 0, 0x18, 0x18, 0x24, 0x18,
@@ -144,7 +144,7 @@ test("starfield reaches every gameplay row, including all five recovered lower r
 test("projectiles, debris, pickups and ordinary enemies share the exclusive bottom fence", () => {
   assert.equal(manifest.fighterWeapons.viewport.gameplayBottom, 240);
   assert.equal(manifest.entityEffects.gameplayBottomExclusive, 240);
-  assert.equal(manifest.enemyRoster.movementPolicy.raiderSoftPursuit
+  assert.equal(manifest.enemyRoster.movementPolicy.interceptorSoftPursuit
     .attackActiveBottomExclusive, 240);
   assert.match(source, /ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = GAMEPLAY_BOTTOM/);
   assert.match(source, /cmp #\(GAMEPLAY_BOTTOM\+1\)/);

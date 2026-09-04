@@ -17,7 +17,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = fs.readFileSync(path.join(root, "src", "main.s"), "utf8");
 const runtime = readExplosionFlashRuntimeState(source);
 const labels = new Map(
-  fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(root, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -53,7 +53,7 @@ test("named PAL colours and linked tables define the exact two fighter profiles"
   assert.equal([...runtime.enemySequence, ...runtime.playerSequence].includes(0x84), false);
 });
 
-test("enemy and Viper COLBK sequences restore base on the exact next PAL frame", () => {
+test("enemy and PlayerFighter COLBK sequences restore base on the exact next PAL frame", () => {
   const enemy = Array.from({ length: 5 }, (_, frame) => explosionFlashColorForTimers(runtime, {
     enemyTimer: runtime.totalExplosionFrames - frame,
   }));
@@ -66,7 +66,7 @@ test("enemy and Viper COLBK sequences restore base on the exact next PAL frame",
   assert.equal(runtime.playerSequence.length * 20, 120);
 });
 
-test("Viper death wins same-frame arbitration and enemy flashes cannot restart forever", () => {
+test("PlayerFighter death wins same-frame arbitration and enemy flashes cannot restart forever", () => {
   for (let playerTimer = 19; playerTimer <= 24; playerTimer += 1) {
     for (let enemyTimer = 21; enemyTimer <= 24; enemyTimer += 1) {
       assert.equal(
@@ -77,13 +77,13 @@ test("Viper death wins same-frame arbitration and enemy flashes cannot restart f
   }
   for (let playerTimer = 1; playerTimer < 19; playerTimer += 1) {
     assert.equal(explosionFlashColorForTimers(runtime, { playerTimer, enemyTimer: 24 }),
-      runtime.baseColor, "enemy flash cannot replace the restored Viper profile");
+      runtime.baseColor, "enemy flash cannot replace the restored PlayerFighter profile");
   }
   const resolution = routine("resolve_enemy_damage", "add_archetype_score");
   assert.match(resolution,
-    /ENEMY_ACTIVE[\s\S]+cmp #ENEMY_ACTIVE_STATE[\s\S]+bne @done[\s\S]+sta ENEMY_ACTIVE[\s\S]+spawn_raider_breakup_effects/);
+    /ENEMY_ACTIVE[\s\S]+cmp #ENEMY_ACTIVE_STATE[\s\S]+bne @done[\s\S]+sta ENEMY_ACTIVE[\s\S]+spawn_interceptor_breakup_effects/);
   assert.match(source,
-    /spawn_raider_breakup_effects:[\s\S]+begin_enemy_fighter_explosion/);
+    /spawn_interceptor_breakup_effects:[\s\S]+begin_enemy_fighter_explosion/);
   assert.match(routine("update_enemy", "draw_enemy"),
     /cmp #ENEMY_EXPLODING_STATE[\s\S]+FIGHTER_EXPLOSION_TIMER\+FIGHTER_EXPLOSION_ENEMY_SLOT[\s\S]+beq @reset\s+rts/);
 });
@@ -91,7 +91,7 @@ test("Viper death wins same-frame arbitration and enemy flashes cannot restart f
 test("the flash has one COLBK owner while gameplay DLI preserves the gameplay-region colour", () => {
   const sound = routine("update_sound", "silence_audio");
   assert.match(sound,
-    /FIGHTER_EXPLOSION_TIMER\+FIGHTER_EXPLOSION_VIPER_SLOT[\s\S]+player_death_flash_colors,x[\s\S]+sta COLBK/);
+    /FIGHTER_EXPLOSION_TIMER\+FIGHTER_EXPLOSION_PLAYER_FIGHTER_SLOT[\s\S]+player_death_flash_colors,x[\s\S]+sta COLBK/);
   assert.match(sound,
     /FIGHTER_EXPLOSION_TIMER\+FIGHTER_EXPLOSION_ENEMY_SLOT[\s\S]+enemy_fighter_flash_colors,x[\s\S]+sta COLBK/);
   assert.doesNotMatch(sound, /sta COLP(?:F|M)[0-3]/);

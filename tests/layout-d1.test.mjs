@@ -11,7 +11,7 @@ import { installBootArtifact } from "../scripts/runtime-image.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = fs.readFileSync(path.join(root, "src/main.s"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build/manifest.json"), "utf8"));
-const labels = new Map(fs.readFileSync(path.join(root, "build/dark-fighter.lbl"), "utf8")
+const labels = new Map(fs.readFileSync(path.join(root, "build/void-strike-65.lbl"), "utf8")
   .split(/\r?\n/).map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
   .filter(Boolean).map((match) => [match[2], Number.parseInt(match[1], 16)]));
 const a2 = fs.readFileSync(path.join(root, "build/a2-kernel-runtime.bin"));
@@ -81,7 +81,7 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
 });
 
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
-  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12901);
+  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12842);
   assert.equal(manifest.transportCapacity.initialBootBytes, 12928);
   assert.equal(manifest.transportCapacity.totalTransportSectors, 161);
   assert.equal(manifest.transportCapacity.totalTransportBytes, 20608);

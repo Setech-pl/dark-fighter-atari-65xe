@@ -202,9 +202,9 @@ const provisionalCapitalSessions = ["XEX", "ATR"].flatMap((medium) =>
   })));
 
 const capitalContactSessions = [0, 1].map((owner) => ({
-  id: `capital-contact-${owner === 0 ? "colonial" : "cylon"}-medium`,
+  id: `capital-contact-${owner === 0 ? "allied" : "hostile"}-medium`,
   difficulty: 1,
-  policy: owner === 0 ? "capital-contact-colonial" : "capital-contact-cylon",
+  policy: owner === 0 ? "capital-contact-allied" : "capital-contact-hostile",
   fireDelay: 4_000,
   frames: owner === 0 ? 560 : 360,
   kind: "capital-projectile-contact",
@@ -216,10 +216,10 @@ const capitalPlayerGeometrySessions = [["XEX", 1], ["ATR", 2]].flatMap(([medium,
     ["top", 0, true], ["middle", 1, true], ["bottom", 2, true],
     ["near", 3, false],
   ].map(([contactMode, contactModeId, expectedHit]) => ({
-    id: `capital-player-${medium.toLowerCase()}-${difficulty}-${owner === 0 ? "colonial" : "cylon"}-${contactMode}`,
+    id: `capital-player-${medium.toLowerCase()}-${difficulty}-${owner === 0 ? "allied" : "hostile"}-${contactMode}`,
     medium,
     difficulty,
-    policy: owner === 0 ? "capital-contact-colonial" : "capital-contact-cylon",
+    policy: owner === 0 ? "capital-contact-allied" : "capital-contact-hostile",
     fireDelay: 4_000,
     frames: owner === 0 ? 600 : 450,
     kind: "capital-player-geometry",
@@ -285,10 +285,10 @@ const lowerPlayfieldSessions = [{
   frames: 420,
   kind: "lower-playfield-boundary",
 }, {
-  id: "lower-playfield-cylon-contact-xex-hard",
+  id: "lower-playfield-hostile-contact-xex-hard",
   medium: "XEX",
   difficulty: 2,
-  policy: "lower-contact-cylon",
+  policy: "lower-contact-hostile",
   fireDelay: 4_000,
   frames: 1_200,
   kind: "lower-playfield-contact",
@@ -317,7 +317,7 @@ const traceLabels = {
   DFTRACE_PC_EFFECT_ERASE: "erase_transient_effect_overlays",
   DFTRACE_PC_EFFECT_UPDATE: "update_transient_effects",
   DFTRACE_PC_EFFECT_RENDER: "render_transient_effect_overlays",
-  DFTRACE_PC_RAIDER_BREAKUP_SPAWN: "materialize_raider_breakup_effects",
+  DFTRACE_PC_INTERCEPTOR_BREAKUP_SPAWN: "materialize_interceptor_breakup_effects",
   DFTRACE_PC_PICKUP_QUALIFIED_KILL: "weapon_pickup_record_qualified_kill",
   DFTRACE_PC_PICKUP_COLLECT: "weapon_pickup_collect",
   DFTRACE_PC_ENTITY_ERASE: "erase_weapon_pickup_overlay_restore",
@@ -410,12 +410,12 @@ const traceLabels = {
   DFTRACE_NEXT_DLIST_LO: "PLAYFIELD_NEXT_DLIST_LO",
   DFTRACE_PC_DLI_END: "profile_gameplay_dli_end",
   DFTRACE_PC_DLI_HUD_END: "profile_gameplay_dli_hud_end",
-  DFTRACE_PC_COMPOSE_START: "compose_viper_projectile_glyph",
+  DFTRACE_PC_COMPOSE_START: "compose_player_fighter_projectile_glyph",
   DFTRACE_PC_COMPOSE_END: "profile_projectile_compose_end",
   DFTRACE_PC_POINTER_START: "initialize_projectile_screen_pointer",
   DFTRACE_PC_POINTER_END: "profile_projectile_pointer_end",
   DFTRACE_PC_ERASE_SLOT: "erase_fighter_projectile_slot",
-  DFTRACE_PC_RAIDER_UPDATE_START: "profile_raider_projectile_update_begin",
+  DFTRACE_PC_INTERCEPTOR_UPDATE_START: "profile_interceptor_projectile_update_begin",
   DFTRACE_PC_RENDER_SLOT: "render_fighter_projectile_slot",
   DFTRACE_PC_ENTITY_ERASE_START: "profile_entity_erase_begin",
   DFTRACE_PC_EFFECT_UPDATE_END: "profile_after_transient_effect_update",
@@ -434,8 +434,8 @@ const traceProfileLabels = [
   "profile_after_broadside_update",
   "profile_after_enemy_damage_resolution",
   "profile_after_collisions",
-  "profile_after_viper_weapon",
-  "profile_after_raider_weapon",
+  "profile_after_player_fighter_weapon",
+  "profile_after_interceptor_weapon",
   "profile_after_world",
   "profile_after_hull_contact",
   "profile_after_entity_update",
@@ -468,19 +468,19 @@ const numericCsvFields = new Set([
   "start_host_frame", "end_host_frame", "next_start_host_frame", "start_scanline",
   "start_cycle", "end_scanline", "end_cycle", "host_vbi_boundaries",
   "extra_vbi_boundaries", "missed_frames", "dli_nmis", "dma_ctl", "nmi_en",
-  "projectiles", "broadside", "far_rendered", "live_raider", "fighter_explosion",
+  "projectiles", "broadside", "far_rendered", "live_interceptor", "fighter_explosion",
   "capital_explosion", "music_active", "fire_sfx", "hit_sfx", "capital_sfx",
   "sound_enabled", "player_lifecycle", "sector_state", "gameplay_frame",
   "difficulty", "active_muzzles", "entity_active", "entity_x", "entity_y",
   "entity_vx", "entity_move_accumulator", "entity_vertical_accumulator",
   "entity_render_id", "events",
   "colbk", "colpm0", "colpm1", "colpm2", "colpm3", "colpf0", "colpf1",
-  "colpf2", "colpf3", "viper_explosion_timer", "enemy_explosion_timer",
+  "colpf2", "colpf3", "player_fighter_explosion_timer", "enemy_explosion_timer",
   "effect_active_mask", "effect_active_count", "effect_rendered_mask",
   "entity_active_mask", "pickup_state", "pickup_booster_state", "pickup_counter", "pickup_x", "pickup_y",
   "pickup_timer_lo", "pickup_timer_hi", "pickup_animation", "pickup_render_id",
   "pickup_drawn_mask", "score_lo", "score_hi", "rapid_projectiles",
-  "viper_projectiles",
+  "player_fighter_projectiles",
   "player_x", "player_y", "prior", "player_erase_calls", "player_draw_calls",
   "player_erase_scanline", "player_draw_scanline",
   "rapid_projectile_slot", "rapid_projectile_address", "rapid_projectile_screen_code",
@@ -554,8 +554,8 @@ for (let index = 0; index < 2; index += 1) {
   numericCsvFields.add(`profile_dli${index}_segment`);
 }
 for (const name of ["profile_compose_calls", "profile_compose_cycles",
-  "profile_pointer_calls", "profile_pointer_cycles", "profile_erase_viper_start",
-  "profile_raider_update_start", "profile_raider_render_start",
+  "profile_pointer_calls", "profile_pointer_cycles", "profile_erase_player_fighter_start",
+  "profile_interceptor_update_start", "profile_interceptor_render_start",
   "profile_entity_erase_start", "profile_effect_update_end",
   "profile_pickup_update_end", "profile_pickup_render_start",
   "profile_effect_render_start"]) numericCsvFields.add(name);
@@ -880,7 +880,7 @@ function run(command, args, options = {}) {
 function prepareAtari800(sourceDirectory) {
   const configurePath = path.join(sourceDirectory, "configure");
   const cpuPath = path.join(sourceDirectory, "src", "cpu.c");
-  const destinationHeader = path.join(sourceDirectory, "src", "darkfighter_trace.h");
+  const destinationHeader = path.join(sourceDirectory, "src", "voidstrike65_trace.h");
   invariant(fs.existsSync(configurePath), `Atari800 configure is missing: ${configurePath}`);
   invariant(fs.existsSync(cpuPath), `Atari800 cpu.c is missing: ${cpuPath}`);
   const configureText = fs.readFileSync(path.join(sourceDirectory, "configure.ac"), "utf8");
@@ -889,11 +889,11 @@ function prepareAtari800(sourceDirectory) {
 
   fs.copyFileSync(headerPath, destinationHeader);
   let cpuText = fs.readFileSync(cpuPath, "utf8");
-  if (!cpuText.includes('#include "darkfighter_trace.h"')) {
+  if (!cpuText.includes('#include "voidstrike65_trace.h"')) {
     const includeAnchor = "#endif /* ASAP */\n";
     invariant(cpuText.includes(includeAnchor), "Atari800 cpu.c include anchor changed");
     cpuText = cpuText.replace(includeAnchor,
-      `${includeAnchor}\n#include "darkfighter_trace.h"\n`);
+      `${includeAnchor}\n#include "voidstrike65_trace.h"\n`);
   }
   if (cpuText.includes("DFTrace_Observe(GET_PC());"))
     cpuText = cpuText.replace("DFTrace_Observe(GET_PC());",
@@ -952,7 +952,7 @@ function decodeEvents(bits) {
     [1 << 14, "effect-erase"],
     [1 << 15, "effect-update"],
     [1 << 16, "effect-render"],
-    [1 << 17, "raider-breakup-spawn"],
+    [1 << 17, "interceptor-breakup-spawn"],
     [1 << 18, "pickup-qualified-kill"],
     [1 << 19, "pickup-collect"],
     [1 << 20, "director-world-row"],
@@ -1020,13 +1020,13 @@ function frameState(row, includeCpuReference = false) {
         render_id: row.pickup_render_id,
         drawn_mask: row.pickup_drawn_mask,
       },
-      viper_projectiles: row.viper_projectiles,
-      rapid_viper_projectiles: row.rapid_projectiles,
+      player_fighter_projectiles: row.player_fighter_projectiles,
+      rapid_player_fighter_projectiles: row.rapid_projectiles,
       score_bcd: [row.score_hi, row.score_lo],
       effect_active_mask: row.effect_active_mask,
       effect_active_count: row.effect_active_count,
       effect_rendered_mask: row.effect_rendered_mask,
-      live_raider: Boolean(row.live_raider),
+      live_interceptor: Boolean(row.live_interceptor),
       fighter_explosion: Boolean(row.fighter_explosion),
       capital_explosion: Boolean(row.capital_explosion),
       music_active: Boolean(row.music_active),
@@ -1057,7 +1057,7 @@ const profileSegmentNames = [
   "frame_visual_ticks", "player_input_lifecycle", "enemy_update",
   "fighter_projectile_update_collision", "player_enemy_collision",
   "broadside_update", "enemy_damage_resolution", "collision_return",
-  "viper_weapon_control", "raider_weapon_control", "world_ring_playfield",
+  "player_fighter_weapon_control", "interceptor_weapon_control", "world_ring_playfield",
   "player_hull_contact", "entity_effect_update", "explosion_effect_visuals",
   "broadside_render", "projectile_render_backing", "entity_effect_render",
   "sector_completion", "music_sound", "main_loop_tail",
@@ -1101,13 +1101,13 @@ function profileCostBreakdown(row) {
   const entityEraseStart = row.profile_entity_erase_start;
   const projectileEraseStart = boundaries[1];
   const projectileEraseEnd = boundaries[2];
-  const viperEraseStart = row.profile_erase_viper_start;
+  const player_fighterEraseStart = row.profile_erase_player_fighter_start;
   const projectileUpdateStart = boundaries[6];
   const projectileUpdateEnd = boundaries[7];
-  const raiderUpdateStart = row.profile_raider_update_start;
+  const interceptorUpdateStart = row.profile_interceptor_update_start;
   const projectileRenderStart = boundaries[18];
   const projectileRenderEnd = boundaries[19];
-  const raiderRenderStart = row.profile_raider_render_start;
+  const interceptorRenderStart = row.profile_interceptor_render_start;
   const entityUpdateStart = boundaries[15];
   const entityUpdateEnd = boundaries[16];
   const effectUpdateEnd = row.profile_effect_update_end;
@@ -1119,17 +1119,17 @@ function profileCostBreakdown(row) {
 
   const effectErase = nested(eraseStart, entityEraseStart, eraseStart, eraseEnd);
   const entityErase = nested(entityEraseStart, eraseEnd, eraseStart, eraseEnd);
-  const raiderErase = nested(projectileEraseStart, viperEraseStart,
+  const interceptorErase = nested(projectileEraseStart, player_fighterEraseStart,
     projectileEraseStart, projectileEraseEnd);
-  const viperErase = nested(viperEraseStart, projectileEraseEnd,
+  const player_fighterErase = nested(player_fighterEraseStart, projectileEraseEnd,
     projectileEraseStart, projectileEraseEnd);
-  const viperUpdate = nested(projectileUpdateStart, raiderUpdateStart,
+  const player_fighterUpdate = nested(projectileUpdateStart, interceptorUpdateStart,
     projectileUpdateStart, projectileUpdateEnd);
-  const raiderUpdate = nested(raiderUpdateStart, projectileUpdateEnd,
+  const interceptorUpdate = nested(interceptorUpdateStart, projectileUpdateEnd,
     projectileUpdateStart, projectileUpdateEnd);
-  const viperRender = nested(projectileRenderStart, raiderRenderStart,
+  const player_fighterRender = nested(projectileRenderStart, interceptorRenderStart,
     projectileRenderStart, projectileRenderEnd);
-  const raiderRender = nested(raiderRenderStart, projectileRenderEnd,
+  const interceptorRender = nested(interceptorRenderStart, projectileRenderEnd,
     projectileRenderStart, projectileRenderEnd);
   const effectUpdate = nested(entityUpdateStart, effectUpdateEnd,
     entityUpdateStart, entityUpdateEnd);
@@ -1151,8 +1151,8 @@ function profileCostBreakdown(row) {
     vbi_and_synchronization: dliCycles,
     world_ring_playfield: segmentCpu(13),
     broadside: segmentCpu(8) + segmentCpu(17),
-    viper_projectiles: viperErase + viperUpdate + segmentCpu(11) + viperRender,
-    raider_projectiles: raiderErase + raiderUpdate + segmentCpu(12) + raiderRender,
+    player_fighter_projectiles: player_fighterErase + player_fighterUpdate + segmentCpu(11) + player_fighterRender,
+    interceptor_projectiles: interceptorErase + interceptorUpdate + segmentCpu(12) + interceptorRender,
     enemy_update_collision: segmentCpu(5) + segmentCpu(7) + segmentCpu(9),
     entity_debris: entityErase + debrisUpdate + debrisRender,
     effects: effectErase + effectUpdate + segmentCpu(16) + effectRender,
@@ -1179,10 +1179,10 @@ function profileCostBreakdown(row) {
       projectile_composition_cycles: row.profile_compose_cycles,
     },
     projectile_detail: {
-      viper: { erase: viperErase, update_collision: viperUpdate,
-        weapon_control: segmentCpu(11), render_backing: viperRender },
-      raider: { erase: raiderErase, update_collision: raiderUpdate,
-        weapon_control: segmentCpu(12), render_backing: raiderRender },
+      player_fighter: { erase: player_fighterErase, update_collision: player_fighterUpdate,
+        weapon_control: segmentCpu(11), render_backing: player_fighterRender },
+      interceptor: { erase: interceptorErase, update_collision: interceptorUpdate,
+        weapon_control: segmentCpu(12), render_backing: interceptorRender },
     },
     entity_effect_detail: {
       effect_erase: effectErase, entity_erase: entityErase,
@@ -1727,11 +1727,11 @@ function main() {
   const emulatorPath = path.join(sourceDirectory, "src", "atari800");
   invariant(fs.existsSync(emulatorPath),
     `Instrumented Atari800 is missing: ${emulatorPath}; rerun with --prepare`);
-  const labelPath = path.join(rootDirectory, "build", "dark-fighter.lbl");
-  const manifestPath = path.join(rootDirectory, "dist", "dark-fighter-manifest.json");
-  const bootPath = path.join(rootDirectory, "dist", "dark-fighter-boot.bin");
-  const xexPath = path.join(rootDirectory, "dist", "dark-fighter.xex");
-  const atrPath = path.join(rootDirectory, "dist", "dark-fighter.atr");
+  const labelPath = path.join(rootDirectory, "build", "void-strike-65.lbl");
+  const manifestPath = path.join(rootDirectory, "dist", "void-strike-65-manifest.json");
+  const bootPath = path.join(rootDirectory, "dist", "void-strike-65-boot.bin");
+  const xexPath = path.join(rootDirectory, "dist", "void-strike-65.xex");
+  const atrPath = path.join(rootDirectory, "dist", "void-strike-65.atr");
   for (const requiredPath of [labelPath, manifestPath, bootPath, xexPath, atrPath]) {
     invariant(fs.existsSync(requiredPath), `Build input is missing: ${requiredPath}`);
   }
@@ -1756,8 +1756,8 @@ function main() {
     xex: fs.readFileSync(xexPath),
     atr: fs.readFileSync(atrPath),
   });
-  runtimeArtifacts["dark-fighter-manifest.json"] = {
-    path: "dist/dark-fighter-manifest.json",
+  runtimeArtifacts["void-strike-65-manifest.json"] = {
+    path: "dist/void-strike-65-manifest.json",
     bytes: manifestBytes.length,
     sha256: sha256(manifestBytes),
   };
@@ -2126,8 +2126,8 @@ function main() {
         difficulty: session.difficulty === 1 ? "MEDIUM" : "HARD",
         input_replay: session.policy,
         frames: rows.length,
-        launches: { colonial: launches[0], cylon: launches[1] },
-        releases: { colonial: releases[0], cylon: releases[1] },
+        launches: { allied: launches[0], hostile: launches[1] },
+        releases: { allied: releases[0], hostile: releases[1] },
         ring_wraps: wraps,
         invariant: {
           actual_minus_expected_transient_cells: 0,
@@ -2425,7 +2425,7 @@ function main() {
       fs.writeFileSync(path.join(buildDirectory, `${session.id}-evidence.json`),
         `${JSON.stringify({
           session: session.id,
-          owner: session.contactOwner === 0 ? "Colonial/BSG" : "Cylon",
+          owner: session.contactOwner === 0 ? "Allied" : "Hostile",
           emulator: "Atari800 7.1.2 PAL/XL",
           production_artifact: path.relative(rootDirectory, xexPath),
           order: "update shell -> common collision -> canonical player damage -> late render",
@@ -2540,8 +2540,8 @@ function main() {
       path.join(buildDirectory, `${session.id}-transient-evidence.json`), "utf8")));
     const nativeSlotCoverage = [0, 1, 2].map((slot) => ({
       slot,
-      colonial: evidence.some((session) => session.launches.colonial[slot] !== 0),
-      cylon: evidence.some((session) => session.launches.cylon[slot] !== 0),
+      allied: evidence.some((session) => session.launches.allied[slot] !== 0),
+      hostile: evidence.some((session) => session.launches.hostile[slot] !== 0),
     }));
     fs.writeFileSync(reportPath, `${JSON.stringify({
       schema_version: 1,
@@ -2559,7 +2559,7 @@ function main() {
     invariant(fs.existsSync(pickupScreenshotPath),
       "Atari800 did not render a visible Rapid Fire capsule during the pickup replay");
     invariant(fs.existsSync(rapidScreenshotPath),
-      "Atari800 did not render a yellow Rapid Fire Viper projectile during the pickup replay");
+      "Atari800 did not render a yellow Rapid Fire PlayerFighter projectile during the pickup replay");
     invariant(fs.existsSync(spreadScreenshotPath),
       "Atari800 did not render a three-projectile Spread Shot fan during the pickup replay");
     const sequencePaths = Array.from({ length: 16 }, (_, index) =>
@@ -2685,7 +2685,7 @@ function main() {
     invariant(top.player_y === 32 && returnedBottom !== undefined &&
       rows.every((row) => row.player_y >= 32 &&
         row.player_y <= canonicalPlayfield.gameplayBottom - 15),
-    "Native joystick replay did not reach both opaque-Viper-safe PAL clamps");
+    "Native joystick replay did not reach both opaque-PlayerFighter-safe PAL clamps");
     invariant(rows.every((row) => row.far_rendered > 0 && row.missed_frames === 0 &&
       row.extra_vbi_boundaries === 0 && row.dli_sequence_violations === 0) &&
       rows.some((row) => row.active_muzzles > 0) && rows.some((row) => row.broadside > 0),
@@ -2708,7 +2708,7 @@ function main() {
         ring: [canonicalPlayfield.entityTop, canonicalPlayfield.gameplayBottom - 1],
         bottom_exclusive: canonicalPlayfield.gameplayBottom,
       },
-      viper: {
+      player_fighter: {
         minimum_pmg_y: top.player_y,
         minimum_frame: top.frame,
         maximum_pmg_y: returnedBottom.player_y,
@@ -2895,7 +2895,7 @@ function main() {
         session: session.id,
         artifact: session.medium,
         difficulty: session.difficulty === 1 ? "MEDIUM" : "HARD",
-        owner: session.contactOwner === 0 ? "Colonial" : "Cylon",
+        owner: session.contactOwner === 0 ? "Allied" : "Hostile",
         contact: session.contactMode,
         expected_hit: session.expectedHit,
         collision_decision: {
@@ -2941,7 +2941,7 @@ function main() {
           raster_x_alignment: "two adjacent ANTIC 4 cells" },
       },
       checkpoint_counterexample: {
-        artifact: "build/runtime-wall-trace/capital-player-xex-1-colonial-top-hitboxes.png",
+        artifact: "build/runtime-wall-trace/capital-player-xex-1-allied-top-hitboxes.png",
         player_logical_y: 110,
         player_pmg_dma_rows: [110, 124],
         player_final_raster: [102, 116],
@@ -2950,7 +2950,7 @@ function main() {
         bolt_glyph_rows: [1, 6],
         bolt_final_raster: [113, 118],
         actual_overlap: [113, 116],
-        conclusion: "the former top label was a four-scanline lower-Viper contact",
+        conclusion: "the former top label was a four-scanline lower-PlayerFighter contact",
       },
       sessions: geometryEvidence,
       passed: true,
@@ -3252,12 +3252,12 @@ function main() {
     memoryIntegrityRows.filter((row) => row.session.includes(`-${medium.toLowerCase()}-`)),
   ]));
   const integrityState = (row) => [
-    row.gameplay_frame, row.events, row.projectiles, row.broadside, row.live_raider,
+    row.gameplay_frame, row.events, row.projectiles, row.broadside, row.live_interceptor,
     row.entity_active_mask, row.entity_x, row.entity_y, row.entity_render_id,
     row.effect_active_mask, row.pickup_state, row.pickup_booster_state,
     row.pickup_counter, row.pickup_x,
     row.pickup_y, row.pickup_timer_lo, row.pickup_timer_hi, row.score_lo, row.score_hi,
-    row.rapid_projectiles, row.viper_projectiles,
+    row.rapid_projectiles, row.player_fighter_projectiles,
   ];
   invariant(integrityByMedium.XEX.every((row, index) =>
     JSON.stringify(integrityState(row)) === JSON.stringify(integrityState(integrityByMedium.ATR[index]))),
@@ -3286,7 +3286,7 @@ function main() {
   const despawnRows = allRows.filter((row) => (row.events & (1 << 9)) !== 0);
   const shotRows = allRows.filter((row) => (row.events & (1 << 12)) !== 0);
   const effectSpawnRows = allRows.filter((row) => (row.events & (1 << 13)) !== 0);
-  const raiderBreakupRows = allRows.filter((row) => (row.events & (1 << 17)) !== 0);
+  const interceptorBreakupRows = allRows.filter((row) => (row.events & (1 << 17)) !== 0);
   const pickupQualifiedKillRows = weaponPickupRows.filter((row) =>
     (row.events & (1 << 18)) !== 0);
   // The deterministic pickup showcase proves capsule/render semantics, while
@@ -3341,13 +3341,13 @@ function main() {
   }
   const rapidProjectileRows = weaponPickupRows.filter((row) => row.rapid_projectiles > 0);
   const spreadVolleyRows = weaponPickupRows.filter((row) =>
-    row.pickup_booster_state === 4 && row.viper_projectiles >= 3);
+    row.pickup_booster_state === 4 && row.player_fighter_projectiles >= 3);
   const activeCapsuleThreeProjectileRows = weaponPickupRows.filter((row) =>
-    row.pickup_state === 2 && row.viper_projectiles >= 3);
+    row.pickup_state === 2 && row.player_fighter_projectiles >= 3);
   const activeCapsuleDuringBoosterRows = pickupModeRows.filter((row) =>
     row.pickup_state === 2 && row.pickup_booster_state >= 3);
   // The projectile's screen code follows its 0..7 vertical phase and one of
-  // four HPOS sub-cell variants. Every Viper code keeps D7 clear so selector 3
+  // four HPOS sub-cell variants. Every PlayerFighter code keeps D7 clear so selector 3
   // stays on the yellow COLPF2 bank; $0f is only one valid phase.
   const rapidProjectileVisibleRows = rapidProjectileRows.filter((row) =>
     (row.rapid_projectile_screen_code & 0x80) === 0 &&
@@ -3390,7 +3390,7 @@ function main() {
   const pickupPhysicalAddressChanges = pickupActiveTransitions.filter(({ previous, row }) =>
     Array.from({ length: 6 }, (_, index) => row[`pickup_new_address${index}`] !==
       previous[`pickup_new_address${index}`]).some(Boolean)).length;
-  const raiderFlashPairs = raiderBreakupRows.filter((row) => {
+  const interceptorFlashPairs = interceptorBreakupRows.filter((row) => {
     const deathFrame = rowsBySessionFrame.get(`${row.session}:${row.frame - 1}`);
     return deathFrame?.colbk === 0x1e && row.colbk === 0x3c;
   });
@@ -3405,9 +3405,9 @@ function main() {
   invariant(bottomDespawnRows.length > 0,
     "Trace did not observe debris leaving the bottom after ring/world advancement");
   invariant(shotRows.length > 0,
-    "Trace did not observe a Viper projectile destroying active debris");
+    "Trace did not observe a PlayerFighter projectile destroying active debris");
   invariant(shotRows.some((row) => row.sector_state === 7),
-    "Trace did not observe a Viper projectile destroying post-capital debris");
+    "Trace did not observe a PlayerFighter projectile destroying post-capital debris");
   invariant(effectSpawnRows.length > 0,
     "Trace did not execute the debris destruction effect spawner");
   invariant(fullEffectRows.length > 0,
@@ -3420,16 +3420,16 @@ function main() {
     "Active debris fragments were never erased on the following frame");
   invariant(effectSpawnRows.some((row) => row.sector_state === 7),
     "Trace did not spawn the five-slot destruction effect after the capital sector");
-  invariant(raiderBreakupRows.length > 0,
-    "Trace did not execute the Raider breakup spawner");
-  invariant(raiderBreakupRows.every((row) =>
+  invariant(interceptorBreakupRows.length > 0,
+    "Trace did not execute the Interceptor breakup spawner");
+  invariant(interceptorBreakupRows.every((row) =>
     row.effect_active_mask === 0x1f && row.effect_active_count === 5 &&
     (row.events & ((1 << 15) | (1 << 16))) === ((1 << 15) | (1 << 16))),
-  "Raider death did not update and render all five local effects in its spawn frame");
-  invariant(raiderFlashPairs.length > 0,
+  "Interceptor death did not update and render all five local effects in its spawn frame");
+  invariant(interceptorFlashPairs.length > 0,
     "Trace did not preserve the accepted yellow-to-red full-screen flash across deferred breakup");
   invariant(pickupQualifiedKillRows.length >= 3,
-    "Atari800 replay did not execute three qualifying Raider projectile deaths");
+    "Atari800 replay did not execute three qualifying Interceptor projectile deaths");
   invariant(pickupCompletedPendingRuns.length > 0 &&
     pickupCompletedPendingRuns.every(({ run }) => {
       const pendingFrames = run.length - 1;
@@ -3497,7 +3497,7 @@ function main() {
   invariant(spreadScreenshotRow,
     "Atari800 replay did not isolate a visible three-projectile Spread fan");
   invariant(activeCapsuleThreeProjectileRows.length > 0,
-    "Atari800 replay did not observe three Viper projectiles with one active capsule");
+    "Atari800 replay did not observe three PlayerFighter projectiles with one active capsule");
   invariant(activeCapsuleDuringBoosterRows.length > 0,
     "Atari800 replay did not create a collectible capsule during an active booster");
   const emptyEntityMaximum = maximumRow(emptyEntityRows, (row) => row.wall_cycles);
@@ -3519,12 +3519,12 @@ function main() {
     row.wall_cycles > SHIELD_BOOSTER_HARD_GATE_CYCLES);
   const noActiveDebrisPathDelta =
     manifest.runtimeTiming.destructibleDebris.noActiveDebrisPathDeltaCpuCycles;
-  const noActiveViperPathDelta =
-    manifest.runtimeTiming.destructibleDebris.noActiveViperProjectilePathDeltaCpuCycles;
+  const noActivePlayerFighterPathDelta =
+    manifest.runtimeTiming.destructibleDebris.noActivePlayerFighterProjectilePathDeltaCpuCycles;
   invariant(noActiveDebrisPathDelta <= 32,
     "Linked no-active-debris path exceeded its +32-cycle limit");
-  invariant(noActiveViperPathDelta <= 48,
-    "Linked no-active-Viper-projectile path exceeded its +48-cycle limit");
+  invariant(noActivePlayerFighterPathDelta <= 48,
+    "Linked no-active-PlayerFighter-projectile path exceeded its +48-cycle limit");
   const activeDebrisRows = activeEntityRows.filter((row) =>
     row.entity_render_id >= manifest.entityEffects.glyphIndex &&
       row.entity_render_id < manifest.entityEffects.glyphIndex +
@@ -3687,25 +3687,25 @@ function main() {
   const enemyFlashSequence = [0x1e, 0x3c, 0x1c, 0x34];
   const playerFlashSequence = [0x1e, 0x3c, 0x1c, 0x3c, 0x38, 0x34];
   const enemyFlashRows = fighterFlashRows.filter((row) =>
-    row.player_lifecycle === 0 && row.viper_explosion_timer < 19 &&
+    row.player_lifecycle === 0 && row.player_fighter_explosion_timer < 19 &&
       row.enemy_explosion_timer >= 21);
-  const playerFlashRows = fighterFlashRows.filter((row) => row.viper_explosion_timer >= 19);
+  const playerFlashRows = fighterFlashRows.filter((row) => row.player_fighter_explosion_timer >= 19);
   invariant([...new Set(enemyFlashRows.map((row) => row.enemy_explosion_timer))]
     .sort((left, right) => right - left).join(",") === "24,23,22,21",
   "PAL trace did not observe every enemy fighter flash timer value");
-  invariant([...new Set(playerFlashRows.map((row) => row.viper_explosion_timer))]
+  invariant([...new Set(playerFlashRows.map((row) => row.player_fighter_explosion_timer))]
     .sort((left, right) => right - left).join(",") === "24,23,22,21,20,19",
-  "PAL trace did not observe every Viper death flash timer value");
+  "PAL trace did not observe every PlayerFighter death flash timer value");
   invariant(enemyFlashRows.every((row) =>
     row.colbk === enemyFlashSequence[24 - row.enemy_explosion_timer]),
   "PAL trace observed an incorrect enemy fighter COLBK sequence");
   invariant(playerFlashRows.every((row) =>
-    row.colbk === playerFlashSequence[24 - row.viper_explosion_timer]),
-  "PAL trace observed an incorrect Viper death COLBK sequence");
+    row.colbk === playerFlashSequence[24 - row.player_fighter_explosion_timer]),
+  "PAL trace observed an incorrect PlayerFighter death COLBK sequence");
   invariant(fighterFlashRows.filter((row) =>
-    row.viper_explosion_timer > 0 && row.viper_explosion_timer < 19)
+    row.player_fighter_explosion_timer > 0 && row.player_fighter_explosion_timer < 19)
     .every((row) => row.colbk === 0),
-  "PAL trace observed a background flash after the Viper death profile restored base");
+  "PAL trace observed a background flash after the PlayerFighter death profile restored base");
   invariant([...enemyFlashSequence, ...playerFlashSequence].every((color) => color !== 0x84),
     "Fighter flash reused the accepted $84 local explosion colour");
 
@@ -3750,7 +3750,7 @@ function main() {
       basis: "ordered decoded CSV rows from every required legal replay",
     },
     artifacts: runtimeArtifacts,
-    artifact: runtimeArtifacts["dark-fighter.xex"],
+    artifact: runtimeArtifacts["void-strike-65.xex"],
     emulator: {
       name: "Atari800",
       version: EXPECTED_ATARI800_VERSION,
@@ -3864,8 +3864,8 @@ function main() {
         hard_overrun_frames: 0,
         no_active_debris_path_delta_cpu_cycles: noActiveDebrisPathDelta,
         no_active_debris_path_limit_cpu_cycles: 32,
-        no_active_viper_projectile_path_delta_cpu_cycles: noActiveViperPathDelta,
-        no_active_viper_projectile_path_limit_cpu_cycles: 48,
+        no_active_player_fighter_projectile_path_delta_cpu_cycles: noActivePlayerFighterPathDelta,
+        no_active_player_fighter_projectile_path_limit_cpu_cycles: 48,
         debris_shot_path: frameState(shotMaximum),
         passed: true,
       },
@@ -3887,7 +3887,7 @@ function main() {
           ENEMY_BREAKUP_HARD_GATE_CYCLES - WEAPON_PICKUP_BASELINE_WALL_CYCLES,
         target_overrun_frames: 4,
         hard_overrun_frames: 0,
-        raider_spawn_frames: 216,
+        interceptor_spawn_frames: 216,
         passed: true,
       },
       weapon_pickup_rapid_fire: {
@@ -4113,7 +4113,7 @@ function main() {
       },
       active_muzzles: coverageRecord(allRows, (row) => row.active_muzzles > 0),
       maximum_projectile_pool: {
-        scope: "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays",
+        scope: "combined active PlayerFighter and Interceptor fighter-projectile slots in legal Atari800 replays",
         combined_physical_capacity: 19,
         maximum_combined_active_observed:
           Math.max(...allRows.map((row) => row.projectiles)),
@@ -4127,8 +4127,8 @@ function main() {
               (row) => row.wall_cycles))
             : null,
         component_physical_capacities: {
-          viper: 10,
-          raider: 9,
+          player_fighter: 10,
+          interceptor: 9,
         },
         evidence_note: allRows.some((row) => row.projectiles === 19)
           ? "The physical 19-slot allocation was reached by a legal replay; 19/19 is observed rather than inferred or artificially seeded."
@@ -4145,7 +4145,7 @@ function main() {
           ? "observed through the production scheduler during the natural first capital-section pass on EASY, MEDIUM, and HARD; no phase, world row, muzzle, projectile, object, or intensity state was seeded"
           : "not observed",
       },
-      live_raider: coverageRecord(allRows, (row) => row.live_raider !== 0),
+      live_interceptor: coverageRecord(allRows, (row) => row.live_interceptor !== 0),
       fighter_explosion: coverageRecord(allRows, (row) => row.fighter_explosion !== 0),
       capital_explosion: coverageRecord(allRows, (row) => row.capital_explosion !== 0),
       music_with_sfx_preemption: coverageRecord(allRows, (row) => row.music_active !== 0 &&
@@ -4170,15 +4170,15 @@ function main() {
           (row.events & (1 << 14)) !== 0),
         post_capital_spawn_observed: effectSpawnRows.some((row) => row.sector_state === 7),
       },
-      raider_breakup_effects: {
-        ...coverageRecord(raiderBreakupRows, () => true),
-        spawner_frames: raiderBreakupRows.length,
+      interceptor_breakup_effects: {
+        ...coverageRecord(interceptorBreakupRows, () => true),
+        spawner_frames: interceptorBreakupRows.length,
         active_mask: 0x1f,
         active_count: 5,
-        spawn_updated_and_rendered: raiderBreakupRows.every((row) =>
+        spawn_updated_and_rendered: interceptorBreakupRows.every((row) =>
           (row.events & ((1 << 15) | (1 << 16))) === ((1 << 15) | (1 << 16))),
-        full_screen_flash_preserved: raiderFlashPairs.length > 0,
-        yellow_death_then_red_materialisation_frames: raiderFlashPairs.length,
+        full_screen_flash_preserved: interceptorFlashPairs.length > 0,
+        yellow_death_then_red_materialisation_frames: interceptorFlashPairs.length,
       },
       weapon_pickup_rapid_fire: {
         qualified_kills: pickupQualifiedKillRows.map((row) => frameState(row)),
@@ -4198,10 +4198,10 @@ function main() {
         },
         yellow_projectiles: {
           ...coverageRecord(rapidProjectileRows, () => true),
-          viper_screen_code_frames: rapidProjectileVisibleRows.length,
+          player_fighter_screen_code_frames: rapidProjectileVisibleRows.length,
           other_code_or_occluded_frames:
             rapidProjectileRows.length - rapidProjectileVisibleRows.length,
-          viper_screen_code_percent:
+          player_fighter_screen_code_percent:
             Math.round(rapidProjectileVisibleRows.length * 10_000 /
               rapidProjectileRows.length) / 100,
           screen_code_minimum: Math.min(...rapidProjectileVisibleRows.map((row) =>
@@ -4234,7 +4234,7 @@ function main() {
           capture_host_frame: spreadScreenshotRow.end_host_frame,
           capture_state: frameState(spreadScreenshotRow),
         },
-        active_capsule_with_three_viper_projectiles:
+        active_capsule_with_three_player_fighter_projectiles:
           coverageRecord(activeCapsuleThreeProjectileRows, () => true),
         active_capsule_during_booster:
           coverageRecord(activeCapsuleDuringBoosterRows, () => true),
@@ -4244,7 +4244,7 @@ function main() {
         shield: coverageRecord(pickupShieldRows, () => true),
         exact_initial_timer_observed: pickupShieldRows.some((row) =>
           row.pickup_timer_lo === 0xfa && row.pickup_timer_hi === 0),
-        viper_colour_phase_source: "authoritative 250-frame booster timer bit 3",
+        player_fighter_colour_phase_source: "authoritative 250-frame booster timer bit 3",
       },
       debris_shot_post_capital: coverageRecord(allRows, (row) =>
         row.sector_state === 7 && (row.events & (1 << 12)) !== 0),

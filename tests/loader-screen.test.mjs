@@ -49,13 +49,13 @@ const referencePath = path.join(
   "loader.png",
 );
 const sourcePath = path.join(rootDirectory, "src", "main.s");
-const labelsPath = path.join(rootDirectory, "build", "dark-fighter.lbl");
-const mapPath = path.join(rootDirectory, "build", "dark-fighter.map");
+const labelsPath = path.join(rootDirectory, "build", "void-strike-65.lbl");
+const mapPath = path.join(rootDirectory, "build", "void-strike-65.map");
 const includePath = path.join(rootDirectory, "build", "loader-screen.inc");
 const manifestPath = path.join(
   rootDirectory,
   "dist",
-  "dark-fighter-manifest.json",
+  "void-strike-65-manifest.json",
 );
 const definition = loadLoaderBitmapDefinition(definitionPath);
 const compiled = compileLoaderBitmap(definition);
@@ -114,7 +114,7 @@ test("loader reference PNG is present and unchanged", () => {
   assert.equal(sha256(reference), definition.reference.sha256);
   assert.equal(
     sha256(reference),
-    "da740dc90db7b2822d73a8aa191c364e523cd0c65b669a2664b5923e83960036",
+    "a8d4fc331d126223b721aedaacc2a9b81e8ddfa0503c65af4118b64fa26d50a2",
   );
 });
 
@@ -176,10 +176,9 @@ test("both LMS ranges preserve 40-byte rows across 4 KB boundaries", () => {
   }
 });
 
-test("bitmap has non-empty title, detailed hull, three engines, BSG, and studio", () => {
-  assert.ok(countPixels(compiled.landmarks.title) > 1800);
+test("bitmap has fitted title, detailed unmarked hull, three engines, and studio", () => {
+  assert.ok(countPixels(compiled.landmarks.title) > 1300);
   assert.ok(countPixels(compiled.landmarks.ship) > 5000);
-  assert.ok(countPixels(compiled.landmarks.marking) > 100);
   assert.ok(countPixels(compiled.landmarks.studio) > 250);
   for (const engine of compiled.landmarks.engineBands) {
     assert.ok(countPixels(engine) > 400);

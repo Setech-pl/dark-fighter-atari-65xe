@@ -11,7 +11,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mainSource = fs.readFileSync(path.join(root, "src/main.s"), "utf8");
 const directorSource = fs.readFileSync(path.join(root, "src/encounter-director.s"), "utf8");
 const labels = new Map();
-for (const file of ["build/dark-fighter.lbl", "build/encounter-director.lbl"]) {
+for (const file of ["build/void-strike-65.lbl", "build/encounter-director.lbl"]) {
   for (const line of fs.readFileSync(path.join(root, file), "utf8").split(/\r?\n/)) {
     const match = /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim());
     if (match) labels.set(match[2], Number.parseInt(match[1], 16));
@@ -167,7 +167,7 @@ test("admission accounts intensity, enforces budget and fails soft", () => {
   image[state.admissionFrame] = 9;
   const admitted = run(image, "director_request", { x: 0 });
   assert.equal(admitted.carry, true);
-  assert.equal(image[state.intensity], 1, "accepted Raider must charge one intensity unit");
+  assert.equal(image[state.intensity], 1, "accepted Interceptor must charge one intensity unit");
   image[labels.get("frame_counter")] = 11;
   image[state.reaction] = 0;
   run(image, "director_release", { x: 0 });
@@ -396,7 +396,7 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
     const previousX = new Map();
     const previousStates = [0, 0, 0];
     const previousFlashes = [0, 0, 0];
-    const cylonCycles = { warnings: 0, flashes: 0, launches: 0 };
+    const hostileCycles = { warnings: 0, flashes: 0, launches: 0 };
     let admittedAtFrame = null;
     let enteredCapitalAtRow = null;
     let completedCapital = false;
@@ -419,11 +419,11 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
         const owner = image[broadOwner + slot];
         const flash = image[broadFlash + slot];
         if (owner === 1 && slotState === 1 && previousStates[slot] !== 1)
-          cylonCycles.warnings += 1;
+          hostileCycles.warnings += 1;
         if (owner === 1 && slotState === 2 && previousStates[slot] === 1)
-          cylonCycles.launches += 1;
+          hostileCycles.launches += 1;
         if (owner === 1 && flash !== 0 && previousFlashes[slot] === 0)
-          cylonCycles.flashes += 1;
+          hostileCycles.flashes += 1;
         previousStates[slot] = slotState;
         previousFlashes[slot] = flash;
         if (image[broadState + slot] !== 2) continue;
@@ -447,14 +447,14 @@ test("natural Level 1 reaches a visible two-sided BROADSIDE without state inject
     assert.ok(enteredCapitalAtRow < 32,
       `difficulty ${difficulty} moved capital section must begin during the provisional intro`);
     assert.ok(visibleByOwner.has(1),
-      `difficulty ${difficulty} must render a natural Cylon projectile`);
+      `difficulty ${difficulty} must render a natural Hostile projectile`);
     assert.deepEqual([...motionByOwner].sort(), [...visibleByOwner].sort(),
       `difficulty ${difficulty} visible projectiles must move in their intended directions`);
-    assert.ok(cylonCycles.warnings >= 3,
-      `difficulty ${difficulty} produced only ${cylonCycles.warnings} Cylon warnings`);
-    assert.equal(cylonCycles.flashes, cylonCycles.warnings,
+    assert.ok(hostileCycles.warnings >= 3,
+      `difficulty ${difficulty} produced only ${hostileCycles.warnings} Hostile warnings`);
+    assert.equal(hostileCycles.flashes, hostileCycles.warnings,
       `difficulty ${difficulty} warning/flash lifecycle mismatch`);
-    assert.equal(cylonCycles.launches, cylonCycles.warnings,
+    assert.equal(hostileCycles.launches, hostileCycles.warnings,
       `difficulty ${difficulty} warning/launch lifecycle mismatch`);
     for (const owner of visibleByOwner) ownersAcrossDifficulties.add(owner);
     assert.equal(completedCapital, true, `difficulty ${difficulty} capital section must drain`);

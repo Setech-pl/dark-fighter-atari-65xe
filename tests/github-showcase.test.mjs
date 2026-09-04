@@ -20,8 +20,8 @@ function pngDimensions(bytes) {
 
 test("showcase manifest binds every image to the current packed release", () => {
   assert.equal(manifest.formatVersion, 1);
-  assert.equal(manifest.runtimeEvidence.xex.sha256, sha256(read("dist/dark-fighter.xex")));
-  assert.equal(manifest.runtimeEvidence.atr.sha256, sha256(read("dist/dark-fighter.atr")));
+  assert.equal(manifest.runtimeEvidence.xex.sha256, sha256(read("dist/void-strike-65.xex")));
+  assert.equal(manifest.runtimeEvidence.atr.sha256, sha256(read("dist/void-strike-65.atr")));
   assert.equal(manifest.runtimeEvidence.wallTrace.sha256,
     sha256(read("docs/runtime-wall-trace.json")));
   assert.deepEqual(
@@ -72,8 +72,8 @@ test("showcase and asset sheets regenerate without ignored capture files", () =>
 test("owner-supplied concept art is preserved and never classified as gameplay", () => {
   const gameplayPaths = new Set(manifest.gameplay.map(({ path: relativePath }) => relativePath));
   assert.deepEqual(manifest.concepts.map(({ path: relativePath }) => relativePath), [
-    "docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg",
-    "docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg",
+    "docs/media/concepts/void-strike-65-concept-from-floppy-to-stars.jpg",
+    "docs/media/concepts/void-strike-65-concept-gauntlet-run.jpg",
   ]);
   for (const concept of manifest.concepts) {
     const bytes = read(concept.path);
@@ -94,7 +94,7 @@ test("public README is English, complete, and free of stale status language", ()
   const readme = read("README.md").toString("utf8");
   const prose = readme.replace(/\s+/g, " ");
   const requiredHeadings = [
-    "# Dark Fighter",
+    "# Void Strike 65",
     "## Gameplay gallery",
     "## The story",
     "## What you can play now",
@@ -107,7 +107,7 @@ test("public README is English, complete, and free of stale status language", ()
     "## Credits and disclaimer",
   ];
   for (const heading of requiredHeadings) assert.ok(readme.includes(heading), heading);
-  assert.match(readme, /Dark Fighter began in 1990/);
+  assert.match(readme, /Void Strike 65 began in 1990/);
   assert.match(prose, /5¼-inch floppy disks using an Atari computer and SIO2SD/);
   assert.match(prose, /completed a full playable release with AI-assisted engineering/);
   assert.match(prose, /The tools changed\. The target did not/);
@@ -116,11 +116,11 @@ test("public README is English, complete, and free of stale status language", ()
   assert.match(readme,
     /Concept art — From Floppy to the Stars[\s\S]*Not an in-game screenshot\./);
   assert.match(readme, /Concept art — Gauntlet Run[\s\S]*Not an in-game screenshot\./);
-  assert.ok(readme.indexOf("dark-fighter-concept-from-floppy-to-stars.jpg") >
+  assert.ok(readme.indexOf("void-strike-65-concept-from-floppy-to-stars.jpg") >
     readme.indexOf("## The story"));
-  assert.ok(readme.indexOf("dark-fighter-concept-from-floppy-to-stars.jpg") <
+  assert.ok(readme.indexOf("void-strike-65-concept-from-floppy-to-stars.jpg") <
     readme.indexOf("## What you can play now"));
-  assert.ok(readme.indexOf("dark-fighter-concept-gauntlet-run.jpg") >
+  assert.ok(readme.indexOf("void-strike-65-concept-gauntlet-run.jpg") >
     readme.indexOf("### Art direction and concepts"));
   assert.doesNotMatch(readme,
     /\bMVP\b|vertical[ -]slice|\bslice\b|proof[ -]of[ -]concept|\bPoC\b|\bprototype\b/i);

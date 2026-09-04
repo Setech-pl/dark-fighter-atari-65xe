@@ -3,38 +3,38 @@
   "generatedBy": "scripts/github-showcase.mjs",
   "runtimeEvidence": {
     "xex": {
-      "path": "dist/dark-fighter.xex",
-      "bytes": 20292,
-      "sha256": "7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5"
+      "path": "dist/void-strike-65.xex",
+      "bytes": 21399,
+      "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
     },
     "atr": {
-      "path": "dist/dark-fighter.atr",
+      "path": "dist/void-strike-65.atr",
       "bytes": 92176,
-      "sha256": "55a3f11225f02c2c00499a88ffa00a7865034a6296ec8b362ba27a1f43d2d1ce"
+      "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "c565121e31a1d18b96b9cb92f87ebea14bf18c1f4bb56790e77bef7f5a09092c"
+      "sha256": "40c1fae3b4472fb8a1942f75349315e45a29c7b40b453c81e681a6d780c22545"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
   "gameplay": [
     {
       "path": "docs/media/gameplay/01-title-loader.png",
-      "description": "Loader title and recovered BSG ship art",
+      "description": "Loader title and capital-ship art",
       "source": "build/runtime-wall-trace/boot-smoke/xex-a5-frame250.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
       "frame": 250,
       "width": 320,
       "height": 240,
-      "source_sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2",
-      "sha256": "39d8ccccc805af63ecded6fd73b2a3f117f8c811c00ada76838f5c6c004326ed",
-      "bytes": 2730
+      "source_sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040",
+      "sha256": "6bb03974c9d6f96dbb76bd38aa2af79bfa5dc4c82b512319b2694faa009d6bf9",
+      "bytes": 2679
     },
     {
       "path": "docs/media/gameplay/02-standard-combat.png",
-      "description": "Viper, Raider, starfield and capital hull corridor",
+      "description": "Player Fighter, Interceptor, starfield and capital hull corridor",
       "source": "build/github-showcase/neutral-combat-025.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
@@ -46,8 +46,8 @@
       "bytes": 979
     },
     {
-      "path": "docs/media/gameplay/03-raider-breakup.png",
-      "description": "Raider local breakup after a Viper projectile kill",
+      "path": "docs/media/gameplay/03-interceptor-breakup.png",
+      "description": "Interceptor local breakup after a Player Fighter projectile kill",
       "source": "build/github-showcase/neutral-combat-031.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
@@ -140,8 +140,8 @@
   "assetSheets": [
     {
       "path": "docs/media/assets/fighter-and-enemies.png",
-      "bytes": 4331,
-      "sha256": "ffff40c98db65989cbe887bfbe18d6750189705c6680ee27ae89775929d1ca9e",
+      "bytes": 4498,
+      "sha256": "822905064e915e0a48c0c110b34d6c05cb5baca9107a1bedf319a700515f6b89",
       "width": 960,
       "height": 400,
       "sources": [
@@ -151,8 +151,8 @@
     },
     {
       "path": "docs/media/assets/weapons-and-effects.png",
-      "bytes": 6899,
-      "sha256": "e9a91806ac3f79a368ad7efe9bd60f2c6708c6798300500288c8c827c5a6e380",
+      "bytes": 7002,
+      "sha256": "54554b966fbafd45e8d716d08c6ecc3378a635499ea46ecd13f485340b41ba83",
       "width": 960,
       "height": 520,
       "sources": [
@@ -163,8 +163,8 @@
     },
     {
       "path": "docs/media/assets/debris-and-pickups.png",
-      "bytes": 5732,
-      "sha256": "91c2dfe619c24edccc904a0fa9e74fa96ce6266186ce327bb2760b0413e1ae6b",
+      "bytes": 5716,
+      "sha256": "c7f78d3f6dbabe5cf5c9f34831c78b858f94e6f45b1eaf69f5fc0e8ebb7ab5c1",
       "width": 960,
       "height": 560,
       "sources": [
@@ -186,7 +186,7 @@
   ],
   "concepts": [
     {
-      "path": "docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg",
+      "path": "docs/media/concepts/void-strike-65-concept-from-floppy-to-stars.jpg",
       "title": "From Floppy to the Stars",
       "caption": "Concept art — From Floppy to the Stars. An AI-assisted visualization of the project’s journey from its 1990 origins to the current release. Not an in-game screenshot.",
       "classification": "owner-supplied AI-assisted concept art",
@@ -196,7 +196,7 @@
       "sha256": "8ed381f3d18ee292d6016ffd850988d01632aec7c97d1135ee54f69f00db2eb4"
     },
     {
-      "path": "docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg",
+      "path": "docs/media/concepts/void-strike-65-concept-gauntlet-run.jpg",
       "title": "Gauntlet Run",
       "caption": "Concept art — Gauntlet Run. An AI-assisted visualization of the intended scale, atmosphere and future battlefield composition. Not an in-game screenshot.",
       "classification": "owner-supplied AI-assisted concept art",

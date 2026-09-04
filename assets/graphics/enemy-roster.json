@@ -1,17 +1,17 @@
 {
   "formatVersion": 1,
   "runtime": {
-    "releaseArchetype": "RAIDER",
+    "releaseArchetype": "INTERCEPTOR",
     "frameStride": 16,
     "accentFrames": 3,
     "animationPhaseFrames": 8,
     "movementPolicy": {
-      "raiderSoftPursuit": {
+      "interceptorSoftPursuit": {
         "targetSamplingIntervalFrames": 8,
         "deadZoneHpos": 3,
         "horizontalAccelerationHpos": 1,
         "maximumHorizontalVelocityHpos": 1,
-        "viperReferenceSpeedHposPerFrame": 2,
+        "player_fighterReferenceSpeedHposPerFrame": 2,
         "movementStepHpos": 2,
         "maximumSpeedRatioNumerator": 4,
         "maximumSpeedRatioDenominator": 5,
@@ -29,12 +29,12 @@
       "accentRegister": "COLPM2",
       "accentValue": 70,
       "candidates": [
-        { "id": "CYLON_OXBLOOD", "value": 66 },
-        { "id": "CYLON_BURGUNDY", "value": 68 },
-        { "id": "CYLON_SCARLET", "value": 72 }
+        { "id": "HOSTILE_OXBLOOD", "value": 66 },
+        { "id": "HOSTILE_BURGUNDY", "value": 68 },
+        { "id": "HOSTILE_SCARLET", "value": 72 }
       ],
-      "selected": "CYLON_BURGUNDY",
-      "note": "P1 uses Cylon-family burgundy $44, distinct in luminance from the Cylon hull $46; P2 remains the brighter red $46 scanner. Fighter pulses use the independent ANTIC 4 playfield pool, so broadside M1-M3 no longer couple their colours."
+      "selected": "HOSTILE_BURGUNDY",
+      "note": "P1 uses Hostile-family burgundy $44, distinct in luminance from the Hostile hull $46; P2 remains the brighter red $46 scanner. Fighter pulses use the independent ANTIC 4 playfield pool, so broadside M1-M3 no longer couple their colours."
     },
     "weaponPolicy": {
       "singlePulse": {
@@ -55,8 +55,8 @@
   },
   "archetypes": [
     {
-      "id": "RAIDER",
-      "reference": "assets/graphics/Cylon Raider.png",
+      "id": "INTERCEPTOR",
+      "reference": "assets/graphics/Hostile Interceptor.png",
       "implemented": true,
       "releaseEnabled": true,
       "role": "Standard fighter",
@@ -89,7 +89,7 @@
       ],
       "hitPoints": 1,
       "score": 10,
-      "movementProfile": "CURRENT_RAIDER",
+      "movementProfile": "CURRENT_INTERCEPTOR",
       "weaponProfile": "SINGLE_PULSE",
       "flags": ["RELEASE", "SCANNER"]
     },
@@ -221,8 +221,8 @@
       "futureWeapon": "Defensive or intercepting fire"
     },
     {
-      "id": "CROWN_RAIDER",
-      "reference": "assets/graphics/Nemesis Command Raider.png",
+      "id": "CROWN_INTERCEPTOR",
+      "reference": "assets/graphics/Nemesis Command Interceptor.png",
       "implemented": false,
       "releaseEnabled": false,
       "role": "Ace or elite",

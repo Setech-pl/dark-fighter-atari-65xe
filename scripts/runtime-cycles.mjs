@@ -58,7 +58,7 @@ const profiledRoutineNames = [
   "handle_player_hull_contact",
   "update_fighter_projectiles",
   "update_broadside",
-  "update_viper_weapon",
+  "update_player_fighter_weapon",
   "update_enemy_weapon",
   "update_starfield",
   "erase_far_star_overlays",
@@ -80,8 +80,8 @@ const profiledRoutineNames = [
   "render_shared_fighter_explosions",
   "render_fighter_projectile_overlays",
   "advance_dst_to_next_physical_row",
-  "viper_projectile_hits_enemy",
-  "raider_projectile_hits_player",
+  "player_fighter_projectile_hits_enemy",
+  "interceptor_projectile_hits_player",
   "update_sound",
   "music_tick_gameplay",
   "entity_effects_erase",
@@ -95,12 +95,12 @@ const profiledRoutineNames = [
   "entity_collide_player",
   "entity_damage_applied",
   "entity_despawn_debris",
-  "entity_viper_projectile_target",
-  "entity_viper_projectile_hits_debris",
+  "entity_player_fighter_projectile_target",
+  "entity_player_fighter_projectile_hits_debris",
   "spawn_debris_destruction_effects",
   "spawn_breakup_effects_at",
-  "spawn_raider_breakup_effects",
-  "materialize_raider_breakup_effects",
+  "spawn_interceptor_breakup_effects",
+  "materialize_interceptor_breakup_effects",
   "update_transient_effects",
   "render_transient_effect_overlays",
   "entity_effects_render",
@@ -290,7 +290,7 @@ function initialiseGameplay(build, difficulty, entryPoints) {
   invariant(machine.cpu.memory[addresses.playerLifecycle] === 0,
     "Gameplay setup did not produce a live player state");
   invariant(machine.cpu.memory[addresses.enemyActive] === 0,
-    "Encounter Director intro must begin before the first Raider admission");
+    "Encounter Director intro must begin before the first Interceptor admission");
   invariant(machine.cpu.memory[addresses.musicActive] === 1,
     "Gameplay setup did not start enabled gameplay music");
   // Timing replay begins from a reachable, post-window mixed-pressure state so
@@ -335,14 +335,14 @@ function snapshotRuntime(cpu, entryPoints) {
       entryPoints.fighterProjectileActive,
       counts.projectileSlots,
     ),
-    viperProjectileOccupancy: countNonZero(
+    player_fighterProjectileOccupancy: countNonZero(
       memory,
       entryPoints.fighterProjectileActive,
       10,
     ),
     broadsideOccupancy: countNonZero(memory, addresses.broadState, counts.broadsideSlots),
     renderedFarStars: countRenderedFarStars(memory),
-    liveRaider: memory[addresses.enemyActive] === 1,
+    liveInterceptor: memory[addresses.enemyActive] === 1,
     activeExplosion: countNonZero(
       memory,
       entryPoints.fighterExplosionTimer,
@@ -412,7 +412,7 @@ function eventNames(frame) {
   }
   if (frame.before.projectileOccupancy > 0) names.push("fighter-projectiles");
   if (frame.before.broadsideOccupancy === counts.broadsideSlots) names.push("three-broadside-slots");
-  if (frame.before.liveRaider) names.push("live-raider");
+  if (frame.before.liveInterceptor) names.push("live-interceptor");
   if (frame.before.activeExplosion) names.push("active-explosion");
   if (frame.before.musicWithSfx) names.push("music+sfx");
   if (frame.before.entityActiveCount > 0) names.push("active-debris");
@@ -432,7 +432,7 @@ function scenarioRecord(frame, optionPollCycles) {
     activeCpuCycles: frame.cycles,
     mainLoopCpuCycles: frame.cycles + optionPollCycles,
     projectileOccupancy: frame.before.projectileOccupancy,
-    viperProjectileOccupancy: frame.before.viperProjectileOccupancy,
+    player_fighterProjectileOccupancy: frame.before.player_fighterProjectileOccupancy,
     broadsideOccupancy: frame.before.broadsideOccupancy,
     renderedFarStars: frame.before.renderedFarStars,
     playerLifecycle: frame.before.playerLifecycle,
@@ -586,8 +586,8 @@ export function measureRuntimeCycles(build) {
     entitySpawnTimer: requiredLabel(build.labels, "ENTITY_SPAWN_TIMER_LO"),
     effectActiveCount: requiredLabel(build.labels, "EFFECT_ACTIVE_COUNT"),
     effectActiveMask: requiredLabel(build.labels, "EFFECT_ACTIVE_MASK"),
-    entityTarget: requiredLabel(build.labels, "entity_viper_projectile_target"),
-    enemyTarget: requiredLabel(build.labels, "viper_projectile_hits_enemy"),
+    entityTarget: requiredLabel(build.labels, "entity_player_fighter_projectile_target"),
+    enemyTarget: requiredLabel(build.labels, "player_fighter_projectile_hits_enemy"),
   };
   const routineAddresses = new Map();
   for (const name of profiledRoutineNames) {
@@ -604,8 +604,8 @@ export function measureRuntimeCycles(build) {
     [requiredLabel(build.labels, "entity_debris_shot"), "entity_debris_shot"],
     [requiredLabel(build.labels, "spawn_debris_destruction_effects"),
       "spawn_debris_destruction_effects"],
-    [requiredLabel(build.labels, "materialize_raider_breakup_effects"),
-      "materialize_raider_breakup_effects"],
+    [requiredLabel(build.labels, "materialize_interceptor_breakup_effects"),
+      "materialize_interceptor_breakup_effects"],
   ]);
 
   const referenceMachine = initialiseGameplay(build, 1, entryPoints);
@@ -856,7 +856,7 @@ export function measureRuntimeCycles(build) {
   let worldNearFullErase;
   let hullEvent;
   let maximumProjectilePool = projectileStressFrame;
-  let liveRaider;
+  let liveInterceptor;
   let activeExplosion;
   let musicWithSfx;
   let legalHeavy;
@@ -867,8 +867,8 @@ export function measureRuntimeCycles(build) {
   let debrisShotPath;
   let debrisDestructionPath;
   let fullEffectsPath;
-  let raiderBreakupPath;
-  let noViperProjectilePath;
+  let interceptorBreakupPath;
+  let noPlayerFighterProjectilePath;
   for (const frame of frames) {
     if (frame.hits.has("scroll_world_columns") && frame.hits.has("erase_far_star_overlays")) {
       worldNearFullErase = chooseMaximum(worldNearFullErase, frame, (candidate) => candidate.cycles);
@@ -878,8 +878,8 @@ export function measureRuntimeCycles(build) {
     }
     maximumProjectilePool = chooseMaximum(maximumProjectilePool, frame, (candidate) =>
       candidate.before.projectileOccupancy * 100_000 + candidate.cycles);
-    if (frame.before.liveRaider) {
-      liveRaider = chooseMaximum(liveRaider, frame, (candidate) => candidate.cycles);
+    if (frame.before.liveInterceptor) {
+      liveInterceptor = chooseMaximum(liveInterceptor, frame, (candidate) => candidate.cycles);
     }
     if (frame.before.activeExplosion) {
       activeExplosion = chooseMaximum(activeExplosion, frame, (candidate) => candidate.cycles);
@@ -914,12 +914,12 @@ export function measureRuntimeCycles(build) {
     if (frame.before.effectActiveCount === 5) {
       fullEffectsPath = chooseMaximum(fullEffectsPath, frame, (candidate) => candidate.cycles);
     }
-    if (frame.hits.has("materialize_raider_breakup_effects")) {
-      raiderBreakupPath = chooseMaximum(raiderBreakupPath, frame,
+    if (frame.hits.has("materialize_interceptor_breakup_effects")) {
+      interceptorBreakupPath = chooseMaximum(interceptorBreakupPath, frame,
         (candidate) => candidate.cycles);
     }
-    if (frame.before.viperProjectileOccupancy === 0) {
-      noViperProjectilePath = chooseMaximum(noViperProjectilePath, frame,
+    if (frame.before.player_fighterProjectileOccupancy === 0) {
+      noPlayerFighterProjectilePath = chooseMaximum(noPlayerFighterProjectilePath, frame,
         (candidate) => candidate.cycles);
     }
     legalHeavy = chooseMaximum(legalHeavy, frame, (candidate) => candidate.cycles);
@@ -930,23 +930,23 @@ export function measureRuntimeCycles(build) {
   invariant(maximumProjectilePool?.before.projectileOccupancy === counts.projectileSlots,
     `Replay occupied ${maximumProjectilePool?.before.projectileOccupancy ?? 0}/` +
     `${counts.projectileSlots} fighter projectile slots`);
-  invariant(liveRaider, "Replay did not retain a live release Raider");
+  invariant(liveInterceptor, "Replay did not retain a live release Interceptor");
   invariant(activeExplosion, "Replay did not reach an active explosion");
   invariant(musicWithSfx, "Replay did not overlap gameplay music with SFX");
   invariant(entityEmptyPath, "Replay did not execute the empty entity/effects path");
   invariant(entityActivePath, "Replay did not execute one active debris path");
   invariant(entitySpawnPath, "Replay did not execute debris spawn");
   invariant(entityContactPath, "Replay did not execute successful debris contact");
-  invariant(debrisShotPath, "Replay did not execute Viper destruction of debris");
+  invariant(debrisShotPath, "Replay did not execute PlayerFighter destruction of debris");
   invariant(debrisDestructionPath, "Replay did not execute final debris destruction");
   invariant(fullEffectsPath?.before.effectActiveMask === 0x1f,
     "Replay did not execute one core plus four debris fragments");
-  invariant(raiderBreakupPath?.after.effectActiveMask === 0x1f &&
-    raiderBreakupPath.after.effectActiveCount === 5,
-  "Replay did not execute one Raider core plus four fragments");
-  invariant(noViperProjectilePath, "Replay did not execute a frame without Viper projectiles");
-  invariant(!noViperProjectilePath.hits.has("entity_viper_projectile_target"),
-    "Debris projectile dispatch ran without an active Viper projectile");
+  invariant(interceptorBreakupPath?.after.effectActiveMask === 0x1f &&
+    interceptorBreakupPath.after.effectActiveCount === 5,
+  "Replay did not execute one Interceptor core plus four fragments");
+  invariant(noPlayerFighterProjectilePath, "Replay did not execute a frame without PlayerFighter projectiles");
+  invariant(!noPlayerFighterProjectilePath.hits.has("entity_player_fighter_projectile_target"),
+    "Debris projectile dispatch ran without an active PlayerFighter projectile");
 
   const measureRoutineCall = (address) => {
     const cpu = referenceMachine.cpu.clone();
@@ -1006,7 +1006,7 @@ export function measureRuntimeCycles(build) {
       hullEvent: scenario(hullEvent),
       maximumProjectilePool: scenario(maximumProjectilePool),
       threeBroadside: scenario(broadsideStressFrame),
-      liveRaider: scenario(liveRaider),
+      liveInterceptor: scenario(liveInterceptor),
       activeExplosion: scenario(activeExplosion),
       musicWithSfx: scenario(musicWithSfx),
       entityEmptyPath: scenario(entityEmptyPath),
@@ -1016,8 +1016,8 @@ export function measureRuntimeCycles(build) {
       debrisShotPath: scenario(debrisShotPath),
       debrisDestructionPath: scenario(debrisDestructionPath),
       fullEffectsPath: scenario(fullEffectsPath),
-      raiderBreakupPath: scenario(raiderBreakupPath),
-      noViperProjectilePath: scenario(noViperProjectilePath),
+      interceptorBreakupPath: scenario(interceptorBreakupPath),
+      noPlayerFighterProjectilePath: scenario(noPlayerFighterProjectilePath),
     },
     entityEffects: {
       emptyPathCpuCycles: emptyEnginePathCycles,
@@ -1030,11 +1030,11 @@ export function measureRuntimeCycles(build) {
     destructibleDebris: {
       noActiveDebrisPathDeltaCpuCycles: noDebrisDispatcherDelta,
       noActiveDebrisPathLimitCpuCycles: 32,
-      noActiveViperProjectilePathDeltaCpuCycles: 0,
-      noActiveViperProjectilePathLimitCpuCycles: 48,
-      shotPathCpuCycles: debrisShotPath.procedureTotalCycles.entity_viper_projectile_target,
+      noActivePlayerFighterProjectilePathDeltaCpuCycles: 0,
+      noActivePlayerFighterProjectilePathLimitCpuCycles: 48,
+      shotPathCpuCycles: debrisShotPath.procedureTotalCycles.entity_player_fighter_projectile_target,
       destructionPathCpuCycles:
-        debrisDestructionPath.procedureTotalCycles.entity_viper_projectile_target,
+        debrisDestructionPath.procedureTotalCycles.entity_player_fighter_projectile_target,
       fullEffectsPathCpuCycles: entityWrapperCycles(fullEffectsPath),
       measurement: "linked target dispatch versus the unchanged enemy-only entry",
     },
@@ -1042,9 +1042,9 @@ export function measureRuntimeCycles(build) {
       noActiveExplosionPathCpuCycles: emptyEnginePathCycles,
       noActiveExplosionPathLimitCpuCycles: 124,
       spawnPathCpuCycles:
-        raiderBreakupPath.procedureTotalCycles.materialize_raider_breakup_effects,
+        interceptorBreakupPath.procedureTotalCycles.materialize_interceptor_breakup_effects,
       fullEffectsPathCpuCycles: entityWrapperCycles(fullEffectsPath),
-      measurement: "linked release Raider death and shared five-slot effect path",
+      measurement: "linked release Interceptor death and shared five-slot effect path",
     },
     replay: {
       sessions: sessions.map(({ difficulty, policy, fireDelay, frames: frameLimit }) => ({
@@ -1090,9 +1090,9 @@ function parseSegmentSizes(mapText) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const labels = parseViceLabels(fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8"));
+  const labels = parseViceLabels(fs.readFileSync(path.join(root, "build", "void-strike-65.lbl"), "utf8"));
   const report = measureRuntimeCycles({
-    residentMain: fs.readFileSync(path.join(root, "build", "dark-fighter.bin")).subarray(0, 0x2000),
+    residentMain: fs.readFileSync(path.join(root, "build", "void-strike-65.bin")).subarray(0, 0x2000),
     loadAddress: 0x2000,
     broadsideRuntime: fs.readFileSync(path.join(root, "build", "broadside-runtime.bin")),
     broadsideRunAddress: requiredLabel(labels, "__BROADSIDE_RUN__"),
@@ -1107,7 +1107,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     pickupCodeRuntime: fs.readFileSync(path.join(root, "build", "pickup-code-runtime.bin")),
     pickupCodeRunAddress: requiredLabel(labels, "__PICKUP_CODE_RUN__"),
     labels,
-    segmentSizes: parseSegmentSizes(fs.readFileSync(path.join(root, "build", "dark-fighter.map"), "utf8")),
+    segmentSizes: parseSegmentSizes(fs.readFileSync(path.join(root, "build", "void-strike-65.map"), "utf8")),
   });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }

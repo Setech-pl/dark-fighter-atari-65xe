@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "displayMode": "ANTIC 4",
-  "description": "Original allied line-carrier layered armour and enemy void-carrier dark slabs for the Dark Fighter broadside corridor.",
+  "description": "Original allied line-carrier layered armour and enemy void-carrier dark slabs for the Void Strike 65 broadside corridor.",
   "charsetBaseIndex": 59,
   "segmentRows": 32,
   "previewStartPhase": 0,
@@ -495,7 +495,7 @@
         "coreRegister": "COLPF2",
         "coreValue": 30
       },
-      "raider": {
+      "interceptor": {
         "widthHpos": 2,
         "height": 3,
         "register": "COLPF3",
@@ -506,12 +506,12 @@
         "height": 6,
         "coreRegister": "COLPF0",
         "coreValue": 14,
-        "colonialRegister": "COLPF2",
-        "colonialValue": 30,
-        "colonialAttribute": 0,
-        "cylonRegister": "COLPF3",
-        "cylonValue": 70,
-        "cylonAttribute": 128
+        "alliedRegister": "COLPF2",
+        "alliedValue": 30,
+        "alliedAttribute": 0,
+        "hostileRegister": "COLPF3",
+        "hostileValue": 70,
+        "hostileAttribute": 128
       }
     },
     "impactHeight": 8,

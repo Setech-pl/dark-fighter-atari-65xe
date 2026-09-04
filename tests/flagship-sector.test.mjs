@@ -124,7 +124,7 @@ function popcount(byte) {
 
 function readLabels() {
   const labels = new Map();
-  for (const line of fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  for (const line of fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)) {
     const match = /^al ([0-9A-Fa-f]{6}) \.([A-Za-z_][A-Za-z0-9_]*)$/.exec(line);
     if (match) labels.set(match[2], Number.parseInt(match[1], 16));
@@ -266,7 +266,7 @@ test("heavy slugs use one connected two-cell six-line playfield lozenge", () => 
   assert.deepEqual([visual.width, visual.height, visual.occupiedPixels,
     visual.connectedObjects, visual.glyphs, visual.renderer],
   [8, 6, 40, 1, [126, 127], "ANTIC4_PLAYFIELD_OVERLAY"]);
-  assert.equal(visual.width >= asset.broadside.projectileVisuals.raider.widthHpos * 2, true);
+  assert.equal(visual.width >= asset.broadside.projectileVisuals.interceptor.widthHpos * 2, true);
 
   const overlayRoutine = source.slice(
     source.indexOf("render_capital_shell_overlays:"),

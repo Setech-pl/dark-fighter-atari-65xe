@@ -5,7 +5,7 @@ export function loadFrontendH31Definition(filePath) {
 }
 
 export function compileFrontendH31(definition) {
-  if (definition.format !== "dark-fighter-frontend-h31-v1") {
+  if (definition.format !== "void-strike-65-frontend-h31-v1") {
     throw new Error("Unsupported frontend H3.1 asset format");
   }
   if (definition.fontRowsHex.length !== 43) {
@@ -21,7 +21,7 @@ export function compileFrontendH31(definition) {
     throw new Error("Frontend H3.1 extended glyph range must be 48-63");
   }
   if (definition.maximumAntic67Glyph !== 63 ||
-      definition.viperGlyphs.join(",") !== "58,59,60,61,62,63") {
+      definition.player_fighterGlyphs.join(",") !== "58,59,60,61,62,63") {
     throw new Error("Frontend H3.1 glyph ownership contract changed");
   }
   return { fontRows, extendedGlyphs, definition };

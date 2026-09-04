@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
 const packageDefinition = JSON.parse(fs.readFileSync(path.join(rootDirectory, "package.json"), "utf8"));
-const releaseName = `dark-fighter-${packageDefinition.version}`;
+const releaseName = `void-strike-65-${packageDefinition.version}`;
 const outputPath = path.join(rootDirectory, "dist", `${releaseName}.zip`);
 
 const topLevelFiles = [
@@ -20,10 +20,10 @@ const topLevelFiles = [
 ];
 const sourceDirectories = ["assets", "cfg", "docs", "levels", "scripts", "src", "tests"];
 const distributionFiles = [
-  "dist/dark-fighter-boot.bin",
-  "dist/dark-fighter-manifest.json",
-  "dist/dark-fighter.atr",
-  "dist/dark-fighter.xex",
+  "dist/void-strike-65-boot.bin",
+  "dist/void-strike-65-manifest.json",
+  "dist/void-strike-65.atr",
+  "dist/void-strike-65.xex",
 ];
 
 function collectFiles(relativeDirectory) {

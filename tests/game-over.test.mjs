@@ -23,7 +23,7 @@ const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 const labels = new Map(
   fs
-    .readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+    .readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -127,7 +127,7 @@ test("GAME OVER leaves the gameplay loop before control, combat, spawn, and scor
     "read_input",
     "update_enemy",
     "handle_collisions",
-    "update_viper_weapon",
+    "update_player_fighter_weapon",
     "update_enemy_weapon",
     "update_starfield",
     "handle_player_hull_contact",

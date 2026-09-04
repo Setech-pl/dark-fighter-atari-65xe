@@ -6,6 +6,7 @@ const BITMAP_HEIGHT = 192;
 export const LOADER_DISPLAY_LIST_ADDRESS = 0x3c00;
 const BITMAP_BYTES_PER_ROW = 40;
 const BITMAP_BYTES = BITMAP_BYTES_PER_ROW * BITMAP_HEIGHT;
+const PACKED_BITMAP_RESIDENCY_BYTES = 1997;
 const COLOR_REGISTERS = ["COLBK", "COLPF1", "COLPF2"];
 const ANTIC_MODE_NUMBERS = new Map([
   ["ANTIC E", 0x0e],
@@ -563,6 +564,12 @@ export function compileLoaderBitmap(definition) {
   }));
   const bitmapBytes = encodeLoaderBitmapPixels(pixels, paletteZones);
   const packedBitmap = packBroadsideLzss(bitmapBytes);
+  if (packedBitmap.length > PACKED_BITMAP_RESIDENCY_BYTES) {
+    throw new Error(
+      `Loader bitmap needs ${packedBitmap.length} packed bytes; ` +
+      `reserved residency is ${PACKED_BITMAP_RESIDENCY_BYTES}`,
+    );
+  }
   if (!unpackBroadsideLzss(packedBitmap).equals(Buffer.from(bitmapBytes))) {
     throw new Error("Loader bitmap LZSS round trip failed");
   }
@@ -654,6 +661,7 @@ export function renderLoaderCa65Include(compiled) {
     `LOADER_BITMAP_BYTES_PER_ROW = ${compiled.bytesPerRow}`,
     `LOADER_BITMAP_BYTES = ${compiled.bitmapBytes.length}`,
     `LOADER_BITMAP_PACKED_BYTES = ${compiled.packedBitmap.length}`,
+    `LOADER_BITMAP_PACKED_RESIDENCY_BYTES = ${PACKED_BITMAP_RESIDENCY_BYTES}`,
     `LOADER_DURATION_FRAMES = ${compiled.durationFrames}`,
     `LOADER_DLI_COUNT = ${compiled.dliLines.length}`,
     "",
@@ -677,6 +685,10 @@ export function renderLoaderCa65Include(compiled) {
 
   lines.push("", "loader_bitmap_lzss:");
   lines.push(...byteLines(compiled.packedBitmap));
+  lines.push(
+    "loader_bitmap_lzss_end:",
+    "    .res LOADER_BITMAP_PACKED_RESIDENCY_BYTES-(loader_bitmap_lzss_end-loader_bitmap_lzss),$00",
+  );
   lines.push("", "loader_display_list = LOADER_DISPLAY_LIST_ADDRESS");
   lines.push(
     '.assert (loader_display_list & $FC00) = ((loader_display_list + LOADER_DISPLAY_LIST_BYTES - 1) & $FC00), error, "loader display list crosses an ANTIC 1 KiB boundary"',

@@ -6,7 +6,56 @@
     "partial": false,
     "required_sessions": 50,
     "completed_sessions": 50,
-    "artifact_binding": "boot BIN, XEX and ATR SHA-256"
+    "artifact_binding": "boot BIN, XEX and ATR SHA-256",
+    "brand_transfer": {
+      "runtime_sessions_regenerated": false,
+      "boot_smoke_regenerated": true,
+      "basis": "Link map and eight executable gameplay modules are byte-identical to the pre-rebrand checkpoint; only brand screen bytes and cold transport compression differ.",
+      "identical_modules": [
+        "broadside-runtime.bin",
+        "weapon-pickup-phase-runtime.bin",
+        "integration-glue.bin",
+        "encounter-director.bin",
+        "entity-code-runtime.bin",
+        "starfield-runtime.bin",
+        "a2-kernel-runtime.bin",
+        "capital-player-collision.bin"
+      ],
+      "previous_artifacts": {
+        "void-strike-65-boot.bin": {
+          "path": "dist/void-strike-65-boot.bin",
+          "bytes": 19456,
+          "sha256": "8e963c78361f9cef41c4984d7380dd03715c53ff4684496a344da7598516efd3"
+        },
+        "void-strike-65.xex": {
+          "path": "dist/void-strike-65.xex",
+          "bytes": 20292,
+          "sha256": "7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5"
+        },
+        "void-strike-65.atr": {
+          "path": "dist/void-strike-65.atr",
+          "bytes": 92176,
+          "sha256": "55a3f11225f02c2c00499a88ffa00a7865034a6296ec8b362ba27a1f43d2d1ce"
+        }
+      },
+      "current_artifacts": {
+        "void-strike-65-boot.bin": {
+          "path": "dist/void-strike-65-boot.bin",
+          "bytes": 20608,
+          "sha256": "4e2c0042e9420b1a76da638640de16a507b975c021f63c42d88580a104fcdbb0"
+        },
+        "void-strike-65.xex": {
+          "path": "dist/void-strike-65.xex",
+          "bytes": 21399,
+          "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
+        },
+        "void-strike-65.atr": {
+          "path": "dist/void-strike-65.atr",
+          "bytes": 92176,
+          "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
+        }
+      }
+    }
   },
   "determinism": {
     "replay_fingerprint_sha256": "a9fd33b54b57f06d776580f13d25809c72c60110e7dbc300cc43d8febaebe734",
@@ -14,26 +63,26 @@
     "basis": "ordered decoded CSV rows from every required legal replay"
   },
   "artifacts": {
-    "dark-fighter-boot.bin": {
-      "path": "dist/dark-fighter-boot.bin",
-      "bytes": 19456,
-      "sha256": "8e963c78361f9cef41c4984d7380dd03715c53ff4684496a344da7598516efd3"
+    "void-strike-65-boot.bin": {
+      "path": "dist/void-strike-65-boot.bin",
+      "bytes": 20608,
+      "sha256": "4e2c0042e9420b1a76da638640de16a507b975c021f63c42d88580a104fcdbb0"
     },
-    "dark-fighter.xex": {
-      "path": "dist/dark-fighter.xex",
-      "bytes": 20292,
-      "sha256": "7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5"
+    "void-strike-65.xex": {
+      "path": "dist/void-strike-65.xex",
+      "bytes": 21399,
+      "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
     },
-    "dark-fighter.atr": {
-      "path": "dist/dark-fighter.atr",
+    "void-strike-65.atr": {
+      "path": "dist/void-strike-65.atr",
       "bytes": 92176,
-      "sha256": "55a3f11225f02c2c00499a88ffa00a7865034a6296ec8b362ba27a1f43d2d1ce"
+      "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
     }
   },
   "artifact": {
-    "path": "dist/dark-fighter.xex",
-    "bytes": 20292,
-    "sha256": "7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5"
+    "path": "dist/void-strike-65.xex",
+    "bytes": 21399,
+    "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
   },
   "emulator": {
     "name": "Atari800",
@@ -61,14 +110,14 @@
     "expected_addresses": {
       "start": 8222,
       "xex_entry": 8944,
-      "loader_dlist": 14336,
+      "loader_dlist": 15360,
       "main_menu_dlist": 37888,
       "playfield_dlist_a": 32528,
-      "playfield_dlist_b": 32603,
+      "playfield_dlist_b": 32618,
       "playfield_dlist_bytes": 75,
-      "loader_dli": 10013,
-      "frontend_dli": 9163,
-      "gameplay_dli": 25126
+      "loader_dli": 10060,
+      "frontend_dli": 9189,
+      "gameplay_dli": 25129
     },
     "sessions": [
       {
@@ -76,9 +125,9 @@
         "medium": "XEX",
         "cold_ram_fill": 165,
         "artifact": {
-          "path": "dist/dark-fighter.xex",
-          "bytes": 20292,
-          "sha256": "7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5"
+          "path": "dist/void-strike-65.xex",
+          "bytes": 21399,
+          "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
         },
         "snapshots": [
           {
@@ -103,49 +152,49 @@
           },
           {
             "frame": 250,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 119,
+            "loader_timer": 123,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 264
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 256
           },
           {
             "frame": 300,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 69,
+            "loader_timer": 73,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 364
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 356
           },
           {
             "frame": 500,
-            "pc": 9908,
+            "pc": 9954,
             "scanline": 0,
-            "cycle": 9,
+            "cycle": 10,
             "loader_timer": 0,
             "game_state": 1,
             "dlist": 37888,
@@ -153,40 +202,40 @@
             "pm_base": 14336,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 9163,
+            "vdslst": 9189,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 577133253,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           },
           {
             "frame": 750,
-            "pc": 37645,
+            "pc": 37020,
             "scanline": 0,
-            "cycle": 10,
+            "cycle": 11,
             "loader_timer": 0,
             "game_state": 6,
-            "dlist": 32603,
+            "dlist": 32618,
             "charset_address": 20480,
             "pm_base": 14336,
             "dma_ctl": 62,
             "nmi_en": 128,
-            "vdslst": 25126,
+            "vdslst": 25129,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 1990628051,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 1708636930,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           }
         ],
         "milestones": {
           "start": 78,
-          "loader": 117,
-          "menu": 374,
-          "frontend_poll": 375,
+          "loader": 121,
+          "menu": 378,
+          "frontend_poll": 379,
           "gameplay_init": 501,
           "main_loop": 505
         },
@@ -200,26 +249,26 @@
           {
             "frame": 250,
             "path": "build/runtime-wall-trace/boot-smoke/xex-a5-frame250.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 300,
             "path": "build/runtime-wall-trace/boot-smoke/xex-a5-frame300.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 500,
             "path": "build/runtime-wall-trace/boot-smoke/xex-a5-frame500.png",
-            "bytes": 1727,
-            "sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+            "bytes": 1722,
+            "sha256": "a6641e847e8c76d3a7dba66fd2060c297baf54c3ca81cfa856727e4adcfab5bc"
           },
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/xex-a5-frame750.png",
-            "bytes": 1292,
-            "sha256": "65640cc59c439da847163ab192a163d9a0bd16cede010161cae923de89e444f9"
+            "bytes": 3117,
+            "sha256": "7b98181a50d44e7cc22a3edc48e93372d36ef69c737d84f880c734fc0af9c356"
           }
         ],
         "passed": true
@@ -229,9 +278,9 @@
         "medium": "XEX",
         "cold_ram_fill": 90,
         "artifact": {
-          "path": "dist/dark-fighter.xex",
-          "bytes": 20292,
-          "sha256": "7809cb6950464926aed069f29ccc671069cfd12a2fc7aad1ea5b1a7bca5400a5"
+          "path": "dist/void-strike-65.xex",
+          "bytes": 21399,
+          "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
         },
         "snapshots": [
           {
@@ -256,49 +305,49 @@
           },
           {
             "frame": 250,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 119,
+            "loader_timer": 123,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 264
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 256
           },
           {
             "frame": 300,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 69,
+            "loader_timer": 73,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 364
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 356
           },
           {
             "frame": 500,
-            "pc": 9908,
+            "pc": 9954,
             "scanline": 0,
-            "cycle": 9,
+            "cycle": 10,
             "loader_timer": 0,
             "game_state": 1,
             "dlist": 37888,
@@ -306,40 +355,40 @@
             "pm_base": 14336,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 9163,
+            "vdslst": 9189,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 577133253,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           },
           {
             "frame": 750,
-            "pc": 37645,
+            "pc": 37020,
             "scanline": 0,
-            "cycle": 10,
+            "cycle": 11,
             "loader_timer": 0,
             "game_state": 6,
-            "dlist": 32603,
+            "dlist": 32618,
             "charset_address": 20480,
             "pm_base": 14336,
             "dma_ctl": 62,
             "nmi_en": 128,
-            "vdslst": 25126,
+            "vdslst": 25129,
             "runad": 8944,
             "initad": 55040,
             "dosvec": 61987,
-            "screen_checksum": 1990628051,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 1708636930,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           }
         ],
         "milestones": {
           "start": 78,
-          "loader": 117,
-          "menu": 374,
-          "frontend_poll": 375,
+          "loader": 121,
+          "menu": 378,
+          "frontend_poll": 379,
           "gameplay_init": 501,
           "main_loop": 505
         },
@@ -353,26 +402,26 @@
           {
             "frame": 250,
             "path": "build/runtime-wall-trace/boot-smoke/xex-5a-frame250.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 300,
             "path": "build/runtime-wall-trace/boot-smoke/xex-5a-frame300.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 500,
             "path": "build/runtime-wall-trace/boot-smoke/xex-5a-frame500.png",
-            "bytes": 1727,
-            "sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+            "bytes": 1722,
+            "sha256": "a6641e847e8c76d3a7dba66fd2060c297baf54c3ca81cfa856727e4adcfab5bc"
           },
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/xex-5a-frame750.png",
-            "bytes": 1292,
-            "sha256": "65640cc59c439da847163ab192a163d9a0bd16cede010161cae923de89e444f9"
+            "bytes": 3117,
+            "sha256": "7b98181a50d44e7cc22a3edc48e93372d36ef69c737d84f880c734fc0af9c356"
           }
         ],
         "passed": true
@@ -382,9 +431,9 @@
         "medium": "ATR",
         "cold_ram_fill": 165,
         "artifact": {
-          "path": "dist/dark-fighter.atr",
+          "path": "dist/void-strike-65.atr",
           "bytes": 92176,
-          "sha256": "55a3f11225f02c2c00499a88ffa00a7865034a6296ec8b362ba27a1f43d2d1ce"
+          "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
         },
         "snapshots": [
           {
@@ -409,92 +458,92 @@
           },
           {
             "frame": 250,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 229,
+            "loader_timer": 247,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 44
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 8
           },
           {
             "frame": 300,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 179,
+            "loader_timer": 197,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 144
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 108
           },
           {
             "frame": 500,
-            "pc": 9908,
+            "pc": 8317,
             "scanline": 0,
-            "cycle": 9,
+            "cycle": 11,
             "loader_timer": 0,
-            "game_state": 1,
-            "dlist": 37888,
-            "charset_address": 18432,
-            "pm_base": 14336,
-            "dma_ctl": 34,
-            "nmi_en": 128,
-            "vdslst": 9163,
+            "game_state": 0,
+            "dlist": 15360,
+            "charset_address": 57344,
+            "pm_base": 0,
+            "dma_ctl": 0,
+            "nmi_en": 0,
+            "vdslst": 10060,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           },
           {
             "frame": 750,
-            "pc": 37645,
+            "pc": 9954,
             "scanline": 0,
             "cycle": 10,
             "loader_timer": 0,
             "game_state": 6,
-            "dlist": 32603,
+            "dlist": 32528,
             "charset_address": 20480,
             "pm_base": 14336,
             "dma_ctl": 62,
             "nmi_en": 128,
-            "vdslst": 25126,
+            "vdslst": 25129,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 1990628051,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 2781565417,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           }
         ],
         "milestones": {
-          "start": 187,
-          "loader": 227,
-          "menu": 484,
-          "frontend_poll": 485,
-          "gameplay_init": 501,
-          "main_loop": 505
+          "start": 202,
+          "loader": 245,
+          "menu": 502,
+          "frontend_poll": 503,
+          "gameplay_init": 505,
+          "main_loop": 509
         },
         "screenshots": [
           {
@@ -506,26 +555,26 @@
           {
             "frame": 250,
             "path": "build/runtime-wall-trace/boot-smoke/atr-a5-frame250.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 300,
             "path": "build/runtime-wall-trace/boot-smoke/atr-a5-frame300.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 500,
             "path": "build/runtime-wall-trace/boot-smoke/atr-a5-frame500.png",
-            "bytes": 1727,
-            "sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+            "bytes": 938,
+            "sha256": "34196004af558614b31ebec2cc97fd691b811321d657f9a291c61d3b436c4a3b"
           },
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/atr-a5-frame750.png",
-            "bytes": 1292,
-            "sha256": "65640cc59c439da847163ab192a163d9a0bd16cede010161cae923de89e444f9"
+            "bytes": 3099,
+            "sha256": "4716401bf253a792c86f58391690db12975776d4ae0a450c2975a11812fd2fbd"
           }
         ],
         "passed": true
@@ -535,9 +584,9 @@
         "medium": "ATR",
         "cold_ram_fill": 90,
         "artifact": {
-          "path": "dist/dark-fighter.atr",
+          "path": "dist/void-strike-65.atr",
           "bytes": 92176,
-          "sha256": "55a3f11225f02c2c00499a88ffa00a7865034a6296ec8b362ba27a1f43d2d1ce"
+          "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
         },
         "snapshots": [
           {
@@ -562,92 +611,92 @@
           },
           {
             "frame": 250,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 229,
+            "loader_timer": 247,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 44
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 8
           },
           {
             "frame": 300,
-            "pc": 9918,
+            "pc": 9965,
             "scanline": 0,
             "cycle": 10,
-            "loader_timer": 179,
+            "loader_timer": 197,
             "game_state": 0,
-            "dlist": 14336,
+            "dlist": 15360,
             "charset_address": 57344,
             "pm_base": 0,
             "dma_ctl": 34,
             "nmi_en": 128,
-            "vdslst": 10013,
+            "vdslst": 10060,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 248110375,
-            "frontend_dlist_checksum": 3409770857,
-            "loader_dli_count": 144
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
+            "loader_dli_count": 108
           },
           {
             "frame": 500,
-            "pc": 9908,
+            "pc": 8317,
             "scanline": 0,
-            "cycle": 9,
+            "cycle": 11,
             "loader_timer": 0,
-            "game_state": 1,
-            "dlist": 37888,
-            "charset_address": 18432,
-            "pm_base": 14336,
-            "dma_ctl": 34,
-            "nmi_en": 128,
-            "vdslst": 9163,
+            "game_state": 0,
+            "dlist": 15360,
+            "charset_address": 57344,
+            "pm_base": 0,
+            "dma_ctl": 0,
+            "nmi_en": 0,
+            "vdslst": 10060,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 2358699305,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 673870381,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           },
           {
             "frame": 750,
-            "pc": 37645,
+            "pc": 9954,
             "scanline": 0,
             "cycle": 10,
             "loader_timer": 0,
             "game_state": 6,
-            "dlist": 32603,
+            "dlist": 32528,
             "charset_address": 20480,
             "pm_base": 14336,
             "dma_ctl": 62,
             "nmi_en": 128,
-            "vdslst": 25126,
+            "vdslst": 25129,
             "runad": 0,
             "initad": 0,
             "dosvec": 8222,
-            "screen_checksum": 1990628051,
-            "frontend_dlist_checksum": 3409770857,
+            "screen_checksum": 2781565417,
+            "frontend_dlist_checksum": 3499229133,
             "loader_dli_count": 500
           }
         ],
         "milestones": {
-          "start": 187,
-          "loader": 227,
-          "menu": 484,
-          "frontend_poll": 485,
-          "gameplay_init": 501,
-          "main_loop": 505
+          "start": 202,
+          "loader": 245,
+          "menu": 502,
+          "frontend_poll": 503,
+          "gameplay_init": 505,
+          "main_loop": 509
         },
         "screenshots": [
           {
@@ -659,33 +708,65 @@
           {
             "frame": 250,
             "path": "build/runtime-wall-trace/boot-smoke/atr-5a-frame250.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 300,
             "path": "build/runtime-wall-trace/boot-smoke/atr-5a-frame300.png",
-            "bytes": 2953,
-            "sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2"
+            "bytes": 2884,
+            "sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040"
           },
           {
             "frame": 500,
             "path": "build/runtime-wall-trace/boot-smoke/atr-5a-frame500.png",
-            "bytes": 1727,
-            "sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+            "bytes": 938,
+            "sha256": "34196004af558614b31ebec2cc97fd691b811321d657f9a291c61d3b436c4a3b"
           },
           {
             "frame": 750,
             "path": "build/runtime-wall-trace/boot-smoke/atr-5a-frame750.png",
-            "bytes": 1292,
-            "sha256": "65640cc59c439da847163ab192a163d9a0bd16cede010161cae923de89e444f9"
+            "bytes": 3099,
+            "sha256": "4716401bf253a792c86f58391690db12975776d4ae0a450c2975a11812fd2fbd"
           }
         ],
         "passed": true
       }
     ],
-    "xex_atr_frame_500_parity_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04",
-    "xex_atr_frame_750_parity_sha256": "65640cc59c439da847163ab192a163d9a0bd16cede010161cae923de89e444f9",
+    "frame_750_gameplay_sha256": [
+      {
+        "artifact": {
+          "path": "dist/void-strike-65.xex",
+          "bytes": 21399,
+          "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
+        },
+        "sha256": "7b98181a50d44e7cc22a3edc48e93372d36ef69c737d84f880c734fc0af9c356"
+      },
+      {
+        "artifact": {
+          "path": "dist/void-strike-65.xex",
+          "bytes": 21399,
+          "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
+        },
+        "sha256": "7b98181a50d44e7cc22a3edc48e93372d36ef69c737d84f880c734fc0af9c356"
+      },
+      {
+        "artifact": {
+          "path": "dist/void-strike-65.atr",
+          "bytes": 92176,
+          "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
+        },
+        "sha256": "4716401bf253a792c86f58391690db12975776d4ae0a450c2975a11812fd2fbd"
+      },
+      {
+        "artifact": {
+          "path": "dist/void-strike-65.atr",
+          "bytes": 92176,
+          "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
+        },
+        "sha256": "4716401bf253a792c86f58391690db12975776d4ae0a450c2975a11812fd2fbd"
+      }
+    ],
     "passed": true
   },
   "semantics": {
@@ -703,8 +784,8 @@
       "vbi_and_synchronization": 246,
       "world_ring_playfield": 11117,
       "broadside": 318,
-      "viper_projectiles": 4968,
-      "raider_projectiles": 806,
+      "player_fighter_projectiles": 4968,
+      "interceptor_projectiles": 806,
       "enemy_update_collision": 2781,
       "entity_debris": 103,
       "effects": 1513,
@@ -723,13 +804,13 @@
       "projectile_composition_cycles": 0
     },
     "projectile_detail": {
-      "viper": {
+      "player_fighter": {
         "erase": 720,
         "update_collision": 1259,
         "weapon_control": 57,
         "render_backing": 2932
       },
-      "raider": {
+      "interceptor": {
         "erase": 228,
         "update_collision": 142,
         "weapon_control": 40,
@@ -814,13 +895,13 @@
         "mainline_cycles": 12
       },
       {
-        "name": "viper_weapon_control",
+        "name": "player_fighter_weapon_control",
         "wall_cycles": 57,
         "dli_cycles": 0,
         "mainline_cycles": 57
       },
       {
-        "name": "raider_weapon_control",
+        "name": "interceptor_weapon_control",
         "wall_cycles": 40,
         "dli_cycles": 0,
         "mainline_cycles": 40
@@ -968,8 +1049,8 @@
       "hard_overrun_frames": 0,
       "no_active_debris_path_delta_cpu_cycles": 20,
       "no_active_debris_path_limit_cpu_cycles": 32,
-      "no_active_viper_projectile_path_delta_cpu_cycles": 0,
-      "no_active_viper_projectile_path_limit_cpu_cycles": 48,
+      "no_active_player_fighter_projectile_path_delta_cpu_cycles": 0,
+      "no_active_player_fighter_projectile_path_limit_cpu_cycles": 48,
       "debris_shot_path": {
         "trace_kind": "memory-integrity-160s",
         "session": "memory-integrity-xex-2-evasive-fire4",
@@ -1026,8 +1107,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 9,
-          "rapid_viper_projectiles": 9,
+          "player_fighter_projectiles": 9,
+          "rapid_player_fighter_projectiles": 9,
           "score_bcd": [
             3,
             32
@@ -1035,7 +1116,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -1079,7 +1160,7 @@
       "remaining_hard_cycles": 74,
       "target_overrun_frames": 4,
       "hard_overrun_frames": 0,
-      "raider_spawn_frames": 216,
+      "interceptor_spawn_frames": 216,
       "passed": true
     },
     "weapon_pickup_rapid_fire": {
@@ -1218,8 +1299,8 @@
             "render_id": 120,
             "drawn_mask": 15
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             64
@@ -1227,7 +1308,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -3669,8 +3750,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 6,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 6,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           48
@@ -3678,7 +3759,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -3761,8 +3842,8 @@
           "render_id": 0,
           "drawn_mask": 0
         },
-        "viper_projectiles": 6,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 6,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           32
@@ -3770,7 +3851,7 @@
         "effect_active_mask": 31,
         "effect_active_count": 5,
         "effect_rendered_mask": 31,
-        "live_raider": false,
+        "live_interceptor": false,
         "fighter_explosion": true,
         "capital_explosion": false,
         "music_active": true,
@@ -3854,8 +3935,8 @@
           "render_id": 0,
           "drawn_mask": 0
         },
-        "viper_projectiles": 6,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 6,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           32
@@ -3863,7 +3944,7 @@
         "effect_active_mask": 31,
         "effect_active_count": 5,
         "effect_rendered_mask": 31,
-        "live_raider": false,
+        "live_interceptor": false,
         "fighter_explosion": true,
         "capital_explosion": false,
         "music_active": true,
@@ -3952,8 +4033,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             128
@@ -3961,7 +4042,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4048,8 +4129,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             128
@@ -4057,7 +4138,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4144,8 +4225,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             128
@@ -4153,7 +4234,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4240,8 +4321,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             5,
             128
@@ -4249,7 +4330,7 @@
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -4339,8 +4420,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 9,
-          "rapid_viper_projectiles": 9,
+          "player_fighter_projectiles": 9,
+          "rapid_player_fighter_projectiles": 9,
           "score_bcd": [
             3,
             32
@@ -4348,7 +4429,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4482,8 +4563,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             128
@@ -4491,7 +4572,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4578,8 +4659,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 9,
-          "rapid_viper_projectiles": 9,
+          "player_fighter_projectiles": 9,
+          "rapid_player_fighter_projectiles": 9,
           "score_bcd": [
             3,
             32
@@ -4587,7 +4668,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4616,15 +4697,15 @@
       }
     },
     "maximum_projectile_pool": {
-      "scope": "combined active Viper and Raider fighter-projectile slots in legal Atari800 replays",
+      "scope": "combined active Player Fighter and Interceptor fighter-projectile slots in legal Atari800 replays",
       "combined_physical_capacity": 19,
       "maximum_combined_active_observed": 13,
       "full_combined_capacity_observed": false,
       "full_combined_capacity_matching_frames": 0,
       "heaviest_at_full_combined_capacity": null,
       "component_physical_capacities": {
-        "viper": 10,
-        "raider": 9
+        "player_fighter": 10,
+        "interceptor": 9
       },
       "evidence_note": "The combined capacity is physical; the report does not claim a full state unless a legal replay actually observes it."
     },
@@ -4687,8 +4768,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             144
@@ -4696,7 +4777,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4728,7 +4809,7 @@
       "three_slot_legal_coincidence_observed": false,
       "classification": "observed through the production scheduler during the natural first capital-section pass on EASY, MEDIUM, and HARD; no phase, world row, muzzle, projectile, object, or intensity state was seeded"
     },
-    "live_raider": {
+    "live_interceptor": {
       "observed": true,
       "matching_frames": 15754,
       "heaviest": {
@@ -4787,8 +4868,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             128
@@ -4796,7 +4877,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -4883,8 +4964,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             5,
             128
@@ -4892,7 +4973,7 @@
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -4982,8 +5063,8 @@
             "render_id": 124,
             "drawn_mask": 0
           },
-          "viper_projectiles": 8,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 8,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             80
@@ -4991,7 +5072,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": false,
           "capital_explosion": true,
           "music_active": true,
@@ -5077,8 +5158,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             128
@@ -5086,7 +5167,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -5173,8 +5254,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             128
@@ -5182,7 +5263,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -5269,8 +5350,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             5,
             128
@@ -5278,7 +5359,7 @@
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -5368,8 +5449,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             5,
             128
@@ -5377,7 +5458,7 @@
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -5467,8 +5548,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 0,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 0,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             6,
             48
@@ -5476,7 +5557,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -5564,8 +5645,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 0,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 0,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             6,
             48
@@ -5573,7 +5654,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -5661,8 +5742,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 9,
-          "rapid_viper_projectiles": 9,
+          "player_fighter_projectiles": 9,
+          "rapid_player_fighter_projectiles": 9,
           "score_bcd": [
             3,
             32
@@ -5670,7 +5751,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -5757,8 +5838,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             5,
             128
@@ -5766,7 +5847,7 @@
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -5804,7 +5885,7 @@
       "following_frame_erase_observed": true,
       "post_capital_spawn_observed": true
     },
-    "raider_breakup_effects": {
+    "interceptor_breakup_effects": {
       "observed": true,
       "matching_frames": 483,
       "heaviest": {
@@ -5863,8 +5944,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 6,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 6,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             6,
             64
@@ -5872,7 +5953,7 @@
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -5894,7 +5975,7 @@
           "near-copy",
           "effect-update",
           "effect-render",
-          "raider-breakup-spawn",
+          "interceptor-breakup-spawn",
           "director-world-row"
         ],
         "cpu_dma_off_reference": null
@@ -5964,8 +6045,8 @@
               "render_id": 0,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               0,
               16
@@ -5973,7 +6054,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6050,8 +6131,8 @@
               "render_id": 0,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               0,
               32
@@ -6059,7 +6140,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6136,8 +6217,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               0,
               48
@@ -6145,7 +6226,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6229,8 +6310,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 5,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 5,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               1,
               32
@@ -6238,7 +6319,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6315,8 +6396,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               1,
               48
@@ -6324,7 +6405,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6401,8 +6482,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               1,
               64
@@ -6410,7 +6491,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6488,8 +6569,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 4,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 4,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               1,
               128
@@ -6497,7 +6578,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6579,8 +6660,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               1,
               144
@@ -6588,7 +6669,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6666,8 +6747,8 @@
               "render_id": 124,
               "drawn_mask": 0
             },
-            "viper_projectiles": 5,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 5,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               0
@@ -6675,7 +6756,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6752,8 +6833,8 @@
               "render_id": 124,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               32
@@ -6761,7 +6842,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6838,8 +6919,8 @@
               "render_id": 124,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               48
@@ -6847,7 +6928,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -6924,8 +7005,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               64
@@ -6933,7 +7014,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7010,8 +7091,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 5,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 5,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               96
@@ -7019,7 +7100,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7102,8 +7183,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               112
@@ -7111,7 +7192,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7188,8 +7269,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               128
@@ -7197,7 +7278,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7284,8 +7365,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               128
@@ -7293,7 +7374,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7380,8 +7461,8 @@
               "render_id": 120,
               "drawn_mask": 15
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               64
@@ -7389,7 +7470,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7473,8 +7554,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 7,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 7,
             "score_bcd": [
               1,
               16
@@ -7482,7 +7563,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7565,8 +7646,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               3,
               0
@@ -7574,7 +7655,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7657,8 +7738,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 5,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 5,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               0
@@ -7666,7 +7747,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7748,8 +7829,8 @@
               "render_id": 124,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               80
@@ -7757,7 +7838,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7839,8 +7920,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 5,
-            "rapid_viper_projectiles": 5,
+            "player_fighter_projectiles": 5,
+            "rapid_player_fighter_projectiles": 5,
             "score_bcd": [
               3,
               32
@@ -7848,7 +7929,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -7930,8 +8011,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 7,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 7,
             "score_bcd": [
               1,
               16
@@ -7939,7 +8020,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8022,8 +8103,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               3,
               0
@@ -8031,7 +8112,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8114,8 +8195,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 5,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 5,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               0
@@ -8123,7 +8204,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8205,8 +8286,8 @@
               "render_id": 124,
               "drawn_mask": 0
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               80
@@ -8214,7 +8295,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8296,8 +8377,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 5,
-            "rapid_viper_projectiles": 5,
+            "player_fighter_projectiles": 5,
+            "rapid_player_fighter_projectiles": 5,
             "score_bcd": [
               3,
               32
@@ -8305,7 +8386,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8387,8 +8468,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 7,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 7,
             "score_bcd": [
               1,
               16
@@ -8396,7 +8477,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8479,8 +8560,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               3,
               0
@@ -8488,7 +8569,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8575,8 +8656,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 9,
-            "rapid_viper_projectiles": 9,
+            "player_fighter_projectiles": 9,
+            "rapid_player_fighter_projectiles": 9,
             "score_bcd": [
               3,
               32
@@ -8584,7 +8665,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8674,8 +8755,8 @@
               "render_id": 120,
               "drawn_mask": 15
             },
-            "viper_projectiles": 6,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 6,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               1,
               16
@@ -8683,7 +8764,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8764,8 +8845,8 @@
               "render_id": 120,
               "drawn_mask": 0
             },
-            "viper_projectiles": 10,
-            "rapid_viper_projectiles": 10,
+            "player_fighter_projectiles": 10,
+            "rapid_player_fighter_projectiles": 10,
             "score_bcd": [
               1,
               16
@@ -8773,7 +8854,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -8800,9 +8881,9 @@
           ],
           "cpu_dma_off_reference": null
         },
-        "viper_screen_code_frames": 437,
+        "player_fighter_screen_code_frames": 437,
         "other_code_or_occluded_frames": 63,
-        "viper_screen_code_percent": 87.4,
+        "player_fighter_screen_code_percent": 87.4,
         "screen_code_minimum": 15,
         "screen_code_maximum": 36,
         "all_screen_codes_select_colpf2": true,
@@ -8870,8 +8951,8 @@
                 "render_id": 120,
                 "drawn_mask": 0
               },
-              "viper_projectiles": 7,
-              "rapid_viper_projectiles": 7,
+              "player_fighter_projectiles": 7,
+              "rapid_player_fighter_projectiles": 7,
               "score_bcd": [
                 1,
                 16
@@ -8879,7 +8960,7 @@
               "effect_active_mask": 0,
               "effect_active_count": 0,
               "effect_rendered_mask": 0,
-              "live_raider": false,
+              "live_interceptor": false,
               "fighter_explosion": false,
               "capital_explosion": false,
               "music_active": true,
@@ -8983,8 +9064,8 @@
               "render_id": 124,
               "drawn_mask": 0
             },
-            "viper_projectiles": 8,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 8,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               48
@@ -8992,7 +9073,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -9078,8 +9159,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 9,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 9,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               3,
               0
@@ -9087,7 +9168,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -9176,8 +9257,8 @@
               "render_id": 252,
               "drawn_mask": 0
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               3,
               0
@@ -9185,7 +9266,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -9213,7 +9294,7 @@
           "cpu_dma_off_reference": null
         }
       },
-      "active_capsule_with_three_viper_projectiles": {
+      "active_capsule_with_three_player_fighter_projectiles": {
         "observed": true,
         "matching_frames": 156,
         "heaviest": {
@@ -9272,8 +9353,8 @@
               "render_id": 120,
               "drawn_mask": 15
             },
-            "viper_projectiles": 7,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 7,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               64
@@ -9281,7 +9362,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -9367,8 +9448,8 @@
               "render_id": 124,
               "drawn_mask": 15
             },
-            "viper_projectiles": 9,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 9,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               80
@@ -9376,7 +9457,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": false,
+            "live_interceptor": false,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -9459,8 +9540,8 @@
             "render_id": 120,
             "drawn_mask": 15
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             2,
             64
@@ -9468,7 +9549,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": true,
+          "live_interceptor": true,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -9555,8 +9636,8 @@
               "render_id": 124,
               "drawn_mask": 0
             },
-            "viper_projectiles": 8,
-            "rapid_viper_projectiles": 0,
+            "player_fighter_projectiles": 8,
+            "rapid_player_fighter_projectiles": 0,
             "score_bcd": [
               2,
               112
@@ -9564,7 +9645,7 @@
             "effect_active_mask": 0,
             "effect_active_count": 0,
             "effect_rendered_mask": 0,
-            "live_raider": true,
+            "live_interceptor": true,
             "fighter_explosion": false,
             "capital_explosion": false,
             "music_active": true,
@@ -9593,7 +9674,7 @@
         }
       },
       "exact_initial_timer_observed": true,
-      "viper_colour_phase_source": "authoritative 250-frame booster timer bit 3"
+      "player_fighter_colour_phase_source": "authoritative 250-frame booster timer bit 3"
     },
     "debris_shot_post_capital": {
       "observed": true,
@@ -9654,8 +9735,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 6,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 6,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             1,
             48
@@ -9663,7 +9744,7 @@
           "effect_active_mask": 30,
           "effect_active_count": 4,
           "effect_rendered_mask": 30,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -9751,8 +9832,8 @@
             "render_id": 252,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             3,
             0
@@ -9760,7 +9841,7 @@
           "effect_active_mask": 0,
           "effect_active_count": 0,
           "effect_rendered_mask": 0,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": false,
           "capital_explosion": false,
           "music_active": true,
@@ -9846,8 +9927,8 @@
             "render_id": 120,
             "drawn_mask": 0
           },
-          "viper_projectiles": 7,
-          "rapid_viper_projectiles": 0,
+          "player_fighter_projectiles": 7,
+          "rapid_player_fighter_projectiles": 0,
           "score_bcd": [
             5,
             128
@@ -9855,7 +9936,7 @@
           "effect_active_mask": 31,
           "effect_active_count": 5,
           "effect_rendered_mask": 31,
-          "live_raider": false,
+          "live_interceptor": false,
           "fighter_explosion": true,
           "capital_explosion": false,
           "music_active": true,
@@ -10106,8 +10187,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 6,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 6,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           48
@@ -10115,7 +10196,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -10198,8 +10279,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 8,
-        "rapid_viper_projectiles": 8,
+        "player_fighter_projectiles": 8,
+        "rapid_player_fighter_projectiles": 8,
         "score_bcd": [
           0,
           112
@@ -10207,7 +10288,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -10290,8 +10371,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 6,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 6,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           48
@@ -10299,7 +10380,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -10382,8 +10463,8 @@
           "render_id": 0,
           "drawn_mask": 0
         },
-        "viper_projectiles": 6,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 6,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           16
@@ -10391,7 +10472,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -10474,8 +10555,8 @@
           "render_id": 0,
           "drawn_mask": 0
         },
-        "viper_projectiles": 8,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 8,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           0
@@ -10483,7 +10564,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -10519,12 +10600,12 @@
           "tick_launch_flashes": 55,
           "update_player_death": 26,
           "read_input": 612,
-          "viper_projectile_hits_enemy": 24,
-          "entity_viper_projectile_target": 44,
+          "player_fighter_projectile_hits_enemy": 24,
+          "entity_player_fighter_projectile_target": 44,
           "update_fighter_projectiles": 882,
           "update_broadside": 994,
           "handle_collisions": 1951,
-          "update_viper_weapon": 316,
+          "update_player_fighter_weapon": 316,
           "erase_far_star_overlays": 991,
           "rotate_playfield_rows": 1204,
           "set_gameplay_row_ptr": 32,
@@ -10606,8 +10687,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 8,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 8,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           96
@@ -10615,7 +10696,7 @@
         "effect_active_mask": 30,
         "effect_active_count": 4,
         "effect_rendered_mask": 30,
-        "live_raider": false,
+        "live_interceptor": false,
         "fighter_explosion": true,
         "capital_explosion": false,
         "music_active": true,
@@ -10699,8 +10780,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 8,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 8,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           96
@@ -10708,7 +10789,7 @@
         "effect_active_mask": 30,
         "effect_active_count": 4,
         "effect_rendered_mask": 24,
-        "live_raider": false,
+        "live_interceptor": false,
         "fighter_explosion": true,
         "capital_explosion": false,
         "music_active": true,
@@ -10747,12 +10828,12 @@
           "update_player_death": 26,
           "read_input": 613,
           "update_enemy": 1112,
-          "viper_projectile_hits_enemy": 61,
-          "entity_viper_projectile_target": 81,
+          "player_fighter_projectile_hits_enemy": 61,
+          "entity_player_fighter_projectile_target": 81,
           "update_fighter_projectiles": 1402,
           "update_broadside": 193,
           "handle_collisions": 1692,
-          "update_viper_weapon": 57,
+          "update_player_fighter_weapon": 57,
           "erase_far_star_overlays": 1021,
           "rotate_playfield_rows": 1204,
           "set_gameplay_row_ptr": 27,
@@ -10832,8 +10913,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 10,
-        "rapid_viper_projectiles": 10,
+        "player_fighter_projectiles": 10,
+        "rapid_player_fighter_projectiles": 10,
         "score_bcd": [
           0,
           80
@@ -10841,7 +10922,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -10923,8 +11004,8 @@
           "render_id": 0,
           "drawn_mask": 0
         },
-        "viper_projectiles": 7,
-        "rapid_viper_projectiles": 0,
+        "player_fighter_projectiles": 7,
+        "rapid_player_fighter_projectiles": 0,
         "score_bcd": [
           0,
           32
@@ -10932,7 +11013,7 @@
         "effect_active_mask": 0,
         "effect_active_count": 0,
         "effect_rendered_mask": 0,
-        "live_raider": true,
+        "live_interceptor": true,
         "fighter_explosion": false,
         "capital_explosion": false,
         "music_active": true,
@@ -11014,8 +11095,8 @@
           "render_id": 120,
           "drawn_mask": 0
         },
-        "viper_projectiles": 9,
-        "rapid_viper_projectiles": 9,
+        "player_fighter_projectiles": 9,
+        "rapid_player_fighter_projectiles": 9,
         "score_bcd": [
           0,
           112
@@ -11023,7 +11104,7 @@
         "effect_active_mask": 30,
         "effect_active_count": 4,
         "effect_rendered_mask": 30,
-        "live_raider": false,
+        "live_interceptor": false,
         "fighter_explosion": true,
         "capital_explosion": false,
         "music_active": true,

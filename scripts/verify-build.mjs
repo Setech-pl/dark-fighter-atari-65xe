@@ -21,9 +21,9 @@ try {
   const reportBytes = fs.readFileSync(reportPath);
   const report = JSON.parse(reportBytes);
   const artifacts = runtimeArtifactSet({
-    boot: fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter-boot.bin")),
-    xex: fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex")),
-    atr: fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.atr")),
+    boot: fs.readFileSync(path.join(rootDirectory, "dist", "void-strike-65-boot.bin")),
+    xex: fs.readFileSync(path.join(rootDirectory, "dist", "void-strike-65.xex")),
+    atr: fs.readFileSync(path.join(rootDirectory, "dist", "void-strike-65.atr")),
   });
   validateRuntimeEvidenceBinding(report, artifacts);
   if (report.gate?.passed !== true) throw new Error("Runtime wall trace failed its current gate");
@@ -31,7 +31,7 @@ try {
   if (manifest.runtimeEvidence.reportSha256 !== reportDescriptor.sha256) {
     throw new Error("Final manifest is not bound to the current runtime wall trace");
   }
-  console.log("Dark Fighter artifacts are internally consistent.");
+  console.log("Void Strike 65 artifacts are internally consistent.");
   console.log(`  payload : ${manifest.payloadBytes} bytes`);
   console.log(`  sectors : ${manifest.bootSectors}`);
   console.log(`  load    : $${manifest.loadAddress.toString(16)}`);

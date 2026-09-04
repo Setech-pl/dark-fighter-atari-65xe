@@ -1,7 +1,7 @@
 # Hardware acceptance checklist
 
-Use the packed release artifacts from `dist/`. Test both `dark-fighter.xex` and
-the bootable `dark-fighter.atr`; do not substitute a debug build or a preview
+Use the packed release artifacts from `dist/`. Test both `void-strike-65.xex` and
+the bootable `void-strike-65.atr`; do not substitute a debug build or a preview
 model. Record emulator/hardware version, medium, joystick, display connection,
 and any failure with a photo or capture and reproduction steps.
 
@@ -32,12 +32,12 @@ For both XEX and ATR:
 - [ ] Menu, options, top scores, music toggle, and exit screen respond normally.
 - [ ] A new game shows `SCORE`, `LIFE`, and the full `HULL` label followed by
       four low intact plates; fields do not corrupt nearby characters.
-- [ ] Viper movement and normal fire remain responsive at 50 FPS PAL; a held
+- [ ] Player Fighter movement and normal fire remain responsive at 50 FPS PAL; a held
       FIRE input emits exactly eight shots at three-frame intervals, then the
       existing 12-frame post-burst pause.
 - [ ] Pause freezes world motion, capital-engine phase, active pickup movement,
       and booster timer; resume restores the exact visible gameplay state.
-- [ ] Colonial and Cylon hulls remain continuous through prow, modules, engine
+- [ ] Allied and Hostile hulls remain continuous through prow, modules, engine
       banks, A2-head changes, and ring wrap.
 - [ ] Capital engines alternate only between dim and bright, holding each phase
       for eight active frames.
@@ -49,30 +49,30 @@ For both XEX and ATR:
       frame 50 (about one PAL second), not while loader, menu, or OPTIONS is
       active. Restarting the level repeats the same frame-50 admission; a
       temporarily full legal budget delays it only until the first legal frame.
-- [ ] During a complete Cylon hull pass, count at least three distinct
+- [ ] During a complete Hostile hull pass, count at least three distinct
       25-frame warning -> four-frame flash -> projectile launches on EASY,
       MEDIUM, and HARD. No two warnings begin together and a full three-slot
       heavy-projectile pool must suppress an otherwise due launch legally.
-- [ ] Steer the Viper into the centre and then the edge of one Cylon and one
-      Colonial/BSG BROADSIDE shell. Each unshielded hit removes exactly two of
+- [ ] Steer the Player Fighter into the centre and then the edge of one Hostile and one
+      Allied BROADSIDE shell. Each unshielded hit removes exactly two of
       ten HULL units, leaves LIFE unchanged when nonlethal, starts the existing
       25-frame post-hit cooldown, and consumes the shell once. A one-HPOS near
-      miss must leave HULL unchanged; affiliation must not suppress Colonial
+      miss must leave HULL unchanged; affiliation must not suppress Allied
       friendly fire. The complete 16x15 gameplay rectangle is solid, including
       transparent corners and internal PMG gaps.
-- [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
-      Raider breakup, and debris breakup behave normally.
-- [ ] Without Shield, an accepted direct Raider contact destroys the Viper
+- [ ] Interceptor fire, collisions, scoring, debris contact, destructible debris,
+      Interceptor breakup, and debris breakup behave normally.
+- [ ] Without Shield, an accepted direct Interceptor contact destroys the Player Fighter
       immediately at every HULL value; Shield, respawn invulnerability, the
       post-hit cooldown, and the same-frame damage latch retain their gates,
-      while the Raider enters its normal scored breakup exactly once.
+      while the Interceptor enters its normal scored breakup exactly once.
 - [ ] Every pickup begins off-screen at Y=8, becomes active at Y=24, advances
       smoothly through the lower playfield to Y=238, and releases at Y=240.
       HARD advances two scanlines on
       every successive frame; no 0,0,0,+8 character-row jump is visible.
 - [ ] Rapid Fire capsule remains one coherent 8x16 object (one phased 2x2/2x3
       footprint) through several ring wraps; no ghost or second pass returns.
-      Fly the Viper nose, side, and rear across phases 0/2/4/6: opaque PMG pixels
+      Fly the Player Fighter nose, side, and rear across phases 0/2/4/6: opaque PMG pixels
       may cover the capsule, but transparent PMG pixels must reveal it with no
       dark rectangle or clipped edge. Collection occurs once and restores the
       lower layer on the following raster.
@@ -83,10 +83,10 @@ For both XEX and ATR:
 - [ ] Spread Shot capsule is one stable red phased footprint with a black fan symbol.
 - [ ] Collecting Spread immediately displays the full `BOOST` label and four
       full energy segments and
-      produces three yellow Viper projectiles: one vertical and two smoothly
+      produces three yellow Player Fighter projectiles: one vertical and two smoothly
       diverging, symmetric side shots.
 - [ ] One held Spread burst contains exactly eight complete salvos. When fewer
-      than three Viper slots are free, the next salvo waits; no one- or two-shot
+      than three Player Fighter slots are free, the next salvo waits; no one- or two-shot
       partial fan appears.
 - [ ] Rapid and Spread replace each other; collecting the active type refreshes
       the `BOOST` field and four-segment bar. It steps at the 75%, 50%, and 25% boundaries; below
@@ -97,18 +97,18 @@ For both XEX and ATR:
 - [ ] Shield is one steel-blue/white phased capsule with a black shield symbol. Its
       250-frame timer survives sector transitions, freezes during pause, and is
       cleared by life loss, Game Over, and New Game.
-- [ ] Shield absorbs Raider shots, broadside impacts, debris, Raider contact,
+- [ ] Shield absorbs Interceptor shots, broadside impacts, debris, Interceptor contact,
       and hull contact without changing HULL, LIFE, SCORE, hit cooldown, flash,
       or HULL-hit SFX; at most one absorption is accepted per frame.
 - [ ] The dense continuous Shield HUD bar uses boundaries 188/126/63 and the
-      Viper remains solid while COLPM0/COLPM3 pulse steel/white at the left,
+      Player Fighter remains solid while COLPM0/COLPM3 pulse steel/white at the left,
       centre, and right side of the corridor.
 - [ ] At native 320-pixel width, HULL plates remain low and angular while BOOST
       cells remain tall and narrow; the two indicators are distinguishable
       without relying on colour. Damaged HULL plates never blink or disappear.
-- [ ] Spread projectiles cross empty space and successive Colonial hull segments
+- [ ] Spread projectiles cross empty space and successive Allied hull segments
       without vertical lines, blank cells, ghosts, or stale projectile glyphs.
-- [ ] Repeat over the Cylon prow, midship modules, engine section, module
+- [ ] Repeat over the Hostile prow, midship modules, engine section, module
       boundaries, A2-head changes, and wrap with the same clean backing result.
 - [ ] Overlapping projectiles do not erase a projectile that remains in the
       cell; the final departure restores the current hull or starfield byte.
@@ -147,8 +147,8 @@ the XEX through the owner's normal real-hardware loader path when available.
       replaced in the fixed rotation, and allowed to expire; pause freezes all timers.
 - [ ] All three Spread Shot projectiles are yellow and form a clear symmetric
       fan without flicker or sudden horizontal jumps.
-- [ ] Normal, Rapid Fire, and Spread Shot Viper projectiles all remain yellow;
-      Raider projectiles retain their separate Cylon red/purple bank.
+- [ ] Normal, Rapid Fire, and Spread Shot Player Fighter projectiles all remain yellow;
+      Interceptor projectiles retain their separate Hostile red/purple bank.
 - [ ] Spread projectiles pass over both capital ships, including prow, midship,
       engines, module boundaries, and wrap, with exact backing restoration.
 - [ ] Long combat produces no ghosts, HUD damage, charset corruption, stuck

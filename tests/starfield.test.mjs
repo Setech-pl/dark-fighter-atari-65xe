@@ -30,7 +30,7 @@ const generated = fs.readFileSync(path.join(root, "build", "starfield.inc"), "ut
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
 const starRuntime = fs.readFileSync(path.join(root, "build", "starfield-runtime.bin"));
 const labels = new Map(
-  fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(root, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -186,8 +186,8 @@ test("ANTIC 4 star screen codes select six isolated glyphs and two safe colour b
   assert.ok(asset.nearLayer.glyphs.every((glyph) =>
     pixelValues(glyph).every((value) => value === 1)), "near glyphs select COLPF0");
   assert.ok(asset.glyphs.every(({ screenCode }) => screenCode < 11));
-  assert.equal(manifest.fighterWeapons.viper.colourValue, 0x1e);
-  assert.equal(manifest.fighterWeapons.raider.colourValue, 0x46);
+  assert.equal(manifest.fighterWeapons.player_fighter.colourValue, 0x1e);
+  assert.equal(manifest.fighterWeapons.interceptor.colourValue, 0x46);
   assert.deepEqual([manifest.starfield.farLayer.colourRegister,
     manifest.starfield.nearLayer.colourRegister], ["COLPF1", "COLPF0"]);
 });

@@ -94,7 +94,7 @@ const broadsideRuntime = fs.readFileSync(
   path.join(rootDirectory, "build", "broadside-runtime.bin"),
 );
 const labels = new Map(
-  fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -323,7 +323,7 @@ function playerBoundsFromPmg(memory) {
   for (let row = 0; row < 256; row += 1) {
     if (playerBases.some((base) => memory[base + row] !== 0)) occupiedDmaRows.push(row);
   }
-  assert.ok(occupiedDmaRows.length > 0, "PMG oracle requires a visible P0/P3 Viper");
+  assert.ok(occupiedDmaRows.length > 0, "PMG oracle requires a visible P0/P3 PlayerFighter");
   const sizeCode = memory[0xd008] & 3;
   const widthScale = [1, 2, 1, 4][sizeCode];
   assert.equal(memory[0xd00b] & 3, sizeCode, "P0/P3 must share one width");
@@ -487,18 +487,18 @@ test("broadside source timing and schedule are deterministic and generated with 
     flyingHeight: 4,
     projectileVisuals: {
       player: { widthHpos: 1, height: 2, coreRegister: "COLPF2", coreValue: 0x1e },
-      raider: { widthHpos: 2, height: 3, register: "COLPF3", value: 0x46 },
+      interceptor: { widthHpos: 2, height: 3, register: "COLPF3", value: 0x46 },
       capital: {
         widthHpos: 8,
         height: 6,
         coreRegister: "COLPF0",
         coreValue: 0x0e,
-        colonialRegister: "COLPF2",
-        colonialValue: 0x1e,
-        colonialAttribute: 0,
-        cylonRegister: "COLPF3",
-        cylonValue: 0x46,
-        cylonAttribute: 0x80,
+        alliedRegister: "COLPF2",
+        alliedValue: 0x1e,
+        alliedAttribute: 0,
+        hostileRegister: "COLPF3",
+        hostileValue: 0x46,
+        hostileAttribute: 0x80,
       },
     },
     impactHeight: 8,
@@ -574,17 +574,17 @@ test("M0 remains isolated while M1-M3 masked writes and SIZEM updates preserve e
       assert.equal(updateMissileSize(byte, missile, 1) & unrelated, byte & unrelated);
     }
   }
-  for (const [name, end] of [["allocate_viper_projectile", "update_enemy_weapon_runtime"],
-    ["update_fighter_projectiles", "viper_projectile_hits_enemy"],
+  for (const [name, end] of [["allocate_player_fighter_projectile", "update_enemy_weapon_runtime"],
+    ["update_fighter_projectiles", "player_fighter_projectile_hits_enemy"],
     ["erase_bullet", "init_fighter_projectiles"]]) {
     const text = routine(name, end);
     assert.doesNotMatch(text, /MISSILES|HPOSM0|SIZEM/,
       "fighter burst rendering must not consume or mutate M0");
   }
-  assert.doesNotMatch(routine("allocate_viper_projectile", "update_enemy_weapon_runtime"),
+  assert.doesNotMatch(routine("allocate_player_fighter_projectile", "update_enemy_weapon_runtime"),
     /initialize_projectile_screen_pointer/,
     "unrendered allocations must defer their redundant screen-pointer calculation");
-  assert.match(routine("render_fighter_projectile_overlays", "build_raider_projectile_glyphs"),
+  assert.match(routine("render_fighter_projectile_overlays", "build_interceptor_projectile_glyphs"),
     /initialize_projectile_screen_pointer/,
     "the real overlay renderer remains the authoritative pointer owner");
   assert.match(routine("init_broadside", "update_broadside"),
@@ -1400,7 +1400,7 @@ test("assembled capital-engine animation is an atomic deterministic 8+8 PAL puls
     [1, 0, 1, 0]);
 });
 
-test("optimized Viper PMG keeps horizontal pixels and clears only the departed vertical row", () => {
+test("optimized PlayerFighter PMG keeps horizontal pixels and clears only the departed vertical row", () => {
   const player0 = 0x3c00;
   const player3 = 0x3f00;
   const stick0 = 0xd300;
@@ -1567,10 +1567,10 @@ test("player damage is one event per frame and the 25-frame cooldown blocks repe
   assert.equal(state.health, 60);
 });
 
-test("assembled Colonial and Cylon shells share raster-aligned player collision and canonical damage", () => {
+test("assembled Allied and Hostile shells share raster-aligned player collision and canonical damage", () => {
   const cases = [
-    { name: "Colonial right-moving", owner: 0, shellX: 122, movedX: 124 },
-    { name: "Cylon left-moving", owner: 1, shellX: 132, movedX: 130 },
+    { name: "Allied right-moving", owner: 0, shellX: 122, movedX: 124 },
+    { name: "Hostile left-moving", owner: 1, shellX: 132, movedX: 130 },
   ];
   for (const { name, owner, shellX, movedX } of cases) {
     const { memory, broadState, constants } = prepareAssembledCapitalPlayerContact({
@@ -1604,7 +1604,7 @@ test("assembled Colonial and Cylon shells share raster-aligned player collision 
     "owner-independent contact cannot be inferred from colour or renderer addresses");
 });
 
-test("assembled Colonial and Cylon shells damage the Viper at the recovered lower boundary", () => {
+test("assembled Allied and Hostile shells damage the PlayerFighter at the recovered lower boundary", () => {
   for (const owner of [0, 1]) {
     const contact = prepareAssembledCapitalPlayerContact({
       owner,
@@ -1709,7 +1709,7 @@ test("assembled capital shells use the 16x15 player and swept 8x6 bolt AABBs at 
   assert.ok(capitalPlayerCollisionLabels.has("capital_player_collision"));
 });
 
-test("player hits retain only the Viper and damage flash, never a world-space IMPACT square", () => {
+test("player hits retain only the PlayerFighter and damage flash, never a world-space IMPACT square", () => {
   const playerX = 124;
   const playerY = 112;
   const playerTop = playerY - ATARI800_CAPTURE_FIRST_DMA_SCANLINE;
@@ -1741,8 +1741,8 @@ test("player hits retain only the Viper and damage flash, never a world-space IM
     memory[0xd013 + scenario.slot] = scenario.colour;
     runAssembledRoutine(memory, "clear_pmg");
     runAssembledRoutine(memory, "draw_player");
-    const viperBefore = playerBoundsFromPmg(memory);
-    assert.deepEqual(viperBefore, {
+    const player_fighterBefore = playerBoundsFromPmg(memory);
+    assert.deepEqual(player_fighterBefore, {
       left: playerX, right: playerX + 15, top: playerTop, bottom: playerTop + 14,
       dma_top: playerY, dma_bottom: playerY + 14, size_code: 1,
     });
@@ -1760,8 +1760,8 @@ test("player hits retain only the Viper and damage flash, never a world-space IM
     assert.equal(memory[constants.get("PLAYER_LIVES")], 3);
     assert.equal(memory[labels.get("damage_timer")], 0x12,
       "the existing full-frame damage flash is the only player-hit feedback");
-    assert.deepEqual(playerBoundsFromPmg(memory), viperBefore,
-      "damage must not add to or distort the P0/P3 Viper footprint");
+    assert.deepEqual(playerBoundsFromPmg(memory), player_fighterBefore,
+      "damage must not add to or distort the P0/P3 PlayerFighter footprint");
     assert.deepEqual(capitalShellScreenTransients(memory), [],
       "the FLYING ANTIC bolt must be erased in the collision frame");
     assert.deepEqual(capitalImpactMissileRows(memory), [],
@@ -2071,7 +2071,7 @@ test("both capital factions can hit a fighter while scoring remains source-owned
   assert.equal(state.score, 0);
   assert.match(routine("handle_collisions", "update_score_display"),
     /jsr update_fighter_projectiles[\s\S]+jsr update_broadside[\s\S]+jsr resolve_enemy_damage/);
-  assert.match(routine("update_fighter_projectiles", "viper_projectile_hits_enemy"),
+  assert.match(routine("update_fighter_projectiles", "player_fighter_projectile_hits_enemy"),
     /DAMAGE_PLAYER_PROJECTILE[\s\S]+jsr queue_enemy_damage/);
   assert.match(routine("update_broadside", "schedule_broadside"),
     /@flying:[\s\S]+jmp @targets[\s\S]+@targets:[\s\S]+jsr capital_shell_collision_flags/);
@@ -2186,7 +2186,7 @@ test("respawn is invulnerable for exactly 250 controlled blinking PAL frames", (
   assert.equal(state.health, 80);
 
   assert.match(routine("main_loop", "wait_frame"),
-    /cmp #PLAYER_DYING[\s\S]+jsr read_input[\s\S]+jsr update_viper_weapon/);
+    /cmp #PLAYER_DYING[\s\S]+jsr read_input[\s\S]+jsr update_player_fighter_weapon/);
   assert.match(routine("draw_player_for_lifecycle", "begin_player_fighter_explosion"),
     /RESPAWN_BLINK_FRAME[\s\S]+RESPAWN_BLINK_HALF_PERIOD_FRAMES[\s\S]+jmp draw_player/);
   assert.doesNotMatch(routine("draw_player_for_lifecycle", "begin_player_fighter_explosion"),

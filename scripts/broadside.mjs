@@ -536,7 +536,7 @@ export function heavyShellVisual(slot, asset, frame) {
   invariant(slot.state === BROADSIDE_STATES.FLYING,
     "Heavy-shell visual requires a FLYING slot");
   const visual = asset.broadside.projectileVisuals.capital;
-  const faction = slot.owner === "allied" ? "colonial" : "cylon";
+  const faction = slot.owner === "allied" ? "allied" : "hostile";
   return {
     x: slot.x,
     y: slot.y,
@@ -548,8 +548,8 @@ export function heavyShellVisual(slot, asset, frame) {
     connectedObjects: 1,
     glyphs: [126, 127],
     renderer: "ANTIC4_PLAYFIELD_OVERLAY",
-    color: faction === "colonial" ? visual.colonialValue : visual.cylonValue,
-    attribute: faction === "colonial" ? visual.colonialAttribute : visual.cylonAttribute,
+    color: faction === "allied" ? visual.alliedValue : visual.hostileValue,
+    attribute: faction === "allied" ? visual.alliedAttribute : visual.hostileAttribute,
   };
 }
 

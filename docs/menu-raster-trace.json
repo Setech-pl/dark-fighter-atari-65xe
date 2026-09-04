@@ -209,7 +209,7 @@
       "medium": "XEX",
       "cold_ram_fill": 0,
       "artifact": {
-        "path": "dist/dark-fighter.xex",
+        "path": "dist/void-strike-65.xex",
         "bytes": 21366,
         "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
       },
@@ -627,7 +627,7 @@
       "medium": "XEX",
       "cold_ram_fill": 165,
       "artifact": {
-        "path": "dist/dark-fighter.xex",
+        "path": "dist/void-strike-65.xex",
         "bytes": 21366,
         "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
       },
@@ -1045,7 +1045,7 @@
       "medium": "XEX",
       "cold_ram_fill": 90,
       "artifact": {
-        "path": "dist/dark-fighter.xex",
+        "path": "dist/void-strike-65.xex",
         "bytes": 21366,
         "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
       },
@@ -1463,7 +1463,7 @@
       "medium": "XEX",
       "cold_ram_fill": 255,
       "artifact": {
-        "path": "dist/dark-fighter.xex",
+        "path": "dist/void-strike-65.xex",
         "bytes": 21366,
         "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
       },
@@ -1881,7 +1881,7 @@
       "medium": "ATR",
       "cold_ram_fill": 0,
       "artifact": {
-        "path": "dist/dark-fighter.atr",
+        "path": "dist/void-strike-65.atr",
         "bytes": 92176,
         "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
       },
@@ -2299,7 +2299,7 @@
       "medium": "ATR",
       "cold_ram_fill": 165,
       "artifact": {
-        "path": "dist/dark-fighter.atr",
+        "path": "dist/void-strike-65.atr",
         "bytes": 92176,
         "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
       },
@@ -2717,7 +2717,7 @@
       "medium": "ATR",
       "cold_ram_fill": 90,
       "artifact": {
-        "path": "dist/dark-fighter.atr",
+        "path": "dist/void-strike-65.atr",
         "bytes": 92176,
         "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
       },
@@ -3135,7 +3135,7 @@
       "medium": "ATR",
       "cold_ram_fill": 255,
       "artifact": {
-        "path": "dist/dark-fighter.atr",
+        "path": "dist/void-strike-65.atr",
         "bytes": 92176,
         "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
       },
@@ -3549,5 +3549,10 @@
       "passed": true
     }
   ],
-  "passed": true
+  "passed": true,
+  "evidence_status": {
+    "status": "historical_pre_rebrand_raster",
+    "current_brand_validation": "build/runtime-wall-trace/boot-smoke/report.json",
+    "note": "Retained as historical lifecycle and memory evidence; its expected raster hashes are not presented as current brand-screen measurements."
+  }
 }

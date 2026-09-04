@@ -996,7 +996,7 @@ export function compileCapitalHulls(definition, options = {}) {
       coreRegister: "COLPF2",
       coreValue: 0x1e,
     }),
-    raider: compileProjectileVisual("raider", {
+    interceptor: compileProjectileVisual("interceptor", {
       widthHpos: 2,
       height: 3,
       register: "COLPF3",
@@ -1007,16 +1007,16 @@ export function compileCapitalHulls(definition, options = {}) {
       height: 6,
       coreRegister: "COLPF0",
       coreValue: 0x0e,
-      colonialRegister: "COLPF2",
-      colonialValue: 0x1e,
-      colonialAttribute: 0,
-      cylonRegister: "COLPF3",
-      cylonValue: 0x46,
-      cylonAttribute: 0x80,
+      alliedRegister: "COLPF2",
+      alliedValue: 0x1e,
+      alliedAttribute: 0,
+      hostileRegister: "COLPF3",
+      hostileValue: 0x46,
+      hostileAttribute: 0x80,
     }),
   });
   invariant(broadsideTiming.projectileVisuals.capital.widthHpos >=
-    broadsideTiming.projectileVisuals.raider.widthHpos * 2,
+    broadsideTiming.projectileVisuals.interceptor.widthHpos * 2,
   "Capital projectile must be at least twice the fighter projectile length");
   const compileScrollRates = (name, denominator) => {
     const rates = broadside[name];
@@ -1348,8 +1348,8 @@ export function renderCapitalHullsCa65Include(asset) {
     `PLAYER_PROJECTILE_VISIBLE_HEIGHT = ${asset.broadside.projectileVisuals.player.height}`,
     `CAPITAL_PROJECTILE_WIDTH_HPOS = ${asset.broadside.projectileVisuals.capital.widthHpos}`,
     `CAPITAL_PROJECTILE_VISIBLE_HEIGHT = ${asset.broadside.projectileVisuals.capital.height}`,
-    `CAPITAL_PROJECTILE_COLONIAL_ATTRIBUTE = ${asset.broadside.projectileVisuals.capital.colonialAttribute}`,
-    `CAPITAL_PROJECTILE_CYLON_ATTRIBUTE = ${asset.broadside.projectileVisuals.capital.cylonAttribute}`,
+    `CAPITAL_PROJECTILE_ALLIED_ATTRIBUTE = ${asset.broadside.projectileVisuals.capital.alliedAttribute}`,
+    `CAPITAL_PROJECTILE_HOSTILE_ATTRIBUTE = ${asset.broadside.projectileVisuals.capital.hostileAttribute}`,
     `BROADSIDE_IMPACT_HEIGHT = ${asset.broadside.impactHeight}`,
     `BROADSIDE_IMPACT_FRAMES = ${asset.broadside.impactFrames}`,
     `BROADSIDE_PLAYER_DAMAGE = ${asset.broadside.playerDamage}`,

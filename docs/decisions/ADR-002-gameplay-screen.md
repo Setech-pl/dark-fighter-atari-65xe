@@ -15,8 +15,8 @@ consume too much RAM and make smooth scrolling harder on a stock 65XE.
   fixed divider row above it completes the 28-row gameplay raster.
 - The playfield palette is black, cold white/steel, amber/yellow, and a switched
   red/burgundy bank.
-- P0 and P3 form the Viper; P1 is the Raider and P2 its red scanner.
-- M0 remains reserved for a possible player weapon. Current Viper projectiles
+- P0 and P3 form the Player Fighter; P1 is the Interceptor and P2 its red scanner.
+- M0 remains reserved for a possible player weapon. Current Player Fighter projectiles
   use restored ANTIC 4 overlays so their ten-slot pool and yellow colour do not
   inherit `COLPM0`.
 - New independently coloured moving objects require fresh PMG, memory, and PAL

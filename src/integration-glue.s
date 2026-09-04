@@ -170,10 +170,10 @@ capital_shell_draw_begin:
 capital_shell_backing_captured:
     dey
     lda BROAD_OWNER,x
-    beq @colonial
-    lda #(CAPITAL_SHELL_LEFT_GLYPH|CAPITAL_PROJECTILE_CYLON_ATTRIBUTE)
+    beq @allied
+    lda #(CAPITAL_SHELL_LEFT_GLYPH|CAPITAL_PROJECTILE_HOSTILE_ATTRIBUTE)
     bne @draw
-@colonial:
+@allied:
     lda #CAPITAL_SHELL_LEFT_GLYPH
 @draw:
     sta (dst_ptr),y

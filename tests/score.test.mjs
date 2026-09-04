@@ -10,7 +10,7 @@ const directory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(directory, "..");
 const source = fs.readFileSync(path.join(root, "src", "main.s"), "utf8");
 const labels = new Map(
-  fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(root, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -352,7 +352,7 @@ test("all score writes use one BCD award path while source ownership stays uncha
   assert.match(routine("update_player_death"),
     /@game_over:[\s\S]+sta PLAYER_LIFECYCLE\s+jsr insert_top_score/);
   assert.match(routine("resolve_enemy_damage"),
-    /cmp #\(DAMAGE_CAPITAL_CYLON\+1\)\s+bcs @no_score\s+pha\s+jsr add_archetype_score\s+pla\s+cmp #DAMAGE_PLAYER_PROJECTILE\s+bne @no_score\s+lda ENTITY_STATE\+WEAPON_PICKUP_SLOT\s+bne @no_score\s+jsr weapon_pickup_record_qualified_kill/);
+    /cmp #\(DAMAGE_CAPITAL_HOSTILE\+1\)\s+bcs @no_score\s+pha\s+jsr add_archetype_score\s+pla\s+cmp #DAMAGE_PLAYER_PROJECTILE\s+bne @no_score\s+lda ENTITY_STATE\+WEAPON_PICKUP_SLOT\s+bne @no_score\s+jsr weapon_pickup_record_qualified_kill/);
   assert.match(routine("init_state"), /sta score_bcd_lo\s+sta score_bcd_hi/);
   assert.doesNotMatch(routine("init_state"), /TOP_SCORE_TABLE/);
   assert.match(routine("finish_startup_after_loader"),
@@ -477,7 +477,7 @@ test("a full-table winner displaces the last record", () => {
 test("ordinary awards update only current BCD score until Game Over", () => {
   const actualAward = createRuntimeMemory();
   assert.equal(actualAward[addresses.enemyScores], 0x10,
-    "the release Raider keeps its descriptor-owned ten-point award");
+    "the release Interceptor keeps its descriptor-owned ten-point award");
   actualAward[addresses.enemyArchetype] = 0;
   actualAward[addresses.scoreLow] = 0;
   actualAward[addresses.scoreHigh] = 0;
@@ -494,7 +494,7 @@ test("assembled death and respawn preserve whole-game SCORE before the next awar
   const externalCalls = new Set([
     "play_hit_sound",
     "erase_bullet",
-    "clear_raider_pulses",
+    "clear_interceptor_pulses",
     "begin_player_fighter_explosion",
     "update_hud_status",
     "erase_player",

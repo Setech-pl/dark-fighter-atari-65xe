@@ -1,4 +1,4 @@
-# Dark Fighter runtime architecture
+# Void Strike 65 runtime architecture
 
 This document describes the current released runtime. Exact address ownership
 is in [memory-map.md](memory-map.md), performance evidence in
@@ -7,7 +7,7 @@ is in [memory-map.md](memory-map.md), performance evidence in
 
 ## Target and artifact model
 
-Dark Fighter targets a stock 64 KB Atari 65XE in PAL mode with documented NMOS
+Void Strike 65 targets a stock 64 KB Atari 65XE in PAL mode with documented NMOS
 6502 instructions. The runtime owns the machine after startup, uses joystick
 port 1, and schedules gameplay at 50 frames per second.
 
@@ -38,7 +38,7 @@ after glue. Startup holds glue at `$7F16-$7FFF` after publishing
 the A2 kernel, then copies it to `$4EFE-$4FE7`; the 645-byte Director expands to
 `$9D75-$9FF9`. The last BROADSIDE source read makes `$8100` reusable;
 only then does startup copy the packed resident suffix and stage it at
-`$8100-$9A53`. The 7,743-byte suffix is stored as a 6,584-byte LZ-10/5 stream
+`$8100-$9ACE`. The 7,743-byte suffix is stored as a 6,607-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. The pickup stream is preserved at `$4801-$4B93` before
 its cold source overlaps the future A2 range, then expands atomically to
@@ -79,7 +79,7 @@ and late-published to `$4EFE-$4FE7`. The Director ends
 at `$9FF9`; `$9FFA-$9FFF` is a six-byte untouched guard.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
-mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to
+mixed ANTIC F/E screen and packs them to **1,929 bytes**. It expands to
 `$4010-$5E0F`; a second LMS at `$5000` prevents a 4 KiB ANTIC boundary crossing.
 A separate 35-byte stream expands the 202-byte loader display list to
 `$3C00-$3CC9` only after the overlapping bitmap source has been consumed.
@@ -126,7 +126,7 @@ The production H3.1 frontend uses one 1 KiB charset at `$4800` and limits all
 ANTIC 6/7 screen codes to glyphs 0-63. Large headings use ANTIC 7, menu/data
 rows use ANTIC 6, structural rows use ANTIC 4, and the two small control hints
 use ANTIC 2. Main Menu and Options each have one DLI to select the monochrome
-hint palette; TOP SCORES and Game Over use no DLI. The menu Viper is a 3x2
+hint palette; TOP SCORES and Game Over use no DLI. The menu Player Fighter is a 3x2
 ANTIC 4 character figure in glyphs 58-63, so frontend PMG remains disabled.
 Frontend entry also clears the five GTIA graphics latches `GRAFP0-3/GRAFM`
 while DMA is blanked. Disabling PMG DMA alone does not clear the last fetched
@@ -173,7 +173,7 @@ MEDIUM, and HARD decode 8, 12, and 16 stations respectively from a compact
 two-bit threshold in each 60-byte module sequence. The first muzzle is one
 character row after the engine section; the remaining nested positions span
 the aft, combat, and forward sections with at least 24 rows of same-side
-separation. Colonial and Cylon positions start from independent domains of the
+separation. Allied and Hostile positions start from independent domains of the
 Director's `5*x+1` byte LCG, generated at build time so gameplay does not
 consume or perturb the Director RNG stream.
 Engine pixels have two phases, `dim` and `bright`, held for eight active frames
@@ -188,11 +188,11 @@ BROADSIDE row pointers are derived again through the logical row table; only the
 current legal cell is redrawn. Warning missiles remain PMG-only and therefore
 never enter ring backing.
 
-BROADSIDE shell contact is owner-independent: Colonial/BSG and Cylon fire both
+BROADSIDE shell contact is owner-independent: Allied and Hostile fire both
 enter one collision dispatcher. Owner selects travel direction and spatial
 ordering only. One inclusive swept-AABB test compares the previous/current
 character-aligned 8x6 bolt envelope with the complete 16x15 gameplay rectangle
-of the Viper. Transparent PMG corners and internal gaps deliberately remain
+of the Player Fighter. Transparent PMG corners and internal gaps deliberately remain
 solid gameplay contact; exactly one HPOS or scanline outside either rectangle
 remains a miss. Collision runs after shell update and before the late shell
 render; a hit enters the existing IMPACT and canonical two-unit damage path.
@@ -237,15 +237,15 @@ head, and ring wrap.
 
 | Pool | Physical capacity | Release active limit | Purpose |
 | --- | ---: | ---: | --- |
-| Viper projectiles | 10 | 10 | normal, Rapid Fire, and Spread Shot |
-| Raider projectiles | 9 | 9 | single-pulse burst |
+| Player Fighter projectiles | 10 | 10 | normal, Rapid Fire, and Spread Shot |
+| Interceptor projectiles | 9 | 9 | single-pulse burst |
 | Combined fighter projectiles | 19 | 19 | contiguous physical allocation |
 | Broadside projectiles | 3 | production scheduler has 2 source turrets | capital fire |
 | Interactive entities | 4 | 2 | debris plus one pickup capsule; controller/reserve slots remain non-rendered |
 | Transient effects | 6 | 5 | one core plus four fragments |
 
 Pool scans are bounded by compile-time counts. Spread Shot admits its centre
-whenever at least one Viper slot is free and admits the two side shots only as
+whenever at least one Player Fighter slot is free and admits the two side shots only as
 an atomic pair. Its ten-frame cooldown is the minimum safe value for the
 28-update maximum legal projectile lifetime: nine frames can reach a
 centre-only tenth slot, while ten frames holds the steady state to three full
@@ -257,18 +257,18 @@ projectile state.
 
 ## Enemies, debris, and boosters
 
-The released ordinary enemy is the Raider. Its descriptor selects hit points,
-score, pursuit profile, weapon profile, and PMG appearance. Raider projectiles
+The released ordinary enemy is the Interceptor. Its descriptor selects hit points,
+score, pursuit profile, weapon profile, and PMG appearance. Interceptor projectiles
 share the fighter-projectile state allocation but use separate slots, red
 glyphs, collision ownership, and lifetime rules.
 
-Direct Raider/Viper overlap is resolved after fighter projectiles and before
+Direct Interceptor/Player Fighter overlap is resolved after fighter projectiles and before
 broadside work. It queues the existing one-point contact hit against the
-Raider, then passes all ten HULL units to the canonical player-damage routine.
+Interceptor, then passes all ten HULL units to the canonical player-damage routine.
 An accepted unshielded contact therefore saturates HULL at zero and uses the
 existing HUD, breakup, life-loss, respawn, and Game Over flow in one event.
 `PLAYER_LIFECYCLE`, Shield, the 25-frame post-hit cooldown, and the per-frame
-damage latch remain the ordered gates. Raider destruction is resolved
+damage latch remain the ordered gates. Interceptor destruction is resolved
 independently afterward through the established scored `EXPLODING`/breakup
 path, including when a player-side gate suppresses damage. Collision geometry,
 movement, scheduling, and persistent state are unchanged.
@@ -276,17 +276,17 @@ movement, scheduling, and persistent state are unchanged.
 Debris is the implemented interactive entity in slot 0. It has bounded
 trajectories, two shapes, two tumble phases, three hit points, contact damage,
 and no score award. Player/debris contact uses the full 16-HPOS width of the
-double-width Viper PMG, while retaining the existing vertical player envelope
+double-width Player Fighter PMG, while retaining the existing vertical player envelope
 and 8x8 debris box. Its single accepted damage event indexes a three-byte
 Easy/Medium/Hard table containing 2/5/7 HULL units, then uses the canonical
-atomic saturating damage/death/HUD path. Its destruction and Raider breakup
+atomic saturating damage/death/HUD path. Its destruction and Interceptor breakup
 materialize into the five-slot active effects envelope and are erased before
 lower layers move. The difficulty lookup replaces the former immediate load
 with `LDX abs` plus `LDA abs,X`: +6 CPU cycles only after a geometric overlap
 passes the earlier latch check, with no cost on inactive or collision-miss
 paths and no persistent-RAM allocation.
 
-Slot 1 owns the sole pickup capsule. A qualifying Viper-projectile Raider
+Slot 1 owns the sole pickup capsule. A qualifying Player Fighter-projectile Interceptor
 kill advances the three-kill drop counter. The next-type selector rotates
 successful capsule creation through Rapid Fire, Spread Shot, and Shield,
 starting with Rapid Fire on New Game. Slot 2 holds the non-rendered timed-
@@ -308,7 +308,7 @@ fixed wait needed for its ACTIVE transition. Once ACTIVE, each update begins
 immediately after ANTIC has scanned the preceding footprint's bottom edge. The
 saved character cells therefore remain intact for that complete raster; reverse
 erase, ring rotation, and the single late redraw then finish before ANTIC returns
-to the new position on the next PAL frame. The Viper remains the P0/P3 foreground
+to the new position on the next PAL frame. The Player Fighter remains the P0/P3 foreground
 at `PRIOR=0`: only set PMG bits cover capsule pixels, while zero PMG bits remain
 transparent. Simulation order, world rates, ring rotation, and global scrolling
 are unchanged.
@@ -330,26 +330,26 @@ writable backing bytes at `$5E06-$5E0F` preserve and restore the complete prior
 field across refresh, replacement, expiry, life loss, and teardown. No PMG,
 bitmap overlay, DLI, palette, or gameplay-charset allocation is involved.
 
-Rapid Fire uses the existing Viper projectile renderer and yellow colour bank.
-Spread Shot uses three logical Viper projectiles: centre, left, and right. All
-three use the yellow Viper colour. Side directions are encoded in the existing
+Rapid Fire uses the existing Player Fighter projectile renderer and yellow colour bank.
+Spread Shot uses three logical Player Fighter projectiles: centre, left, and right. All
+three use the yellow Player Fighter colour. Side directions are encoded in the existing
 render/state byte, and the parity of the existing lifetime supplies their
 one-HPOS-per-two-updates fixed phase, avoiding another allocation.
 
 Shield leaves the normal weapon cadence active. Its separate state is checked
 after `PLAYER_ALIVE` and before the ordinary 25-frame damage cooldown. A valid
 absorption consumes the frame's one damage event without changing HULL, LIFE,
-SCORE, hit flash, cooldown, or HULL-hit SFX. Raider shots disappear, broadside
-shots enter their established impact state, debris is consumed, and Raider or
+SCORE, hit flash, cooldown, or HULL-hit SFX. Interceptor shots disappear, broadside
+shots enter their established impact state, debris is consumed, and Interceptor or
 hull-contact side effects retain their prior behavior. The Shield timer also
-drives a solid COLPM0/COLPM3 steel/white pulse; it never hides the Viper and is
+drives a solid COLPM0/COLPM3 steel/white pulse; it never hides the Player Fighter and is
 therefore distinct from respawn invulnerability.
 
 ## Character and PMG ownership
 
-The gameplay charset has two free glyphs. Stars use 1-6, Viper projectile
+The gameplay charset has two free glyphs. Stars use 1-6, Player Fighter projectile
 phases 11-46, Spread Shot composite scratch 47-56, capital hulls 59-89,
-Raider/projectile phases 90-109, debris 110-117, and fragments 118-119. Glyphs
+Interceptor/projectile phases 90-109, debris 110-117, and fragments 118-119. Glyphs
 120-125 are the single-owner dynamic pickup compositor bank; one of the three
 type-specific, eight-phase sources is copied there before the sole late draw.
 Glyphs 126-127 are the dedicated connected left/right BROADSIDE bolt halves.
@@ -360,8 +360,8 @@ energy, and glyph 8 for the distinct continuous Shield bar. Digits and letters
 retain their existing allocations and colours.
 
 PMG base is `$3800`; active DMA pages are `$3B00-$3FFF`. P0 and P3 form the
-Viper, P1 is the Raider, and P2 is its scanner. M1-M3 serve broadside warnings
-and impacts. M0 remains reserved; current Viper weapons are ANTIC 4 overlays so
+Player Fighter, P1 is the Interceptor, and P2 is its scanner. M1-M3 serve broadside warnings
+and impacts. M0 remains reserved; current Player Fighter weapons are ANTIC 4 overlays so
 the ten-slot pool and yellow colour are independent of `COLPM0`.
 
 ## Determinism and verification

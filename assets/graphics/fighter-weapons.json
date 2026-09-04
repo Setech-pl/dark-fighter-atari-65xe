@@ -1,10 +1,10 @@
 {
   "formatVersion": 1,
   "glyphLayout": {
-    "viperBase": 11,
-    "raiderBase": 90
+    "player_fighterBase": 11,
+    "interceptorBase": 90
   },
-  "viper": {
+  "player_fighter": {
     "poolSlots": 10,
     "burstCount": 8,
     "burstIntervalFrames": 3,

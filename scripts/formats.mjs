@@ -148,11 +148,11 @@ export function parseAtr(buffer) {
 
 export function validateBuildDirectory(rootDirectory) {
   const distDirectory = path.join(rootDirectory, "dist");
-  const manifestPath = path.join(distDirectory, "dark-fighter-manifest.json");
+  const manifestPath = path.join(distDirectory, "void-strike-65-manifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  const boot = fs.readFileSync(path.join(distDirectory, "dark-fighter-boot.bin"));
-  const xex = fs.readFileSync(path.join(distDirectory, "dark-fighter.xex"));
-  const atr = fs.readFileSync(path.join(distDirectory, "dark-fighter.atr"));
+  const boot = fs.readFileSync(path.join(distDirectory, "void-strike-65-boot.bin"));
+  const xex = fs.readFileSync(path.join(distDirectory, "void-strike-65.xex"));
+  const atr = fs.readFileSync(path.join(distDirectory, "void-strike-65.atr"));
 
   invariant(boot.length === manifest.payloadBytes, "Manifest payload size differs from boot binary");
   const transport = manifest.transportCapacity;

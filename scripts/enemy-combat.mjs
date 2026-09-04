@@ -18,8 +18,8 @@ export const ENEMY_VISIBLE_BOTTOM_EXCLUSIVE = canonicalPlayfield.gameplayBottom;
 export const ENEMY_DAMAGE_SOURCES = Object.freeze({
   PLAYER_PROJECTILE: 0,
   PLAYER_CONTACT: 1,
-  CAPITAL_CYLON: 2,
-  CAPITAL_COLONIAL: 3,
+  CAPITAL_HOSTILE: 2,
+  CAPITAL_ALLIED: 3,
   ENEMY_PROJECTILE: 4,
   CLEANUP: 5,
 });
@@ -27,7 +27,7 @@ export const ENEMY_DAMAGE_SOURCES = Object.freeze({
 const SCORE_AWARDING_SOURCES = new Set([
   ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE,
   ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
-  ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON,
+  ENEMY_DAMAGE_SOURCES.CAPITAL_HOSTILE,
 ]);
 
 function invariant(condition, message) {
@@ -126,7 +126,7 @@ export function sweptHorizontalProjectileTargets(projectile, targets) {
 }
 
 export function projectileVisualMetrics(asset) {
-  const { player, raider, capital } = asset.broadside.projectileVisuals;
+  const { player, interceptor, capital } = asset.broadside.projectileVisuals;
   const capitalOccupiedPixels = capital.height * capital.widthHpos - 8;
   return {
     player: {
@@ -137,63 +137,63 @@ export function projectileVisualMetrics(asset) {
       register: player.coreRegister,
       color: player.coreValue,
     },
-    raider: {
-      width: raider.widthHpos,
-      height: raider.height,
-      occupiedPixels: raider.widthHpos * raider.height,
+    interceptor: {
+      width: interceptor.widthHpos,
+      height: interceptor.height,
+      occupiedPixels: interceptor.widthHpos * interceptor.height,
       renderer: "ANTIC4_GLYPH_POOL",
-      register: raider.register,
-      color: raider.value,
+      register: interceptor.register,
+      color: interceptor.value,
     },
-    colonial: {
+    allied: {
       width: capital.widthHpos,
       height: capital.height,
       occupiedPixels: capitalOccupiedPixels,
       renderer: "ANTIC4_PLAYFIELD_OVERLAY",
-      attribute: capital.colonialAttribute,
-      color: capital.colonialValue,
+      attribute: capital.alliedAttribute,
+      color: capital.alliedValue,
     },
-    cylon: {
+    hostile: {
       width: capital.widthHpos,
       height: capital.height,
       occupiedPixels: capitalOccupiedPixels,
       renderer: "ANTIC4_PLAYFIELD_OVERLAY",
-      attribute: capital.cylonAttribute,
-      color: capital.cylonValue,
+      attribute: capital.hostileAttribute,
+      color: capital.hostileValue,
     },
   };
 }
 
-export function createRaiderPursuitState(asset, {
+export function createInterceptorPursuitState(asset, {
   x = asset.implemented[0].logicalBounds[0],
   y = ENEMY_FULLY_VISIBLE_TOP,
   velocityX = 0,
   moveAccumulator = 0,
 } = {}) {
-  const raider = asset.implemented[0];
-  invariant(raider?.id === "RAIDER", "Soft pursuit requires the release Raider");
-  invariant(Number.isInteger(x) && x >= raider.logicalBounds[0] &&
-    x <= raider.logicalBounds[1], "Raider pursuit X is outside its legal corridor");
-  invariant(Number.isInteger(y), "Raider pursuit Y must be an integer scanline");
-  invariant([-1, 0, 1].includes(velocityX), "Raider pursuit velocity must be -1, 0, or 1");
-  const denominator = asset.runtime.movementPolicy.raiderSoftPursuit.maximumSpeedRatioDenominator;
+  const interceptor = asset.implemented[0];
+  invariant(interceptor?.id === "INTERCEPTOR", "Soft pursuit requires the release Interceptor");
+  invariant(Number.isInteger(x) && x >= interceptor.logicalBounds[0] &&
+    x <= interceptor.logicalBounds[1], "Interceptor pursuit X is outside its legal corridor");
+  invariant(Number.isInteger(y), "Interceptor pursuit Y must be an integer scanline");
+  invariant([-1, 0, 1].includes(velocityX), "Interceptor pursuit velocity must be -1, 0, or 1");
+  const denominator = asset.runtime.movementPolicy.interceptorSoftPursuit.maximumSpeedRatioDenominator;
   invariant(Number.isInteger(moveAccumulator) && moveAccumulator >= 0 &&
-    moveAccumulator < denominator, "Raider movement accumulator is outside its rate window");
+    moveAccumulator < denominator, "Interceptor movement accumulator is outside its rate window");
   return { x, y, velocityX, moveAccumulator };
 }
 
-// Mirrors update_raider_soft_pursuit in the assembled runtime. The player and
-// Raider positions are their established left edges, so the four-HPOS centre
+// Mirrors update_interceptor_soft_pursuit in the assembled runtime. The player and
+// Interceptor positions are their established left edges, so the four-HPOS centre
 // correction is part of the signed target delta rather than an unexplained
 // steering offset. Direction changes pass through zero for one sample period.
-export function stepRaiderSoftPursuit(asset, state, {
+export function stepInterceptorSoftPursuit(asset, state, {
   frame,
   playerX,
 } = {}) {
-  const raider = asset.implemented[0];
-  const policy = asset.runtime.movementPolicy.raiderSoftPursuit;
-  invariant(Number.isInteger(frame) && frame >= 0, "Raider pursuit frame must be non-negative");
-  invariant(Number.isInteger(playerX), "Raider pursuit target must use an integer player X");
+  const interceptor = asset.implemented[0];
+  const policy = asset.runtime.movementPolicy.interceptorSoftPursuit;
+  invariant(Number.isInteger(frame) && frame >= 0, "Interceptor pursuit frame must be non-negative");
+  invariant(Number.isInteger(playerX), "Interceptor pursuit target must use an integer player X");
   const next = { ...state };
   const sampled = frame % policy.targetSamplingIntervalFrames === 0;
   let targetDelta = null;
@@ -203,7 +203,7 @@ export function stepRaiderSoftPursuit(asset, state, {
     const weave = (frame % policy.weavePeriodFrames) < policy.weavePeriodFrames / 2
       ? -policy.weaveAmplitudeHpos
       : policy.weaveAmplitudeHpos;
-    const centreCorrection = (raider.visibleWidth - 8) / 2;
+    const centreCorrection = (interceptor.visibleWidth - 8) / 2;
     targetDelta = playerX + weave - next.x - centreCorrection;
     if (targetDelta > policy.deadZoneHpos) {
       requestedVelocity = next.velocityX < 0 ? 0 : policy.horizontalAccelerationHpos;
@@ -226,27 +226,27 @@ export function stepRaiderSoftPursuit(asset, state, {
       next.x += movedHpos;
     }
   }
-  if (next.x < raider.logicalBounds[0]) {
-    next.x = raider.logicalBounds[0];
+  if (next.x < interceptor.logicalBounds[0]) {
+    next.x = interceptor.logicalBounds[0];
     next.velocityX = 0;
     next.moveAccumulator = 0;
-  } else if (next.x > raider.logicalBounds[1]) {
-    next.x = raider.logicalBounds[1];
+  } else if (next.x > interceptor.logicalBounds[1]) {
+    next.x = interceptor.logicalBounds[1];
     next.velocityX = 0;
     next.moveAccumulator = 0;
   }
   return { ...next, sampled, targetDelta, requestedVelocity, movedHpos };
 }
 
-export function simulateRaiderSoftPursuit(asset, {
+export function simulateInterceptorSoftPursuit(asset, {
   frameCount = 96,
   initialState,
   playerXForFrame = () => 124,
 } = {}) {
-  let state = initialState ?? createRaiderPursuitState(asset, { x: 120, y: 56 });
+  let state = initialState ?? createInterceptorPursuitState(asset, { x: 120, y: 56 });
   const trace = [];
   for (let frame = 0; frame < frameCount; frame += 1) {
-    state = stepRaiderSoftPursuit(asset, state, {
+    state = stepInterceptorSoftPursuit(asset, state, {
       frame,
       playerX: playerXForFrame(frame),
     });
@@ -294,7 +294,7 @@ export function stepEnemyCombatFrame(asset, state, {
   let damageApplied = false;
   for (let pulseSlot = 0; pulseSlot < next.pool.length; pulseSlot += 1) {
     const pulse = next.pool[pulseSlot];
-    if (pulse?.owner !== "RAIDER") continue;
+    if (pulse?.owner !== "INTERCEPTOR") continue;
     pulse.previousY = pulse.y;
     pulse.y += pulsePolicy.speed;
     pulse.lifetime -= 1;
@@ -354,7 +354,7 @@ export function stepEnemyCombatFrame(asset, state, {
   const origin = enemyPulseSpawnPosition(archetype, enemyX, enemyY, pulsePolicy);
   next.pool[pulseSlot] = {
     active: true,
-    owner: "RAIDER",
+    owner: "INTERCEPTOR",
     source: "ENEMY_SINGLE_PULSE",
     damage: pulsePolicy.damage,
     visualProfile: "SHORT_RED_ANTIC4",
@@ -392,11 +392,11 @@ export function simulateEnemyCombatFrames(asset, frameCount, options = {}) {
   return { state, trace };
 }
 
-// Advance a naturally spawned release Raider through the same cooldown,
+// Advance a naturally spawned release Interceptor through the same cooldown,
 // visibility, fixed-pool allocation, movement and swept-collision path used by
 // stepEnemyCombatFrame. This deliberately starts before the cooldown elapses;
 // callers cannot pre-create a pulse and still claim a firing trace.
-export function simulateNaturalRaiderFire(asset, {
+export function simulateNaturalInterceptorFire(asset, {
   difficulty = 1,
   slotIndex = 0,
   frameCount = 220,
@@ -429,7 +429,7 @@ export function simulateNaturalRaiderFire(asset, {
       sectorState,
     });
     const allocated = state.shotsFired !== shotsBefore;
-    const active = state.pool.filter((pulse) => pulse?.owner === "RAIDER");
+    const active = state.pool.filter((pulse) => pulse?.owner === "INTERCEPTOR");
     const pulse = active.at(-1);
     const activePmgBytes = [];
     trace.push({
@@ -447,14 +447,14 @@ export function simulateNaturalRaiderFire(asset, {
       poolOccupancy: state.pool.map((entry) => entry?.owner ?? "FREE"),
       allocationResult: allocated ? "ALLOCATED" : "NONE",
       projectileOwner: pulse?.owner ?? "NONE",
-      renderSlot: pulse?.owner === "RAIDER" ? `PF${pulse.renderSlot}` : "NONE",
+      renderSlot: pulse?.owner === "INTERCEPTOR" ? `PF${pulse.renderSlot}` : "NONE",
       hpos: pulse?.x ?? null,
       y: pulse?.y ?? null,
       sizeM,
       activePmgBytes,
       activePlayfieldProjectiles: active.map(({ renderSlot, x, previousY, y }) =>
         ({ renderSlot, x, previousY, y, width: policy.widthHpos, height: policy.height })),
-      collisionResult: state.playerHealth < playerHealthBefore ? "VIPER_HIT" : "NONE",
+      collisionResult: state.playerHealth < playerHealthBefore ? "PLAYER_FIGHTER_HIT" : "NONE",
       playerHealthBefore,
       playerHealth: state.playerHealth,
     });

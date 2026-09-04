@@ -1,5 +1,5 @@
-#ifndef DARKFIGHTER_TRACE_H
-#define DARKFIGHTER_TRACE_H
+#ifndef VOIDSTRIKE65_TRACE_H
+#define VOIDSTRIKE65_TRACE_H
 
 #include <stdint.h>
 #include <stdio.h>
@@ -54,7 +54,7 @@ typedef struct {
 	unsigned projectiles;
 	unsigned broadside;
 	unsigned far_rendered;
-	unsigned live_raider;
+	unsigned live_interceptor;
 	unsigned fighter_explosion;
 	unsigned capital_explosion;
 	unsigned music_active;
@@ -149,13 +149,13 @@ typedef struct {
 	unsigned colpf1;
 	unsigned colpf2;
 	unsigned colpf3;
-	unsigned viper_explosion_timer;
+	unsigned player_fighter_explosion_timer;
 	unsigned enemy_explosion_timer;
 	unsigned effect_active_mask;
 	unsigned effect_active_count;
 	unsigned effect_rendered_mask;
 	unsigned rapid_projectiles;
-	unsigned viper_projectiles;
+	unsigned player_fighter_projectiles;
 	unsigned rapid_projectile_slot;
 	unsigned rapid_projectile_address;
 	unsigned rapid_projectile_screen_code;
@@ -256,9 +256,9 @@ typedef struct {
 	unsigned profile_compose_cycles;
 	unsigned profile_pointer_calls;
 	unsigned profile_pointer_cycles;
-	uint64_t profile_erase_viper_start;
-	uint64_t profile_raider_update_start;
-	uint64_t profile_raider_render_start;
+	uint64_t profile_erase_player_fighter_start;
+	uint64_t profile_interceptor_update_start;
+	uint64_t profile_interceptor_render_start;
 	uint64_t profile_entity_erase_start;
 	uint64_t profile_effect_update_end;
 	uint64_t profile_pickup_update_end;
@@ -284,7 +284,7 @@ enum {
 	DFTRACE_EVENT_EFFECT_ERASE = 1u << 14,
 	DFTRACE_EVENT_EFFECT_UPDATE = 1u << 15,
 	DFTRACE_EVENT_EFFECT_RENDER = 1u << 16,
-	DFTRACE_EVENT_RAIDER_BREAKUP_SPAWN = 1u << 17,
+	DFTRACE_EVENT_INTERCEPTOR_BREAKUP_SPAWN = 1u << 17,
 	DFTRACE_EVENT_PICKUP_QUALIFIED_KILL = 1u << 18,
 	DFTRACE_EVENT_PICKUP_COLLECT = 1u << 19,
 	DFTRACE_EVENT_DIRECTOR_WORLD = 1u << 20,
@@ -314,7 +314,7 @@ static unsigned dftrace_pc_compose_end;
 static unsigned dftrace_pc_pointer_start;
 static unsigned dftrace_pc_pointer_end;
 static unsigned dftrace_pc_erase_slot;
-static unsigned dftrace_pc_raider_update_start;
+static unsigned dftrace_pc_interceptor_update_start;
 static unsigned dftrace_pc_render_slot;
 static unsigned dftrace_pc_entity_erase_start;
 static unsigned dftrace_pc_effect_update_end;
@@ -340,7 +340,7 @@ static unsigned dftrace_pc_effect_spawn;
 static unsigned dftrace_pc_effect_erase;
 static unsigned dftrace_pc_effect_update;
 static unsigned dftrace_pc_effect_render;
-static unsigned dftrace_pc_raider_breakup_spawn;
+static unsigned dftrace_pc_interceptor_breakup_spawn;
 static unsigned dftrace_pc_pickup_qualified_kill;
 static unsigned dftrace_pc_pickup_collect;
 static unsigned dftrace_pc_director_world;
@@ -587,12 +587,12 @@ static unsigned dfboot_env_u(const char *name)
 	char *end;
 	unsigned long parsed;
 	if (value == NULL || *value == '\0') {
-		fprintf(stderr, "darkfighter boot smoke: missing %s\n", name);
+		fprintf(stderr, "voidstrike65 boot smoke: missing %s\n", name);
 		exit(2);
 	}
 	parsed = strtoul(value, &end, 0);
 	if (*end != '\0' || parsed > 0xffffu) {
-		fprintf(stderr, "darkfighter boot smoke: invalid %s=%s\n", name, value);
+		fprintf(stderr, "voidstrike65 boot smoke: invalid %s=%s\n", name, value);
 		exit(2);
 	}
 	return (unsigned) parsed;
@@ -623,7 +623,7 @@ static void dfboot_capture(unsigned frame, unsigned pc)
 	DFBootSnapshot *snapshot;
 	char screenshot[FILENAME_MAX];
 	if (dfboot_snapshots_count >= 5u) {
-		fprintf(stderr, "darkfighter boot smoke: too many target frames\n");
+		fprintf(stderr, "voidstrike65 boot smoke: too many target frames\n");
 		exit(2);
 	}
 	snapshot = &dfboot_snapshots[dfboot_snapshots_count++];
@@ -651,7 +651,7 @@ static void dfboot_capture(unsigned frame, unsigned pc)
 		snprintf(screenshot, sizeof(screenshot), "%s-frame%03u.png",
 			dfboot_screenshot_prefix, frame);
 		if (!Screen_SaveScreenshot(screenshot, 0)) {
-			fprintf(stderr, "darkfighter boot smoke: screenshot failed: %s\n", screenshot);
+			fprintf(stderr, "voidstrike65 boot smoke: screenshot failed: %s\n", screenshot);
 			exit(2);
 		}
 	}
@@ -686,7 +686,7 @@ static void dfboot_write(void)
 		dfboot_seen_start, dfboot_seen_loader, dfboot_seen_menu,
 		dfboot_seen_frontend, dfboot_seen_gameplay, dfboot_seen_main);
 	if (fclose(dfboot_file) != 0) {
-		perror("darkfighter boot smoke close");
+		perror("voidstrike65 boot smoke close");
 		exit(2);
 	}
 }
@@ -697,17 +697,17 @@ static void dfboot_init(void)
 	dfboot_artifact = getenv("DFBOOT_ARTIFACT");
 	dfboot_screenshot_prefix = getenv("DFBOOT_SCREENSHOT_PREFIX");
 	if (dfboot_artifact == NULL || *dfboot_artifact == '\0') {
-		fprintf(stderr, "darkfighter boot smoke: missing DFBOOT_ARTIFACT\n");
+		fprintf(stderr, "voidstrike65 boot smoke: missing DFBOOT_ARTIFACT\n");
 		exit(2);
 	}
 	dfboot_file = fopen(getenv("DFBOOT_OUTPUT"), "w");
 	if (dfboot_file == NULL) {
-		perror("darkfighter boot smoke output");
+		perror("voidstrike65 boot smoke output");
 		exit(2);
 	}
 	dfboot_fill = dfboot_env_u("DFBOOT_RAM_FILL");
 	if (dfboot_fill > 0xffu) {
-		fprintf(stderr, "darkfighter boot smoke: RAM fill exceeds one byte\n");
+		fprintf(stderr, "voidstrike65 boot smoke: RAM fill exceeds one byte\n");
 		exit(2);
 	}
 	for (address = 0x8000u; address < 0xa000u; ++address)
@@ -733,7 +733,7 @@ static void dfboot_observe(unsigned pc)
 		dfboot_init();
 	frame = (unsigned) Atari800_nframes;
 	if (frame > 500u && MEMORY_mem[pc] == 0x00u) {
-		fprintf(stderr, "darkfighter boot smoke: unexpected BRK frame=%u pc=$%04x "
+		fprintf(stderr, "voidstrike65 boot smoke: unexpected BRK frame=%u pc=$%04x "
 			"state=%u module=%02x,%02x,%02x,%02x\n", frame, pc,
 			MEMORY_mem[dfboot_game_state], MEMORY_mem[0x8e61u], MEMORY_mem[0x8e62u],
 			MEMORY_mem[0x8e63u], MEMORY_mem[0x8e64u]);
@@ -744,7 +744,7 @@ static void dfboot_observe(unsigned pc)
 		dfboot_same_frame_instructions = 0u;
 	}
 	else if (++dfboot_same_frame_instructions == 20000000u) {
-		fprintf(stderr, "darkfighter boot smoke: stalled at frame %u pc=$%04x state=%u "
+		fprintf(stderr, "voidstrike65 boot smoke: stalled at frame %u pc=$%04x state=%u "
 			"module=%02x,%02x,%02x,%02x\n", frame, pc,
 			MEMORY_mem[dfboot_game_state], MEMORY_mem[0x8e61u], MEMORY_mem[0x8e62u],
 			MEMORY_mem[0x8e63u], MEMORY_mem[0x8e64u]);
@@ -880,12 +880,12 @@ static unsigned dfmenu_env_u(const char *name)
 	char *end;
 	unsigned long parsed;
 	if (value == NULL || *value == '\0') {
-		fprintf(stderr, "darkfighter menu audit: missing %s\n", name);
+		fprintf(stderr, "voidstrike65 menu audit: missing %s\n", name);
 		exit(2);
 	}
 	parsed = strtoul(value, &end, 0);
 	if (*end != '\0' || parsed > 0xffffu) {
-		fprintf(stderr, "darkfighter menu audit: invalid %s=%s\n", name, value);
+		fprintf(stderr, "voidstrike65 menu audit: invalid %s=%s\n", name, value);
 		exit(2);
 	}
 	return (unsigned) parsed;
@@ -908,7 +908,7 @@ static void dfmenu_capture(unsigned frame, unsigned pc)
 	unsigned dlist_length = dfmenu_frontend_dlist_end - dfmenu_main_menu_dlist;
 	if (dfmenu_snapshots_count >= sizeof(dfmenu_snapshots) / sizeof(dfmenu_snapshots[0]) ||
 		dlist_length > sizeof(snapshot->dlist_bytes)) {
-		fprintf(stderr, "darkfighter menu audit: snapshot capacity exceeded\n");
+		fprintf(stderr, "voidstrike65 menu audit: snapshot capacity exceeded\n");
 		exit(2);
 	}
 	snapshot = &dfmenu_snapshots[dfmenu_snapshots_count++];
@@ -963,7 +963,7 @@ static void dfmenu_capture(unsigned frame, unsigned pc)
 			"%s-menu%u-age%03u.png", dfmenu_screenshot_prefix,
 			snapshot->generation, snapshot->menu_age);
 		if (!Screen_SaveScreenshot(snapshot->screenshot, 0)) {
-			fprintf(stderr, "darkfighter menu audit: screenshot failed: %s\n",
+			fprintf(stderr, "voidstrike65 menu audit: screenshot failed: %s\n",
 				snapshot->screenshot);
 			exit(2);
 		}
@@ -1030,7 +1030,7 @@ static void dfmenu_write(void)
 	}
 	fputs("  ]\n}\n", dfmenu_file);
 	if (fclose(dfmenu_file) != 0) {
-		perror("darkfighter menu audit close");
+		perror("voidstrike65 menu audit close");
 		exit(2);
 	}
 }
@@ -1041,19 +1041,19 @@ static void dfmenu_init(void)
 	unsigned address;
 	dfmenu_file = fopen(getenv("DFMENU_OUTPUT"), "w");
 	if (dfmenu_file == NULL) {
-		perror("darkfighter menu audit output");
+		perror("voidstrike65 menu audit output");
 		exit(2);
 	}
 	dfmenu_artifact = getenv("DFMENU_ARTIFACT");
 	dfmenu_screenshot_prefix = getenv("DFMENU_SCREENSHOT_PREFIX");
 	if (dfmenu_artifact == NULL || *dfmenu_artifact == '\0') {
-		fprintf(stderr, "darkfighter menu audit: missing artifact\n");
+		fprintf(stderr, "voidstrike65 menu audit: missing artifact\n");
 		exit(2);
 	}
 	dfmenu_fill = dfmenu_env_u("DFMENU_RAM_FILL");
 	dfmenu_cycles = dfmenu_env_u("DFMENU_CYCLES");
 	if (dfmenu_fill > 0xffu || dfmenu_cycles == 0u || dfmenu_cycles > 3u) {
-		fprintf(stderr, "darkfighter menu audit: invalid fill/cycle count\n");
+		fprintf(stderr, "voidstrike65 menu audit: invalid fill/cycle count\n");
 		exit(2);
 	}
 	for (address = 0x8000u; address < 0xa000u; ++address)
@@ -1185,12 +1185,12 @@ static unsigned dftrace_env_u(const char *name)
 	char *end;
 	unsigned long parsed;
 	if (value == NULL || *value == '\0') {
-		fprintf(stderr, "darkfighter trace: missing %s\n", name);
+		fprintf(stderr, "voidstrike65 trace: missing %s\n", name);
 		exit(2);
 	}
 	parsed = strtoul(value, &end, 0);
 	if (*end != '\0' || parsed > 0xffffu) {
-		fprintf(stderr, "darkfighter trace: invalid %s=%s\n", name, value);
+		fprintf(stderr, "voidstrike65 trace: invalid %s=%s\n", name, value);
 		exit(2);
 	}
 	return (unsigned) parsed;
@@ -1365,14 +1365,14 @@ static void dftrace_snapshot_rapid_projectile(DFTraceFrame *frame)
 	for (slot = 0; slot < 10u; ++slot) {
 		unsigned state = MEMORY_mem[dftrace_projectile_active + slot];
 		if (state != 0u && MEMORY_mem[dftrace_projectile_rendered + slot] != 0u)
-			frame->viper_projectiles++;
+			frame->player_fighter_projectiles++;
 		if (state == 1u && MEMORY_mem[dftrace_projectile_rendered + slot] != 0u &&
 			MEMORY_mem[dftrace_entity_state + 2u] == 3u) {
 			unsigned address = MEMORY_mem[dftrace_projectile_screen_lo + slot] |
 				(MEMORY_mem[dftrace_projectile_screen_hi + slot] << 8);
 			unsigned screen_code = MEMORY_mem[address];
 			frame->rapid_projectiles++;
-			/* Prefer the exact yellow Viper code ($0f), not merely any positive
+			/* Prefer the exact yellow PlayerFighter code ($0f), not merely any positive
 			 * code: a later base/broadside glyph may occupy the same cell. */
 			if (frame->rapid_projectile_slot == 0xffffffffu ||
 				((frame->rapid_projectile_screen_code != 0x0fu ||
@@ -1497,10 +1497,10 @@ static void dftrace_set_gameplay_input(unsigned frame)
 	unsigned trigger = frame <= dftrace_fire_delay ? 1 : 0;
 	unsigned x = MEMORY_mem[dftrace_player_x];
 	unsigned y = MEMORY_mem[dftrace_player_y];
-	if (strcmp(dftrace_policy, "capital-contact-colonial") == 0 ||
-		strcmp(dftrace_policy, "capital-contact-cylon") == 0) {
+	if (strcmp(dftrace_policy, "capital-contact-allied") == 0 ||
+		strcmp(dftrace_policy, "capital-contact-hostile") == 0) {
 		unsigned slot;
-		unsigned target_owner = strcmp(dftrace_policy, "capital-contact-cylon") == 0;
+		unsigned target_owner = strcmp(dftrace_policy, "capital-contact-hostile") == 0;
 		unsigned target_x = target_owner ?
 			(dftrace_difficulty == 1u ? 84u :
 			 dftrace_capital_contact_mode == 1u ? 88u : 96u) : 148u;
@@ -1546,9 +1546,9 @@ static void dftrace_set_gameplay_input(unsigned frame)
 				break;
 			}
 		}
-		/* The production schedule launches Colonial first.  In Cylon sessions,
+		/* The production schedule launches Allied first.  In Hostile sessions,
 		 * evade that non-target bolt by the nearest exact vertical near-miss,
-		 * then return to the requested physical row before the Cylon arrives.
+		 * then return to the requested physical row before the Hostile arrives.
 		 * Only joystick input is changed; no guest state is seeded. */
 		for (slot = 0u; slot < 3u; ++slot) {
 			unsigned state = MEMORY_mem[dftrace_broad_state + slot];
@@ -1561,7 +1561,7 @@ static void dftrace_set_gameplay_input(unsigned frame)
 			if (owner == target_owner || state == 0u)
 				continue;
 			if (state == 1u) {
-				/* The Cylon policy already starts on its safe pre-position row. */
+				/* The Hostile policy already starts on its safe pre-position row. */
 				break;
 			}
 			if (state != 2u)
@@ -1613,7 +1613,7 @@ static void dftrace_set_gameplay_input(unsigned frame)
 		if (reached_top && y < DFTRACE_PLAYER_MAX_Y)
 			stick = 0x0du;
 	}
-	else if (strcmp(dftrace_policy, "lower-contact-cylon") == 0) {
+	else if (strcmp(dftrace_policy, "lower-contact-hostile") == 0) {
 		unsigned slot;
 		unsigned target_y = DFTRACE_PLAYER_MAX_Y;
 		trigger = 1u;
@@ -1656,7 +1656,7 @@ static void dftrace_set_gameplay_input(unsigned frame)
 			stick &= 0x0du;
 	}
 	else if (strcmp(dftrace_policy, "hunt") == 0) {
-		/* Follow the live Raider's PMG origin using only ordinary joystick
+		/* Follow the live Interceptor's PMG origin using only ordinary joystick
 		 * input. This remains a production gameplay replay: no guest state is
 		 * seeded, and held FIRE enters the canonical burst controller. */
 		if (MEMORY_mem[dftrace_entity_state + 1u] == 2u) {
@@ -1719,7 +1719,7 @@ static void dftrace_set_gameplay_input(unsigned frame)
 		}
 	}
 	else if (strcmp(dftrace_policy, "pickup-overlap") == 0) {
-		/* Earn one production drop. Keep the Viper's visible double-width PMG
+		/* Earn one production drop. Keep the PlayerFighter's visible double-width PMG
 		 * edge over the capsule while its narrower collision envelope remains
 		 * one HPOS beyond contact for four fine phases, then align and collect
 		 * through the ordinary joystick/collision path. */
@@ -2394,7 +2394,7 @@ static void dftrace_capture_capital_contact_decision(unsigned pc, unsigned slot)
 	snprintf(path, sizeof(path), "%s-%02u.png",
 		dftrace_capital_contact_prefix, dftrace_capital_contact_count);
 	if (!Screen_SaveScreenshot(path, 0)) {
-		fprintf(stderr, "darkfighter trace: capital contact screenshot failed: %s\n",
+		fprintf(stderr, "voidstrike65 trace: capital contact screenshot failed: %s\n",
 			path);
 		exit(2);
 	}
@@ -2419,7 +2419,7 @@ static void dftrace_snapshot(DFTraceFrame *frame)
 	frame->projectiles = dftrace_count_nonzero(dftrace_projectile_active, 19);
 	frame->broadside = dftrace_count_nonzero(dftrace_broad_state, 3);
 	frame->far_rendered = dftrace_count_far_rendered();
-	frame->live_raider = MEMORY_mem[dftrace_enemy_active] == 1;
+	frame->live_interceptor = MEMORY_mem[dftrace_enemy_active] == 1;
 	frame->fighter_explosion = dftrace_count_nonzero(dftrace_fighter_explosion_timer, 2);
 	frame->capital_explosion = dftrace_count_nonzero(dftrace_capital_explosion_timer, 2);
 	frame->music_active = MEMORY_mem[dftrace_music_active] != 0;
@@ -2581,7 +2581,7 @@ static void dftrace_snapshot_flash(DFTraceFrame *frame)
 	frame->colpf1 = GTIA_COLPF1;
 	frame->colpf2 = GTIA_COLPF2;
 	frame->colpf3 = GTIA_COLPF3;
-	frame->viper_explosion_timer = MEMORY_mem[dftrace_fighter_explosion_timer];
+	frame->player_fighter_explosion_timer = MEMORY_mem[dftrace_fighter_explosion_timer];
 	frame->enemy_explosion_timer = MEMORY_mem[dftrace_fighter_explosion_timer + 1u];
 	frame->effect_active_mask = MEMORY_mem[dftrace_effect_active_mask];
 	frame->effect_active_count = MEMORY_mem[dftrace_effect_active_count];
@@ -2630,10 +2630,10 @@ static void dftrace_write(void)
 	unsigned index;
 	file = fopen(dftrace_output, "w");
 	if (file == NULL) {
-		perror("darkfighter trace output");
+		perror("voidstrike65 trace output");
 		exit(2);
 	}
-	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_raider,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,viper_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,viper_projectiles,pickup_booster_state,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_address4,pickup_old_address5,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_backing4,pickup_old_backing5,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_before_erase4,pickup_old_before_erase5,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_old_after_erase4,pickup_old_after_erase5,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_address4,pickup_new_address5,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_backing4,pickup_new_backing5,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_new_after_draw4,pickup_new_after_draw5,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,capital_visible_allied_cells,capital_visible_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation");
+	fprintf(file, "session,frame,start_clock,end_clock,next_start_clock,wall_cycles,start_host_frame,end_host_frame,next_start_host_frame,start_scanline,start_cycle,end_scanline,end_cycle,host_vbi_boundaries,extra_vbi_boundaries,missed_frames,dli_nmis,dma_ctl,nmi_en,projectiles,broadside,far_rendered,live_interceptor,fighter_explosion,capital_explosion,music_active,fire_sfx,hit_sfx,capital_sfx,sound_enabled,player_lifecycle,sector_state,gameplay_frame,difficulty,active_muzzles,entity_active,entity_x,entity_y,entity_vx,entity_move_accumulator,entity_vertical_accumulator,entity_render_id,colbk,colpm0,colpm1,colpm2,colpm3,colpf0,colpf1,colpf2,colpf3,player_fighter_explosion_timer,enemy_explosion_timer,events,effect_active_mask,effect_active_count,effect_rendered_mask,entity_active_mask,pickup_state,pickup_counter,pickup_x,pickup_y,pickup_timer_lo,pickup_timer_hi,pickup_animation,pickup_render_id,pickup_drawn_mask,score_lo,score_hi,rapid_projectiles,rapid_projectile_slot,rapid_projectile_address,rapid_projectile_screen_code,rapid_projectile_backing,dli_sequence_violations,maximum_dlis_per_host_frame,pause_test_completed,pause_timer_before,pause_timer_after,pause_engine_timer_before,pause_engine_timer_after,pause_engine_phase_before,pause_engine_phase_after,pause_host_frames,player_fighter_projectiles,pickup_booster_state,pickup_prev_x,pickup_prev_y,pickup_prev_render_row,pickup_prev_render_phase,pickup_render_row,pickup_render_phase,pickup_vscroll,pickup_a2_head,pickup_erase_calls,pickup_draw_calls,pickup_erase_scanline,pickup_erase_cycle,pickup_draw_scanline,pickup_draw_cycle,pickup_old_address0,pickup_old_address1,pickup_old_address2,pickup_old_address3,pickup_old_address4,pickup_old_address5,pickup_old_backing0,pickup_old_backing1,pickup_old_backing2,pickup_old_backing3,pickup_old_backing4,pickup_old_backing5,pickup_old_before_erase0,pickup_old_before_erase1,pickup_old_before_erase2,pickup_old_before_erase3,pickup_old_before_erase4,pickup_old_before_erase5,pickup_old_after_erase0,pickup_old_after_erase1,pickup_old_after_erase2,pickup_old_after_erase3,pickup_old_after_erase4,pickup_old_after_erase5,pickup_new_address0,pickup_new_address1,pickup_new_address2,pickup_new_address3,pickup_new_address4,pickup_new_address5,pickup_new_backing0,pickup_new_backing1,pickup_new_backing2,pickup_new_backing3,pickup_new_backing4,pickup_new_backing5,pickup_new_after_draw0,pickup_new_after_draw1,pickup_new_after_draw2,pickup_new_after_draw3,pickup_new_after_draw4,pickup_new_after_draw5,pickup_glyph_cells_before,pickup_glyph_cells_after,pickup_footprints_before,pickup_footprints_after,pickup_first_overwrite_pc,pickup_first_overwrite_address,pickup_first_overwrite_value,pickup_first_overwrite_scanline,engine_timer,engine_phase,corridor_phase,ring_flags,engine_vscroll,engine_a2_head,engine_allied_cells,engine_enemy_cells,capital_visible_allied_cells,capital_visible_enemy_cells,engine_copy_calls,engine_copy_scanline,engine_copy_cycle,engine_first_write_pc,engine_first_write_address,engine_first_write_old,engine_first_write_new,engine_first_write_scanline,engine_first_write_cycle,engine_charset_hash,engine_displayed_dlist_lo,engine_published_dlist_lo,engine_active_dlist_lo,engine_next_dlist_lo,engine_row0_address,engine_displayed_row0_address,engine_active_row0_address,engine_divider0,engine_divider1,engine_divider2,engine_divider3,engine_divider4,engine_divider5,engine_divider6,engine_divider7,engine_recycled0,engine_recycled1,engine_recycled2,engine_recycled3,engine_recycled4,engine_recycled5,engine_recycled6,engine_recycled7,engine_first_dlist_write_pc,engine_first_dlist_write_address,engine_first_dlist_write_old,engine_first_dlist_write_new,engine_first_dlist_write_scanline,engine_first_dlist_write_cycle,engine_first_recycled_write_pc,engine_first_recycled_write_address,engine_first_recycled_write_old,engine_first_recycled_write_new,engine_first_recycled_write_scanline,engine_first_recycled_write_cycle,engine_playfield_select_calls,engine_playfield_select_scanline,engine_playfield_select_cycle,engine_playfield_select_dlist,engine_playfield_select_active_lo,gameplay_generation");
 	for (index = 0; index < DFTRACE_PROFILE_COUNT; ++index)
 		fprintf(file, ",profile_clock%u", index);
 	for (index = 0; index < DFTRACE_PROFILE_DLI_COUNT; ++index)
@@ -2641,8 +2641,8 @@ static void dftrace_write(void)
 			index, index, index);
 	fprintf(file, ",profile_compose_calls,profile_compose_cycles"
 		",profile_pointer_calls,profile_pointer_cycles"
-		",profile_erase_viper_start,profile_raider_update_start"
-		",profile_raider_render_start,profile_entity_erase_start"
+		",profile_erase_player_fighter_start,profile_interceptor_update_start"
+		",profile_interceptor_render_start,profile_entity_erase_start"
 		",profile_effect_update_end,profile_pickup_update_end"
 		",profile_pickup_render_start,profile_effect_render_start"
 		",player_x,player_y,prior,player_erase_calls,player_draw_calls"
@@ -2685,7 +2685,7 @@ static void dftrace_write(void)
 			frame->start_y, frame->start_x, frame->end_y, frame->end_x,
 			host_boundaries, extra_boundaries, missed_frames, frame->dli_nmis,
 			frame->dma_ctl, frame->nmi_en, frame->projectiles, frame->broadside,
-			frame->far_rendered, frame->live_raider, frame->fighter_explosion,
+			frame->far_rendered, frame->live_interceptor, frame->fighter_explosion,
 			frame->capital_explosion, frame->music_active, frame->fire_sfx,
 			frame->hit_sfx, frame->capital_sfx, frame->sound_enabled,
 			frame->player_lifecycle, frame->sector_state, frame->gameplay_frame,
@@ -2694,7 +2694,7 @@ static void dftrace_write(void)
 			frame->entity_move_accumulator, frame->entity_vertical_accumulator,
 			frame->entity_render_id, frame->colbk, frame->colpm0, frame->colpm1,
 			frame->colpm2, frame->colpm3, frame->colpf0, frame->colpf1,
-			frame->colpf2, frame->colpf3, frame->viper_explosion_timer,
+			frame->colpf2, frame->colpf3, frame->player_fighter_explosion_timer,
 			frame->enemy_explosion_timer, frame->events, frame->effect_active_mask,
 			frame->effect_active_count, frame->effect_rendered_mask,
 			frame->entity_active_mask, frame->pickup_state, frame->pickup_counter,
@@ -2709,7 +2709,7 @@ static void dftrace_write(void)
 			frame->pause_engine_timer_before, frame->pause_engine_timer_after,
 			frame->pause_engine_phase_before, frame->pause_engine_phase_after,
 			frame->pause_host_frames);
-		fprintf(file, ",%u,%u", frame->viper_projectiles, frame->pickup_booster_state);
+		fprintf(file, ",%u,%u", frame->player_fighter_projectiles, frame->pickup_booster_state);
 		fprintf(file,
 			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
 			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
@@ -2798,9 +2798,9 @@ static void dftrace_write(void)
 			",%u,%u,%u,%u,%u,%u,%u",
 			frame->profile_compose_calls, frame->profile_compose_cycles,
 			frame->profile_pointer_calls, frame->profile_pointer_cycles,
-			(unsigned long long) frame->profile_erase_viper_start,
-			(unsigned long long) frame->profile_raider_update_start,
-			(unsigned long long) frame->profile_raider_render_start,
+			(unsigned long long) frame->profile_erase_player_fighter_start,
+			(unsigned long long) frame->profile_interceptor_update_start,
+			(unsigned long long) frame->profile_interceptor_render_start,
 			(unsigned long long) frame->profile_entity_erase_start,
 			(unsigned long long) frame->profile_effect_update_end,
 			(unsigned long long) frame->profile_pickup_update_end,
@@ -2844,7 +2844,7 @@ static void dftrace_write(void)
 			frame->player_invulnerability_after, frame->player_damage_cooldown_after);
 	}
 	if (fclose(file) != 0) {
-		perror("darkfighter trace close");
+		perror("voidstrike65 trace close");
 		exit(2);
 	}
 }
@@ -2856,7 +2856,7 @@ static void dftrace_init(void)
 		unsigned address;
 		unsigned fill = dftrace_env_u("DFTRACE_RAM_FILL");
 		if (fill > 0xffu) {
-			fprintf(stderr, "darkfighter trace: RAM fill exceeds one byte\n");
+			fprintf(stderr, "voidstrike65 trace: RAM fill exceeds one byte\n");
 			exit(2);
 		}
 		for (address = 0x8000u; address < 0xa000u; ++address)
@@ -2874,19 +2874,19 @@ static void dftrace_init(void)
 		getenv("DFTRACE_ENGINE_SCREENSHOT_LIMIT") == NULL ? 150u :
 		dftrace_env_u("DFTRACE_ENGINE_SCREENSHOT_LIMIT");
 	if (dftrace_difficulty > 2) {
-		fprintf(stderr, "darkfighter trace: invalid difficulty %u\n", dftrace_difficulty);
+		fprintf(stderr, "voidstrike65 trace: invalid difficulty %u\n", dftrace_difficulty);
 		exit(2);
 	}
 	dftrace_policy = getenv("DFTRACE_POLICY");
 	dftrace_session = getenv("DFTRACE_SESSION");
 	dftrace_output = getenv("DFTRACE_OUTPUT");
 	if (dftrace_policy == NULL || dftrace_session == NULL || dftrace_output == NULL) {
-		fprintf(stderr, "darkfighter trace: missing string environment\n");
+		fprintf(stderr, "voidstrike65 trace: missing string environment\n");
 		exit(2);
 	}
 	dftrace_frames = (DFTraceFrame *) calloc(dftrace_limit, sizeof(*dftrace_frames));
 	if (dftrace_frames == NULL) {
-		fprintf(stderr, "darkfighter trace: allocation failed\n");
+		fprintf(stderr, "voidstrike65 trace: allocation failed\n");
 		exit(2);
 	}
 #define DFTRACE_ADDRESS(field, env) field = dftrace_env_u(env)
@@ -2908,7 +2908,7 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_pointer_start, "DFTRACE_PC_POINTER_START");
 	DFTRACE_ADDRESS(dftrace_pc_pointer_end, "DFTRACE_PC_POINTER_END");
 	DFTRACE_ADDRESS(dftrace_pc_erase_slot, "DFTRACE_PC_ERASE_SLOT");
-	DFTRACE_ADDRESS(dftrace_pc_raider_update_start, "DFTRACE_PC_RAIDER_UPDATE_START");
+	DFTRACE_ADDRESS(dftrace_pc_interceptor_update_start, "DFTRACE_PC_INTERCEPTOR_UPDATE_START");
 	DFTRACE_ADDRESS(dftrace_pc_render_slot, "DFTRACE_PC_RENDER_SLOT");
 	DFTRACE_ADDRESS(dftrace_pc_entity_erase_start, "DFTRACE_PC_ENTITY_ERASE_START");
 	DFTRACE_ADDRESS(dftrace_pc_effect_update_end, "DFTRACE_PC_EFFECT_UPDATE_END");
@@ -2932,7 +2932,7 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_effect_erase, "DFTRACE_PC_EFFECT_ERASE");
 	DFTRACE_ADDRESS(dftrace_pc_effect_update, "DFTRACE_PC_EFFECT_UPDATE");
 	DFTRACE_ADDRESS(dftrace_pc_effect_render, "DFTRACE_PC_EFFECT_RENDER");
-	DFTRACE_ADDRESS(dftrace_pc_raider_breakup_spawn, "DFTRACE_PC_RAIDER_BREAKUP_SPAWN");
+	DFTRACE_ADDRESS(dftrace_pc_interceptor_breakup_spawn, "DFTRACE_PC_INTERCEPTOR_BREAKUP_SPAWN");
 	DFTRACE_ADDRESS(dftrace_pc_pickup_qualified_kill, "DFTRACE_PC_PICKUP_QUALIFIED_KILL");
 	DFTRACE_ADDRESS(dftrace_pc_pickup_collect, "DFTRACE_PC_PICKUP_COLLECT");
 	DFTRACE_ADDRESS(dftrace_pc_director_world, "DFTRACE_PC_DIRECTOR_WORLD");
@@ -3048,7 +3048,7 @@ static void dftrace_init(void)
 		dftrace_capital_contact_owner = dftrace_env_u("DFTRACE_CAPITAL_CONTACT_OWNER");
 		dftrace_capital_contact_mode = dftrace_env_u("DFTRACE_CAPITAL_CONTACT_MODE");
 		if (dftrace_capital_contact_owner > 1u || dftrace_capital_contact_mode > 3u) {
-			fprintf(stderr, "darkfighter trace: invalid capital contact owner %u\n",
+			fprintf(stderr, "voidstrike65 trace: invalid capital contact owner %u\n",
 				dftrace_capital_contact_owner);
 			exit(2);
 		}
@@ -3062,7 +3062,7 @@ static void dftrace_init(void)
 		if (compositor_output != NULL && *compositor_output != '\0') {
 			dftrace_broad_compositor_file = fopen(compositor_output, "w");
 			if (dftrace_broad_compositor_file == NULL) {
-				perror("darkfighter broadside compositor output");
+				perror("voidstrike65 broadside compositor output");
 				exit(2);
 			}
 		}
@@ -3164,7 +3164,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 				rapid.rapid_projectile_screen_code < 47u &&
 				dftrace_is_ring_address(rapid.rapid_projectile_address)) {
 				if (!Screen_SaveScreenshot(dftrace_rapid_screenshot, 0)) {
-					fprintf(stderr, "darkfighter trace: Rapid Fire screenshot failed: %s\n",
+					fprintf(stderr, "voidstrike65 trace: Rapid Fire screenshot failed: %s\n",
 						dftrace_rapid_screenshot);
 					exit(2);
 				}
@@ -3177,10 +3177,10 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 			DFTraceFrame spread;
 			memset(&spread, 0, sizeof(spread));
 			dftrace_snapshot_rapid_projectile(&spread);
-			if (spread.viper_projectiles >= 3u &&
+			if (spread.player_fighter_projectiles >= 3u &&
 				MEMORY_mem[dftrace_effect_active_count] == 0u) {
 				if (!Screen_SaveScreenshot(dftrace_spread_screenshot, 0)) {
-					fprintf(stderr, "darkfighter trace: Spread Shot screenshot failed: %s\n",
+					fprintf(stderr, "voidstrike65 trace: Spread Shot screenshot failed: %s\n",
 						dftrace_spread_screenshot);
 					exit(2);
 				}
@@ -3200,7 +3200,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 				dftrace_pickup_screenshot_frame == 0xffffffffu &&
 				dftrace_pickup_visible_passes == 2u &&
 				!Screen_SaveScreenshot(dftrace_pickup_screenshot, 0)) {
-				fprintf(stderr, "darkfighter trace: pickup screenshot failed: %s\n",
+				fprintf(stderr, "voidstrike65 trace: pickup screenshot failed: %s\n",
 					dftrace_pickup_screenshot);
 				exit(2);
 			}
@@ -3225,7 +3225,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 				snprintf(path, sizeof(path), "%s-%02u.png",
 					dftrace_pickup_sequence_prefix, dftrace_pickup_sequence_count);
 				if (!Screen_SaveScreenshot(path, 0)) {
-					fprintf(stderr, "darkfighter trace: pickup sequence screenshot failed: %s\n",
+					fprintf(stderr, "voidstrike65 trace: pickup sequence screenshot failed: %s\n",
 						path);
 					exit(2);
 				}
@@ -3255,7 +3255,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 			snprintf(path, sizeof(path), "%s-%02u.png",
 				dftrace_pickup_traversal_prefix, dftrace_pickup_traversal_count);
 			if (!Screen_SaveScreenshot(path, 0)) {
-				fprintf(stderr, "darkfighter trace: pickup traversal screenshot failed: %s\n",
+				fprintf(stderr, "voidstrike65 trace: pickup traversal screenshot failed: %s\n",
 					path);
 				exit(2);
 			}
@@ -3279,7 +3279,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 				snprintf(path, sizeof(path), "%s-%02u.png",
 					dftrace_pickup_contact_prefix, dftrace_pickup_contact_count);
 				if (!Screen_SaveScreenshot(path, 0)) {
-					fprintf(stderr, "darkfighter trace: pickup contact screenshot failed: %s\n",
+					fprintf(stderr, "voidstrike65 trace: pickup contact screenshot failed: %s\n",
 						path);
 					exit(2);
 				}
@@ -3300,7 +3300,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 				snprintf(path, sizeof(path), "%s-%02u.png",
 					dftrace_muzzle_screenshot_prefix, dftrace_muzzle_screenshot_count);
 				if (!Screen_SaveScreenshot(path, 0)) {
-					fprintf(stderr, "darkfighter trace: muzzle screenshot failed: %s\n", path);
+					fprintf(stderr, "voidstrike65 trace: muzzle screenshot failed: %s\n", path);
 					exit(2);
 				}
 				++dftrace_muzzle_screenshot_count;
@@ -3314,7 +3314,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 				snprintf(path, sizeof(path), "%s-%02u.png",
 					dftrace_capital_contact_prefix, dftrace_capital_contact_count);
 				if (!Screen_SaveScreenshot(path, 0)) {
-					fprintf(stderr, "darkfighter trace: capital contact screenshot failed: %s\n",
+					fprintf(stderr, "voidstrike65 trace: capital contact screenshot failed: %s\n",
 						path);
 					exit(2);
 				}
@@ -3332,7 +3332,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 			exit(0);
 		}
 		if (MEMORY_mem[dftrace_difficulty_setting] != dftrace_difficulty) {
-			fprintf(stderr, "darkfighter trace: production frontend selected difficulty %u, expected %u\n",
+			fprintf(stderr, "voidstrike65 trace: production frontend selected difficulty %u, expected %u\n",
 				MEMORY_mem[dftrace_difficulty_setting], dftrace_difficulty);
 			exit(2);
 		}
@@ -3357,7 +3357,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 			snprintf(path, sizeof(path), "%s-%03u.png",
 				dftrace_engine_screenshot_prefix, dftrace_engine_screenshot_count);
 			if (!Screen_SaveScreenshot(path, 0)) {
-				fprintf(stderr, "darkfighter trace: engine screenshot failed: %s\n", path);
+				fprintf(stderr, "voidstrike65 trace: engine screenshot failed: %s\n", path);
 				exit(2);
 			}
 			++dftrace_engine_screenshot_count;
@@ -3447,13 +3447,13 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 			(unsigned) (dftrace_clock() + 6u - dftrace_pointer_start_clock);
 	}
 	if (pc == dftrace_pc_erase_slot && x_register == 8u &&
-		dftrace_current.profile_erase_viper_start == 0u)
-		dftrace_current.profile_erase_viper_start = dftrace_clock();
-	if (pc == dftrace_pc_raider_update_start)
-		dftrace_current.profile_raider_update_start = dftrace_clock();
+		dftrace_current.profile_erase_player_fighter_start == 0u)
+		dftrace_current.profile_erase_player_fighter_start = dftrace_clock();
+	if (pc == dftrace_pc_interceptor_update_start)
+		dftrace_current.profile_interceptor_update_start = dftrace_clock();
 	if (pc == dftrace_pc_render_slot && x_register == 10u &&
-		dftrace_current.profile_raider_render_start == 0u)
-		dftrace_current.profile_raider_render_start = dftrace_clock();
+		dftrace_current.profile_interceptor_render_start == 0u)
+		dftrace_current.profile_interceptor_render_start = dftrace_clock();
 	if (pc == dftrace_pc_entity_erase_start)
 		dftrace_current.profile_entity_erase_start = dftrace_clock();
 	if (pc == dftrace_pc_effect_update_end)
@@ -3552,8 +3552,8 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 		dftrace_current.events |= DFTRACE_EVENT_EFFECT_UPDATE;
 	else if (pc == dftrace_pc_effect_render)
 		dftrace_current.events |= DFTRACE_EVENT_EFFECT_RENDER;
-	else if (pc == dftrace_pc_raider_breakup_spawn)
-		dftrace_current.events |= DFTRACE_EVENT_RAIDER_BREAKUP_SPAWN;
+	else if (pc == dftrace_pc_interceptor_breakup_spawn)
+		dftrace_current.events |= DFTRACE_EVENT_INTERCEPTOR_BREAKUP_SPAWN;
 	else if (pc == dftrace_pc_pickup_qualified_kill)
 		dftrace_current.events |= DFTRACE_EVENT_PICKUP_QUALIFIED_KILL;
 	else if (pc == dftrace_pc_pickup_collect)
