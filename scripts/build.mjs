@@ -865,7 +865,7 @@ async function build() {
   ]);
   if (bootSectors !== 101 || totalTransportSectors !== 161 ||
     transportPayload.length !== 20608 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
-      [102, 45, 5644, 6643, 0x5e10],
+      [102, 45, 5660, 6643, 0x5e10],
       [147, 8, packedWeaponPickupPhaseBank.length, packedWeaponPickupPhaseBank.length,
         weaponPickupPackedStagingAddress],
       [155, 2, 229, 234, glueStagingAddress],

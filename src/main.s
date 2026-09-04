@@ -7308,7 +7308,16 @@ update_broadside:
     ; Opposite-owner capital shells share only the painter's z-order. They do
     ; not collide, change lifecycle, or suppress either slot's world targets.
     jmp @world_targets
-    .res 20,$00                 ; preserve reviewed BROADSIDE entry addresses
+; A player hit already owns the full-frame Viper damage flash. Keep the
+; canonical FLYING->IMPACT timer without drawing the world-space PMG square
+; retained for hull/fighter impacts.
+@player_impact:
+    lda #BROAD_IMPACT
+    sta BROAD_STATE,x
+    lda #BROADSIDE_IMPACT_FRAMES
+    sta BROAD_TIMER,x
+    rts
+    .res 3,$00                  ; preserve reviewed BROADSIDE entry addresses
 @world_targets:
     jsr capital_shell_collision_flags
     lda BROAD_COLLISION,x
@@ -7326,7 +7335,7 @@ update_broadside:
     lda BROAD_COLLISION,x
     and #$01                    ; Cylon shell reaches the Viper first
     beq @hull
-    jsr begin_broadside_impact
+    jsr @player_impact
     jsr apply_broadside_player_damage
     jmp @next
 @hull:
@@ -7351,6 +7360,9 @@ update_broadside:
 @impact:
     dec BROAD_TIMER,x
     beq @free
+    lda BROAD_COLLISION,x        ; player damage already owns the feedback
+    lsr
+    bcs @next                    ; never paint its world-space PMG square
     lda BROAD_TIMER,x
     and #$01                    ; bounded blink reuses the same missile slot
     beq @next

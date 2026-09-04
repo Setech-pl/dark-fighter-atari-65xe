@@ -53,7 +53,7 @@ at `$5264`; the rest of the last sector is transport padding.
 | `$4773-$4871` | 255 B | A2 source; staged at `$7F16`, then copied to `$9000-$90FE` before entity/effects clear |
 | `$4872-$5260` | 2,543 B | packed 3,112-byte ENTITY_CODE; staged at `$534B-$5D39`, expands to `$9100-$9D27` |
 | `$5261-$5264` | 4 B | source-owned `DFB1` trailer; consumed before the GLUE chunk reuses `$5261` |
-| ATR sectors 102-146 | 5,760 B | external BROADSIDE record: 5,644 B packed / 6,643 B raw to `$5E10-$7802` |
+| ATR sectors 102-146 | 5,760 B | external BROADSIDE record: 5,660 B packed / 6,643 B raw to `$5E10-$7802` |
 | ATR sectors 147-154 | 1,024 B | pickup/code/collision record: 921 B prepacked at cold `$8C80-$9018`; after preservation at `$4801-$4B99`, it expands 1,666 B to `$8800-$8E81` |
 | ATR sectors 155-156 | 256 B | GLUE record: 229 B packed / 234 B raw to staging `$5261-$534A` |
 | ATR sectors 157-161 | 640 B | Director record: 585 B packed / 645 B raw to `$9D75-$9FF9` |

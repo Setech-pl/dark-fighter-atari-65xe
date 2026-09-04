@@ -89,7 +89,7 @@ test("Layout D.2 exact memory and transport budgets remain frozen", () => {
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [102, 45, 5644, 6643, 0x5e10],
+    [102, 45, 5660, 6643, 0x5e10],
     [147, 8, 921, 921, 0x8c80],
     [155, 2, 229, 234, 0x5261],
     [157, 5, 585, 645, 0x9d75],

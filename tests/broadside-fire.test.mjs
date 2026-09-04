@@ -276,6 +276,26 @@ function playerGameplayAabb(playerX, playerY) {
   return { left: playerX, right: playerX + 15, top, bottom: top + 14 };
 }
 
+function capitalShellScreenTransients(memory) {
+  const cells = [];
+  const start = canonicalPlayfield.ringBufferAddress;
+  const end = start + canonicalPlayfield.ringRows * 40;
+  for (let address = start; address < end; address += 1) {
+    const glyph = memory[address] & 0x7f;
+    if (glyph === 126 || glyph === 127) cells.push({ address, value: memory[address] });
+  }
+  return cells;
+}
+
+function capitalImpactMissileRows(memory) {
+  const rows = [];
+  for (let row = 0; row < 256; row += 1) {
+    const value = memory[0x3b00 + row] & 0xfc; // M1-M3; M0 remains player-owned.
+    if (value !== 0) rows.push({ row, value });
+  }
+  return rows;
+}
+
 function inclusiveAabbsOverlap(first, second) {
   return first.left <= second.right && first.right >= second.left &&
     first.top <= second.bottom && first.bottom >= second.top;
@@ -1687,6 +1707,88 @@ test("assembled capital shells use the 16x15 player and swept 8x6 bolt AABBs at 
     /capital_player_collision_bounds|\.byte|mask|nibble/i,
     "the gameplay hitbox must not retain pixel-mask narrow-phase data");
   assert.ok(capitalPlayerCollisionLabels.has("capital_player_collision"));
+});
+
+test("player hits retain only the Viper and damage flash, never a world-space IMPACT square", () => {
+  const playerX = 124;
+  const playerY = 112;
+  const playerTop = playerY - ATARI800_CAPTURE_FIRST_DMA_SCANLINE;
+  const contacts = [
+    { name: "top", boltTop: playerTop - 5 },
+    { name: "middle", boltTop: playerTop + 4 },
+    { name: "bottom", boltTop: playerTop + 14 },
+  ];
+  const naturalOwnerSlots = [
+    { owner: 0, slot: 0, currentLeft: 120, colour: 0x44 },
+    { owner: 1, slot: 1, currentLeft: 136, colour: 0x46 },
+  ];
+
+  for (const scenario of naturalOwnerSlots) for (const contactGeometry of contacts) {
+    const shellX = shellInitialX(scenario.owner, scenario.currentLeft, false);
+    const contact = prepareAssembledCapitalPlayerContact({
+      owner: scenario.owner,
+      slot: scenario.slot,
+      shellX,
+      playerX,
+      playerY,
+      boltRasterTop: contactGeometry.boltTop,
+    });
+    const { memory, broadState, slotState, constants } = contact;
+    memory[0xd000] = playerX;
+    memory[0xd003] = playerX;
+    memory[0xd008] = 1;
+    memory[0xd00b] = 1;
+    memory[0xd013 + scenario.slot] = scenario.colour;
+    runAssembledRoutine(memory, "clear_pmg");
+    runAssembledRoutine(memory, "draw_player");
+    const viperBefore = playerBoundsFromPmg(memory);
+    assert.deepEqual(viperBefore, {
+      left: playerX, right: playerX + 15, top: playerTop, bottom: playerTop + 14,
+      dma_top: playerY, dma_bottom: playerY + 14, size_code: 1,
+    });
+
+    runAssembledRoutine(memory, "render_capital_shell_overlays");
+    assert.equal(capitalShellScreenTransients(memory).length, 2,
+      `${scenario.owner}/${contactGeometry.name}: one legal two-cell bolt before contact`);
+    runAssembledRoutine(memory, "update_broadside");
+
+    assert.equal(memory[slotState], BROADSIDE_STATES.IMPACT);
+    assert.equal(memory[broadState + 3 + scenario.slot], scenario.owner,
+      "FLYING->IMPACT must retain the owner");
+    assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], 8);
+    assert.equal(memory[constants.get("BROAD_DAMAGE_COOLDOWN")], 25);
+    assert.equal(memory[constants.get("PLAYER_LIVES")], 3);
+    assert.equal(memory[labels.get("damage_timer")], 0x12,
+      "the existing full-frame damage flash is the only player-hit feedback");
+    assert.deepEqual(playerBoundsFromPmg(memory), viperBefore,
+      "damage must not add to or distort the P0/P3 Viper footprint");
+    assert.deepEqual(capitalShellScreenTransients(memory), [],
+      "the FLYING ANTIC bolt must be erased in the collision frame");
+    assert.deepEqual(capitalImpactMissileRows(memory), [],
+      `${scenario.owner}/${contactGeometry.name}: no M1-M3 IMPACT component is legal`);
+
+    runAssembledRoutine(memory, "update_broadside");
+    assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], 8);
+    assert.equal(memory[constants.get("BROAD_DAMAGE_COOLDOWN")], 24);
+    assert.deepEqual(capitalImpactMissileRows(memory), []);
+    for (let frame = 1; frame < asset.broadside.impactFrames; frame += 1) {
+      runAssembledRoutine(memory, "update_broadside");
+      assert.deepEqual(capitalImpactMissileRows(memory), [],
+        `player IMPACT frame ${frame + 1} must remain visually empty`);
+      assert.deepEqual(capitalShellScreenTransients(memory), []);
+    }
+    assert.equal(memory[slotState], BROADSIDE_STATES.FREE,
+      "the original IMPACT timer must still release the correct slot");
+
+    for (let rotation = 0; rotation < canonicalPlayfield.ringRows; rotation += 1) {
+      runAssembledRoutine(memory, "rotate_playfield_rows");
+      runAssembledRoutine(memory, "prebuild_next_playfield_display_list");
+    }
+    assert.deepEqual(capitalImpactMissileRows(memory), [],
+      "a later ring wrap must not revive the PMG square");
+    assert.deepEqual(capitalShellScreenTransients(memory), [],
+      "a later ring wrap must not revive the ANTIC bolt");
+  }
 });
 
 test("capital-shell impact obeys cooldown, respawn invulnerability, release, and simultaneous latch", () => {

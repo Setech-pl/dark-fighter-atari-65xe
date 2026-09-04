@@ -69,7 +69,7 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
 Production records begin at sectors 102, 147, 155, and 157. Their packed/raw
-lengths are respectively 5,644/6,643 B, 921/921 B, 229/234 B, and 585/645 B.
+lengths are respectively 5,660/6,643 B, 921/921 B, 229/234 B, and 585/645 B.
 The second record carries the compressed immutable pickup phase bank plus its
 late compositor and the 33-byte collision module. Its cold copy at
 `$8C80-$9018` is first preserved at `$4801-$4B99`, then decompressed to
