@@ -31,7 +31,8 @@ provenance belong under `docs/media/`.
 ## Owner references
 
 - `loader.png` is the owner-authored composition reference for the capital-ship
-  profile, title, three engine groups, and green studio footer.
+  profile, title, three engine groups, and green `(C) 2026 SETECH GAME STUDIO`
+  footer.
 - `void-strike-65-screen-concept-v1.png` is the accepted gameplay composition and
   art-direction reference.
 - `mainmenu.png` is the accepted menu composition reference; it is not copied or

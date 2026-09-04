@@ -2,7 +2,7 @@
   "formatVersion": 2,
   "reference": {
     "path": "assets/graphics/loader.png",
-    "sha256": "a8d4fc331d126223b721aedaacc2a9b81e8ddfa0503c65af4118b64fa26d50a2",
+    "sha256": "f77650dc0c388497143584f2af779949cdd34d87f1559f7ed7d66c3f75e38248",
     "width": 1402,
     "height": 1122
   },
@@ -38,7 +38,7 @@
       "displayMode": "ANTIC F",
       "foregroundPixel": 1,
       "startLine": 40,
-      "endLine": 163,
+      "endLine": 156,
       "foreground": "$0A",
       "registers": {
         "COLBK": "$00",
@@ -50,7 +50,7 @@
       "name": "studio",
       "displayMode": "ANTIC E",
       "foregroundPixel": 2,
-      "startLine": 164,
+      "startLine": 157,
       "endLine": 191,
       "foreground": "$D8",
       "registers": {
@@ -73,6 +73,10 @@
       "letterSpacing": 1,
       "spaceAdvance": 3,
       "glyphs": {
+        "(": ["00010", "00100", "01000", "01000", "01000", "00100", "00010"],
+        ")": ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
+        "0": ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
+        "2": ["11110", "00001", "00001", "01110", "10000", "10000", "11110"],
         "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
         "6": ["01111", "10000", "10000", "11110", "10001", "10001", "01110"],
         "A": ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
@@ -226,10 +230,22 @@
 
     {
       "kind": "pixelText",
+      "name": "copyright",
+      "text": "(C) 2026",
+      "font": "military5x7",
+      "x": 131,
+      "y": 157,
+      "scaleX": 1,
+      "scaleY": 2,
+      "letterSpacing": 3,
+      "pattern": "solid"
+    },
+    {
+      "kind": "pixelText",
       "name": "studio",
       "text": "SETECH GAME STUDIO",
       "font": "military5x7",
-      "x": 91,
+      "x": 95,
       "y": 174,
       "scaleX": 1,
       "scaleY": 2,
@@ -245,6 +261,8 @@
       {"x": 10, "y": 77, "width": 138, "height": 36},
       {"x": 14, "y": 113, "width": 153, "height": 39}
     ],
-    "studio": {"x": 91, "y": 174, "width": 138, "height": 14}
+    "copyright": {"x": 132, "y": 157, "width": 56, "height": 14},
+    "studio": {"x": 94, "y": 174, "width": 132, "height": 14},
+    "footer": {"x": 94, "y": 157, "width": 132, "height": 31}
   }
 }

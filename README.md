@@ -160,6 +160,7 @@ hardware checklists live under [`docs/`](docs/README.md).
 
 ## Credits and license
 
+- **Copyright:** `(C) 2026 SETECH GAME STUDIO`
 - **Creator, project owner, developer, and gameplay vision:** Marcin Krzetowski
 - **AI-assisted engineering:** Codex, supporting implementation, testing,
   analysis, and documentation under owner direction.

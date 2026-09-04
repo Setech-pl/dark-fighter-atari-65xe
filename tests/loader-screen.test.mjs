@@ -114,7 +114,7 @@ test("loader reference PNG is present and unchanged", () => {
   assert.equal(sha256(reference), definition.reference.sha256);
   assert.equal(
     sha256(reference),
-    "a8d4fc331d126223b721aedaacc2a9b81e8ddfa0503c65af4118b64fa26d50a2",
+    "f77650dc0c388497143584f2af779949cdd34d87f1559f7ed7d66c3f75e38248",
   );
 });
 
@@ -150,13 +150,13 @@ test("bounded LZSS round-trip is exact and ends at the bitmap boundary", () => {
 
   const allAnticFBytes = encodeLoaderBitmapPixels(compiled.pixels);
   assert.deepEqual(
-    compiled.bitmapBytes.subarray(0, 164 * compiled.bytesPerRow),
-    allAnticFBytes.subarray(0, 164 * compiled.bytesPerRow),
+    compiled.bitmapBytes.subarray(0, 157 * compiled.bytesPerRow),
+    allAnticFBytes.subarray(0, 157 * compiled.bytesPerRow),
     "mixed-mode encoding must not alter title or ship bitmap bytes",
   );
   assert.notDeepEqual(
-    compiled.bitmapBytes.subarray(164 * compiled.bytesPerRow),
-    allAnticFBytes.subarray(164 * compiled.bytesPerRow),
+    compiled.bitmapBytes.subarray(157 * compiled.bytesPerRow),
+    allAnticFBytes.subarray(157 * compiled.bytesPerRow),
     "studio rows must be re-encoded as ANTIC E two-bit pixels",
   );
 });
@@ -179,6 +179,7 @@ test("both LMS ranges preserve 40-byte rows across 4 KB boundaries", () => {
 test("bitmap has fitted title, detailed unmarked hull, three engines, and studio", () => {
   assert.ok(countPixels(compiled.landmarks.title) > 1300);
   assert.ok(countPixels(compiled.landmarks.ship) > 5000);
+  assert.ok(countPixels(compiled.landmarks.copyright) > 80);
   assert.ok(countPixels(compiled.landmarks.studio) > 250);
   for (const engine of compiled.landmarks.engineBands) {
     assert.ok(countPixels(engine) > 400);
@@ -194,6 +195,189 @@ test("bitmap has fitted title, detailed unmarked hull, three engines, and studio
   }
 });
 
+test("copyright footer has two small centered lines with the accepted spacing", () => {
+  const copyrightElement = definition.elements.find(({ name }) => name === "copyright");
+  const studioElement = definition.elements.find(({ name }) => name === "studio");
+  assert.equal(copyrightElement.text, "(C) 2026");
+  assert.equal(studioElement.text, "SETECH GAME STUDIO");
+  assert.deepEqual(compiled.landmarks.copyright, { x: 132, y: 157, width: 56, height: 14 });
+  assert.deepEqual(compiled.landmarks.studio, { x: 94, y: 174, width: 132, height: 14 });
+  assert.deepEqual(compiled.landmarks.footer, { x: 94, y: 157, width: 132, height: 31 });
+  for (const character of ["(", ")", "0", "2"]) {
+    assert.ok(definition.fonts.military5x7.glyphs[character], `missing ASCII ${character}`);
+  }
+
+  const occupiedInRows = (startLine, endLine) => {
+    const occupied = [];
+    for (let y = startLine; y <= endLine; y += 1) {
+      for (let x = 0; x < 320; x += 1) {
+        if (loaderBitmapPixelValueAt(compiled, x, y) !== 0) occupied.push([x, y]);
+      }
+    }
+    return occupied;
+  };
+  const bounds = (occupied) => {
+    const xs = occupied.map(([x]) => x);
+    const ys = occupied.map(([, y]) => y);
+    return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  };
+  const copyrightPixels = occupiedInRows(157, 170);
+  const studioPixels = occupiedInRows(174, 187);
+  assert.deepEqual(bounds(copyrightPixels), [132, 187, 157, 170]);
+  assert.deepEqual(bounds(studioPixels), [94, 225, 174, 187]);
+  for (const occupied of [copyrightPixels, studioPixels]) {
+    const xs = occupied.map(([x]) => x);
+    assert.equal(Math.min(...xs), 319 - Math.max(...xs), "each footer line must be centered");
+  }
+  for (let y = 171; y <= 173; y += 1) {
+    for (let x = 0; x < 320; x += 1) {
+      assert.equal(loaderBitmapPixelValueAt(compiled, x, y), 0, "footer gap must stay blank");
+    }
+  }
+
+  const previous = structuredClone(definition);
+  previous.paletteZones[1].endLine = 163;
+  previous.paletteZones[2].startLine = 164;
+  previous.elements = previous.elements.filter(({ name }) => name !== "copyright");
+  const previousStudio = previous.elements.find(({ name }) => name === "studio");
+  previousStudio.x = 91;
+  previousStudio.y = 174;
+  delete previous.landmarks.copyright;
+  delete previous.landmarks.footer;
+  previous.landmarks.studio = { x: 91, y: 174, width: 138, height: 14 };
+  const previousCompiled = compileLoaderBitmap(previous);
+  let changed = 0;
+  for (let y = 0; y < compiled.height; y += 1) {
+    for (let x = 0; x < compiled.width; x += 1) {
+      const differs = compiled.pixels[y * compiled.width + x] !==
+        previousCompiled.pixels[y * compiled.width + x];
+      if (!differs) continue;
+      changed += 1;
+      assert.ok(x >= 90 && x <= 225 && y >= 157 && y <= 187,
+        `footer pixel escaped mask at ${x},${y}`);
+    }
+  }
+  assert.ok(changed > 0);
+  assert.equal(compiled.bitmapBytes.length, 40 * 192);
+});
+
+test("packed XEX footer matches the two-line cd62731 ANTIC E visual oracle", () => {
+  const acceptedGlyphs = {
+    "(": ["00010", "00100", "01000", "01000", "01000", "00100", "00010"],
+    ")": ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
+    "0": ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
+    "2": ["11110", "00001", "00001", "01110", "10000", "10000", "11110"],
+    "6": ["01111", "10000", "10000", "11110", "10001", "10001", "01110"],
+    A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+    C: ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
+    D: ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
+    E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+    G: ["01111", "10000", "10000", "10111", "10001", "10001", "01110"],
+    H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+    I: ["11111", "00100", "00100", "00100", "00100", "00100", "11111"],
+    M: ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
+    O: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
+    S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
+    T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
+    U: ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
+  };
+  const lines = [
+    { text: "(C) 2026", x: 131, y: 157 },
+    { text: "SETECH GAME STUDIO", x: 95, y: 174 },
+  ];
+  const sourcePixels = new Uint8Array(320 * 192);
+  for (const line of lines) {
+    let cursorX = line.x;
+    for (const character of line.text) {
+      if (character === " ") {
+        cursorX += 3;
+        continue;
+      }
+      const glyph = acceptedGlyphs[character];
+      assert.ok(glyph, `accepted glyph snapshot missing ${character}`);
+      for (let glyphY = 0; glyphY < 7; glyphY += 1) {
+        for (let glyphX = 0; glyphX < 5; glyphX += 1) {
+          if (glyph[glyphY][glyphX] !== "1") continue;
+          sourcePixels[(line.y + glyphY * 2) * 320 + cursorX + glyphX] = 1;
+          sourcePixels[(line.y + glyphY * 2 + 1) * 320 + cursorX + glyphX] = 1;
+        }
+      }
+      cursorX += 8;
+    }
+  }
+
+  const expected = Buffer.alloc(7680);
+  for (let y = 157; y <= 187; y += 1) {
+    for (let byteColumn = 0; byteColumn < 40; byteColumn += 1) {
+      let value = 0;
+      for (let pair = 0; pair < 4; pair += 1) {
+        const x = byteColumn * 8 + pair * 2;
+        const foreground = sourcePixels[y * 320 + x] | sourcePixels[y * 320 + x + 1];
+        value |= (foreground ? 2 : 0) << (6 - pair * 2);
+      }
+      expected[y * 40 + byteColumn] = value;
+    }
+  }
+
+  const memory = executeLoaderUnpack(readLabels());
+  const actual = Buffer.alloc(7680);
+  for (let y = 0; y < 192; y += 1) {
+    const address = y < 102 ? 0x4010 + y * 40 : 0x5000 + (y - 102) * 40;
+    actual.set(memory.subarray(address, address + 40), y * 40);
+  }
+  const anticEPixel = (bytes, x, y) => {
+    const value = bytes[y * 40 + Math.floor(x / 8)];
+    return (value >> (6 - Math.floor((x & 7) / 2) * 2)) & 3;
+  };
+
+  for (const [lineIndex, line] of lines.entries()) {
+    let cursorX = line.x;
+    for (const [characterIndex, character] of [...line.text].entries()) {
+      if (character === " ") {
+        cursorX += 3;
+        continue;
+      }
+      for (let scanline = 0; scanline < 14; scanline += 1) {
+        const firstPairX = cursorX & ~1;
+        const lastPairX = (cursorX + 4) & ~1;
+        for (let x = firstPairX; x <= lastPairX; x += 2) {
+          assert.equal(
+            anticEPixel(actual, x, line.y + scanline),
+            anticEPixel(expected, x, line.y + scanline),
+            `line ${lineIndex}, glyph ${characterIndex} ${character}, scanline ${scanline}, pair x=${x}`,
+          );
+        }
+      }
+      cursorX += 8;
+    }
+  }
+  assert.deepEqual(
+    actual.subarray(157 * 40, 188 * 40),
+    expected.subarray(157 * 40, 188 * 40),
+    "actual ANTIC E bytes must contain only the exact centered two-line footer",
+  );
+
+  const shiftedStudioOracle = [];
+  for (let y = 174; y <= 187; y += 1) {
+    for (let x = 94; x <= 225; x += 2) shiftedStudioOracle.push(anticEPixel(actual, x, y));
+  }
+  assert.equal(
+    sha256(Buffer.from(shiftedStudioOracle)),
+    "cec7c32a265edd5820198c9329175f1c5f2d25175c1da45102743507e21273cd",
+    "SETECH GAME STUDIO must be the cd62731 native raster shifted intact by four pixels",
+  );
+
+  const outsideMask = Buffer.from(actual);
+  for (let y = 157; y <= 187; y += 1) {
+    outsideMask.fill(0, y * 40 + 11, y * 40 + 29);
+  }
+  assert.equal(
+    sha256(outsideMask),
+    "7055b00421d4be403664cc4b3743c99514b172b903698b6f81055cf39b706bd0",
+    "loader bytes outside the footer mask must match accepted cd62731",
+  );
+});
+
 test("title and ship remain ANTIC F while the $D8 studio uses ANTIC E", () => {
   assert.deepEqual(
     compiled.paletteZones.map(({ displayMode, startLine, endLine, foregroundValue }) => [
@@ -204,11 +388,11 @@ test("title and ship remain ANTIC F while the $D8 studio uses ANTIC E", () => {
     ]),
     [
       ["ANTIC F", 0, 39, 0x1e],
-      ["ANTIC F", 40, 163, 0x0a],
-      ["ANTIC E", 164, 191, 0xd8],
+      ["ANTIC F", 40, 156, 0x0a],
+      ["ANTIC E", 157, 191, 0xd8],
     ],
   );
-  assert.deepEqual(compiled.dliLines, [39, 163]);
+  assert.deepEqual(compiled.dliLines, [39, 156]);
   for (const zone of compiled.paletteZones) {
     assert.equal(zone.values.get("COLBK"), 0x00);
   }
@@ -245,7 +429,7 @@ test("studio ANTIC E pixels use COLBK=$00 and assembled COLPF1=$D8", () => {
   );
 
   const studio = compiled.paletteZones[2];
-  assert.deepEqual([studio.startLine, studio.endLine], [164, 191]);
+  assert.deepEqual([studio.startLine, studio.endLine], [157, 191]);
   const footerPixelValues = new Set();
   for (let y = studio.startLine; y <= studio.endLine; y += 1) {
     for (let x = 0; x < compiled.width; x += 2) {
@@ -253,9 +437,10 @@ test("studio ANTIC E pixels use COLBK=$00 and assembled COLPF1=$D8", () => {
     }
   }
   assert.deepEqual([...footerPixelValues].sort(), [0, 2]);
-  assert.equal(loaderBitmapPixelValueAt(compiled, 92, 174), 2);
-  assert.equal(loaderBitmapPixelValueAt(compiled, 90, 174), 0);
-  assert.equal(loaderBitmapPixelValueAt(compiled, 230, 174), 0);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 134, 157), 2);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 130, 157), 0);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 188, 157), 0);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 96, 174), 2);
   assert.equal(anticERegisterForBitmapPixel(studio.values, 2), 0xd8);
   assert.equal(anticERegisterForBitmapPixel(studio.values, 0), 0x00);
   assert.notEqual(anticERegisterForBitmapPixel(studio.values, 0), 0xd0);
@@ -285,7 +470,7 @@ test("generated include is canonical and contains no ANTIC 4 loader assets", () 
   assert.doesNotMatch(source, /loader_screen_packbits|unpack_loader_screen/);
 });
 
-test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
+test("assembled display list contains 157 ANTIC F and 35 ANTIC E lines", () => {
   const labels = readLabels();
   const displayListAddress = LOADER_DISPLAY_LIST_ADDRESS;
   assert.equal(displayListAddress & 0x3ff, 0);
@@ -318,7 +503,7 @@ test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
   for (let line = 0; line < 192; line += 1) {
     const opcode = expected[offset];
     const mode = opcode & 0x0f;
-    assert.equal(mode, line < 164 ? 0x0f : 0x0e);
+    assert.equal(mode, line < 157 ? 0x0f : 0x0e);
     anticFLines += mode === 0x0f ? 1 : 0;
     anticELines += mode === 0x0e ? 1 : 0;
     offset += 1;
@@ -335,10 +520,10 @@ test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
       offset += 2;
     }
   }
-  assert.equal(anticFLines, 164);
-  assert.equal(anticELines, 28);
+  assert.equal(anticFLines, 157);
+  assert.equal(anticELines, 35);
   assert.equal(lmsCount, 2);
-  assert.deepEqual(dliLines, [39, 163]);
+  assert.deepEqual(dliLines, [39, 156]);
   assert.deepEqual(
     [...expected.subarray(offset)],
     [0x41, displayListAddress & 0xff, displayListAddress >> 8],
@@ -403,9 +588,10 @@ test("capital-hull integration preserves gameplay preview dimensions", () => {
 test("loader preview follows ANTIC F title/ship and ANTIC E studio semantics", () => {
   const { loaderAsset, registerPixels } = readLoaderRuntimeState(definition);
   const studio = loaderAsset.paletteZones[2];
-  assert.equal(registerPixels[174 * loaderAsset.width + 92], 0xd8);
-  assert.equal(registerPixels[174 * loaderAsset.width + 90], 0x00);
-  assert.equal(registerPixels[174 * loaderAsset.width + 230], 0x00);
+  assert.equal(registerPixels[157 * loaderAsset.width + 134], 0xd8);
+  assert.equal(registerPixels[157 * loaderAsset.width + 130], 0x00);
+  assert.equal(registerPixels[157 * loaderAsset.width + 188], 0x00);
+  assert.equal(registerPixels[174 * loaderAsset.width + 96], 0xd8);
   for (let y = studio.startLine; y <= studio.endLine; y += 1) {
     for (let x = 0; x < loaderAsset.width; x += 1) {
       if (loaderBitmapPixelValueAt(loaderAsset, x, y) === 0) {

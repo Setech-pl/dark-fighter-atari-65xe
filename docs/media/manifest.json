@@ -5,12 +5,12 @@
     "xex": {
       "path": "dist/void-strike-65.xex",
       "bytes": 21399,
-      "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
+      "sha256": "bf8ede13d89e9782d7d7242afeaa98d9eba089aafb382ddb6bda8654177386e3"
     },
     "atr": {
       "path": "dist/void-strike-65.atr",
       "bytes": 92176,
-      "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
+      "sha256": "822324a213d28c1dfa079b78c72b058d8625d04e64a32a1d5062edc1401d122e"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
@@ -28,9 +28,9 @@
       "frame": 250,
       "width": 320,
       "height": 240,
-      "source_sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040",
-      "sha256": "6bb03974c9d6f96dbb76bd38aa2af79bfa5dc4c82b512319b2694faa009d6bf9",
-      "bytes": 2679
+      "source_sha256": "2c26a63d4ab8564be1810e9f8748cd9634db587ecba7d9942c9c9899edb0c8c5",
+      "sha256": "ebb33585f9d6022e2f9ece6516d77188fee702ccaa1a6753452e31842e2ebcce",
+      "bytes": 3883
     },
     {
       "path": "docs/media/gameplay/02-standard-combat.png",
