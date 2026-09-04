@@ -130,9 +130,13 @@ For both XEX and ATR:
 Use a stock PAL Atari 65XE with 64 KB and boot the ATR through SIO2SD. Also run
 the XEX through the owner's normal real-hardware loader path when available.
 
+The current XEX and ATR pass in Atari800, but physical ATR/SIO acceptance is
+still open. Repair and verify the fast disk-access path before treating an
+emulator boot as evidence that the SIO2SD path is complete.
+
 - [ ] Cold boot succeeds repeatedly after power-off, not only after warm reset.
-- [ ] The 100-sector OS boot read is followed by standard-speed SIOV reads of
-      extension sectors 101-157; no SIO turbo support is required.
+- [ ] The 100-sector OS boot read is followed by verified SIO reads of extension
+      sectors 101-157 through the repaired fast disk-access path.
 - [ ] A deliberately truncated or CRC-corrupted test ATR stops on the fixed red
       loader error screen and never enters partially loaded code.
 - [ ] Loader duration, menu transitions, audio, controls, pause, Game Over, and

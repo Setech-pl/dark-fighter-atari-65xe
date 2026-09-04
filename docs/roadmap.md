@@ -27,24 +27,24 @@ The repository currently contains:
 
 ## Immediate work
 
-1. **Owner retest of Player Fighter weapon presentation** — confirm the all-yellow
-   player-weapon colour and the current 8/10/8 Normal/Rapid/Spread balance.
-2. **Shield Booster** — design and measure the third pickup type without
-   assuming memory, timing, duration, or stacking behavior before review.
-3. **Pickup drop-cadence tuning** — use owner playtest feedback to revisit the
+1. **Player Fighter visual unification** — align the runtime craft with the
+   approved silhouette, markings, and worn military visual direction.
+2. **Pickup drop-cadence tuning** — use owner playtest feedback to revisit the
    current every-third-qualifying-Interceptor-kill cadence. The present value is
    implemented behavior, not accepted final balance; this task must change it
    explicitly rather than editing documentation alone.
+3. **Spread Shot and Shield follow-up** — continue their presentation and
+   balance review without describing either implemented booster as future work.
 
 ## Later work
 
 Later work remains subject to owner prioritization and fresh memory/timing
 measurement:
 
-- additional enemy archetypes from the existing review roster;
-- level progression and authored encounter data;
-- mines, additional capital-ship attack patterns, and bosses;
-- **Nova Missile** — after Shield Booster, design the fourth pickup as a
+- six playable enemy types drawn from the review roster;
+- a three-module weapon structure and authored enemy formations;
+- a modular defense platform and a modular boss encounter;
+- **Nova Missile** — after the current booster set, design a fourth pickup as a
   boss-only, single-shot special weapon outside the ordinary pickup rotation.
   Specify it together with boss lifecycle/HULL and the budget for its
   single-damage, multi-phase detonation; it must never spawn in standard

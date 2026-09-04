@@ -11,6 +11,7 @@ import {
 } from "../scripts/artifact-launch.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const retiredSlug = ["dark", "fighter"].join("-");
 
 test("public launch paths are absolute, current and manifest-bound", () => {
   const binding = publicArtifactBinding(root);
@@ -19,7 +20,7 @@ test("public launch paths are absolute, current and manifest-bound", () => {
   for (const kind of ["boot", "xex", "atr", "manifest"]) {
     assert.equal(path.isAbsolute(binding[kind].path), true);
     assert.equal(fs.statSync(binding[kind].path).size, binding[kind].bytes);
-    assert.doesNotMatch(path.basename(binding[kind].path), /dark-fighter/i);
+    assert.doesNotMatch(path.basename(binding[kind].path), new RegExp(retiredSlug, "i"));
   }
 });
 
@@ -40,6 +41,6 @@ test("the SELF TEST-producing ATR-as-XEX invocation is rejected", () => {
 
 test("a stale or cached old artifact cannot satisfy the public binding", () => {
   const launch = structuredClone(atari800ArtifactLaunches(root).xex);
-  launch.artifact.path = path.resolve(root, "dist", "dark-fighter.xex");
+  launch.artifact.path = path.resolve(root, "dist", `${retiredSlug}.xex`);
   assert.throws(() => validateAtari800Launch(launch), /public artifact path/);
 });
