@@ -2,11 +2,13 @@
 
 ; Final-raster BROADSIDE bolt versus Viper collision.
 ; Entry: X is the BROADSIDE slot; src_ptr is the inclusive swept bolt L/R,
-; dst_ptr is the inclusive 16-HPOS player L/R, and frontend_data_ptr is the
-; half-open interval of bolt centre Y values that overlap the 15-line player.
+; dst_ptr is the inclusive 16-HPOS player L/R, frontend_data_ptr is the
+; inclusive player raster T/B, and BROAD_RASTER_TOP is cached by the physical
+; screen-row mapper. Glyphs 126/127 occupy six scanlines from that top.
 ; Exit: carry set on swept-AABB contact. The caller restores its slot.
 
-BROAD_Y = $4E4C
+BROAD_RASTER_TOP = $4E72
+CAPITAL_SHELL_VISIBLE_SCANLINES = 6
 src_ptr = $94
 dst_ptr = $96
 frontend_data_ptr = $98
@@ -23,14 +25,16 @@ capital_player_collision:
     cmp src_ptr
     bcc capital_player_collision_miss
 
-    ; BROAD_Y is the bolt centre. The caller maps player [Y..Y+14] against
-    ; bolt [BROAD_Y-3..BROAD_Y+2] to the exact half-open centre interval
-    ; [player_y-2..player_y+18).
-    lda BROAD_Y,x
+    ; Inclusive final-raster Y intervals. The cached top follows the displayed
+    ; physical screen row; no logical BROAD_Y coordinate enters this decision.
+    lda BROAD_RASTER_TOP,x
+    clc
+    adc #(CAPITAL_SHELL_VISIBLE_SCANLINES-1)
     cmp frontend_data_ptr
     bcc capital_player_collision_miss
-    cmp frontend_data_ptr+1
-    bcs capital_player_collision_miss
+    lda frontend_data_ptr+1
+    cmp BROAD_RASTER_TOP,x
+    bcc capital_player_collision_miss
 capital_player_collision_hit:
     sec
     rts
@@ -38,4 +42,4 @@ capital_player_collision_miss:
     clc
     rts
 
-.assert * <= $8E7C, error, "swept-AABB capital/player collision exceeds reviewed runtime tail"
+.assert * <= $8E82, error, "final-raster capital/player collision exceeds reviewed runtime tail"

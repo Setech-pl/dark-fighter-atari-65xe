@@ -102,17 +102,19 @@ BSS, and no glyphs. Linked runtime was 16,924 B; simultaneous residency was
 18,762 B and safe residency was 3,425 B. The entry and muzzle raster sequences plus raw per-frame
 traces are stored under `build/runtime-wall-trace/provisional-capital-*-cold-*`.
 
-The owner-independent capital-shell/player collision module is a 27-byte
-inclusive swept-AABB routine at `$8E61-$8E7B`, appended to the existing pickup
-phase/code stream. Replacing the former pixel-mask narrow phase removes 83 B of
-simultaneous runtime residency: 18,910 -> 18,827 B, increasing safe residency
-from 3,277 to 3,360 B. Linked CODE/data and persistent BSS do not change. The
-aggregate pickup/code/collision transport shrinks from 994 to 915 B while
+The owner-independent capital-shell/player collision module is a 33-byte
+inclusive final-raster swept-AABB routine at `$8E61-$8E81`, appended to the
+existing pickup phase/code stream. Replacing the former pixel-mask narrow phase
+still removes 77 B of simultaneous runtime residency: 18,910 -> 18,833 B,
+increasing safe residency from 3,277 to 3,354 B. Relative to the accepted
+renderer checkpoint, code/data grows by 6 B and persistent reserved BSS does
+not grow; three bytes of its existing compatibility hole now cache the mapped
+bolt raster tops. The aggregate pickup/code/collision transport is 921 B while
 remaining inside its existing eight-sector allocation; total transport remains
 161 sectors.
 
-Focused native XEX MEDIUM and ATR HARD sessions cover both owners and top,
-side, bottom, one-scanline near-miss, and full-speed swept contacts. Their
+Focused native XEX MEDIUM and ATR HARD sessions cover both owners and true
+top, middle, bottom, and one-scanline near-miss contacts. Their
 current timings are recorded in `capital-player-collision-trace.json`; this
 focused run deliberately does not replace the accepted global gauntlet below.
 

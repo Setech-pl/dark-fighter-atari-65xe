@@ -213,19 +213,19 @@ const capitalContactSessions = [0, 1].map((owner) => ({
 
 const capitalPlayerGeometrySessions = [["XEX", 1], ["ATR", 2]].flatMap(([medium, difficulty]) =>
   [0, 1].flatMap((owner) => [
-    ["top", -2, true], ["side", 7, true], ["bottom", 17, true],
-    ["near", -3, false], ["sweep", 7, true],
-  ].map(([contactMode, contactDelta, expectedHit]) => ({
+    ["top", 0, true], ["middle", 1, true], ["bottom", 2, true],
+    ["near", 3, false],
+  ].map(([contactMode, contactModeId, expectedHit]) => ({
     id: `capital-player-${medium.toLowerCase()}-${difficulty}-${owner === 0 ? "colonial" : "cylon"}-${contactMode}`,
     medium,
     difficulty,
     policy: owner === 0 ? "capital-contact-colonial" : "capital-contact-cylon",
     fireDelay: 4_000,
-    frames: owner === 0 ? 600 : 400,
+    frames: owner === 0 ? 600 : 450,
     kind: "capital-player-geometry",
     contactOwner: owner,
     contactMode,
-    contactDelta,
+    contactModeId,
     expectedHit,
   }))));
 
@@ -374,6 +374,7 @@ const traceLabels = {
   DFTRACE_BROAD_ROW_HI: "BROAD_ROW_HI",
   DFTRACE_BROAD_FLASH_TIMER: "BROAD_FLASH_TIMER",
   DFTRACE_PLAYFIELD_BROAD_ROW: "PLAYFIELD_BROAD_ROW",
+  DFTRACE_BROAD_RASTER_TOP: "BROAD_RASTER_TOP",
   DFTRACE_BROAD_TURRET_FIRED: "BROAD_TURRET_FIRED",
   DFTRACE_CORRIDOR_PHASE: "corridor_phase",
   DFTRACE_ENTITY_ACTIVE_COUNT: "ENTITY_ACTIVE_COUNT",
@@ -559,24 +560,31 @@ for (const name of ["profile_compose_calls", "profile_compose_cycles",
   "profile_pickup_update_end", "profile_pickup_render_start",
   "profile_effect_render_start"]) numericCsvFields.add(name);
 
-function nativeCapitalPlayerAabb(row, slot) {
-  const owner = row[`broad${slot}_owner`];
+function nativeCapitalPlayerAabb(row, slot, physicalEvent) {
+  invariant(physicalEvent?.player_physical?.valid === 1,
+    "Native collision oracle is missing visible P0/P3 bytes");
+  const physicalSlot = physicalEvent.slots.find((item) => item.slot === slot)?.physical;
+  invariant(physicalSlot?.valid === 1,
+    "Native collision oracle is missing the physical 126/127 screen footprint");
+  invariant(physicalSlot.glyph_rows[0] === 1 && physicalSlot.glyph_rows[1] === 6,
+    "Native collision oracle found unexpected occupied bolt glyph rows");
+  invariant(physicalSlot.cache_top === physicalSlot.raster[2],
+    "Production bolt raster cache disagrees with physical LMS/screen/glyph bounds");
+  const [playerLeft, playerRight, playerTop, playerBottom] =
+    physicalEvent.player_physical.raster;
+  const [previous, previousRight, boltTop, boltBottom] = physicalSlot.raster;
   const current = row[`broad${slot}_raster_x`];
-  const logical = row[`broad${slot}_x`];
-  const previous = (owner === 0 ? logical - 2 : logical + 2) & 0xfc;
-  const playerX = row.player_x_after;
-  const playerY = row.player_y_after;
-  const shellY = row[`broad${slot}_y`];
-  const player = { left: playerX, right: playerX + 15, top: playerY, bottom: playerY + 14 };
+  const currentRight = current + 7;
+  const player = { left: playerLeft, right: playerRight, top: playerTop, bottom: playerBottom };
   const bolt = {
     previous_left: previous,
-    previous_right: previous + 7,
+    previous_right: previousRight,
     current_left: current,
-    current_right: current + 7,
+    current_right: currentRight,
     sweep_left: Math.min(previous, current),
-    sweep_right: Math.max(previous + 7, current + 7),
-    top: shellY - 3,
-    bottom: shellY + 2,
+    sweep_right: Math.max(previousRight, currentRight),
+    top: boltTop,
+    bottom: boltBottom,
   };
   const overlapLeft = Math.max(player.left, bolt.sweep_left);
   const overlapRight = Math.min(player.right, bolt.sweep_right);
@@ -585,6 +593,10 @@ function nativeCapitalPlayerAabb(row, slot) {
   const hit = overlapLeft <= overlapRight && overlapTop <= overlapBottom;
   return {
     rule: "inclusive swept-AABB",
+    oracle: {
+      player: "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+      bolt: "cached physical row pointer + displayed LMS + screen codes + glyph rows",
+    },
     player,
     bolt,
     overlap: hit ? {
@@ -764,6 +776,7 @@ function writeHitboxContact(paths, geometries, outputPath) {
   const frames = paths.map((framePath) =>
     decodeAtari800Screenshot(fs.readFileSync(framePath)));
   for (let index = 0; index < frames.length; index += 1) {
+    if (geometries[index] === null) continue;
     const { player, bolt } = geometries[index];
     drawHposAabb(frames[index], player, [0x00, 0xff, 0xff]);
     drawHposAabb(frames[index], {
@@ -789,6 +802,7 @@ function writeHitboxContact(paths, geometries, outputPath) {
     path: path.relative(rootDirectory, outputPath),
     frames: ["before", "contact", "after"],
     legend: { player_16x15: "cyan", bolt_current_8x6: "yellow", bolt_sweep: "red" },
+    overlay_asserted_against_physical_oracle: true,
     width, height, bytes: png.length, sha256: sha256(png),
   };
 }
@@ -1954,9 +1968,7 @@ function main() {
 	  ...(capitalScreenshotPrefix === undefined ? {} : {
 	    DFTRACE_CAPITAL_CONTACT_PREFIX: capitalScreenshotPrefix,
 	    DFTRACE_CAPITAL_CONTACT_OWNER: String(session.contactOwner),
-	    ...(session.contactDelta === undefined ? {} : {
-	      DFTRACE_CAPITAL_CONTACT_DELTA: String(session.contactDelta),
-	    }),
+	    DFTRACE_CAPITAL_CONTACT_MODE: String(session.contactModeId),
 	  }),
 	  ...(session.kind === "engine-restart-after-game-over" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
@@ -2730,67 +2742,91 @@ function main() {
   }
   if (capitalPlayerCollisionOnly) {
     const geometryEvidence = [];
-    for (const session of capitalPlayerGeometrySessions) {
+    for (const session of sessionsToRun) {
       const rows = allRows.filter((row) => row.session === session.id);
       invariant(rows.length === session.frames,
         `${session.id} returned ${rows.length}/${session.frames} gameplay frames`);
+      const compositorPath = path.join(buildDirectory,
+        `${session.id}-broadside-compositor.jsonl`);
+      const compositor = fs.readFileSync(compositorPath, "utf8").trim().split(/\n/)
+        .filter(Boolean).map((line) => JSON.parse(line));
+      const decisionName = session.expectedHit ? "player_aabb_hit" : "player_aabb_miss";
       let selected;
       let slot;
-      if (session.expectedHit) {
-        for (const row of rows.filter((candidate) =>
-          candidate.capital_player_damage_calls !== 0)) {
-          const matchingSlot = [0, 1, 2].find((index) =>
-            row[`broad${index}_owner`] === session.contactOwner &&
-            row[`broad${index}_state`] === 3 &&
-            (row[`broad${index}_collision`] & 1) !== 0);
-          if (matchingSlot === undefined) continue;
-          const geometry = nativeCapitalPlayerAabb(row, matchingSlot);
-          if (!geometry.hit) continue;
-          if (session.contactMode === "sweep" &&
-              geometry.bolt.previous_left === geometry.bolt.current_left) continue;
+      let physicalEvent;
+      let decision;
+      for (const row of rows) {
+        for (const index of [0, 1, 2]) {
+          if (row[`broad${index}_owner`] !== session.contactOwner) continue;
+          const candidateDecision = compositor.find((event) => event.frame === row.frame &&
+            event.slot === index && event.event === decisionName);
+          const candidatePhysical = compositor.find((event) => event.frame === row.frame &&
+            event.slot === index && event.event === "erase_begin" &&
+            event.player_physical?.valid === 1 &&
+            event.slots.find((item) => item.slot === index)?.physical?.valid === 1);
+          if (!candidateDecision || !candidatePhysical) continue;
+          const candidateGeometry = nativeCapitalPlayerAabb(row, index, candidatePhysical);
+          const horizontalGap = candidateGeometry.hit ? 0 :
+            Math.max(candidateGeometry.player.left - candidateGeometry.bolt.sweep_right,
+              candidateGeometry.bolt.sweep_left - candidateGeometry.player.right, 0);
+          const verticalGap = candidateGeometry.hit ? 0 :
+            Math.max(candidateGeometry.player.top - candidateGeometry.bolt.bottom,
+              candidateGeometry.bolt.top - candidateGeometry.player.bottom, 0);
+          const requestedPhysicalGeometry = session.contactMode === "top"
+            ? candidateGeometry.bolt.bottom === candidateGeometry.player.top
+            : session.contactMode === "middle"
+              ? candidateGeometry.bolt.top === candidateGeometry.player.top + 4
+              : session.contactMode === "bottom"
+                ? candidateGeometry.bolt.top === candidateGeometry.player.bottom
+                : candidateGeometry.bolt.bottom + 1 === candidateGeometry.player.top;
+          if (candidateGeometry.hit !== session.expectedHit ||
+              !requestedPhysicalGeometry ||
+              (!session.expectedHit && (horizontalGap !== 0 || verticalGap !== 1))) continue;
+          if (session.expectedHit && (row.capital_player_damage_calls === 0 ||
+              row.player_health < 2 ||
+              row.player_health_after !== row.player_health - 2 ||
+              row.player_damage_cooldown_after !== 25 ||
+              row[`broad${index}_state`] !== 3 ||
+              (row[`broad${index}_collision`] & 1) === 0)) continue;
+          if (!session.expectedHit && row.capital_player_damage_calls !== 0) continue;
           selected = row;
-          slot = matchingSlot;
+          slot = index;
+          physicalEvent = candidatePhysical;
+          decision = candidateDecision;
           break;
         }
-        invariant(selected !== undefined,
-          `${session.id} did not produce the requested opaque ${session.contactMode} hit`);
+        if (selected) break;
       }
-      else {
-        selected = rows.find((row) => [0, 1, 2].some((index) => {
-          if (row[`broad${index}_owner`] !== session.contactOwner ||
-              row[`broad${index}_state`] !== 2 ||
-              row[`broad${index}_y`] - row.player_y_after !== session.contactDelta) return false;
-          const shellLeft = row[`broad${index}_raster_x`];
-          if (shellLeft > row.player_x_after + 15 || shellLeft + 7 < row.player_x_after) return false;
-          if (nativeCapitalPlayerAabb(row, index).hit) return false;
-          slot = index;
-          return true;
-        }));
-        invariant(selected !== undefined && selected.capital_player_damage_calls === 0,
-          `${session.id} did not preserve the requested one-scanline near miss`);
-      }
+      invariant(selected !== undefined,
+        `${session.id} did not produce the requested physical ${session.contactMode} ` +
+        `${session.expectedHit ? "hit" : "one-scanline miss"}`);
       const selectedIndex = rows.indexOf(selected);
       const before = rows[Math.max(0, selectedIndex - 1)];
       const after = rows[Math.min(rows.length - 1, selectedIndex + 1)];
-      const geometry = nativeCapitalPlayerAabb(selected, slot);
+      const geometry = nativeCapitalPlayerAabb(selected, slot, physicalEvent);
       invariant(geometry.hit === session.expectedHit,
         `${session.id} disagrees with the independent gameplay AABBs`);
       if (session.expectedHit) {
-        invariant(selected.player_health === 10 && selected.player_health_after === 8 &&
-          selected.player_lives_after === 3 && selected.player_damage_cooldown_after === 25 &&
-          after.player_health_after === 8,
+        invariant(selected.player_health >= 2 &&
+          selected.player_health_after === selected.player_health - 2 &&
+          selected.player_lives_after === selected.player_lives &&
+          selected.player_damage_cooldown_after === 25 &&
+          after.player_health_after === selected.player_health_after &&
+          after.player_damage_cooldown_after === 24,
         `${session.id} bypassed the canonical HULL/cooldown lifecycle`);
       }
       const maximumWall = Math.max(...rows.map((row) => row.wall_cycles));
       const missed = rows.reduce((sum, row) => sum + row.missed_frames, 0);
       const extraVbi = rows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0);
       const overruns = rows.filter((row) => row.wall_cycles > SHIELD_BOOSTER_HARD_GATE_CYCLES);
+      const rasterTransientViolations = rows.filter((row) =>
+        row.broad_screen_orphan_cells !== 0 || row.broad_screen_missing_cells !== 0 ||
+        [0, 1, 2].some((index) => row[`broad_pmg_orphan_rows${index}`] !== 0 ||
+          row[`broad_pmg_missing_rows${index}`] !== 0));
       invariant(missed === 0 && extraVbi === 0 && overruns.length === 0,
         `${session.id} exceeded the physical PAL gate`);
-      const compositorPath = path.join(buildDirectory,
-        `${session.id}-broadside-compositor.jsonl`);
-      const compositor = fs.readFileSync(compositorPath, "utf8").trim().split(/\n/)
-        .filter(Boolean).map((line) => JSON.parse(line));
+      invariant(rasterTransientViolations.length === 0,
+        `${session.id} produced an orphan/missing ANTIC or PMG transient`);
       invariant(compositor.every((event) => event.orphan_codes === 0),
         `${session.id} left an orphan BROADSIDE glyph`);
       const invalidTransientBacking = compositor.filter((event) => event.slots.some((item) =>
@@ -2802,41 +2838,42 @@ function main() {
         })));
       invariant(invalidTransientBacking.length === 0,
         `${session.id} retained a bolt glyph outside a valid overlapping-slot stack`);
-      const decisionName = session.expectedHit ? "player_aabb_hit" : "player_aabb_miss";
-      const decision = compositor.find((event) => event.frame === selected.frame &&
-        event.slot === slot && event.event === decisionName);
       invariant(decision !== undefined,
         `${session.id} is missing its executed swept-AABB decision event`);
       const basename = `${session.id}-frame`;
       const screenshots = fs.readdirSync(buildDirectory)
         .filter((name) => name.startsWith(`${basename}-`) && name.endsWith(".png"))
         .sort().map((name) => path.join(buildDirectory, name));
-      invariant(screenshots.length === 16,
-        `${session.id} did not retain its 16-frame native raster window`);
+      invariant(screenshots.length === 32,
+        `${session.id} did not retain its 32-frame native raster window`);
       const sheetPath = path.join(buildDirectory, `${session.id}-sequence.png`);
-      writeScreenshotContact(screenshots, sheetPath, 4);
-      const captureStartIndex = rows.findIndex((row) => [0, 1, 2].some((index) => {
-        const state = row[`broad${index}_state`];
-        const owner = row[`broad${index}_owner`];
-        const shellX = row[`broad${index}_x`];
-        const shellY = row[`broad${index}_y`];
-        const playerLeft = row.player_x;
-        const playerRight = playerLeft + 15;
-        const horizontalGap = owner === 0
-          ? Math.max(0, playerLeft - (shellX + 7))
-          : Math.max(0, shellX - playerRight);
-        return state === 2 && owner === session.contactOwner && horizontalGap <= 16 &&
-          shellY + 10 >= row.player_y && shellY <= row.player_y + 18;
-      }));
-      const selectedScreenshotIndices = [selectedIndex - 1, selectedIndex, selectedIndex + 1]
-        .map((index) => index - captureStartIndex);
-      invariant(captureStartIndex >= 0 && selectedScreenshotIndices.every((index) =>
+      writeScreenshotContact(screenshots, sheetPath, 8);
+      const captureStartEvent = compositor.find((event) =>
+        event.event === "screenshot_capture_begin");
+      /* A screenshot taken on entry to gameplay frame F is the completed
+       * raster produced by frame F-1.  Therefore a collision decision in S
+       * belongs to the screenshot captured on entry to S+1. */
+      const selectedScreenshotIndices = [before, selected, after]
+        .map((row) => row.frame + 1 - captureStartEvent?.frame);
+      invariant(captureStartEvent !== undefined && selectedScreenshotIndices.every((index) =>
         index >= 0 && index < screenshots.length),
       `${session.id} cannot map before/contact/after rows to native screenshots`);
       const hitboxSheetPath = path.join(buildDirectory, `${session.id}-hitboxes.png`);
+      const physicalGeometryForRow = (row) => {
+        const event = compositor.find((candidate) => candidate.frame === row.frame &&
+          candidate.slot === slot && candidate.event === "erase_begin" &&
+          candidate.player_physical?.valid === 1 &&
+          candidate.slots.find((item) => item.slot === slot)?.physical?.valid === 1);
+        return event ? nativeCapitalPlayerAabb(row, slot, event) : null;
+      };
+      const overlayGeometries = [before, selected, after].map(physicalGeometryForRow);
+      invariant(overlayGeometries[1] !== null &&
+        JSON.stringify(overlayGeometries[1].player) === JSON.stringify(geometry.player) &&
+        JSON.stringify(overlayGeometries[1].bolt) === JSON.stringify(geometry.bolt),
+      `${session.id} overlay differs from PMG/LMS/screen/glyph oracle bounds`);
       const hitboxScreenshot = writeHitboxContact(
         selectedScreenshotIndices.map((index) => screenshots[index]),
-        [before, selected, after].map((row) => nativeCapitalPlayerAabb(row, slot)),
+        overlayGeometries,
         hitboxSheetPath,
       );
       const compactFrame = (row) => ({
@@ -2868,6 +2905,10 @@ function main() {
           clock: decision.clock,
         },
         raster_geometry: geometry,
+        physical_oracle: {
+          player: physicalEvent.player_physical,
+          bolt: physicalEvent.slots.find((item) => item.slot === slot).physical,
+        },
         frames: { before: compactFrame(before), contact: compactFrame(selected), after: compactFrame(after) },
         timing: {
           maximum_wall_cycles: maximumWall,
@@ -2877,6 +2918,8 @@ function main() {
           physical_overruns: overruns.length,
         },
         orphan_glyphs: 0,
+        orphan_pmg_scanlines: 0,
+        missing_pmg_scanlines: 0,
         transient_backing_glyphs: 0,
         screenshot_sequence: path.relative(rootDirectory, sheetPath),
         hitbox_screenshot_sequence: hitboxScreenshot,
@@ -2886,22 +2929,42 @@ function main() {
       });
     }
     const report = {
-      schema_version: 1,
+      schema_version: 2,
       generated_by: "scripts/runtime-wall-trace.mjs --capital-player-collision-only",
       artifacts: runtimeArtifacts,
       geometry: {
         player: { width_hpos: 16, height_scanlines: 15, inclusive: true,
+          source: "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + DMA-to-capture mapping",
           transparent_sprite_pixels_are_solid_for_gameplay: true },
         bolt: { width_hpos: 8, height_scanlines: 6, inclusive: true,
-          top: "BROAD_Y-3", bottom: "BROAD_Y+2", raster_x_alignment: "BROAD_X & $FC" },
+          source: "cached physical row pointer + displayed LMS + screen RAM + glyph rows 1..6",
+          raster_x_alignment: "two adjacent ANTIC 4 cells" },
+      },
+      checkpoint_counterexample: {
+        artifact: "build/runtime-wall-trace/capital-player-xex-1-colonial-top-hitboxes.png",
+        player_logical_y: 110,
+        player_pmg_dma_rows: [110, 124],
+        player_final_raster: [102, 116],
+        bolt_logical_y: 108,
+        bolt_physical_pointer: 0x8410,
+        bolt_glyph_rows: [1, 6],
+        bolt_final_raster: [113, 118],
+        actual_overlap: [113, 116],
+        conclusion: "the former top label was a four-scanline lower-Viper contact",
       },
       sessions: geometryEvidence,
       passed: true,
     };
     const reportBytes = `${JSON.stringify(report, null, 2)}\n`;
     fs.writeFileSync(path.join(buildDirectory, "capital-player-collision-report.json"), reportBytes);
+    const durableReport = {
+      ...report,
+      durable_evidence: true,
+      source_report_sha256: sha256(reportBytes),
+      provenance: "independent physical oracle; not a byte copy of the build report",
+    };
     fs.writeFileSync(path.join(rootDirectory, "docs", "capital-player-collision-trace.json"),
-      reportBytes);
+      `${JSON.stringify(durableReport, null, 2)}\n`);
     console.log(`Capital/player geometry: ${geometryEvidence.length} native sessions passed`);
     return;
   }

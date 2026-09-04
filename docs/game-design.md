@@ -123,11 +123,13 @@ pass through on independent trajectories, using only deterministic visual
 z-order while their footprints overlap.
 The final character-aligned 8-HPOS shell raster is swept symmetrically between
 its previous and current positions. Gameplay uses one inclusive AABB test: the
-Viper owns the complete `[player_x..player_x+15]` by
-`[player_y..player_y+14]` rectangle, including transparent PMG corners and
-internal gaps; the bolt owns eight HPOS and six scanlines from `BROAD_Y-3`
-through `BROAD_Y+2`. Exactly one HPOS or scanline beyond those envelopes is a
-miss. A real overlap consumes the shell into its normal impact lifecycle and
+Viper owns the complete 16-HPOS by 15-scanline rectangle reconstructed from
+the final P0/P3 PMG DMA rows, including transparent PMG corners and internal
+gaps. The bolt owns eight HPOS and the six occupied scanlines of glyphs
+126/127 at the cached physical screen row selected by the active gameplay
+display list. Logical `player_y` and `BROAD_Y` are not compared directly.
+Exactly one HPOS or scanline beyond those final-raster envelopes is a miss. A
+real overlap consumes the shell into its normal impact lifecycle and
 applies the established capital damage of 20%, or two of ten HULL units,
 through the canonical player-damage pipeline.
 Shield, respawn invulnerability, the 25-frame post-hit cooldown, and the

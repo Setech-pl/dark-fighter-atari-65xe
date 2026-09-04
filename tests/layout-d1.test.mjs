@@ -89,14 +89,14 @@ test("Layout D.2 exact memory and transport budgets remain frozen", () => {
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [102, 45, 5641, 6643, 0x5e10],
-    [147, 8, 915, 915, 0x8c80],
+    [102, 45, 5644, 6643, 0x5e10],
+    [147, 8, 921, 921, 0x8c80],
     [155, 2, 229, 234, 0x5261],
     [157, 5, 585, 645, 0x9d75],
   ]);
   assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 17203);
-  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18827);
-  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3360);
+  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18833);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3354);
 });
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {

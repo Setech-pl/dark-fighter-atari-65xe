@@ -1,26 +1,26 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "generated_by": "scripts/runtime-wall-trace.mjs --capital-player-collision-only",
   "artifacts": {
     "dark-fighter-boot.bin": {
       "path": "dist/dark-fighter-boot.bin",
       "bytes": 20608,
-      "sha256": "2bd2177720536baf4d68f042ea6a14569f7485a58244a4b7195344e056db8338"
+      "sha256": "3f7f1a9682c6dd80757cec020da8de6aff7165ea52dd354f10f2a54273f7d913"
     },
     "dark-fighter.xex": {
       "path": "dist/dark-fighter.xex",
-      "bytes": 21393,
-      "sha256": "4d0ea0de63f01b736e846adaf88aa67fa9545462bae4127e7bf60bf4b3f6b2e0"
+      "bytes": 21399,
+      "sha256": "a90bee1db299f75e2faa0f69a07f1a2674d6c2c31cc6adef0ad2edd2bf4777e3"
     },
     "dark-fighter.atr": {
       "path": "dist/dark-fighter.atr",
       "bytes": 92176,
-      "sha256": "50d6c9aec0f4872ace9378dbe557a8d9ef9eb066f856f02d8dbaaf9765b2a343"
+      "sha256": "0cf4bd874465573cac888050e8639c783a6de95b60891e0984b735e5043700e7"
     },
     "dark-fighter-manifest.json": {
       "path": "dist/dark-fighter-manifest.json",
-      "bytes": 818468,
-      "sha256": "df59a6c246dc9a22c0c48e2b329c8855589dde6ccb76a42b439fa4d5f5550f78"
+      "bytes": 821945,
+      "sha256": "ae316bcaed2a95033a8fba2a7e3a5796810999a6e23dd3b8bd05b6e8554678a6"
     }
   },
   "geometry": {
@@ -28,16 +28,43 @@
       "width_hpos": 16,
       "height_scanlines": 15,
       "inclusive": true,
+      "source": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + DMA-to-capture mapping",
       "transparent_sprite_pixels_are_solid_for_gameplay": true
     },
     "bolt": {
       "width_hpos": 8,
       "height_scanlines": 6,
       "inclusive": true,
-      "top": "BROAD_Y-3",
-      "bottom": "BROAD_Y+2",
-      "raster_x_alignment": "BROAD_X & $FC"
+      "source": "cached physical row pointer + displayed LMS + screen RAM + glyph rows 1..6",
+      "raster_x_alignment": "two adjacent ANTIC 4 cells"
     }
+  },
+  "checkpoint_counterexample": {
+    "artifact": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-hitboxes.png",
+    "player_logical_y": 110,
+    "player_pmg_dma_rows": [
+      110,
+      124
+    ],
+    "player_final_raster": [
+      102,
+      116
+    ],
+    "bolt_logical_y": 108,
+    "bolt_physical_pointer": 33808,
+    "bolt_glyph_rows": [
+      1,
+      6
+    ],
+    "bolt_final_raster": [
+      113,
+      118
+    ],
+    "actual_overlap": [
+      113,
+      116
+    ],
+    "conclusion": "the former top label was a four-scanline lower-Viper contact"
   },
   "sessions": [
     {
@@ -49,43 +76,91 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19661912
+        "pc": 36478,
+        "clock": 22613834
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 110,
-          "bottom": 124
+          "left": 148,
+          "right": 163,
+          "top": 118,
+          "bottom": 132
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 110,
-          "bottom": 110
+          "left": 148,
+          "right": 151,
+          "top": 118,
+          "bottom": 118
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            126,
+            140
+          ],
+          "raster": [
+            148,
+            163,
+            118,
+            132
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 167,
+          "frame": 250,
           "player": {
-            "x": 124,
-            "y": 110,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 126,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -93,20 +168,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 108,
-            "raster_x": 116,
-            "physical_row_pointer": 33808,
-            "collision_or_backing": 4
+            "raster_x": 140,
+            "physical_row_pointer": 33408,
+            "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 168,
+          "frame": 251,
           "player": {
-            "x": 124,
-            "y": 110,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 148,
+            "y": 126,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -114,20 +189,20 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33368,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 169,
+          "frame": 252,
           "player": {
-            "x": 124,
-            "y": 110,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 148,
+            "y": 125,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -135,22 +210,24 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33368,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23197,
-        "gate_headroom": 9371,
+        "maximum_wall_cycles": 25963,
+        "gate_headroom": 6605,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -165,60 +242,109 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7353,
-        "sha256": "961ba4c84fb0c8f74d39223b2042ac404697c5f4e92874172fca16685d357ab9"
+        "bytes": 7544,
+        "sha256": "53bc0074bb1561166fe323b5d831a24a1bcb13f469b4f0971364ae07ae8d36d8"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-top.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-colonial-side",
+      "session": "capital-player-xex-1-colonial-middle",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
       "owner": "Colonial",
-      "contact": "side",
+      "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19661906
+        "pc": 36478,
+        "clock": 22613834
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 101,
-          "bottom": 115
+          "left": 148,
+          "right": 163,
+          "top": 109,
+          "bottom": 123
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 105,
-          "bottom": 110
+          "left": 148,
+          "right": 151,
+          "top": 113,
+          "bottom": 118
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            117,
+            131
+          ],
+          "raster": [
+            148,
+            163,
+            109,
+            123
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 167,
+          "frame": 250,
           "player": {
-            "x": 124,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 117,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -226,20 +352,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 108,
-            "raster_x": 116,
-            "physical_row_pointer": 33808,
-            "collision_or_backing": 4
+            "raster_x": 140,
+            "physical_row_pointer": 33408,
+            "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 168,
+          "frame": 251,
           "player": {
-            "x": 124,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 148,
+            "y": 117,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -247,20 +373,20 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33368,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 169,
+          "frame": 252,
           "player": {
-            "x": 124,
-            "y": 101,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 148,
+            "y": 116,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -268,26 +394,28 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33368,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23145,
-        "gate_headroom": 9423,
+        "maximum_wall_cycles": 25963,
+        "gate_headroom": 6605,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-side-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-side-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -298,13 +426,14 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7371,
-        "sha256": "51c8da80846e0721f10ec192bfa6a2baedbbf07319a5d679b5c902c0733427d1"
+        "bytes": 7545,
+        "sha256": "5014b35ee4752d6db05ace0caae27384c006418fb775d8ad4982ff960dc4e840"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-side.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-side-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-middle-broadside-compositor.jsonl"
     },
     {
       "session": "capital-player-xex-1-colonial-bottom",
@@ -315,43 +444,91 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19661906
+        "pc": 36478,
+        "clock": 22613834
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 91,
-          "bottom": 105
+          "left": 148,
+          "right": 163,
+          "top": 99,
+          "bottom": 113
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 105,
-          "bottom": 105
+          "left": 148,
+          "right": 151,
+          "top": 113,
+          "bottom": 113
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            107,
+            121
+          ],
+          "raster": [
+            148,
+            163,
+            99,
+            113
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 167,
+          "frame": 250,
           "player": {
-            "x": 124,
-            "y": 91,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 107,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -359,20 +536,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 108,
-            "raster_x": 116,
-            "physical_row_pointer": 33808,
-            "collision_or_backing": 4
+            "raster_x": 140,
+            "physical_row_pointer": 33408,
+            "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 168,
+          "frame": 251,
           "player": {
-            "x": 124,
-            "y": 91,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 148,
+            "y": 107,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -380,20 +557,20 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33368,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 169,
+          "frame": 252,
           "player": {
-            "x": 124,
-            "y": 91,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 148,
+            "y": 108,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -401,22 +578,24 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33368,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23145,
-        "gate_headroom": 9423,
+        "maximum_wall_cycles": 25953,
+        "gate_headroom": 6615,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -431,10 +610,11 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7349,
-        "sha256": "0df2f7a894801f1ee605ed22e1004fcc9b4fd81218e2997e96fcfcd61eabcf99"
+        "bytes": 7555,
+        "sha256": "ffad7304d59a085e9db8a2b28ddcee8286183c1bd7efebe5596f3dcc3e1ffa9e"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-broadside-compositor.jsonl"
@@ -448,103 +628,153 @@
       "expected_hit": false,
       "collision_decision": {
         "branch": "player_aabb_miss",
-        "pc": 36474,
-        "clock": 19661908
+        "pc": 36480,
+        "clock": 20052929
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 111,
-          "bottom": 125
+          "left": 148,
+          "right": 163,
+          "top": 119,
+          "bottom": 133
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": null,
         "hit": false
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            127,
+            141
+          ],
+          "raster": [
+            148,
+            163,
+            119,
+            133
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 167,
+          "frame": 178,
           "player": {
-            "x": 124,
-            "y": 111,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 127,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
-            "cooldown": 0
+            "cooldown": 20
           },
           "projectile": {
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 108,
-            "raster_x": 116,
-            "physical_row_pointer": 33808,
-            "collision_or_backing": 4
+            "raster_x": 140,
+            "physical_row_pointer": 33608,
+            "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 168,
+          "frame": 179,
           "player": {
-            "x": 124,
-            "y": 111,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 127,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
-            "cooldown": 0
+            "cooldown": 19
           },
           "projectile": {
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33568,
             "collision_or_backing": 0
           }
         },
         "after": {
-          "frame": 169,
+          "frame": 180,
           "player": {
-            "x": 124,
-            "y": 111,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 127,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
-            "cooldown": 0
+            "cooldown": 18
           },
           "projectile": {
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 122,
+            "logical_x": 146,
             "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
+            "raster_x": 144,
+            "physical_row_pointer": 33568,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 25047,
-        "gate_headroom": 7521,
+        "maximum_wall_cycles": 25247,
+        "gate_headroom": 7321,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -559,146 +789,14 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 6246,
-        "sha256": "5d522d7a6b52f5fe6558718487d72e09e4a2223cac452ae04c62205f23d4c2a7"
+        "bytes": 5873,
+        "sha256": "ec9dd5813ad7fc8d2dc58c4c24114b13b0480597905c2fb3b0af8634c30a2b6b"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-near.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-broadside-compositor.jsonl"
-    },
-    {
-      "session": "capital-player-xex-1-colonial-sweep",
-      "artifact": "XEX",
-      "difficulty": "MEDIUM",
-      "owner": "Colonial",
-      "contact": "sweep",
-      "expected_hit": true,
-      "collision_decision": {
-        "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19661906
-      },
-      "raster_geometry": {
-        "rule": "inclusive swept-AABB",
-        "player": {
-          "left": 124,
-          "right": 139,
-          "top": 101,
-          "bottom": 115
-        },
-        "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 105,
-          "bottom": 110
-        },
-        "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 105,
-          "bottom": 110
-        },
-        "hit": true
-      },
-      "frames": {
-        "before": {
-          "frame": 167,
-          "player": {
-            "x": 124,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 10,
-            "life": 3,
-            "cooldown": 0
-          },
-          "projectile": {
-            "slot": 0,
-            "owner": 0,
-            "state": 2,
-            "logical_x": 118,
-            "logical_y": 108,
-            "raster_x": 116,
-            "physical_row_pointer": 33808,
-            "collision_or_backing": 4
-          }
-        },
-        "contact": {
-          "frame": 168,
-          "player": {
-            "x": 124,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 25
-          },
-          "projectile": {
-            "slot": 0,
-            "owner": 0,
-            "state": 3,
-            "logical_x": 120,
-            "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
-            "collision_or_backing": 1
-          }
-        },
-        "after": {
-          "frame": 169,
-          "player": {
-            "x": 124,
-            "y": 101,
-            "hull_before": 8,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 24
-          },
-          "projectile": {
-            "slot": 0,
-            "owner": 0,
-            "state": 3,
-            "logical_x": 120,
-            "logical_y": 108,
-            "raster_x": 120,
-            "physical_row_pointer": 33768,
-            "collision_or_backing": 0
-          }
-        }
-      },
-      "timing": {
-        "maximum_wall_cycles": 23145,
-        "gate_headroom": 9423,
-        "missed_frames": 0,
-        "extra_vbi_boundaries": 0,
-        "physical_overruns": 0
-      },
-      "orphan_glyphs": 0,
-      "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep-sequence.png",
-      "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep-hitboxes.png",
-        "frames": [
-          "before",
-          "contact",
-          "after"
-        ],
-        "legend": {
-          "player_16x15": "cyan",
-          "bolt_current_8x6": "yellow",
-          "bolt_sweep": "red"
-        },
-        "width": 1008,
-        "height": 240,
-        "bytes": 7371,
-        "sha256": "51c8da80846e0721f10ec192bfa6a2baedbbf07319a5d679b5c902c0733427d1"
-      },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep-broadside-compositor.jsonl"
     },
     {
       "session": "capital-player-xex-1-cylon-top",
@@ -709,43 +807,91 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19697764
+        "pc": 36478,
+        "clock": 20978139
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 110,
-          "bottom": 124
+          "left": 84,
+          "right": 99,
+          "top": 118,
+          "bottom": 132
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 100,
+          "previous_right": 107,
+          "current_left": 96,
+          "current_right": 103,
+          "sweep_left": 96,
+          "sweep_right": 107,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 110,
-          "bottom": 110
+          "left": 96,
+          "right": 99,
+          "top": 118,
+          "bottom": 118
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            84,
+            84
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            126,
+            140
+          ],
+          "raster": [
+            84,
+            99,
+            118,
+            132
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 13,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            100,
+            107,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 168,
+          "frame": 204,
           "player": {
-            "x": 154,
-            "y": 110,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 84,
+            "y": 126,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -753,20 +899,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 100,
             "logical_y": 108,
-            "raster_x": 172,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 207
+            "raster_x": 100,
+            "physical_row_pointer": 33128,
+            "collision_or_backing": 2
           }
         },
         "contact": {
-          "frame": 169,
+          "frame": 205,
           "player": {
-            "x": 154,
-            "y": 110,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 84,
+            "y": 126,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -774,20 +920,20 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 98,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
+            "raster_x": 96,
+            "physical_row_pointer": 33128,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 170,
+          "frame": 206,
           "player": {
-            "x": 154,
-            "y": 110,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 84,
+            "y": 125,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -795,22 +941,24 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 98,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
+            "raster_x": 96,
+            "physical_row_pointer": 33088,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23941,
-        "gate_headroom": 8627,
+        "maximum_wall_cycles": 24625,
+        "gate_headroom": 7943,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -825,60 +973,109 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7056,
-        "sha256": "98d805e9fbdcf1d526dffeb6047f94fb1d468e72c211f10fb2359ff83d70e892"
+        "bytes": 7403,
+        "sha256": "2fca5d3e89574169dfa884b0d79ce67228a60abd4349eb5b6f52ddf33c4374aa"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-top.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-xex-1-cylon-side",
+      "session": "capital-player-xex-1-cylon-middle",
       "artifact": "XEX",
       "difficulty": "MEDIUM",
       "owner": "Cylon",
-      "contact": "side",
+      "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19697764
+        "pc": 36478,
+        "clock": 20978135
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 101,
-          "bottom": 115
+          "left": 84,
+          "right": 99,
+          "top": 109,
+          "bottom": 123
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 100,
+          "previous_right": 107,
+          "current_left": 96,
+          "current_right": 103,
+          "sweep_left": 96,
+          "sweep_right": 107,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 105,
-          "bottom": 110
+          "left": 96,
+          "right": 99,
+          "top": 113,
+          "bottom": 118
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            84,
+            84
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            117,
+            131
+          ],
+          "raster": [
+            84,
+            99,
+            109,
+            123
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 13,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            100,
+            107,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 168,
+          "frame": 204,
           "player": {
-            "x": 154,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 84,
+            "y": 117,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -886,20 +1083,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 100,
             "logical_y": 108,
-            "raster_x": 172,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 207
+            "raster_x": 100,
+            "physical_row_pointer": 33128,
+            "collision_or_backing": 2
           }
         },
         "contact": {
-          "frame": 169,
+          "frame": 205,
           "player": {
-            "x": 154,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 84,
+            "y": 117,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -907,20 +1104,20 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 98,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
+            "raster_x": 96,
+            "physical_row_pointer": 33128,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 170,
+          "frame": 206,
           "player": {
-            "x": 154,
-            "y": 101,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 84,
+            "y": 116,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -928,26 +1125,28 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 98,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
+            "raster_x": 96,
+            "physical_row_pointer": 33088,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23941,
-        "gate_headroom": 8627,
+        "maximum_wall_cycles": 24625,
+        "gate_headroom": 7943,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-side-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-side-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -958,13 +1157,14 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7058,
-        "sha256": "305df53c2f75c4c260fb8e1ca159b3872d2ef112deacc33878e043a75a00d840"
+        "bytes": 7438,
+        "sha256": "ddeee8396124e73949e1f6a978420d60f348e82c6219485014c013b8eb6ce89f"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-side.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-side-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-middle-broadside-compositor.jsonl"
     },
     {
       "session": "capital-player-xex-1-cylon-bottom",
@@ -975,43 +1175,91 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19697764
+        "pc": 36478,
+        "clock": 20978139
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 91,
-          "bottom": 105
+          "left": 84,
+          "right": 99,
+          "top": 99,
+          "bottom": 113
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 100,
+          "previous_right": 107,
+          "current_left": 96,
+          "current_right": 103,
+          "sweep_left": 96,
+          "sweep_right": 107,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 105,
-          "bottom": 105
+          "left": 96,
+          "right": 99,
+          "top": 113,
+          "bottom": 113
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            84,
+            84
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            107,
+            121
+          ],
+          "raster": [
+            84,
+            99,
+            99,
+            113
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 13,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            100,
+            107,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 168,
+          "frame": 204,
           "player": {
-            "x": 154,
-            "y": 91,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 84,
+            "y": 107,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1019,20 +1267,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 100,
             "logical_y": 108,
-            "raster_x": 172,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 207
+            "raster_x": 100,
+            "physical_row_pointer": 33128,
+            "collision_or_backing": 2
           }
         },
         "contact": {
-          "frame": 169,
+          "frame": 205,
           "player": {
-            "x": 154,
-            "y": 91,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 84,
+            "y": 107,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -1040,20 +1288,20 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 98,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
+            "raster_x": 96,
+            "physical_row_pointer": 33128,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 170,
+          "frame": 206,
           "player": {
-            "x": 154,
-            "y": 91,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 84,
+            "y": 106,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -1061,22 +1309,24 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 98,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
+            "raster_x": 96,
+            "physical_row_pointer": 33088,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23941,
-        "gate_headroom": 8627,
+        "maximum_wall_cycles": 24625,
+        "gate_headroom": 7943,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -1091,10 +1341,11 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7059,
-        "sha256": "d1838ef22446ebbce896b0930a0b792aec03f9fb5add5eaea54b5c8cc800d9fb"
+        "bytes": 7442,
+        "sha256": "4b550c22767c7a1c7b55170eed6c309986068bc09280dc410c087d0c3e564e88"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-broadside-compositor.jsonl"
@@ -1108,38 +1359,86 @@
       "expected_hit": false,
       "collision_decision": {
         "branch": "player_aabb_miss",
-        "pc": 36474,
-        "clock": 19697760
+        "pc": 36480,
+        "clock": 20978131
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 111,
-          "bottom": 125
+          "left": 84,
+          "right": 99,
+          "top": 119,
+          "bottom": 133
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 105,
-          "bottom": 110
+          "previous_left": 100,
+          "previous_right": 107,
+          "current_left": 96,
+          "current_right": 103,
+          "sweep_left": 96,
+          "sweep_right": 107,
+          "top": 113,
+          "bottom": 118
         },
         "overlap": null,
         "hit": false
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            84,
+            84
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            127,
+            141
+          ],
+          "raster": [
+            84,
+            99,
+            119,
+            133
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32570,
+          "screen_column": 13,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            100,
+            107,
+            113,
+            118
+          ],
+          "cache_top": 113
+        }
+      },
       "frames": {
         "before": {
-          "frame": 168,
+          "frame": 204,
           "player": {
-            "x": 154,
-            "y": 111,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 84,
+            "y": 127,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1147,20 +1446,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 100,
             "logical_y": 108,
-            "raster_x": 172,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 207
+            "raster_x": 100,
+            "physical_row_pointer": 33128,
+            "collision_or_backing": 2
           }
         },
         "contact": {
-          "frame": 169,
+          "frame": 205,
           "player": {
-            "x": 154,
-            "y": 111,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 84,
+            "y": 127,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1168,20 +1467,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 170,
+            "logical_x": 98,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 210
+            "raster_x": 96,
+            "physical_row_pointer": 33128,
+            "collision_or_backing": 0
           }
         },
         "after": {
-          "frame": 170,
+          "frame": 206,
           "player": {
-            "x": 154,
-            "y": 111,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 84,
+            "y": 127,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1189,22 +1488,24 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 168,
+            "logical_x": 96,
             "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 210
+            "raster_x": 96,
+            "physical_row_pointer": 33088,
+            "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 25047,
-        "gate_headroom": 7521,
+        "maximum_wall_cycles": 25223,
+        "gate_headroom": 7345,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -1219,146 +1520,14 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 5333,
-        "sha256": "a1de956ec4bff0b610794361f455ba1b166ba56a8dc9189cdb4d9e2e1b5015f5"
+        "bytes": 6307,
+        "sha256": "6df1d2145ffe92fab589a34562110ee1cb8317d48396e682489db631e73a7ba1"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-near.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-broadside-compositor.jsonl"
-    },
-    {
-      "session": "capital-player-xex-1-cylon-sweep",
-      "artifact": "XEX",
-      "difficulty": "MEDIUM",
-      "owner": "Cylon",
-      "contact": "sweep",
-      "expected_hit": true,
-      "collision_decision": {
-        "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 19697764
-      },
-      "raster_geometry": {
-        "rule": "inclusive swept-AABB",
-        "player": {
-          "left": 154,
-          "right": 169,
-          "top": 101,
-          "bottom": 115
-        },
-        "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 105,
-          "bottom": 110
-        },
-        "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 105,
-          "bottom": 110
-        },
-        "hit": true
-      },
-      "frames": {
-        "before": {
-          "frame": 168,
-          "player": {
-            "x": 154,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 10,
-            "life": 3,
-            "cooldown": 0
-          },
-          "projectile": {
-            "slot": 1,
-            "owner": 1,
-            "state": 2,
-            "logical_x": 172,
-            "logical_y": 108,
-            "raster_x": 172,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 207
-          }
-        },
-        "contact": {
-          "frame": 169,
-          "player": {
-            "x": 154,
-            "y": 101,
-            "hull_before": 10,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 25
-          },
-          "projectile": {
-            "slot": 1,
-            "owner": 1,
-            "state": 3,
-            "logical_x": 170,
-            "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 1
-          }
-        },
-        "after": {
-          "frame": 170,
-          "player": {
-            "x": 154,
-            "y": 101,
-            "hull_before": 8,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 24
-          },
-          "projectile": {
-            "slot": 1,
-            "owner": 1,
-            "state": 3,
-            "logical_x": 170,
-            "logical_y": 108,
-            "raster_x": 168,
-            "physical_row_pointer": 33728,
-            "collision_or_backing": 0
-          }
-        }
-      },
-      "timing": {
-        "maximum_wall_cycles": 23941,
-        "gate_headroom": 8627,
-        "missed_frames": 0,
-        "extra_vbi_boundaries": 0,
-        "physical_overruns": 0
-      },
-      "orphan_glyphs": 0,
-      "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep-sequence.png",
-      "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep-hitboxes.png",
-        "frames": [
-          "before",
-          "contact",
-          "after"
-        ],
-        "legend": {
-          "player_16x15": "cyan",
-          "bolt_current_8x6": "yellow",
-          "bolt_sweep": "red"
-        },
-        "width": 1008,
-        "height": 240,
-        "bytes": 7058,
-        "sha256": "305df53c2f75c4c260fb8e1ca159b3872d2ef112deacc33878e043a75a00d840"
-      },
-      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep-broadside-compositor.jsonl"
     },
     {
       "session": "capital-player-atr-2-colonial-top",
@@ -1369,43 +1538,91 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24321459
+        "pc": 36478,
+        "clock": 27024372
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 118,
-          "bottom": 132
+          "left": 148,
+          "right": 163,
+          "top": 126,
+          "bottom": 140
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 118,
-          "bottom": 118
+          "left": 148,
+          "right": 151,
+          "top": 126,
+          "bottom": 126
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            134,
+            148
+          ],
+          "raster": [
+            148,
+            163,
+            126,
+            140
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32618,
+          "display_instruction": 32663,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 158,
+          "frame": 234,
           "player": {
-            "x": 124,
-            "y": 118,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 134,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1413,20 +1630,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 116,
-            "raster_x": 116,
-            "physical_row_pointer": 33688,
+            "raster_x": 140,
+            "physical_row_pointer": 33248,
             "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 159,
+          "frame": 235,
           "player": {
-            "x": 124,
-            "y": 118,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 148,
+            "y": 134,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -1434,20 +1651,20 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 160,
+          "frame": 236,
           "player": {
-            "x": 124,
-            "y": 118,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 148,
+            "y": 133,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -1455,22 +1672,24 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23787,
-        "gate_headroom": 8781,
+        "maximum_wall_cycles": 26397,
+        "gate_headroom": 6171,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -1485,60 +1704,109 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7438,
-        "sha256": "73b446d2bcdc6f9d80742a25eb4203a6043ef0914eefdd135c1ce4e3c7c4f9a1"
+        "bytes": 7622,
+        "sha256": "e636458993e0b2de28c15003d7c8a284cef2dbf7dd272e24df8a345815a46df8"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-top.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-colonial-side",
+      "session": "capital-player-atr-2-colonial-middle",
       "artifact": "ATR",
       "difficulty": "HARD",
       "owner": "Colonial",
-      "contact": "side",
+      "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24321464
+        "pc": 36478,
+        "clock": 27024366
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 109,
-          "bottom": 123
+          "left": 148,
+          "right": 163,
+          "top": 117,
+          "bottom": 131
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 113,
-          "bottom": 118
+          "left": 148,
+          "right": 151,
+          "top": 121,
+          "bottom": 126
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            125,
+            139
+          ],
+          "raster": [
+            148,
+            163,
+            117,
+            131
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32618,
+          "display_instruction": 32663,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 158,
+          "frame": 234,
           "player": {
-            "x": 124,
-            "y": 109,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 125,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1546,20 +1814,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 116,
-            "raster_x": 116,
-            "physical_row_pointer": 33688,
+            "raster_x": 140,
+            "physical_row_pointer": 33248,
             "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 159,
+          "frame": 235,
           "player": {
-            "x": 124,
-            "y": 109,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 148,
+            "y": 125,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -1567,20 +1835,20 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 160,
+          "frame": 236,
           "player": {
-            "x": 124,
-            "y": 109,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 148,
+            "y": 124,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -1588,26 +1856,28 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23787,
-        "gate_headroom": 8781,
+        "maximum_wall_cycles": 26815,
+        "gate_headroom": 5753,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-side-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-side-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -1618,13 +1888,14 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7445,
-        "sha256": "791277e526214225061dbb09cb269335ccd4277685921cbfb47e62aae8ffdb22"
+        "bytes": 7611,
+        "sha256": "e54c5bcae56c07634f63c1b301de072011343c738797e49b4447c8a18a0091e2"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-side.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-side-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-middle-broadside-compositor.jsonl"
     },
     {
       "session": "capital-player-atr-2-colonial-bottom",
@@ -1635,43 +1906,91 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24321464
+        "pc": 36478,
+        "clock": 27024372
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 99,
-          "bottom": 113
+          "left": 148,
+          "right": 163,
+          "top": 107,
+          "bottom": 121
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 113,
-          "bottom": 113
+          "left": 148,
+          "right": 151,
+          "top": 121,
+          "bottom": 121
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            115,
+            129
+          ],
+          "raster": [
+            148,
+            163,
+            107,
+            121
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32618,
+          "display_instruction": 32663,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 158,
+          "frame": 234,
           "player": {
-            "x": 124,
-            "y": 99,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 115,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1679,20 +1998,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 116,
-            "raster_x": 116,
-            "physical_row_pointer": 33688,
+            "raster_x": 140,
+            "physical_row_pointer": 33248,
             "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 159,
+          "frame": 235,
           "player": {
-            "x": 124,
-            "y": 99,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 148,
+            "y": 115,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -1700,20 +2019,20 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 160,
+          "frame": 236,
           "player": {
-            "x": 124,
-            "y": 99,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 148,
+            "y": 114,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -1721,22 +2040,24 @@
             "slot": 0,
             "owner": 0,
             "state": 3,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 23775,
-        "gate_headroom": 8793,
+        "maximum_wall_cycles": 25852,
+        "gate_headroom": 6716,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -1751,10 +2072,11 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7404,
-        "sha256": "2eed89f3c3b3241700a5cda6fdde4e3042df4d74b379f3070ded75cc8bad2aca"
+        "bytes": 7647,
+        "sha256": "f6c6054d87cbb2c62fd103deb22770577ff5732a7e2f9d4dec4ac3ba8aa40c73"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-broadside-compositor.jsonl"
@@ -1768,38 +2090,86 @@
       "expected_hit": false,
       "collision_decision": {
         "branch": "player_aabb_miss",
-        "pc": 36474,
-        "clock": 24321455
+        "pc": 36480,
+        "clock": 27024364
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 124,
-          "right": 139,
-          "top": 119,
-          "bottom": 133
+          "left": 148,
+          "right": 163,
+          "top": 127,
+          "bottom": 141
         },
         "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 140,
+          "previous_right": 147,
+          "current_left": 144,
+          "current_right": 151,
+          "sweep_left": 140,
+          "sweep_right": 151,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": null,
         "hit": false
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            148,
+            148
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            135,
+            149
+          ],
+          "raster": [
+            148,
+            163,
+            127,
+            141
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32618,
+          "display_instruction": 32663,
+          "screen_column": 23,
+          "screen_codes": [
+            126,
+            127
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            140,
+            147,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 158,
+          "frame": 234,
           "player": {
-            "x": 124,
-            "y": 119,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 135,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1807,20 +2177,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 118,
+            "logical_x": 142,
             "logical_y": 116,
-            "raster_x": 116,
-            "physical_row_pointer": 33688,
+            "raster_x": 140,
+            "physical_row_pointer": 33248,
             "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 159,
+          "frame": 235,
           "player": {
-            "x": 124,
-            "y": 119,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 135,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1828,20 +2198,20 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 120,
+            "logical_x": 144,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 0
           }
         },
         "after": {
-          "frame": 160,
+          "frame": 236,
           "player": {
-            "x": 124,
-            "y": 119,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 148,
+            "y": 135,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -1849,22 +2219,24 @@
             "slot": 0,
             "owner": 0,
             "state": 2,
-            "logical_x": 122,
+            "logical_x": 146,
             "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
+            "raster_x": 144,
+            "physical_row_pointer": 33208,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 26993,
-        "gate_headroom": 5575,
+        "maximum_wall_cycles": 25949,
+        "gate_headroom": 6619,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -1879,146 +2251,14 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 6254,
-        "sha256": "271291084d2101e65929667379a66595c21a9c3e8c0dd2fc6e40def851a53549"
+        "bytes": 6339,
+        "sha256": "f469c32af5dbaadaec2d918360ba7682b6f6944365dafd773916fd15a105500b"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-near.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-broadside-compositor.jsonl"
-    },
-    {
-      "session": "capital-player-atr-2-colonial-sweep",
-      "artifact": "ATR",
-      "difficulty": "HARD",
-      "owner": "Colonial",
-      "contact": "sweep",
-      "expected_hit": true,
-      "collision_decision": {
-        "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24321464
-      },
-      "raster_geometry": {
-        "rule": "inclusive swept-AABB",
-        "player": {
-          "left": 124,
-          "right": 139,
-          "top": 109,
-          "bottom": 123
-        },
-        "bolt": {
-          "previous_left": 116,
-          "previous_right": 123,
-          "current_left": 120,
-          "current_right": 127,
-          "sweep_left": 116,
-          "sweep_right": 127,
-          "top": 113,
-          "bottom": 118
-        },
-        "overlap": {
-          "left": 124,
-          "right": 127,
-          "top": 113,
-          "bottom": 118
-        },
-        "hit": true
-      },
-      "frames": {
-        "before": {
-          "frame": 158,
-          "player": {
-            "x": 124,
-            "y": 109,
-            "hull_before": 10,
-            "hull_after": 10,
-            "life": 3,
-            "cooldown": 0
-          },
-          "projectile": {
-            "slot": 0,
-            "owner": 0,
-            "state": 2,
-            "logical_x": 118,
-            "logical_y": 116,
-            "raster_x": 116,
-            "physical_row_pointer": 33688,
-            "collision_or_backing": 0
-          }
-        },
-        "contact": {
-          "frame": 159,
-          "player": {
-            "x": 124,
-            "y": 109,
-            "hull_before": 10,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 25
-          },
-          "projectile": {
-            "slot": 0,
-            "owner": 0,
-            "state": 3,
-            "logical_x": 120,
-            "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 1
-          }
-        },
-        "after": {
-          "frame": 160,
-          "player": {
-            "x": 124,
-            "y": 109,
-            "hull_before": 8,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 24
-          },
-          "projectile": {
-            "slot": 0,
-            "owner": 0,
-            "state": 3,
-            "logical_x": 120,
-            "logical_y": 116,
-            "raster_x": 120,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 0
-          }
-        }
-      },
-      "timing": {
-        "maximum_wall_cycles": 23787,
-        "gate_headroom": 8781,
-        "missed_frames": 0,
-        "extra_vbi_boundaries": 0,
-        "physical_overruns": 0
-      },
-      "orphan_glyphs": 0,
-      "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep-sequence.png",
-      "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep-hitboxes.png",
-        "frames": [
-          "before",
-          "contact",
-          "after"
-        ],
-        "legend": {
-          "player_16x15": "cyan",
-          "bolt_current_8x6": "yellow",
-          "bolt_sweep": "red"
-        },
-        "width": 1008,
-        "height": 240,
-        "bytes": 7445,
-        "sha256": "791277e526214225061dbb09cb269335ccd4277685921cbfb47e62aae8ffdb22"
-      },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep-broadside-compositor.jsonl"
     },
     {
       "session": "capital-player-atr-2-cylon-top",
@@ -2029,43 +2269,91 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24286038
+        "pc": 36478,
+        "clock": 31969358
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 118,
-          "bottom": 132
+          "left": 96,
+          "right": 111,
+          "top": 126,
+          "bottom": 140
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 92,
+          "previous_right": 99,
+          "current_left": 88,
+          "current_right": 95,
+          "sweep_left": 88,
+          "sweep_right": 99,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 118,
-          "bottom": 118
+          "left": 96,
+          "right": 99,
+          "top": 126,
+          "bottom": 126
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            96,
+            96
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            134,
+            148
+          ],
+          "raster": [
+            96,
+            111,
+            126,
+            140
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32618,
+          "display_instruction": 32663,
+          "screen_column": 11,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            92,
+            99,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 157,
+          "frame": 373,
           "player": {
-            "x": 154,
-            "y": 118,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 96,
+            "y": 135,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -2073,20 +2361,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 92,
             "logical_y": 116,
-            "raster_x": 172,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 207
+            "raster_x": 92,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 1
           }
         },
         "contact": {
-          "frame": 158,
+          "frame": 374,
           "player": {
-            "x": 154,
-            "y": 118,
-            "hull_before": 10,
-            "hull_after": 8,
+            "x": 96,
+            "y": 134,
+            "hull_before": 8,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 25
           },
@@ -2094,20 +2382,20 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 90,
             "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
+            "raster_x": 88,
+            "physical_row_pointer": 33688,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 159,
+          "frame": 375,
           "player": {
-            "x": 154,
-            "y": 118,
-            "hull_before": 8,
-            "hull_after": 8,
+            "x": 96,
+            "y": 133,
+            "hull_before": 6,
+            "hull_after": 6,
             "life": 3,
             "cooldown": 24
           },
@@ -2115,22 +2403,24 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 90,
             "logical_y": 116,
-            "raster_x": 168,
+            "raster_x": 88,
             "physical_row_pointer": 33648,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 24057,
-        "gate_headroom": 8511,
+        "maximum_wall_cycles": 26053,
+        "gate_headroom": 6515,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -2145,58 +2435,107 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7418,
-        "sha256": "701ba9ee3b78a974d955e80aa144f1545527a706682e3f661dcef4a9864b64e2"
+        "bytes": 7236,
+        "sha256": "6932df7200d8216550c9aa6c75d395045594826a134da1ca675177c75acf27d6"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-top.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-broadside-compositor.jsonl"
     },
     {
-      "session": "capital-player-atr-2-cylon-side",
+      "session": "capital-player-atr-2-cylon-middle",
       "artifact": "ATR",
       "difficulty": "HARD",
       "owner": "Cylon",
-      "contact": "side",
+      "contact": "middle",
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24286034
+        "pc": 36478,
+        "clock": 25495233
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 109,
-          "bottom": 123
+          "left": 88,
+          "right": 103,
+          "top": 117,
+          "bottom": 131
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 104,
+          "previous_right": 111,
+          "current_left": 100,
+          "current_right": 107,
+          "sweep_left": 100,
+          "sweep_right": 111,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 113,
-          "bottom": 118
+          "left": 100,
+          "right": 103,
+          "top": 121,
+          "bottom": 126
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            88,
+            88
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            125,
+            139
+          ],
+          "raster": [
+            88,
+            103,
+            117,
+            131
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32573,
+          "screen_column": 14,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            104,
+            111,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 157,
+          "frame": 191,
           "player": {
-            "x": 154,
-            "y": 109,
+            "x": 88,
+            "y": 125,
             "hull_before": 10,
             "hull_after": 10,
             "life": 3,
@@ -2206,18 +2545,18 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 104,
             "logical_y": 116,
-            "raster_x": 172,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 207
+            "raster_x": 104,
+            "physical_row_pointer": 34088,
+            "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 158,
+          "frame": 192,
           "player": {
-            "x": 154,
-            "y": 109,
+            "x": 88,
+            "y": 125,
             "hull_before": 10,
             "hull_after": 8,
             "life": 3,
@@ -2227,18 +2566,18 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 102,
             "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
+            "raster_x": 100,
+            "physical_row_pointer": 34088,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 159,
+          "frame": 193,
           "player": {
-            "x": 154,
-            "y": 109,
+            "x": 88,
+            "y": 124,
             "hull_before": 8,
             "hull_after": 8,
             "life": 3,
@@ -2248,26 +2587,28 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 102,
             "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
+            "raster_x": 100,
+            "physical_row_pointer": 34048,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 24051,
-        "gate_headroom": 8517,
+        "maximum_wall_cycles": 26880,
+        "gate_headroom": 5688,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-side-sequence.png",
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle-sequence.png",
       "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-side-hitboxes.png",
+        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle-hitboxes.png",
         "frames": [
           "before",
           "contact",
@@ -2278,13 +2619,14 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7411,
-        "sha256": "b8a91de76f279a2e83f9be75dc29b8493c1464b6b60443d9adb57269f28469fc"
+        "bytes": 7578,
+        "sha256": "c72fe4ab49abc835f7e7c3cf0361041049527714239147f47bd89578a573b9fe"
       },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-side.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-side-broadside-compositor.jsonl"
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-middle-broadside-compositor.jsonl"
     },
     {
       "session": "capital-player-atr-2-cylon-bottom",
@@ -2295,41 +2637,89 @@
       "expected_hit": true,
       "collision_decision": {
         "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24286034
+        "pc": 36478,
+        "clock": 25353275
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 99,
-          "bottom": 113
+          "left": 96,
+          "right": 111,
+          "top": 107,
+          "bottom": 121
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 112,
+          "previous_right": 119,
+          "current_left": 108,
+          "current_right": 115,
+          "sweep_left": 108,
+          "sweep_right": 119,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 113,
-          "bottom": 113
+          "left": 108,
+          "right": 111,
+          "top": 121,
+          "bottom": 121
         },
         "hit": true
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            96,
+            96
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            115,
+            129
+          ],
+          "raster": [
+            96,
+            111,
+            107,
+            121
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32573,
+          "screen_column": 16,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            112,
+            119,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 157,
+          "frame": 187,
           "player": {
-            "x": 154,
-            "y": 99,
+            "x": 96,
+            "y": 115,
             "hull_before": 10,
             "hull_after": 10,
             "life": 3,
@@ -2339,18 +2729,18 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 112,
             "logical_y": 116,
-            "raster_x": 172,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 207
+            "raster_x": 112,
+            "physical_row_pointer": 33088,
+            "collision_or_backing": 0
           }
         },
         "contact": {
-          "frame": 158,
+          "frame": 188,
           "player": {
-            "x": 154,
-            "y": 99,
+            "x": 96,
+            "y": 115,
             "hull_before": 10,
             "hull_after": 8,
             "life": 3,
@@ -2360,18 +2750,18 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 110,
             "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
+            "raster_x": 108,
+            "physical_row_pointer": 33088,
             "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 159,
+          "frame": 189,
           "player": {
-            "x": 154,
-            "y": 99,
+            "x": 96,
+            "y": 114,
             "hull_before": 8,
             "hull_after": 8,
             "life": 3,
@@ -2381,22 +2771,24 @@
             "slot": 1,
             "owner": 1,
             "state": 3,
-            "logical_x": 170,
+            "logical_x": 110,
             "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
+            "raster_x": 108,
+            "physical_row_pointer": 34128,
             "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 24050,
-        "gate_headroom": 8518,
+        "maximum_wall_cycles": 25991,
+        "gate_headroom": 6577,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -2411,10 +2803,11 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 7414,
-        "sha256": "49190059461d264773fef2ae14498fbc72a7d9f14dea2bd169f299b5b8f936a3"
+        "bytes": 7577,
+        "sha256": "57f5d904907f966d4d47d5ac1ca95f9ffad8dca85d7a7b3576cfbe22a196c333"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-broadside-compositor.jsonl"
@@ -2428,38 +2821,86 @@
       "expected_hit": false,
       "collision_decision": {
         "branch": "player_aabb_miss",
-        "pc": 36474,
-        "clock": 24286034
+        "pc": 36480,
+        "clock": 31933726
       },
       "raster_geometry": {
         "rule": "inclusive swept-AABB",
+        "oracle": {
+          "player": "P0/P3 bytes + HPOSP0/HPOSP3 + SIZEP0/SIZEP3 + capture DMA origin",
+          "bolt": "cached physical row pointer + displayed LMS + screen codes + glyph rows"
+        },
         "player": {
-          "left": 154,
-          "right": 169,
-          "top": 119,
-          "bottom": 133
+          "left": 96,
+          "right": 111,
+          "top": 127,
+          "bottom": 141
         },
         "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 113,
-          "bottom": 118
+          "previous_left": 92,
+          "previous_right": 99,
+          "current_left": 92,
+          "current_right": 99,
+          "sweep_left": 92,
+          "sweep_right": 99,
+          "top": 121,
+          "bottom": 126
         },
         "overlap": null,
         "hit": false
       },
+      "physical_oracle": {
+        "player": {
+          "valid": 1,
+          "hpos": [
+            96,
+            96
+          ],
+          "size": [
+            1,
+            1
+          ],
+          "pmg_dma": [
+            135,
+            149
+          ],
+          "raster": [
+            96,
+            111,
+            127,
+            141
+          ]
+        },
+        "bolt": {
+          "valid": 1,
+          "display_list": 32528,
+          "display_instruction": 32573,
+          "screen_column": 11,
+          "screen_codes": [
+            254,
+            255
+          ],
+          "glyph_rows": [
+            1,
+            6
+          ],
+          "raster": [
+            92,
+            99,
+            121,
+            126
+          ],
+          "cache_top": 121
+        }
+      },
       "frames": {
         "before": {
-          "frame": 157,
+          "frame": 372,
           "player": {
-            "x": 154,
-            "y": 119,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 96,
+            "y": 136,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -2467,20 +2908,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 172,
+            "logical_x": 94,
             "logical_y": 116,
-            "raster_x": 172,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 207
+            "raster_x": 92,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 1
           }
         },
         "contact": {
-          "frame": 158,
+          "frame": 373,
           "player": {
-            "x": 154,
-            "y": 119,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 96,
+            "y": 135,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -2488,20 +2929,20 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 170,
+            "logical_x": 92,
             "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 210
+            "raster_x": 92,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 1
           }
         },
         "after": {
-          "frame": 159,
+          "frame": 374,
           "player": {
-            "x": 154,
-            "y": 119,
-            "hull_before": 10,
-            "hull_after": 10,
+            "x": 96,
+            "y": 135,
+            "hull_before": 8,
+            "hull_after": 8,
             "life": 3,
             "cooldown": 0
           },
@@ -2509,22 +2950,24 @@
             "slot": 1,
             "owner": 1,
             "state": 2,
-            "logical_x": 168,
+            "logical_x": 90,
             "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 210
+            "raster_x": 88,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 0
           }
         }
       },
       "timing": {
-        "maximum_wall_cycles": 26993,
-        "gate_headroom": 5575,
+        "maximum_wall_cycles": 26053,
+        "gate_headroom": 6515,
         "missed_frames": 0,
         "extra_vbi_boundaries": 0,
         "physical_overruns": 0
       },
       "orphan_glyphs": 0,
+      "orphan_pmg_scanlines": 0,
+      "missing_pmg_scanlines": 0,
       "transient_backing_glyphs": 0,
       "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-sequence.png",
       "hitbox_screenshot_sequence": {
@@ -2539,147 +2982,18 @@
           "bolt_current_8x6": "yellow",
           "bolt_sweep": "red"
         },
+        "overlay_asserted_against_physical_oracle": true,
         "width": 1008,
         "height": 240,
-        "bytes": 6235,
-        "sha256": "b0c76fa126f9022e05526a9b14af089ce61669003a4caa46ac847fed8de05762"
+        "bytes": 6171,
+        "sha256": "1e3c1c6f3ab7dd9951d252d7429d588f1fd5c148a647c4215bac103465ecf472"
       },
       "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-near.csv",
       "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-broadside-compositor.jsonl"
-    },
-    {
-      "session": "capital-player-atr-2-cylon-sweep",
-      "artifact": "ATR",
-      "difficulty": "HARD",
-      "owner": "Cylon",
-      "contact": "sweep",
-      "expected_hit": true,
-      "collision_decision": {
-        "branch": "player_aabb_hit",
-        "pc": 36472,
-        "clock": 24286034
-      },
-      "raster_geometry": {
-        "rule": "inclusive swept-AABB",
-        "player": {
-          "left": 154,
-          "right": 169,
-          "top": 109,
-          "bottom": 123
-        },
-        "bolt": {
-          "previous_left": 172,
-          "previous_right": 179,
-          "current_left": 168,
-          "current_right": 175,
-          "sweep_left": 168,
-          "sweep_right": 179,
-          "top": 113,
-          "bottom": 118
-        },
-        "overlap": {
-          "left": 168,
-          "right": 169,
-          "top": 113,
-          "bottom": 118
-        },
-        "hit": true
-      },
-      "frames": {
-        "before": {
-          "frame": 157,
-          "player": {
-            "x": 154,
-            "y": 109,
-            "hull_before": 10,
-            "hull_after": 10,
-            "life": 3,
-            "cooldown": 0
-          },
-          "projectile": {
-            "slot": 1,
-            "owner": 1,
-            "state": 2,
-            "logical_x": 172,
-            "logical_y": 116,
-            "raster_x": 172,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 207
-          }
-        },
-        "contact": {
-          "frame": 158,
-          "player": {
-            "x": 154,
-            "y": 109,
-            "hull_before": 10,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 25
-          },
-          "projectile": {
-            "slot": 1,
-            "owner": 1,
-            "state": 3,
-            "logical_x": 170,
-            "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 1
-          }
-        },
-        "after": {
-          "frame": 159,
-          "player": {
-            "x": 154,
-            "y": 109,
-            "hull_before": 8,
-            "hull_after": 8,
-            "life": 3,
-            "cooldown": 24
-          },
-          "projectile": {
-            "slot": 1,
-            "owner": 1,
-            "state": 3,
-            "logical_x": 170,
-            "logical_y": 116,
-            "raster_x": 168,
-            "physical_row_pointer": 33648,
-            "collision_or_backing": 0
-          }
-        }
-      },
-      "timing": {
-        "maximum_wall_cycles": 24051,
-        "gate_headroom": 8517,
-        "missed_frames": 0,
-        "extra_vbi_boundaries": 0,
-        "physical_overruns": 0
-      },
-      "orphan_glyphs": 0,
-      "transient_backing_glyphs": 0,
-      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep-sequence.png",
-      "hitbox_screenshot_sequence": {
-        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep-hitboxes.png",
-        "frames": [
-          "before",
-          "contact",
-          "after"
-        ],
-        "legend": {
-          "player_16x15": "cyan",
-          "bolt_current_8x6": "yellow",
-          "bolt_sweep": "red"
-        },
-        "width": 1008,
-        "height": 240,
-        "bytes": 7411,
-        "sha256": "b8a91de76f279a2e83f9be75dc29b8493c1464b6b60443d9adb57269f28469fc"
-      },
-      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep.csv",
-      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep-broadside-compositor.jsonl"
     }
   ],
-  "passed": true
+  "passed": true,
+  "durable_evidence": true,
+  "source_report_sha256": "8cd1de2834bc6cabdcc1611984d2af84768a1b5e7004ebb4dddaf7c771abdbbb",
+  "provenance": "independent physical oracle; not a byte copy of the build report"
 }

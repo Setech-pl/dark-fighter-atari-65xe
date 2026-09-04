@@ -34,6 +34,7 @@
 #define DFTRACE_CHARSET 0x4400u
 #define DFTRACE_PROFILE_COUNT 22u
 #define DFTRACE_PROFILE_DLI_COUNT 2u
+#define DFTRACE_CAPTURE_DMA_Y_OFFSET 8u
 
 typedef struct {
 	uint64_t start_clock;
@@ -411,6 +412,7 @@ static unsigned dftrace_broad_row_lo;
 static unsigned dftrace_broad_row_hi;
 static unsigned dftrace_broad_flash_timer;
 static unsigned dftrace_playfield_broad_row;
+static unsigned dftrace_broad_raster_top;
 static FILE *dftrace_broad_compositor_file;
 static unsigned dftrace_entity_active_count;
 static unsigned dftrace_entity_x;
@@ -481,7 +483,7 @@ static unsigned dftrace_muzzle_screenshot_count;
 static int dftrace_muzzle_screenshot_primed;
 static const char *dftrace_capital_contact_prefix;
 static unsigned dftrace_capital_contact_owner;
-static int dftrace_capital_contact_delta = 7;
+static unsigned dftrace_capital_contact_mode;
 static unsigned dftrace_capital_contact_count;
 static int dftrace_capital_contact_primed;
 static const char *dftrace_rapid_screenshot;
@@ -506,6 +508,29 @@ static unsigned dftrace_pause_engine_phase_before;
 static unsigned dftrace_pause_engine_phase_after;
 static unsigned dftrace_pause_host_frames;
 static unsigned dftrace_pause_test_completed;
+
+typedef struct {
+	unsigned valid;
+	unsigned left;
+	unsigned right;
+	unsigned top;
+	unsigned bottom;
+	unsigned dma_top;
+	unsigned dma_bottom;
+	unsigned physical_pointer;
+	unsigned display_list;
+	unsigned display_instruction;
+	unsigned screen_column;
+	unsigned code_left;
+	unsigned code_right;
+	unsigned glyph_first_row;
+	unsigned glyph_last_row;
+	unsigned cache_top;
+} DFTracePhysicalBounds;
+
+static DFTracePhysicalBounds dftrace_last_player_physical;
+static DFTracePhysicalBounds dftrace_last_bolt_physical[3];
+static unsigned dftrace_last_physical_frame[3];
 
 typedef struct {
 	unsigned frame;
@@ -1369,6 +1394,103 @@ static void dftrace_set_input(unsigned stick, unsigned trigger)
 	GTIA_TRIG[0] = (UBYTE) (trigger != 0);
 }
 
+static DFTracePhysicalBounds dftrace_player_physical_bounds(void)
+{
+	DFTracePhysicalBounds result;
+	unsigned row;
+	unsigned first = 0xffffffffu;
+	unsigned last = 0u;
+	unsigned size;
+	memset(&result, 0, sizeof(result));
+	for (row = 0u; row < 256u; ++row) {
+		if (MEMORY_mem[0x3c00u + row] == 0u && MEMORY_mem[0x3f00u + row] == 0u)
+			continue;
+		if (first == 0xffffffffu)
+			first = row;
+		last = row;
+	}
+	if (first == 0xffffffffu || first < DFTRACE_CAPTURE_DMA_Y_OFFSET)
+		return result;
+	size = GTIA_SIZEP0 & 3u;
+	result.valid = GTIA_HPOSP0 == GTIA_HPOSP3 && (GTIA_SIZEP3 & 3u) == size;
+	result.left = GTIA_HPOSP0;
+	result.right = result.left + 8u * (size == 1u ? 2u : size == 3u ? 4u : 1u) - 1u;
+	result.dma_top = first;
+	result.dma_bottom = last;
+	result.top = first - DFTRACE_CAPTURE_DMA_Y_OFFSET;
+	result.bottom = last - DFTRACE_CAPTURE_DMA_Y_OFFSET;
+	return result;
+}
+
+static DFTracePhysicalBounds dftrace_bolt_physical_bounds(unsigned slot,
+	unsigned display_list_lo)
+{
+	DFTracePhysicalBounds result;
+	unsigned pointer;
+	unsigned base;
+	unsigned column;
+	unsigned character_top = 0xffffffffu;
+	unsigned instruction = 0u;
+	unsigned row;
+	memset(&result, 0, sizeof(result));
+	if (slot >= 3u)
+		return result;
+	pointer = MEMORY_mem[dftrace_broad_row_lo + slot] |
+		((unsigned) MEMORY_mem[dftrace_broad_row_hi + slot] << 8);
+	base = 0x7f00u + display_list_lo;
+	if ((MEMORY_mem[base + 1u] | ((unsigned) MEMORY_mem[base + 2u] << 8)) == pointer) {
+		character_top = 0u;
+		instruction = base;
+	}
+	else if ((MEMORY_mem[base + 4u] | ((unsigned) MEMORY_mem[base + 5u] << 8)) == pointer) {
+		character_top = 8u;
+		instruction = base + 3u;
+	}
+	else for (row = 0u; row < DFTRACE_RING_ROWS; ++row) {
+		unsigned address = MEMORY_mem[base + 7u + row * 3u] |
+			((unsigned) MEMORY_mem[base + 8u + row * 3u] << 8);
+		if (address == pointer) {
+			character_top = 16u + row * 8u;
+			instruction = base + 6u + row * 3u;
+			break;
+		}
+	}
+	if (character_top == 0xffffffffu)
+		return result;
+	for (column = 0u; column < 39u; ++column) {
+		if ((MEMORY_mem[pointer + column] & 0x7fu) == 126u &&
+			(MEMORY_mem[pointer + column + 1u] & 0x7fu) == 127u)
+			break;
+	}
+	if (column == 39u)
+		return result;
+	result.glyph_first_row = 0xffffffffu;
+	for (row = 0u; row < 8u; ++row) {
+		unsigned left = MEMORY_mem[DFTRACE_CHARSET + 126u * 8u + row];
+		unsigned right = MEMORY_mem[DFTRACE_CHARSET + 127u * 8u + row];
+		if (left == 0u && right == 0u)
+			continue;
+		if (result.glyph_first_row == 0xffffffffu)
+			result.glyph_first_row = row;
+		result.glyph_last_row = row;
+	}
+	if (result.glyph_first_row == 0xffffffffu)
+		return result;
+	result.valid = 1u;
+	result.left = 48u + column * 4u;
+	result.right = result.left + 7u;
+	result.top = character_top + result.glyph_first_row;
+	result.bottom = character_top + result.glyph_last_row;
+	result.physical_pointer = pointer;
+	result.display_list = base;
+	result.display_instruction = instruction;
+	result.screen_column = column;
+	result.code_left = MEMORY_mem[pointer + column];
+	result.code_right = MEMORY_mem[pointer + column + 1u];
+	result.cache_top = MEMORY_mem[dftrace_broad_raster_top + slot];
+	return result;
+}
+
 static void dftrace_set_gameplay_input(unsigned frame)
 {
 	unsigned stick = 0x0f;
@@ -1379,26 +1501,97 @@ static void dftrace_set_gameplay_input(unsigned frame)
 		strcmp(dftrace_policy, "capital-contact-cylon") == 0) {
 		unsigned slot;
 		unsigned target_owner = strcmp(dftrace_policy, "capital-contact-cylon") == 0;
-		unsigned target_x = target_owner ? 154u : 124u;
-		/* Natural capital bolts use centre scanline 108/116 on MEDIUM/HARD. Begin moving
-		 * through the production joystick path before launch; the 1-HPOS player
-		 * cadence cannot otherwise reach a left-launched Cylon bolt in time. */
-		int target_y = (dftrace_difficulty == 2u ? 116 : 108) -
-			dftrace_capital_contact_delta;
+		unsigned target_x = target_owner ?
+			(dftrace_difficulty == 1u ? 84u :
+			 dftrace_capital_contact_mode == 1u ? 88u : 96u) : 148u;
+		/* Drive from reconstructed displayed PMG/screen bounds, never BROAD_Y or
+		 * scenario names. player_y remains the PMG DMA index, hence the final +8. */
+		int target_y = target_owner ? 102 : 112;
 		for (slot = 0u; slot < 3u; ++slot) {
 			unsigned state = MEMORY_mem[dftrace_broad_state + slot];
 			if ((state == 1u || state == 2u) &&
 				MEMORY_mem[dftrace_broad_state + 3u + slot] == target_owner) {
-				if (state == 2u) {
-					unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
-					target_y = (int) shell_y - dftrace_capital_contact_delta;
+				if (state == 1u && MEMORY_mem[dftrace_broad_raster_top + slot] != 0u) {
+					int bolt_top = MEMORY_mem[dftrace_broad_raster_top + slot];
+					int player_top;
+					if (dftrace_capital_contact_mode == 0u)
+						player_top = bolt_top + 5;
+					else if (dftrace_capital_contact_mode == 1u)
+						player_top = bolt_top - 4;
+					else if (dftrace_capital_contact_mode == 2u)
+						player_top = bolt_top - 14;
+					else
+						player_top = bolt_top + 6;
+					target_y = player_top + (int) DFTRACE_CAPTURE_DMA_Y_OFFSET;
 				}
-				if (target_y < 40) target_y = 40;
-				if (target_y > (int) DFTRACE_PLAYER_MAX_Y)
-					target_y = (int) DFTRACE_PLAYER_MAX_Y;
+				else if (state == 2u) {
+					DFTracePhysicalBounds bolt = dftrace_bolt_physical_bounds(slot,
+						MEMORY_mem[dftrace_active_dlist_lo]);
+					if (!bolt.valid)
+						bolt = dftrace_bolt_physical_bounds(slot,
+							dftrace_displayed_dlist_lo);
+					if (bolt.valid) {
+						int player_top;
+						if (dftrace_capital_contact_mode == 0u)
+							player_top = (int) bolt.bottom;
+						else if (dftrace_capital_contact_mode == 1u)
+							player_top = (int) bolt.top - 4;
+						else if (dftrace_capital_contact_mode == 2u)
+							player_top = (int) bolt.top - 14;
+						else
+							player_top = (int) bolt.bottom + 1;
+						target_y = player_top + (int) DFTRACE_CAPTURE_DMA_Y_OFFSET;
+					}
+				}
 				break;
 			}
 		}
+		/* The production schedule launches Colonial first.  In Cylon sessions,
+		 * evade that non-target bolt by the nearest exact vertical near-miss,
+		 * then return to the requested physical row before the Cylon arrives.
+		 * Only joystick input is changed; no guest state is seeded. */
+		for (slot = 0u; slot < 3u; ++slot) {
+			unsigned state = MEMORY_mem[dftrace_broad_state + slot];
+			unsigned owner = MEMORY_mem[dftrace_broad_state + 3u + slot];
+			DFTracePhysicalBounds bolt;
+			unsigned approaching;
+			int desired_top;
+			int above;
+			int below;
+			if (owner == target_owner || state == 0u)
+				continue;
+			if (state == 1u) {
+				/* The Cylon policy already starts on its safe pre-position row. */
+				break;
+			}
+			if (state != 2u)
+				continue;
+			bolt = dftrace_bolt_physical_bounds(slot,
+				MEMORY_mem[dftrace_active_dlist_lo]);
+			if (!bolt.valid)
+				continue;
+			approaching = owner == 0u ?
+				bolt.left <= target_x + 15u && bolt.right + 64u >= target_x :
+				bolt.right >= target_x && bolt.left <= target_x + 15u + 64u;
+			if (!approaching)
+				continue;
+			desired_top = target_y - (int) DFTRACE_CAPTURE_DMA_Y_OFFSET;
+			if (desired_top + 14 < (int) bolt.top || desired_top > (int) bolt.bottom)
+				continue;
+			/* Leave two additional scanlines for the one-frame input/display
+			 * publication latency; the qualified target still uses exact bounds. */
+			above = (int) bolt.top - 17;
+			below = (int) bolt.bottom + 3;
+			if ((desired_top > above ? desired_top - above : above - desired_top) <=
+				(desired_top > below ? desired_top - below : below - desired_top))
+				target_y = above + (int) DFTRACE_CAPTURE_DMA_Y_OFFSET;
+			else
+				target_y = below + (int) DFTRACE_CAPTURE_DMA_Y_OFFSET;
+			break;
+		}
+		if (target_y < 40) target_y = 40;
+		if (target_y > (int) DFTRACE_PLAYER_MAX_Y)
+			target_y = (int) DFTRACE_PLAYER_MAX_Y;
 		if (x < target_x)
 			stick = 0x07u;
 		else if (x > target_x)
@@ -2080,6 +2273,7 @@ static void dftrace_broad_compositor_event(const char *event, unsigned slot)
 	unsigned pointer = 0u;
 	unsigned token = 0u;
 	unsigned first = 0u;
+	DFTracePhysicalBounds player = dftrace_player_physical_bounds();
 	if (dftrace_broad_compositor_file == NULL)
 		return;
 	if (slot < 3u) {
@@ -2096,7 +2290,9 @@ static void dftrace_broad_compositor_event(const char *event, unsigned slot)
 	fprintf(dftrace_broad_compositor_file,
 		"{\"frame\":%u,\"host_frame\":%u,\"clock\":%llu,\"event\":\"%s\","
 		"\"slot\":%u,\"address\":[%u,%u],\"cell\":[%u,%u],\"orphan_codes\":%u,"
-		"\"pmg_tables\":[%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u],\"slots\":[",
+		"\"pmg_tables\":[%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u],"
+		"\"player_physical\":{\"valid\":%u,\"hpos\":[%u,%u],\"size\":[%u,%u],"
+		"\"pmg_dma\":[%u,%u],\"raster\":[%u,%u,%u,%u]},\"slots\":[",
 		dftrace_count, (unsigned) Atari800_nframes,
 		(unsigned long long) dftrace_clock(), event, slot, first, first + 1u,
 		first == 0u ? 0u : MEMORY_mem[first],
@@ -2104,19 +2300,31 @@ static void dftrace_broad_compositor_event(const char *event, unsigned slot)
 		MEMORY_mem[0x37feu], MEMORY_mem[0x37ffu], MEMORY_mem[0x3800u],
 		MEMORY_mem[0x3801u], MEMORY_mem[0x3802u], MEMORY_mem[0x3803u],
 		MEMORY_mem[0x3804u], MEMORY_mem[0x3805u], MEMORY_mem[0x3806u],
-		MEMORY_mem[0x3807u], MEMORY_mem[0x3808u], MEMORY_mem[0x3809u]);
+		MEMORY_mem[0x3807u], MEMORY_mem[0x3808u], MEMORY_mem[0x3809u],
+		player.valid, GTIA_HPOSP0, GTIA_HPOSP3, GTIA_SIZEP0, GTIA_SIZEP3,
+		player.dma_top, player.dma_bottom, player.left, player.right,
+		player.top, player.bottom);
 	for (index = 0u; index < 3u; ++index) {
 		unsigned row_pointer = MEMORY_mem[dftrace_broad_row_lo + index] |
 			((unsigned) MEMORY_mem[dftrace_broad_row_hi + index] << 8);
 		unsigned previous = MEMORY_mem[dftrace_broad_state + 21u + index];
 		unsigned cell_address = previous == 0u ? 0u : row_pointer + previous - 1u;
+		/* The main loop is building the raster selected by ACTIVE_DLIST.  The
+		 * host framebuffer and displayed_dlist_lo still describe the preceding
+		 * completed raster until the next ANTIC frame boundary. */
+		DFTracePhysicalBounds bolt = dftrace_bolt_physical_bounds(index,
+			MEMORY_mem[dftrace_active_dlist_lo]);
 		if (index != 0u)
 			fputc(',', dftrace_broad_compositor_file);
 		fprintf(dftrace_broad_compositor_file,
 			"{\"slot\":%u,\"owner\":%u,\"state\":%u,\"x\":%u,\"y\":%u,"
 			"\"raster_x\":%u,\"raster_y\":%u,"
 			"\"row_pointer\":%u,\"previous_token\":%u,\"backing\":[%u,%u],"
-			"\"footprint_address\":[%u,%u],\"footprint_cell\":[%u,%u]}",
+			"\"footprint_address\":[%u,%u],\"footprint_cell\":[%u,%u],"
+			"\"physical\":{\"valid\":%u,\"display_list\":%u,"
+			"\"display_instruction\":%u,\"screen_column\":%u,"
+			"\"screen_codes\":[%u,%u],\"glyph_rows\":[%u,%u],"
+			"\"raster\":[%u,%u,%u,%u],\"cache_top\":%u}}",
 			index, MEMORY_mem[dftrace_broad_state + 3u + index],
 			MEMORY_mem[dftrace_broad_state + index],
 			MEMORY_mem[dftrace_broad_state + 9u + index],
@@ -2127,9 +2335,81 @@ static void dftrace_broad_compositor_event(const char *event, unsigned slot)
 			MEMORY_mem[dftrace_broad_state + 24u + index], cell_address,
 			cell_address == 0u ? 0u : cell_address + 1u,
 			cell_address == 0u ? 0u : MEMORY_mem[cell_address],
-			cell_address == 0u ? 0u : MEMORY_mem[cell_address + 1u]);
+			cell_address == 0u ? 0u : MEMORY_mem[cell_address + 1u],
+			bolt.valid, bolt.display_list, bolt.display_instruction,
+			bolt.screen_column, bolt.code_left, bolt.code_right,
+			bolt.glyph_first_row, bolt.glyph_last_row,
+			bolt.left, bolt.right, bolt.top, bolt.bottom, bolt.cache_top);
 	}
 	fprintf(dftrace_broad_compositor_file, "]}\n");
+}
+
+static void dftrace_capture_capital_contact_decision(unsigned pc, unsigned slot)
+{
+	char path[1024];
+	DFTracePhysicalBounds *player;
+	DFTracePhysicalBounds *bolt;
+	unsigned current_left;
+	unsigned current_right;
+	unsigned sweep_left;
+	unsigned sweep_right;
+	int requested_geometry;
+	if (dftrace_capital_contact_prefix == NULL ||
+		*dftrace_capital_contact_prefix == '\0' ||
+		dftrace_capital_contact_count != 0u || slot >= 3u ||
+		MEMORY_mem[dftrace_broad_state + 3u + slot] != dftrace_capital_contact_owner)
+		return;
+	if ((dftrace_capital_contact_mode == 3u &&
+		 pc != dftrace_pc_capital_player_aabb_miss) ||
+		(dftrace_capital_contact_mode != 3u &&
+		 pc != dftrace_pc_capital_player_aabb_hit))
+		return;
+	if (dftrace_capital_contact_mode != 3u &&
+		MEMORY_mem[dftrace_broad_state + 30u] != 0u)
+		return;
+	player = &dftrace_last_player_physical;
+	bolt = &dftrace_last_bolt_physical[slot];
+	if (dftrace_last_physical_frame[slot] != dftrace_count ||
+		!player->valid || !bolt->valid)
+		return;
+	current_left = MEMORY_mem[dftrace_broad_state + 9u + slot] & 0xfcu;
+	current_right = current_left + 7u;
+	sweep_left = bolt->left < current_left ? bolt->left : current_left;
+	sweep_right = bolt->right > current_right ? bolt->right : current_right;
+	if (sweep_left > player->right || sweep_right < player->left)
+		return;
+	requested_geometry = dftrace_capital_contact_mode == 0u ?
+		bolt->bottom == player->top :
+		dftrace_capital_contact_mode == 1u ?
+		bolt->top == player->top + 4u :
+		dftrace_capital_contact_mode == 2u ?
+		bolt->top == player->bottom :
+		bolt->bottom + 1u == player->top;
+	if (!requested_geometry)
+		return;
+	/* At the branch PC, screen RAM still represents the completed preceding
+	 * raster.  Retain it as frame zero; subsequent main-loop entries capture
+	 * the raster produced by this decision and its successors. */
+	dftrace_broad_compositor_event("screenshot_capture_begin", slot);
+	snprintf(path, sizeof(path), "%s-%02u.png",
+		dftrace_capital_contact_prefix, dftrace_capital_contact_count);
+	if (!Screen_SaveScreenshot(path, 0)) {
+		fprintf(stderr, "darkfighter trace: capital contact screenshot failed: %s\n",
+			path);
+		exit(2);
+	}
+	dftrace_capital_contact_count = 1u;
+	dftrace_capital_contact_primed = 1;
+}
+
+static void dftrace_remember_capital_physical(unsigned slot)
+{
+	if (slot >= 3u)
+		return;
+	dftrace_last_player_physical = dftrace_player_physical_bounds();
+	dftrace_last_bolt_physical[slot] = dftrace_bolt_physical_bounds(slot,
+		MEMORY_mem[dftrace_active_dlist_lo]);
+	dftrace_last_physical_frame[slot] = dftrace_count;
 }
 
 static void dftrace_snapshot(DFTraceFrame *frame)
@@ -2723,6 +3003,7 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_broad_row_hi, "DFTRACE_BROAD_ROW_HI");
 	DFTRACE_ADDRESS(dftrace_broad_flash_timer, "DFTRACE_BROAD_FLASH_TIMER");
 	DFTRACE_ADDRESS(dftrace_playfield_broad_row, "DFTRACE_PLAYFIELD_BROAD_ROW");
+	DFTRACE_ADDRESS(dftrace_broad_raster_top, "DFTRACE_BROAD_RASTER_TOP");
 	DFTRACE_ADDRESS(dftrace_entity_active_count, "DFTRACE_ENTITY_ACTIVE_COUNT");
 	DFTRACE_ADDRESS(dftrace_entity_x, "DFTRACE_ENTITY_X");
 	DFTRACE_ADDRESS(dftrace_entity_y, "DFTRACE_ENTITY_Y");
@@ -2764,11 +3045,9 @@ static void dftrace_init(void)
 	dftrace_muzzle_screenshot_prefix = getenv("DFTRACE_MUZZLE_SCREENSHOT_PREFIX");
 	dftrace_capital_contact_prefix = getenv("DFTRACE_CAPITAL_CONTACT_PREFIX");
 	if (dftrace_capital_contact_prefix != NULL && *dftrace_capital_contact_prefix != '\0') {
-		const char *delta = getenv("DFTRACE_CAPITAL_CONTACT_DELTA");
 		dftrace_capital_contact_owner = dftrace_env_u("DFTRACE_CAPITAL_CONTACT_OWNER");
-		if (delta != NULL && *delta != '\0')
-			dftrace_capital_contact_delta = atoi(delta);
-		if (dftrace_capital_contact_owner > 1u) {
+		dftrace_capital_contact_mode = dftrace_env_u("DFTRACE_CAPITAL_CONTACT_MODE");
+		if (dftrace_capital_contact_owner > 1u || dftrace_capital_contact_mode > 3u) {
 			fprintf(stderr, "darkfighter trace: invalid capital contact owner %u\n",
 				dftrace_capital_contact_owner);
 			exit(2);
@@ -3029,27 +3308,8 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 		}
 		if (dftrace_capital_contact_prefix != NULL &&
 			*dftrace_capital_contact_prefix != '\0' &&
-			dftrace_capital_contact_count < 16u) {
-			unsigned slot;
-			if (!dftrace_capital_contact_primed) for (slot = 0u; slot < 3u; ++slot) {
-				unsigned state = MEMORY_mem[dftrace_broad_state + slot];
-				unsigned owner = MEMORY_mem[dftrace_broad_state + 3u + slot];
-				unsigned shell_x = MEMORY_mem[dftrace_broad_state + 9u + slot];
-				unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
-				unsigned player_left = MEMORY_mem[dftrace_player_x];
-				unsigned player_right = player_left + 15u;
-				unsigned horizontal_gap = owner == 0u ?
-					(player_left > shell_x + 7u ? player_left - (shell_x + 7u) : 0u) :
-					(shell_x > player_right ? shell_x - player_right : 0u);
-				unsigned player_top = MEMORY_mem[dftrace_player_y];
-				if (state == 2u && owner == dftrace_capital_contact_owner &&
-					horizontal_gap <= 16u && shell_y + 10u >= player_top &&
-					shell_y <= player_top + 18u) {
-					dftrace_capital_contact_primed = 1;
-					break;
-				}
-			}
-			if (dftrace_capital_contact_primed) {
+			dftrace_capital_contact_count < 32u &&
+			dftrace_capital_contact_primed) {
 				char path[1024];
 				snprintf(path, sizeof(path), "%s-%02u.png",
 					dftrace_capital_contact_prefix, dftrace_capital_contact_count);
@@ -3059,7 +3319,6 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 					exit(2);
 				}
 				++dftrace_capital_contact_count;
-			}
 		}
 		if (dftrace_count != 0 &&
 			dftrace_frames[dftrace_count - 1].next_start_clock == 0u) {
@@ -3125,14 +3384,22 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_registe
 		++dftrace_current.capital_collision_calls;
 	if (pc == dftrace_pc_capital_player_damage)
 		++dftrace_current.capital_player_damage_calls;
-	if (pc == dftrace_pc_capital_player_aabb_hit)
+	if (pc == dftrace_pc_capital_player_aabb_hit) {
+		dftrace_capture_capital_contact_decision(pc,
+			MEMORY_mem[dftrace_broad_state + 34u]);
 		dftrace_broad_compositor_event("player_aabb_hit",
 			MEMORY_mem[dftrace_broad_state + 34u]);
-	else if (pc == dftrace_pc_capital_player_aabb_miss)
+	}
+	else if (pc == dftrace_pc_capital_player_aabb_miss) {
+		dftrace_capture_capital_contact_decision(pc,
+			MEMORY_mem[dftrace_broad_state + 34u]);
 		dftrace_broad_compositor_event("player_aabb_miss",
 			MEMORY_mem[dftrace_broad_state + 34u]);
-	if (pc == dftrace_pc_broad_erase_begin)
+	}
+	if (pc == dftrace_pc_broad_erase_begin) {
+		dftrace_remember_capital_physical(x_register);
 		dftrace_broad_compositor_event("erase_begin", x_register);
+	}
 	else if (pc == dftrace_pc_broad_erase_restored)
 		dftrace_broad_compositor_event("erase_cells_restored", x_register);
 	else if (pc == dftrace_pc_broad_erase_end)

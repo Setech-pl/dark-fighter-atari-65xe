@@ -224,6 +224,7 @@ function prepareAssembledCapitalPlayerContact({
   shellY = 107,
   playerX = 124,
   playerY = 100,
+  boltRasterTop = playerY - ATARI800_CAPTURE_FIRST_DMA_SCANLINE + 4,
   playerLifecycle = PLAYER_LIFECYCLE_STATES.ALIVE,
   damageCooldown = 0,
 } = {}) {
@@ -237,6 +238,7 @@ function prepareAssembledCapitalPlayerContact({
   const rowAddress = canonicalPlayfield.ringBufferAddress + 8 * 40;
   memory[labels.get("BROAD_ROW_LO") + slot] = rowAddress & 0xff;
   memory[labels.get("BROAD_ROW_HI") + slot] = rowAddress >> 8;
+  memory[labels.get("BROAD_RASTER_TOP") + slot] = boltRasterTop;
   memory[labels.get("player_x")] = playerX;
   memory[labels.get("player_y")] = playerY;
   memory[labels.get("PLAYER_LIFECYCLE")] = playerLifecycle;
@@ -253,7 +255,7 @@ function shellInitialX(owner, currentRasterLeft, swept) {
   return currentRasterLeft + (swept ? 4 : 2);
 }
 
-function capitalShellSweptAabb(owner, initialX, shellY) {
+function capitalShellSweptAabb(owner, initialX, boltRasterTop) {
   const previousLeft = initialX & 0xfc;
   const currentLogical = owner === 0 ? initialX + 2 : initialX - 2;
   const currentLeft = currentLogical & 0xfc;
@@ -264,19 +266,182 @@ function capitalShellSweptAabb(owner, initialX, shellY) {
     currentRight: currentLeft + 7,
     left: Math.min(previousLeft, currentLeft),
     right: Math.max(previousLeft + 7, currentLeft + 7),
-    top: shellY - 3,
-    bottom: shellY + 2,
+    top: boltRasterTop,
+    bottom: boltRasterTop + 5,
   };
 }
 
 function playerGameplayAabb(playerX, playerY) {
-  return { left: playerX, right: playerX + 15, top: playerY, bottom: playerY + 14 };
+  const top = playerY - ATARI800_CAPTURE_FIRST_DMA_SCANLINE;
+  return { left: playerX, right: playerX + 15, top, bottom: top + 14 };
 }
 
 function inclusiveAabbsOverlap(first, second) {
   return first.left <= second.right && first.right >= second.left &&
     first.top <= second.bottom && first.bottom >= second.top;
 }
+
+const ATARI800_CAPTURE_FIRST_DMA_SCANLINE = 8;
+
+function runAssembledRoutineWithCpu(memory, name, { x = 0, y = 0, a = 0 } = {}) {
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.x = x;
+  cpu.y = y;
+  cpu.a = a;
+  cpu.pc = labels.get(name);
+  for (let steps = 0; steps < 100_000 && cpu.pc !== stop; steps += 1) cpu.step();
+  assert.equal(cpu.pc, stop, `${name} did not return`);
+  return cpu;
+}
+
+function playerBoundsFromPmg(memory) {
+  const playerBases = [0x3c00, 0x3f00];
+  const occupiedDmaRows = [];
+  for (let row = 0; row < 256; row += 1) {
+    if (playerBases.some((base) => memory[base + row] !== 0)) occupiedDmaRows.push(row);
+  }
+  assert.ok(occupiedDmaRows.length > 0, "PMG oracle requires a visible P0/P3 Viper");
+  const sizeCode = memory[0xd008] & 3;
+  const widthScale = [1, 2, 1, 4][sizeCode];
+  assert.equal(memory[0xd00b] & 3, sizeCode, "P0/P3 must share one width");
+  assert.equal(memory[0xd003], memory[0xd000], "P0/P3 must share one HPOS origin");
+  return {
+    left: memory[0xd000],
+    right: memory[0xd000] + 8 * widthScale - 1,
+    top: occupiedDmaRows[0] - ATARI800_CAPTURE_FIRST_DMA_SCANLINE,
+    bottom: occupiedDmaRows.at(-1) - ATARI800_CAPTURE_FIRST_DMA_SCANLINE,
+    dma_top: occupiedDmaRows[0],
+    dma_bottom: occupiedDmaRows.at(-1),
+    size_code: sizeCode,
+  };
+}
+
+function displayListModeHeight(opcode) {
+  const mode = opcode & 0x0f;
+  if (mode === 2 || mode === 3 || mode === 4 || mode === 5 || mode === 6 || mode === 7)
+    return 8;
+  assert.fail(`Unsupported oracle display-list mode $${opcode.toString(16)}`);
+}
+
+function displayRowForPhysicalPointer(memory, displayList, targetPointer) {
+  let address = displayList;
+  let rasterTop = 0;
+  for (let instructions = 0; instructions < 64; instructions += 1) {
+    const opcode = memory[address];
+    if ((opcode & 0x0f) === 1) break;
+    const hasLms = (opcode & 0x40) !== 0;
+    if (hasLms) {
+      const pointer = memory[address + 1] | (memory[address + 2] << 8);
+      if (pointer === targetPointer) return { rasterTop, opcode, instructionAddress: address };
+    }
+    rasterTop += displayListModeHeight(opcode);
+    address += hasLms ? 3 : 1;
+  }
+  assert.fail(`Physical row $${targetPointer.toString(16)} is absent from active display list`);
+}
+
+function boltBoundsFromDisplay(memory, slot) {
+  const broadRowLo = labels.get("BROAD_ROW_LO");
+  const broadRowHi = labels.get("BROAD_ROW_HI");
+  const pointer = memory[broadRowLo + slot] | (memory[broadRowHi + slot] << 8);
+  const activeDlist = 0x7f00 | memory[labels.get("PLAYFIELD_ACTIVE_DLIST_LO")];
+  const display = displayRowForPhysicalPointer(memory, activeDlist, pointer);
+  let column = -1;
+  for (let candidate = 0; candidate < 39; candidate += 1) {
+    if ((memory[pointer + candidate] & 0x7f) === 126 &&
+        (memory[pointer + candidate + 1] & 0x7f) === 127) {
+      column = candidate;
+      break;
+    }
+  }
+  assert.notEqual(column, -1, "screen-RAM oracle requires the rendered 126/127 pair");
+  const charset = memory[0xd409] << 8;
+  const occupiedGlyphRows = [];
+  for (let row = 0; row < 8; row += 1) {
+    const left = memory[charset + 126 * 8 + row];
+    const right = memory[charset + 127 * 8 + row];
+    if (left !== 0 || right !== 0) occupiedGlyphRows.push(row);
+  }
+  assert.deepEqual(occupiedGlyphRows, [1, 2, 3, 4, 5, 6]);
+  return {
+    left: 48 + column * 4,
+    right: 48 + (column + 2) * 4 - 1,
+    top: display.rasterTop + occupiedGlyphRows[0],
+    bottom: display.rasterTop + occupiedGlyphRows.at(-1),
+    physical_pointer: pointer,
+    display_list: activeDlist,
+    display_instruction: display.instructionAddress,
+    screen_column: column,
+    glyph_rows: occupiedGlyphRows,
+  };
+}
+
+function prepareIndependentRasterScene({ owner, slot, ringRotations, playerDmaTop }) {
+  const memory = createLinkedRuntimeMemory();
+  runAssembledRoutine(memory, "copy_charset");
+  runAssembledRoutine(memory, "init_broadside");
+  runAssembledRoutine(memory, "init_playfield_display_lists");
+  for (let rotation = 0; rotation < ringRotations; rotation += 1) {
+    runAssembledRoutine(memory, "rotate_playfield_rows");
+    runAssembledRoutine(memory, "prebuild_next_playfield_display_list");
+  }
+  const broadState = labels.get("BROAD_STATE");
+  memory[broadState + slot] = BROADSIDE_STATES.FLYING;
+  memory[broadState + 3 + slot] = owner;
+  memory[broadState + 9 + slot] = 120;
+  memory[broadState + 12 + slot] = 108;
+  memory[labels.get("PLAYFIELD_BROAD_ROW") + slot] = 13;
+  runAssembledRoutine(memory, "set_broadside_row_ptr", { x: slot });
+  runAssembledRoutine(memory, "render_capital_shell_overlays");
+
+  memory[labels.get("player_x")] = 124;
+  memory[labels.get("player_y")] = playerDmaTop;
+  memory[0xd000] = 124;
+  memory[0xd003] = 124;
+  memory[0xd008] = 1;
+  memory[0xd00b] = 1;
+  memory[0xd409] = 0x44;
+  runAssembledRoutine(memory, "clear_pmg");
+  runAssembledRoutine(memory, "draw_player");
+  return memory;
+}
+
+test("capital/player collision agrees with independently reconstructed final raster Y", () => {
+  const positions = [
+    { name: "top edge", playerDmaTop: 126, expectedHit: true },
+    { name: "upper third", playerDmaTop: 123, expectedHit: true },
+    { name: "middle", playerDmaTop: 114, expectedHit: true },
+    { name: "lower third", playerDmaTop: 108, expectedHit: true },
+    { name: "bottom edge", playerDmaTop: 107, expectedHit: true },
+    { name: "one scanline above", playerDmaTop: 127, expectedHit: false },
+    { name: "one scanline below", playerDmaTop: 106, expectedHit: false },
+  ];
+  for (const owner of [0, 1]) for (const slot of [0, 1, 2]) {
+    for (const ringRotations of [0, 1, 13, 26, 27]) for (const position of positions) {
+      const memory = prepareIndependentRasterScene({
+        owner, slot, ringRotations, playerDmaTop: position.playerDmaTop,
+      });
+      const player = playerBoundsFromPmg(memory);
+      const bolt = boltBoundsFromDisplay(memory, slot);
+      const oracleHit = inclusiveAabbsOverlap(player, bolt);
+      assert.equal(oracleHit, position.expectedHit,
+        `${position.name}: independent raster premise; ` +
+        `PMG ${player.top}..${player.bottom}, screen $${bolt.physical_pointer.toString(16)} ` +
+        `glyph ${bolt.top}..${bolt.bottom}`);
+      memory[labels.get("src_ptr")] = bolt.left;
+      memory[labels.get("src_ptr") + 1] = bolt.right;
+      const cpu = runAssembledRoutineWithCpu(memory, "capital_shell_hits_player", { x: slot });
+      assert.equal(cpu.getFlag(0x01), position.expectedHit,
+        `owner ${owner}, slot ${slot}, ring ${ringRotations}: ${position.name}; ` +
+        `PMG ${player.top}..${player.bottom}, screen $${bolt.physical_pointer.toString(16)} ` +
+        `glyph ${bolt.top}..${bolt.bottom}, cache ` +
+        `${memory[labels.get("BROAD_RASTER_TOP") + slot]}`);
+    }
+  }
+});
 
 test("broadside source timing and schedule are deterministic and generated with turret metadata", () => {
   const second = compileCapitalHulls(loadCapitalHullsDefinition(definitionPath));
@@ -1436,19 +1601,19 @@ test("assembled Colonial and Cylon shells damage the Viper at the recovered lowe
 test("assembled capital shells use the 16x15 player and swept 8x6 bolt AABBs at every edge", () => {
   const playerPositions = [32, 112, 225];
   const cases = [
-    { name: "first top scanline", playerX: 124, currentLeft: 128, deltaY: -2, hit: true },
-    { name: "top-left corner", playerX: 123, currentLeft: 116, deltaY: -2, hit: true },
-    { name: "top-right corner", playerX: 125, currentLeft: 140, deltaY: -2, hit: true },
-    { name: "middle left side", playerX: 123, currentLeft: 116, deltaY: 7, hit: true },
-    { name: "middle right side", playerX: 125, currentLeft: 140, deltaY: 7, hit: true },
-    { name: "center", playerX: 124, currentLeft: 128, deltaY: 7, hit: true },
-    { name: "bottom-left corner", playerX: 123, currentLeft: 116, deltaY: 17, hit: true },
-    { name: "bottom-right corner", playerX: 125, currentLeft: 140, deltaY: 17, hit: true },
-    { name: "last bottom scanline", playerX: 124, currentLeft: 128, deltaY: 17, hit: true },
-    { name: "one HPOS before left", playerX: 124, currentLeft: 116, deltaY: 7, hit: false },
-    { name: "one HPOS after right", playerX: 124, currentLeft: 140, deltaY: 7, hit: false },
-    { name: "one scanline above", playerX: 124, currentLeft: 128, deltaY: -3, hit: false },
-    { name: "one scanline below", playerX: 124, currentLeft: 128, deltaY: 18, hit: false },
+    { name: "first top scanline", playerX: 124, currentLeft: 128, rasterDelta: -5, hit: true },
+    { name: "top-left corner", playerX: 123, currentLeft: 116, rasterDelta: -5, hit: true },
+    { name: "top-right corner", playerX: 125, currentLeft: 140, rasterDelta: -5, hit: true },
+    { name: "middle left side", playerX: 123, currentLeft: 116, rasterDelta: 7, hit: true },
+    { name: "middle right side", playerX: 125, currentLeft: 140, rasterDelta: 7, hit: true },
+    { name: "center", playerX: 124, currentLeft: 128, rasterDelta: 7, hit: true },
+    { name: "bottom-left corner", playerX: 123, currentLeft: 116, rasterDelta: 14, hit: true },
+    { name: "bottom-right corner", playerX: 125, currentLeft: 140, rasterDelta: 14, hit: true },
+    { name: "last bottom scanline", playerX: 124, currentLeft: 128, rasterDelta: 14, hit: true },
+    { name: "one HPOS before left", playerX: 124, currentLeft: 116, rasterDelta: 7, hit: false },
+    { name: "one HPOS after right", playerX: 124, currentLeft: 140, rasterDelta: 7, hit: false },
+    { name: "one scanline above", playerX: 124, currentLeft: 128, rasterDelta: -6, hit: false },
+    { name: "one scanline below", playerX: 124, currentLeft: 128, rasterDelta: 15, hit: false },
   ];
 
   for (const owner of [0, 1]) {
@@ -1456,15 +1621,15 @@ test("assembled capital shells use the 16x15 player and swept 8x6 bolt AABBs at 
       for (const playerY of playerPositions) {
         for (const item of cases) {
           const shellX = shellInitialX(owner, item.currentLeft, false);
-          const shellY = playerY + item.deltaY;
-          const shellAabb = capitalShellSweptAabb(owner, shellX, shellY);
+          const boltRasterTop = playerY - ATARI800_CAPTURE_FIRST_DMA_SCANLINE + item.rasterDelta;
+          const shellAabb = capitalShellSweptAabb(owner, shellX, boltRasterTop);
           const playerAabb = playerGameplayAabb(item.playerX, playerY);
           assert.equal(shellAabb.currentLeft, item.currentLeft,
             `${item.name}: final raster X premise`);
           assert.equal(inclusiveAabbsOverlap(shellAabb, playerAabb), item.hit,
             `${item.name}: swept-AABB premise`);
           const contact = prepareAssembledCapitalPlayerContact({
-            owner, slot, shellX, shellY, playerX: item.playerX, playerY,
+            owner, slot, shellX, playerX: item.playerX, playerY, boltRasterTop,
           });
           const third = (slot + 1) % 3;
           contact.memory[contact.broadState + third] = BROADSIDE_STATES.WARNING;
@@ -1492,20 +1657,20 @@ test("assembled capital shells use the 16x15 player and swept 8x6 bolt AABBs at 
       for (const playerY of playerPositions) {
         const playerX = 124;
         const currentRasterLeft = owner === 0 ? playerX : playerX + 12;
-        for (const [vertical, deltaY, hit] of [
+        for (const [vertical, rasterDelta, hit] of [
           ["through player", 7, true],
-          ["above player", -3, false],
-          ["below player", 18, false],
+          ["above player", -6, false],
+          ["below player", 15, false],
         ]) {
           const shellX = shellInitialX(owner, currentRasterLeft, true);
-          const shellY = playerY + deltaY;
-          const shellAabb = capitalShellSweptAabb(owner, shellX, shellY);
+          const boltRasterTop = playerY - ATARI800_CAPTURE_FIRST_DMA_SCANLINE + rasterDelta;
+          const shellAabb = capitalShellSweptAabb(owner, shellX, boltRasterTop);
           assert.notEqual(shellAabb.previousLeft, shellAabb.currentLeft,
             `${vertical}: sweep must span two final raster positions`);
           assert.equal(inclusiveAabbsOverlap(shellAabb,
             playerGameplayAabb(playerX, playerY)), hit, `${vertical}: AABB premise`);
           const contact = prepareAssembledCapitalPlayerContact({
-            owner, slot, shellX, shellY, playerX, playerY,
+            owner, slot, shellX, playerX, playerY, boltRasterTop,
           });
           runAssembledRoutine(contact.memory, "update_broadside");
           assert.equal(contact.memory[contact.slotState],
@@ -1553,6 +1718,8 @@ test("capital-shell impact obeys cooldown, respawn invulnerability, release, and
   simultaneous.memory[simultaneous.broadState + 4] = 1;
   simultaneous.memory[simultaneous.broadState + 10] = 132;
   simultaneous.memory[simultaneous.broadState + 13] = 107;
+  simultaneous.memory[labels.get("BROAD_RASTER_TOP") + 1] =
+    simultaneous.memory[labels.get("BROAD_RASTER_TOP")];
   runAssembledRoutine(simultaneous.memory, "update_broadside");
   assert.deepEqual(Array.from(simultaneous.memory.subarray(
     simultaneous.broadState, simultaneous.broadState + 2)),

@@ -20,7 +20,7 @@ lifetime phases and are not additive free memory.
 | `$8000-$80FF` | 256 B | `ENTITY_STATE` BSS |
 | `$8800-$8C7F` | 1,152 B | immutable three-type/eight-phase pickup glyph source bank |
 | `$8C80-$8E60` | 481 B | late phased pickup compositor, size helpers, exact reverse-erase support, and provisional active-gameplay capital admission gate |
-| `$8E61-$8E7B` | 27 B | shared inclusive swept-AABB capital-bolt/Viper collision module |
+| `$8E61-$8E81` | 33 B | shared inclusive final-raster swept-AABB capital-bolt/Viper collision module |
 | `$9000-$90FE` | 255 B | relocated A2 kernel; one byte reserved through `$90FF` |
 | `$9100-$9D27` | 3,112 B | relocated `ENTITY_CODE`, including H3.1 display lists and frontend helpers; reserved through `$9D74` |
 | `$9D75-$9FF9` | 645 B | Hybrid Encounter Director code/common/Level 1 data |
@@ -30,8 +30,8 @@ lifetime phases and are not additive free memory.
 The linked production runtime metric is `CODE + STARFIELD + BROADSIDE +
 A2_KERNEL + ENTITY_CODE + PICKUP_CODE = 17,203 B`. With the 1,152-byte pickup
 phase bank, late-published GLUE, DIRECTOR, and their frozen integration
-accounting plus the 27-byte collision module, simultaneous feature residency
-is 18,827 B and safe residency is 3,360 B.
+accounting plus the 33-byte collision module, simultaneous feature residency
+is 18,833 B and safe residency is 3,354 B.
 BROADSIDE is 6,643 B after moving the bolt renderer into retired GLUE space
 and unrolling the fixed 3x3 capital-impact compositor; PICKUP_CODE remains 481 B.
 Late-published GLUE grows by 81 B to 234 B; persistent BSS and glyph allocation
@@ -53,15 +53,15 @@ at `$5264`; the rest of the last sector is transport padding.
 | `$4773-$4871` | 255 B | A2 source; staged at `$7F16`, then copied to `$9000-$90FE` before entity/effects clear |
 | `$4872-$5260` | 2,543 B | packed 3,112-byte ENTITY_CODE; staged at `$534B-$5D39`, expands to `$9100-$9D27` |
 | `$5261-$5264` | 4 B | source-owned `DFB1` trailer; consumed before the GLUE chunk reuses `$5261` |
-| ATR sectors 102-146 | 5,760 B | external BROADSIDE record: 5,641 B packed / 6,643 B raw to `$5E10-$7802` |
-| ATR sectors 147-154 | 1,024 B | pickup/code/collision record: 915 B prepacked at cold `$8C80-$9012`; after preservation at `$4801-$4B93`, it expands 1,660 B to `$8800-$8E7B` |
+| ATR sectors 102-146 | 5,760 B | external BROADSIDE record: 5,644 B packed / 6,643 B raw to `$5E10-$7802` |
+| ATR sectors 147-154 | 1,024 B | pickup/code/collision record: 921 B prepacked at cold `$8C80-$9018`; after preservation at `$4801-$4B99`, it expands 1,666 B to `$8800-$8E81` |
 | ATR sectors 155-156 | 256 B | GLUE record: 229 B packed / 234 B raw to staging `$5261-$534A` |
 | ATR sectors 157-161 | 640 B | Director record: 585 B packed / 645 B raw to `$9D75-$9FF9` |
 
 The `DFMC` v1 manifest is 78 B for the current four records and reserves space
 inside stage-2 for at most eight records. The ATR has 559 free sectors
 (71,552 B). Runtime and transport budgets remain separate; the current
-Director simultaneous-residency accounting reports 3,360 B safe, while the
+Director simultaneous-residency accounting reports 3,354 B safe, while the
 separate 6,841-byte transport capacity reports 4,957 B remaining. The older
 15,346-byte capacity reference remains useful only as history; the production
 gate is the exact 17,203-byte linked runtime
@@ -90,11 +90,11 @@ this lifetime.
 | `$4028-$404F` | 40 B | fixed gameplay divider; never a rotating/transient backing row |
 | `$4050-$43FF` | 944 B | frontend screen RAM; not used by the expanded gameplay ring |
 | `$4400-$47FF` | 1,024 B | gameplay charset |
-| `$4800-$4BFF` | 1,024 B | frontend charset; `$4801-$4B93` temporarily preserves the 915-byte pickup/code/collision transport stream before frontend construction |
+| `$4800-$4BFF` | 1,024 B | frontend charset; `$4801-$4B99` temporarily preserves the 921-byte pickup/code/collision transport stream before frontend construction |
 | `$4C00-$4D1F` | 288 B | expanded Colonial hull map, 32x9 |
 | `$4D20-$4E3F` | 288 B | expanded Cylon hull map, 32x9 |
 | `$4E40-$4E70` | 49 B | persistent runtime state through difficulty setting |
-| `$4E71-$4ECA` | 90 B | hull scroll, backing, sector, lifecycle, music, muzzle, score, and two-phase engine state |
+| `$4E71-$4ECA` | 90 B | hull scroll, three cached final-raster bolt tops at `$4E72-$4E74`, backing, sector, lifecycle, music, muzzle, score, and two-phase engine state |
 | `$4ECB-$4ED6` | 12 B | Raider, damage, and starfield scalar state |
 | `$4ED7-$4ED8` | 2 B | allied/enemy fixed-divider versus ring muzzle-domain state; consumes the former compatibility pad without shifting later state |
 | `$4ED9-$4EE9` | 17 B | menu/gameplay music and tracked-muzzle state |
@@ -132,8 +132,8 @@ this lifetime.
 | `$85EF-$87FF` | 529 B | unowned after cold startup |
 | `$8800-$8C7F` | 1,152 B | immutable pickup phase bank: three types × eight phases × six glyphs × eight bytes |
 | `$8C80-$8E60` | 481 B | pickup compositor, mapper, backing, common capital-shell collision dispatcher, exact reverse erase, and provisional first-capital gameplay gate; cold source is moved before publication |
-| `$8E61-$8E7B` | 27 B | inclusive 16x15-player versus swept-8x6-bolt AABB collision module |
-| `$8E7C-$8FFF` | 388 B | unowned after cold startup |
+| `$8E61-$8E81` | 33 B | inclusive 16x15-player versus final-raster swept-8x6-bolt AABB collision module |
+| `$8E82-$8FFF` | 382 B | unowned after cold startup |
 | `$9000-$90FE` | 255 B | A2 kernel |
 | `$90FF` | 1 B | free A2 reservation tail |
 | `$9100-$9D27` | 3,112 B | entity/effect/booster/projectile-composite and H3.1 frontend runtime |

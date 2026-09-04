@@ -619,8 +619,8 @@ async function build() {
     configPath: path.join(rootDirectory, "cfg", "capital-player-collision.cfg"),
     stem: "capital-player-collision",
   });
-  if (capitalPlayerCollisionModule.raw.length > 0x1b) {
-    throw new Error(`Capital/player collision module exceeds $8E61-$8E7B: ` +
+  if (capitalPlayerCollisionModule.raw.length > 0x21) {
+    throw new Error(`Capital/player collision module exceeds $8E61-$8E81: ` +
       `${capitalPlayerCollisionModule.raw.length} B`);
   }
   if (weaponPickupPhaseBankAddress + weaponPickupPhaseBank.length + pickupCodeRuntime.length !==
@@ -865,7 +865,7 @@ async function build() {
   ]);
   if (bootSectors !== 101 || totalTransportSectors !== 161 ||
     transportPayload.length !== 20608 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
-      [102, 45, 5641, 6643, 0x5e10],
+      [102, 45, 5644, 6643, 0x5e10],
       [147, 8, packedWeaponPickupPhaseBank.length, packedWeaponPickupPhaseBank.length,
         weaponPickupPackedStagingAddress],
       [155, 2, 229, 234, glueStagingAddress],

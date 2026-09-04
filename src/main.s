@@ -185,6 +185,7 @@ BROAD_STATE_END             = BROAD_VISIBLE_SCROLLS+$01
 DIFFICULTY_SETTING          = BROAD_STATE_END        ; 1 B, persists across frontend states
 FRONTEND_PERSISTENT_END     = DIFFICULTY_SETTING+$01
 HULL_SCROLL_ACCUMULATOR     = FRONTEND_PERSISTENT_END
+BROAD_RASTER_TOP            = HULL_SCROLL_ACCUMULATOR+$01 ; 3 B, final capture rows
 CORRIDOR_BOUNDARY_ROWS      = CAPITAL_HULL_VISIBLE_ROWS
 ; The original 23+23 bytes remain a compatibility hole so every following
 ; resident-state address stays fixed. Expanded boundary backing lives beside
@@ -284,6 +285,7 @@ SESSION_SCORE_STATE_END      = TOP_SCORE_TABLE_END
 ; constants has no runtime footprint and avoids duplicating the resident-state
 ; layout in a host-side wall-clock tracer.
 .export BROAD_STATE, BROAD_TURRET, BROAD_ROW_LO, BROAD_ROW_HI, BROAD_FLASH_TIMER
+.export BROAD_RASTER_TOP
 .export BROAD_DAMAGE_COOLDOWN, BROAD_DAMAGE_APPLIED
 .export DIFFICULTY_SETTING, CAPITAL_SECTOR_STATE, PLAYER_LIFECYCLE
 .export CAPITAL_EXPLOSION_TIMER, CAPITAL_EXPLOSION_SOUND_TIMER, ENEMY_ACTIVE
@@ -405,6 +407,10 @@ PLAYER_COLLISION_WIDTH = 8
 PLAYER_VISIBLE_WIDTH_HPOS = 16
 PLAYER_COLLISION_LAST_ROW = 14
 PLAYER_OPAQUE_HEIGHT = PLAYER_COLLISION_LAST_ROW+1
+PMG_DMA_CAPTURE_Y_OFFSET = 8
+CAPITAL_SHELL_FIRST_VISIBLE_GLYPH_ROW = 1
+CAPITAL_SHELL_LAST_VISIBLE_GLYPH_ROW = 6
+CAPITAL_SHELL_VISIBLE_SCANLINES = CAPITAL_SHELL_LAST_VISIBLE_GLYPH_ROW-CAPITAL_SHELL_FIRST_VISIBLE_GLYPH_ROW+1
 PLAYER_X_MIN = 48
 PLAYER_X_MAX = 200
 PLAYER_Y_MIN = GAMEPLAY_TOP+16
@@ -651,6 +657,7 @@ WEAPON_PICKUP_COLD_STAGING = $4801
 VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_COUNT
 
 .assert BROAD_STATE_END <= $4E80, error, "broadside resident state exceeds 64 bytes"
+.assert BROAD_RASTER_TOP+BROADSIDE_SLOT_COUNT <= BROAD_TURRET_FIRED, error, "capital-shell raster cache exceeds compatibility state hole"
 .assert CAPITAL_HULL_TURRET_COUNT = 2, error, "tracked muzzle records require exactly one turret per side"
 .assert GAMEPLAY_RESIDENT_END <= $4F00, error, "gameplay resident state exceeds reclaimed RAM"
 .assert STARFIELD_STATE_END <= $4F00, error, "starfield scalar state exceeds reclaimed RAM"
@@ -7116,6 +7123,7 @@ init_broadside:
 @clear_flash:
     sta BROAD_FLASH_TIMER,x
     sta PLAYFIELD_BROAD_ROW,x
+    sta BROAD_RASTER_TOP,x
     dex
     bpl @clear_flash
     ldx #$01
@@ -7462,14 +7470,7 @@ schedule_broadside:
     sta PLAYFIELD_BROAD_ROW,x
     lda BROAD_WORK_COUNT
     sta BROAD_TURRET,x
-    ldy BROAD_WORK_VALUE
-    lda dst_ptr
-    sec
-    sbc capital_hull_turrets+CAPITAL_TURRET_MUZZLE_COLUMN_OFFSET,y
-    sta BROAD_ROW_LO,x
-    lda dst_ptr+1
-    sbc #$00
-    sta BROAD_ROW_HI,x
+    jsr set_broadside_row_ptr
 
 @next_candidate:
     inc BROAD_WORK_COUNT
@@ -7664,6 +7665,17 @@ set_broadside_row_ptr:
     sta BROAD_ROW_LO,x
     lda dst_ptr+1
     sta BROAD_ROW_HI,x
+    ; This is the sole production mapping from a displayed capital-shell row
+    ; to Atari800/owner-capture raster Y. The gameplay display list starts at
+    ; capture row zero, and glyphs 126/127 occupy rows 1..6 of their ANTIC 4
+    ; cell. Ring rotation changes the physical pointer, never this final row.
+    lda PLAYFIELD_BROAD_ROW,x
+    asl
+    asl
+    asl
+    clc
+    adc #(GAMEPLAY_FIRST_SCREEN_ROW*8+CAPITAL_SHELL_FIRST_VISIBLE_GLYPH_ROW)
+    sta BROAD_RASTER_TOP,x
     rts
 
 set_capital_explosion_row_ptr:
@@ -8309,13 +8321,15 @@ capital_shell_hits_player:
     clc
     adc #(PLAYER_VISIBLE_WIDTH_HPOS-1)
     sta dst_ptr+1
+    ; player_y is the single-line PMG DMA index. Atari800's 240-line capture
+    ; begins eight DMA scanlines later, so publish the complete solid 16x15
+    ; gameplay rectangle in final-raster coordinates for the shared module.
     lda player_y
     sec
-    sbc #(CAPITAL_PROJECTILE_VISIBLE_HEIGHT/2-1)
+    sbc #PMG_DMA_CAPTURE_Y_OFFSET
     sta frontend_data_ptr
     clc
-    lda frontend_data_ptr
-    adc #(PLAYER_COLLISION_LAST_ROW+CAPITAL_PROJECTILE_VISIBLE_HEIGHT)
+    adc #PLAYER_COLLISION_LAST_ROW
     sta frontend_data_ptr+1
     jmp CAPITAL_PLAYER_COLLISION
 
@@ -8744,15 +8758,17 @@ handle_player_hull_contact:
 ; Preserve the reviewed integration-glue target after replacing the former
 ; periodic cannon-mask decoder with the smaller encoded-layout selector.
 free_broadside_slot_layout_lead_pad:
+    .res 3,$00
 free_broadside_slot:
     jsr erase_broadside_slot
     lda #BROAD_FREE
     sta BROAD_STATE,x
     sta BROAD_TIMER,x
     sta HPOSM1,x
+    sta BROAD_RASTER_TOP,x
     rts
 free_broadside_slot_layout_pad:
-    .byte $AE,$62,$4E            ; displaced LDX BROAD_WORK_SLOT, unreachable
+                                ; former three-byte layout pad now resets Y
 .assert free_broadside_slot = $76C1, error, "integration release target moved"
 
 .segment "BROADSIDE"

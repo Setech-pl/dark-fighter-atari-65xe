@@ -32,7 +32,7 @@ The four ordered DFMC records are BROADSIDE in sectors 102-146, the packed
 pickup phase/code/collision stream in sectors 147-154, 234-byte integration glue
 in sectors 155-156, and the Encounter Director in sectors 157-161. ATR stages
 each record at `$8100`; BROADSIDE expands 6,643 bytes to `$5E10-$7802`, the
-915-byte pickup stream is published temporarily at `$8C80-$9012`, and glue
+921-byte pickup stream is published temporarily at `$8C80-$9018`, and glue
 expands to `$5261-$534A`. Packed ENTITY_CODE stages at `$534B-$5D39`, directly
 after glue. Startup holds glue at `$7F16-$7FFF` after publishing
 the A2 kernel, then copies it to `$4EFE-$4FE7`; the 645-byte Director expands to
@@ -42,7 +42,7 @@ only then does startup copy the packed resident suffix and stage it at
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
 eight-record manifest. The pickup stream is preserved at `$4801-$4B93` before
 its cold source overlaps the future A2 range, then expands atomically to
-`$8800-$8E7B`; the final 27 bytes are the capital/player collision module.
+`$8800-$8E81`; the final 33 bytes are the final-raster capital/player collision module.
 No loader byte remains resident or enters gameplay.
 
 The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
@@ -69,11 +69,11 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
 Production records begin at sectors 102, 147, 155, and 157. Their packed/raw
-lengths are respectively 5,641/6,643 B, 915/915 B, 229/234 B, and 585/645 B.
+lengths are respectively 5,644/6,643 B, 921/921 B, 229/234 B, and 585/645 B.
 The second record carries the compressed immutable pickup phase bank plus its
-late compositor and the 27-byte collision module. Its cold copy at
-`$8C80-$9012` is first preserved at `$4801-$4B93`, then decompressed to
-`$8800-$8E7B`; source and destination never overlap while live. Glue is
+late compositor and the 33-byte collision module. Its cold copy at
+`$8C80-$9018` is first preserved at `$4801-$4B99`, then decompressed to
+`$8800-$8E81`; source and destination never overlap while live. Glue is
 transported to `$5261`, held at `$7F16-$7FFF` while ENTITY_CODE is unpacked,
 and late-published to `$4EFE-$4FE7`. The Director ends
 at `$9FF9`; `$9FFA-$9FFF` is a six-byte untouched guard.
