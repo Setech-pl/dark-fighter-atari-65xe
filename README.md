@@ -251,11 +251,18 @@ belong in `build/` and `dist/`; source assets remain under `assets/`.
 atari800 -xe -pal -nobasic -run dist/void-strike-65.xex
 ```
 
+The equivalent manifest-bound launcher is `npm run play:xex`. It prints the
+absolute path and SHA-256 of the file before starting Atari800.
+
 ### Boot the ATR in Atari800
 
 ```bash
 atari800 -xe -pal -nobasic dist/void-strike-65.atr
 ```
+
+The equivalent manifest-bound launcher is `npm run play:atr`. Do not use
+`-run` for an ATR: that option invokes Atari800's executable loader instead of
+mounting the image as `D1:` and leaves a cold XL/XE at SELF TEST.
 
 Map the host joystick to Atari port 1. Use the joystick to move, FIRE to shoot
 or select menu entries, and the physical/console `OPTION` key to enter the

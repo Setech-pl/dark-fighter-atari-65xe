@@ -9,6 +9,7 @@ import { LOADER_DISPLAY_LIST_ADDRESS } from "./loader-assets.mjs";
 import { runtimeArtifactSet, runtimeArtifactNames } from "./runtime-evidence.mjs";
 import { canonicalPlayfield } from "./playfield.mjs";
 import { readStartMenuRuntimeState } from "./preview.mjs";
+import { atari800ArtifactLaunches, validateAtari800Launch } from "./artifact-launch.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -1244,13 +1245,21 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
   invariant(Object.values(expected).every(Number.isInteger),
     "Boot-smoke expected-address labels are incomplete");
 
+  const publicLaunches = atari800ArtifactLaunches(rootDirectory);
+  invariant(publicLaunches.xex.artifact.path === xexPath &&
+    publicLaunches.atr.artifact.path === atrPath,
+  "Boot smoke must use the manifest-bound public artifact paths");
   const definitions = [];
-  for (const artifact of [
-    { id: "xex", path: xexPath, arguments: ["-run", xexPath] },
-    { id: "atr", path: atrPath, arguments: [atrPath] },
-  ]) {
+  for (const artifact of [publicLaunches.xex, publicLaunches.atr]) {
+    validateAtari800Launch(artifact);
     for (const fill of [0xa5, 0x5a]) {
-      definitions.push({ ...artifact, fill, id: `${artifact.id}-${fill.toString(16)}` });
+      definitions.push({
+        ...artifact,
+        path: artifact.artifact.path,
+        arguments: artifact.mediaArguments,
+        fill,
+        id: `${artifact.id}-${fill.toString(16)}`,
+      });
     }
   }
 
@@ -1331,8 +1340,17 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
       cold_ram_fill: definition.fill,
       artifact: {
         path: path.relative(rootDirectory, definition.path),
-        bytes: fs.statSync(definition.path).size,
-        sha256: sha256(fs.readFileSync(definition.path)),
+        absolute_path: definition.path,
+        bytes: definition.artifact.bytes,
+        sha256: definition.artifact.sha256,
+      },
+      launch: {
+        emulator_path: path.resolve(emulatorPath),
+        arguments: [
+          "-xe", "-pal", "-nobasic", "-nosound", "-turbo", "-no-video-accel", "-no-vsync",
+          ...definition.arguments,
+        ],
+        mode: definition.mode,
       },
       snapshots: result.snapshots,
       milestones,
