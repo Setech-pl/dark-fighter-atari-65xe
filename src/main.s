@@ -39,6 +39,12 @@ PROVISIONAL_CAPITAL_BROADSIDE_REACTION_ROWS = 12
 integration_director_world_row = $4EFE
 integration_debris_spawn = $4F0D
 integration_debris_release = $4F1D
+integration_apply_allied_prow = $4F25
+integration_apply_enemy_prow = $4F28
+CAPITAL_SHELL_GLYPH_SOURCE = $4F97
+render_capital_shell_overlay = $4F9F
+integration_broadside_release = $4FDC
+CAPITAL_PLAYER_COLLISION = $8E61
 
 .import __A2_KERNEL_RUN__, __A2_KERNEL_SIZE__
 .import __BOOT_STAGE2_LOAD__, __BOOT_STAGE2_RUN__, __BOOT_STAGE2_SIZE__
@@ -79,6 +85,7 @@ SIZEP1      = $D009
 SIZEP2      = $D00A
 SIZEP3      = $D00B
 SIZEM       = $D00C
+GRAFP0      = $D00D
 M0PL        = $D008
 M1PL        = $D009
 M2PL        = $D00A
@@ -184,6 +191,9 @@ CORRIDOR_BOUNDARY_ROWS      = CAPITAL_HULL_VISIBLE_ROWS
 ; the high-RAM ring tables after cold staging.
 CORRIDOR_BOUNDARY_LEFT      = PLAYFIELD_RING_STATE_END
 CORRIDOR_BOUNDARY_RIGHT     = CORRIDOR_BOUNDARY_LEFT+CORRIDOR_BOUNDARY_ROWS
+CORRIDOR_PHASE_HI           = CORRIDOR_BOUNDARY_RIGHT+CORRIDOR_BOUNDARY_ROWS
+HULL_DRAW_ROW_LO            = CORRIDOR_PHASE_HI+$01
+HULL_DRAW_ROW_HI            = HULL_DRAW_ROW_LO+$01
 BROAD_TURRET_FIRED          = HULL_SCROLL_ACCUMULATOR+$2F
 BROAD_FLASH_TIMER           = BROAD_TURRET_FIRED+CAPITAL_HULL_TURRET_COUNT ; 3 B
 CAPITAL_SECTOR_STATE        = BROAD_FLASH_TIMER+$03
@@ -214,9 +224,10 @@ GAMEPLAY_RESIDENT_END       = ENEMY_PENDING_SOURCE+$01
 ; Sparse far stars are decorative overlays above the authoritative near-layer
 ; cells.  Their row is logical and their column physical within that row, so a
 ; 50%-rate LMS rotation cannot accidentally drag the independent 25%-rate
-; layer. The expanded population moves into the released-loader gap below
-; $5000 rather than growing back into STARFIELD code at $552A.
-STAR_FAR_ACTIVE              = $4F25
+; layer. The logical records live beside the post-loader ring state so the
+; late-published integration glue can use the complete contiguous $4EFE-$4FFF
+; helper window without overlapping stars.
+STAR_FAR_ACTIVE              = HULL_DRAW_ROW_HI+$01
 STAR_FAR_ROW                 = STAR_FAR_ACTIVE+STAR_FAR_CAPACITY
 STAR_FAR_COLUMN              = STAR_FAR_ROW+STAR_FAR_CAPACITY
 STAR_FAR_CODE                = STAR_FAR_COLUMN+STAR_FAR_CAPACITY
@@ -311,12 +322,14 @@ PLAYFIELD_RING_STATE_END = PLAYFIELD_PREBUILD_PENDING+$01
 .assert >PLAYFIELD_DLIST_A = >PLAYFIELD_DLIST_B, error, "hybrid display lists must share one page"
 .assert PLAYFIELD_DLIST_END <= $8000, error, "expanded display lists overlap entity/effects RAM"
 .assert PLAYFIELD_RING_STATE_END <= WEAPON_PICKUP_PHASE_BANK, error, "expanded ring overlaps pickup phases"
-.assert CORRIDOR_BOUNDARY_RIGHT+CORRIDOR_BOUNDARY_ROWS <= WEAPON_PICKUP_PHASE_BANK, error, "expanded boundary backing overlaps pickup phases"
+.assert HULL_DRAW_ROW_HI+$01 <= WEAPON_PICKUP_PHASE_BANK, error, "expanded hull coordinate state overlaps pickup phases"
+.assert STAR_FAR_STATE_END <= WEAPON_PICKUP_PHASE_BANK, error, "far-star logical state overlaps pickup phases"
 .export PLAYFIELD_DLIST_A, PLAYFIELD_DLIST_B, PLAYFIELD_ROW_LO, PLAYFIELD_ROW_HI
 .export PLAYFIELD_RING_ROWS
 .export PLAYFIELD_ACTIVE_DLIST_LO, PLAYFIELD_NEXT_DLIST_LO, PLAYFIELD_RING_FLAGS
 .export PLAYFIELD_BROAD_ROW, PLAYFIELD_CAPITAL_EXPLOSION_ROW
 .export PLAYFIELD_PREBUILD_PENDING, PLAYFIELD_RING_STATE_END
+.export CORRIDOR_PHASE_HI, HULL_DRAW_ROW_LO, HULL_DRAW_ROW_HI
 
 BROAD_FREE    = 0
 BROAD_WARNING = 1
@@ -492,12 +505,14 @@ HUD_SHIELD_FOUR_SEGMENT_MIN = 188
 .include "enemy-roster.inc"
 
 .assert CORRIDOR_BOUNDARY_ROWS = CAPITAL_HULL_VISIBLE_ROWS, error, "boundary backing must cover every gameplay row"
+.assert HULL_DRAW_ROW_LO = $85F0, error, "integration prow glue low-row ABI moved"
+.assert HULL_DRAW_ROW_HI = $85F1, error, "integration prow glue high-row ABI moved"
+.assert BROAD_WORK_COUNT = $4E63, error, "integration prow glue scratch ABI moved"
 
-; Existing high-energy hull glyphs form a compact two-phase capital slug.
-; Playfield colour banks give the two capital factions independent colours
-; without changing the player/enemy colours coupled to COLPM0-COLPM3.
-CAPITAL_SHELL_PHASE0  = CAPITAL_HULL_GLYPH_BASE+18
-CAPITAL_SHELL_PHASE1  = CAPITAL_HULL_GLYPH_BASE+19
+; The final two gameplay glyphs form the left/right halves of one continuous
+; 8x6 bolt. Bit 7 still selects the Cylon PF3 bank without changing its shape.
+CAPITAL_SHELL_LEFT_GLYPH  = 126
+CAPITAL_SHELL_RIGHT_GLYPH = 127
 
 .ifndef ENEMY_REVIEW_HARNESS
 ENEMY_REVIEW_HARNESS = 0
@@ -639,7 +654,8 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert CAPITAL_HULL_TURRET_COUNT = 2, error, "tracked muzzle records require exactly one turret per side"
 .assert GAMEPLAY_RESIDENT_END <= $4F00, error, "gameplay resident state exceeds reclaimed RAM"
 .assert STARFIELD_STATE_END <= $4F00, error, "starfield scalar state exceeds reclaimed RAM"
-.assert STAR_FAR_STATE_END <= $552A, error, "far-star records overlap relocated starfield code"
+.assert STAR_FAR_ACTIVE >= HULL_DRAW_ROW_HI+$01, error, "far-star records overlap hull ring state"
+.assert STAR_FAR_STATE_END <= WEAPON_PICKUP_PHASE_BANK, error, "far-star records overlap pickup phases"
 .assert STAR_FAR_SCREEN_LO >= $8100, error, "far-star screen cache overlaps initialized entity state"
 .assert STAR_FAR_SCREEN_END <= $9000, error, "far-star screen cache overlaps A2 kernel"
 .assert STAR_FAR_FIRST > CH_SPACE, error, "star codes must not alias blank space"
@@ -673,6 +689,8 @@ VIPER_COMPOSITE_GLYPH_BASE = VIPER_PROJECTILE_GLYPH_BASE+VIPER_PROJECTILE_GLYPH_
 .assert WEAPON_PICKUP_GLYPH_BASE = 120, error, "Rapid Fire glyph indices must begin at 120"
 .assert WEAPON_PICKUP_PHASE_GLYPH_COUNT = 6, error, "pickup fine compositor must own a two-by-three glyph bank"
 .assert WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_PHASE_GLYPH_COUNT = 126, error, "pickup phase glyphs must occupy 120-125"
+.assert CAPITAL_SHELL_LEFT_GLYPH = WEAPON_PICKUP_GLYPH_BASE+WEAPON_PICKUP_PHASE_GLYPH_COUNT, error, "capital shell left half must begin at free glyph 126"
+.assert CAPITAL_SHELL_RIGHT_GLYPH = CAPITAL_SHELL_LEFT_GLYPH+1, error, "capital shell right half must end at glyph 127"
 .assert WEAPON_PICKUP_SPREAD_GLYPH_BASE = 120, error, "all pickup types must share the phased glyph bank"
 .assert WEAPON_PICKUP_SHIELD_GLYPH_BASE = WEAPON_PICKUP_SPREAD_GLYPH_BASE, error, "all pickup types must share the phased glyph bank"
 .assert WEAPON_PICKUP_SHIELD_GLYPH_BYTES = WEAPON_PICKUP_SPREAD_GLYPH_BYTES, error, "Shared pickup glyph banks must have identical footprints"
@@ -908,6 +926,9 @@ boot_return:
 start:
     sei
 
+layout_d_hold_glue:
+layout_d_hold_glue_end:
+
     lda #$00
     sta NMIEN
     sta DMACTL
@@ -1096,6 +1117,15 @@ copy_boot_stream:
 @done:
     rts
 
+stage_a2_kernel:
+    ldy #$00
+@copy_a2:
+    lda BOOT_A2_STAGING,y
+    sta __A2_KERNEL_RUN__,y
+    iny
+    bne @copy_a2
+    jmp stage_glue_holding
+
 broadside_packed_source:
     .word $FFFF
 
@@ -1136,25 +1166,6 @@ unpack_entity_runtime:
     sta broadside_destination+2
     jmp broadside_unpack_command
 
-; The staged A2 bytes are copied after the resident suffix has been restored.
-stage_a2_kernel:
-    ldy #$00
-@copy:
-    lda BOOT_A2_STAGING,y
-    sta __A2_KERNEL_RUN__,y
-    iny
-    cpy #<__A2_KERNEL_SIZE__
-    bne @copy
-layout_d_hold_glue:
-    ldy #(LAYOUT_D_GLUE_BYTES-1)
-@hold:
-    lda LAYOUT_D_GLUE_STAGING,y
-    sta LAYOUT_D_GLUE_HOLDING,y
-    dey
-    bpl @hold
-layout_d_hold_glue_end:
-    rts
-
 .assert __A2_KERNEL_SIZE__ > 0, error, "A2 kernel must not be empty"
 .assert __A2_KERNEL_SIZE__ < $0100, error, "A2 kernel copy loop is limited to 255 bytes"
 .assert __ENTITY_CODE_SIZE__ > 0, error, "ENTITY_CODE must not be empty"
@@ -1190,6 +1201,16 @@ boot_chunk_ready:
 .assert *-start <= $01A3, error, "resident bootstrap prefix exceeds its fixed boundary"
 .res $01A3-(*-start)
 resident_runtime_suffix:
+stage_glue_holding:
+    ldy #(LAYOUT_D_GLUE_BYTES-1)
+@hold_glue:
+    lda LAYOUT_D_GLUE_STAGING,y
+    sta LAYOUT_D_GLUE_HOLDING,y
+    dey
+    cpy #$FF
+    bne @hold_glue
+    rts
+
 frontend_loop:
     jsr wait_frame
     lda game_state
@@ -1457,6 +1478,19 @@ enter_game_over:
     lda #STATE_GAME_OVER
     bne enter_frontend_state
 
+; Both frontend entry paths call this with A=$00 after display and PMG DMA are
+; blanked. Disable NMI first, then clear the final DMA-fed GTIA graphics bytes;
+; memory-only clear_pmg is not sufficient here.
+clear_pmg_graphics_latches:
+.export clear_pmg_graphics_latches
+    sta NMIEN
+    ldx #$04
+@loop:
+    sta GRAFP0,x
+    dex
+    bpl @loop
+    rts
+
 enter_frontend_state:
     sta game_state
     cmp #STATE_MAIN_MENU
@@ -1472,7 +1506,7 @@ enter_frontend_state:
     sta frontend_input_armed
     sta DMACTL
     sta GRACTL
-    sta NMIEN
+    jsr clear_pmg_graphics_latches
     jsr select_frontend_display
     jsr render_frontend_state
     jsr wait_frame_start
@@ -2327,7 +2361,7 @@ enter_pause:
     lda #$00
     sta DMACTL
     sta GRACTL
-    sta NMIEN
+    jsr clear_pmg_graphics_latches
     jsr pause_silence_audio
     jsr backup_gameplay_screen
     jmp show_pause_menu
@@ -2363,6 +2397,8 @@ pause_loop:
     jmp resume_gameplay
 :
 
+pause_frontend_input_poll = *
+.export pause_frontend_input_poll
     lda STICK0
     and #$0F
     sta stick_value
@@ -5870,6 +5906,9 @@ scroll_hull_columns_advance_scene:
     jsr draw_hull_row
     jsr track_top_muzzles
     inc corridor_phase
+    bne :+
+    inc CORRIDOR_PHASE_HI
+:
     lda BROAD_VISIBLE_SCROLLS
     cmp #CAPITAL_HULL_VISIBLE_ROWS
     bcs :+
@@ -5916,20 +5955,30 @@ clear_top_hull_row:
     bne @enemy
     rts
 
+.segment "CODE"
+
 update_sector_state:
+    lda CORRIDOR_PHASE_HI
+    beq @low_page
+    cmp #$01
+    bne @drain
     lda corridor_phase
-    cmp #CAPITAL_HULL_SECTION_ENGINES_END
-    bcc @engines
-    cmp #CAPITAL_HULL_SECTION_AFT_END
-    bcc @aft
-    cmp #CAPITAL_HULL_SECTION_COMBAT_END
+    cmp #<CAPITAL_HULL_SECTION_COMBAT_END
     bcc @combat
-    cmp #CAPITAL_HULL_SECTION_FORWARD_END
+    cmp #<CAPITAL_HULL_SECTION_FORWARD_END
     bcc @forward
-    cmp #CAPITAL_HULL_STREAM_ROWS
+    cmp #<CAPITAL_HULL_STREAM_ROWS
     bcc @prow
+@drain:
     lda #CAPITAL_HULL_STATE_DRAIN
     bne @store
+@low_page:
+    lda corridor_phase
+    cmp #<CAPITAL_HULL_SECTION_ENGINES_END
+    bcc @engines
+    cmp #<CAPITAL_HULL_SECTION_AFT_END
+    bcc @aft
+    bcs @combat
 @engines:
     lda #CAPITAL_HULL_STATE_ENGINES
     beq @store
@@ -5948,7 +5997,11 @@ update_sector_state:
     sta CAPITAL_SECTOR_STATE
     rts
 
-; At most one source muzzle per side can be visible in the gameplay viewport.
+.segment "BROADSIDE"
+
+; One scheduling/overlay record per side follows the newest legal station.
+; Dense layouts may introduce that station while the previous record is still
+; in the ring, so claiming row zero must reset the complete station lifecycle.
 ; Logical row plus explicit fixed-divider/ring domain are authoritative. The
 ; exact pointer is only a derived overlay address; its high byte also doubles
 ; as the active flag.
@@ -6025,6 +6078,8 @@ track_top_muzzles:
     bne @enemy
     lda #$00
     sta MUZZLE_VISIBLE_ROW
+    sta MUZZLE_ROW_DOMAIN
+    sta BROAD_TURRET_FIRED
     clc
     lda dst_ptr
     adc #CORRIDOR_CENTRAL_FIRST
@@ -6032,6 +6087,8 @@ track_top_muzzles:
     lda dst_ptr+1
     adc #$00
     sta MUZZLE_SCREEN_HI
+    lda #$01
+    sta BROAD_SCHEDULE_TIMER     ; every new legal station gets a prompt turn
 @enemy:
     ldy #(CORRIDOR_CENTRAL_END-1)
     lda (dst_ptr),y
@@ -6039,6 +6096,8 @@ track_top_muzzles:
     bne @done
     lda #$00
     sta MUZZLE_VISIBLE_ROW+1
+    sta MUZZLE_ROW_DOMAIN+1
+    sta BROAD_TURRET_FIRED+1
     clc
     lda dst_ptr
     adc #(CORRIDOR_CENTRAL_END-1)
@@ -6046,6 +6105,8 @@ track_top_muzzles:
     lda dst_ptr+1
     adc #$00
     sta MUZZLE_SCREEN_HI+1
+    lda #$01
+    sta BROAD_SCHEDULE_TIMER
 @done:
     rts
 
@@ -6128,12 +6189,19 @@ generate_starfield_row:
     bne @clear_central
     jmp generate_near_star_row
 
-; Resolve a finite sector row to one reusable eight-row source module. The
-; selected module id and local row remain in BROAD_WORK_VALUE/COUNT so the
-; engine overlay can be applied without a second lookup.
+.segment "BROADSIDE"
+
+; Resolve a finite 16-bit sector row (X:A) to one reusable eight-row source
+; module. The selected module id and local row remain in
+; BROAD_WORK_VALUE/COUNT so the engine overlay can be applied without a second
+; lookup. The 480-row stream intentionally exceeds the old byte coordinate.
 resolve_allied_sector_row:
-    cmp #CAPITAL_HULL_SECTOR_ROWS
+    cpx #>CAPITAL_HULL_SECTOR_ROWS
+    bcc @valid
+    bne @invalid
+    cmp #<CAPITAL_HULL_SECTOR_ROWS
     bcs @invalid
+@valid:
     sta loader_repeat_value
     and #(CAPITAL_HULL_SECTOR_MODULE_ROWS-1)
     sta BROAD_WORK_COUNT
@@ -6141,9 +6209,19 @@ resolve_allied_sector_row:
     lsr
     lsr
     lsr
+    sta src_ptr
+    txa
+    asl
+    asl
+    asl
+    asl
+    asl
+    ora src_ptr
     tay
     lda allied_sector_sequence,y
-    sta BROAD_WORK_VALUE
+    ldx #CAPITAL_HULL_ALLIED_TURRET_MODULE
+    jsr select_sector_module
+    lda BROAD_WORK_VALUE
     asl
     asl
     asl
@@ -6158,8 +6236,12 @@ resolve_allied_sector_row:
     rts
 
 resolve_enemy_sector_row:
-    cmp #CAPITAL_HULL_SECTOR_ROWS
+    cpx #>CAPITAL_HULL_SECTOR_ROWS
+    bcc @valid
+    bne @invalid
+    cmp #<CAPITAL_HULL_SECTOR_ROWS
     bcs @invalid
+@valid:
     sta loader_repeat_value
     and #(CAPITAL_HULL_SECTOR_MODULE_ROWS-1)
     sta BROAD_WORK_COUNT
@@ -6167,9 +6249,19 @@ resolve_enemy_sector_row:
     lsr
     lsr
     lsr
+    sta src_ptr
+    txa
+    asl
+    asl
+    asl
+    asl
+    asl
+    ora src_ptr
     tay
     lda enemy_sector_sequence,y
-    sta BROAD_WORK_VALUE
+    ldx #CAPITAL_HULL_ENEMY_TURRET_MODULE
+    jsr select_sector_module
+    lda BROAD_WORK_VALUE
     asl
     asl
     asl
@@ -6182,6 +6274,39 @@ resolve_enemy_sector_row:
 @invalid:
     sec
     rts
+
+.segment "BROADSIDE"
+
+; A packs a clean module id in its low nibble and the minimum enabled
+; difficulty in bits 6-7 (HARD/MEDIUM/EASY = 1/2/3). X is the side's turret
+; module. This keeps all three seeded layouts inside the original 60-byte
+; sequence and never consumes runtime Director RNG state.
+select_sector_module:
+    sta loader_repeat_value
+    and #$0F
+    sta BROAD_WORK_VALUE
+    lda loader_repeat_value
+    and #$C0
+    beq @ordinary
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc DIFFICULTY_SETTING
+    cmp #$03
+    bcc @ordinary
+    stx BROAD_WORK_VALUE
+@ordinary:
+    rts
+
+.segment "PICKUP_CODE"
+turret_layout_pickup_compat_pad:
+    .byte $00,$00,$00,$00,$00,$00,$00,$00
+
+.segment "BROADSIDE"
 
 ; A contains a source row in the compact 32x9 combat map.
 set_allied_hull_source:
@@ -6217,90 +6342,15 @@ set_enemy_hull_source:
     sta src_ptr+1
     rts
 
-; The final 32 rows use compact one-byte occupancy profiles. Missing source
-; cells are filled with faction mass, cleared cells remain genuine empty
-; space, and the innermost occupied cell receives a partial-pixel edge glyph.
-apply_allied_prow_profile:
-    lda corridor_phase
-    cmp #CAPITAL_HULL_SECTION_FORWARD_END
-    bcc @done
-    cmp #CAPITAL_HULL_SECTION_PROW_END
-    bcs @done
-    sec
-    sbc #CAPITAL_HULL_SECTION_FORWARD_END
-    tay
-    lda allied_prow_occupancy_masks,y
-    sta loader_repeat_value
-    ldy #$00
-@cell:
-    lsr loader_repeat_value
-    bcc @clear
-    sty BROAD_WORK_COUNT          ; final stored value is the innermost cell
-    lda (dst_ptr),y
-    bne @next
-    lda #CAPITAL_HULL_ALLIED_PROW_FILL_CODE
-    sta (dst_ptr),y
-    bne @next
-@clear:
-    lda #CH_SPACE
-    sta (dst_ptr),y
-@next:
-    iny
-    cpy #CORRIDOR_ALLIED_COLUMNS
-    bne @cell
-    ldy BROAD_WORK_COUNT
-    lda #CAPITAL_HULL_ALLIED_PROW_EDGE_CODE
-    sta (dst_ptr),y
-@done:
-    rts
-
-apply_enemy_prow_profile:
-    lda corridor_phase
-    cmp #CAPITAL_HULL_SIDE_PHASE_ROWS
-    bcc @done
-    sec
-    sbc #CAPITAL_HULL_SIDE_PHASE_ROWS
-    cmp #CAPITAL_HULL_SECTION_FORWARD_END
-    bcc @done
-    cmp #CAPITAL_HULL_SECTION_PROW_END
-    bcs @done
-    sec
-    sbc #CAPITAL_HULL_SECTION_FORWARD_END
-    tay
-    lda enemy_prow_occupancy_masks,y
-    sta loader_repeat_value
-    lda #$FF
-    sta BROAD_WORK_COUNT
-    ldy #CORRIDOR_ENEMY_FIRST
-@cell:
-    lsr loader_repeat_value
-    bcc @clear
-    lda BROAD_WORK_COUNT
-    bpl :+
-    sty BROAD_WORK_COUNT          ; first stored value is the innermost cell
-:
-    lda (dst_ptr),y
-    bne @next
-    lda #CAPITAL_HULL_ENEMY_PROW_FILL_CODE
-    sta (dst_ptr),y
-    bne @next
-@clear:
-    lda #CH_SPACE
-    sta (dst_ptr),y
-@next:
-    iny
-    cpy #40
-    bne @cell
-    ldy BROAD_WORK_COUNT
-    lda #CAPITAL_HULL_ENEMY_PROW_EDGE_CODE
-    sta (dst_ptr),y
-@done:
-    rts
+.segment "BROADSIDE"
 
 ; Draws the next finite sector row without advancing its shared longitudinal
 ; coordinate. The right ship uses a fixed eight-row content offset only.
 draw_hull_row:
     lda corridor_phase
+    sta HULL_DRAW_ROW_LO
+    ldx CORRIDOR_PHASE_HI
+    stx HULL_DRAW_ROW_HI
     jsr resolve_allied_sector_row
     bcs @blank_allied
     jsr set_allied_hull_source
@@ -6311,7 +6361,11 @@ draw_hull_row:
     iny
     cpy #CAPITAL_HULL_MAP_COLUMNS
     bne @allied_hull
-    jsr apply_allied_prow_profile
+    lda #<allied_prow_occupancy_masks
+    sta src_ptr
+    lda #>allied_prow_occupancy_masks
+    sta src_ptr+1
+    jsr integration_apply_allied_prow
     lda BROAD_WORK_VALUE
     cmp #CAPITAL_HULL_ALLIED_ENGINE_MODULE
     bne @enemy
@@ -6339,10 +6393,15 @@ draw_hull_row:
 
 @enemy:
     lda corridor_phase
-    cmp #CAPITAL_HULL_SIDE_PHASE_ROWS
-    bcc @blank_enemy
     sec
     sbc #CAPITAL_HULL_SIDE_PHASE_ROWS
+    sta HULL_DRAW_ROW_LO
+    lda CORRIDOR_PHASE_HI
+    sbc #$00
+    tax
+    stx HULL_DRAW_ROW_HI
+    bcc @blank_enemy
+    lda HULL_DRAW_ROW_LO
     jsr resolve_enemy_sector_row
     bcs @blank_enemy
     jsr set_enemy_hull_source
@@ -6360,7 +6419,11 @@ draw_hull_row:
     iny
     cpy #40
     bne @enemy_hull
-    jsr apply_enemy_prow_profile
+    lda #<enemy_prow_occupancy_masks
+    sta src_ptr
+    lda #>enemy_prow_occupancy_masks
+    sta src_ptr+1
+    jsr integration_apply_enemy_prow
     lda BROAD_WORK_VALUE
     cmp #CAPITAL_HULL_ENEMY_ENGINE_MODULE
     bne @done
@@ -6388,6 +6451,8 @@ draw_hull_row:
     bne @clear_enemy
 @done:
     rts
+
+.segment "BROADSIDE"
 
 fill_starfield_empty_cells:
     jmp generate_near_star_row
@@ -6878,14 +6943,16 @@ frontend_marker_positions:
 frontend_screen_records_end:
     .assert frontend_screen_records_end - frontend_screen_records < $0200, error, "frontend screen data exceeds compact budget"
 
+.segment "RODATA"
+
 ; Packed 32-row maps are expanded once to $4C00-$4E3F. Metadata remains
 ; resident and is the contract for broadside firing/collision in stage 2.
 enemy_hull_packed_map:
     EMIT_ENEMY_HULL_PACKED_MAP
 
-; Immutable PMG masks belong with the main read-only data. Keeping these six
-; bytes out of the relocation block leaves the HUD formatter inside the fixed
-; BROADSIDE_RAM boundary without consuming the protected finale arena.
+; These runtime-live PMG masks end at $3809.  The boot-only loader display
+; list lives in the later PMG page while PMG DMA is disabled, so publication
+; cannot corrupt the renderer tables.
 missile_masks:
     .byte $0C,$30,$C0
 missile_clear_masks:
@@ -6916,10 +6983,14 @@ world_scroll_rates:
     EMIT_WORLD_SCROLL_RATES
 hull_scroll_rates:
     EMIT_HULL_SCROLL_RATES
+
+.segment "BROADSIDE"
 allied_collision_boundaries:
     EMIT_ALLIED_COLLISION_BOUNDARIES
 enemy_collision_boundaries:
     EMIT_ENEMY_COLLISION_BOUNDARIES
+
+.segment "BROADSIDE"
 allied_sector_module_sources:
     EMIT_ALLIED_SECTOR_MODULE_SOURCES
 enemy_sector_module_sources:
@@ -6928,10 +6999,8 @@ allied_sector_sequence:
     EMIT_ALLIED_SECTOR_SEQUENCE
 enemy_sector_sequence:
     EMIT_ENEMY_SECTOR_SEQUENCE
-allied_engine_overlay_masks:
-    EMIT_ALLIED_ENGINE_OVERLAY_MASKS
-enemy_engine_overlay_masks:
-    EMIT_ENEMY_ENGINE_OVERLAY_MASKS
+
+.segment "BROADSIDE"
 allied_prow_occupancy_masks:
     EMIT_ALLIED_PROW_OCCUPANCY_MASKS
 enemy_prow_occupancy_masks:
@@ -6940,23 +7009,23 @@ allied_prow_collision_boundaries:
     EMIT_ALLIED_PROW_COLLISION_BOUNDARIES
 enemy_prow_collision_boundaries:
     EMIT_ENEMY_PROW_COLLISION_BOUNDARIES
-engine_animation_frames:
-    EMIT_ENGINE_ANIMATION_FRAMES
+
+.segment "BROADSIDE"
 capital_explosion_phases:
     EMIT_CAPITAL_EXPLOSION_PHASES
 capital_explosion_sound_frequency:
     EMIT_CAPITAL_EXPLOSION_SOUND_FREQUENCY
 capital_explosion_sound_control:
     EMIT_CAPITAL_EXPLOSION_SOUND_CONTROL
+
+.segment "BROADSIDE"
 capital_explosion_phase_offsets:
     .byte 0,9,18,27,36,45
 explosion_backup_offsets:
     .byte 0,9
-
 turret_record_offsets:
     .byte $00,$07
-turret_warning_last_safe_rows:
-    EMIT_TURRET_WARNING_LAST_SAFE_ROWS
+
 .segment "RODATA"
 
 top_score_row_template:
@@ -7013,7 +7082,18 @@ pause_quit_screen_data:
     .byte $FF
 
 init_broadside:
+    ldx #$07
+@copy_shell_glyphs:
+    lda CAPITAL_SHELL_GLYPH_SOURCE,x
+    sta CHARSET+CAPITAL_SHELL_LEFT_GLYPH*8,x
+    asl
+    sta CHARSET+CAPITAL_SHELL_RIGHT_GLYPH*8,x
+    dex
+    bpl @copy_shell_glyphs
     lda #$00
+    sta CORRIDOR_PHASE_HI
+    sta HULL_DRAW_ROW_LO
+    sta HULL_DRAW_ROW_HI
     ldx #(CAPITAL_HULL_TURRET_COUNT-1)
 @clear_muzzles:
     sta MUZZLE_ROW_DOMAIN,x
@@ -7163,9 +7243,16 @@ update_broadside:
     beq :+
     dec BROAD_DAMAGE_COOLDOWN
 :
+    ; Late capital-shell rendering is a 0->2 painter's stack. Restore every
+    ; saved footprint in the exact inverse order before any slot can move,
+    ; transition state, or draw this frame's PMG warning/impact.
+    ldx #(BROADSIDE_SLOT_COUNT-1)
+@erase_slot:
+    jsr erase_broadside_slot
+    dex
+    bpl @erase_slot
     ldx #$00
 @slot:
-    jsr erase_broadside_slot
     lda BROAD_STATE,x
     bne :+
     jmp @next
@@ -7210,6 +7297,11 @@ update_broadside:
     sbc #BROADSIDE_PROJECTILE_SPEED
     sta BROAD_X,x
 @targets:
+    ; Opposite-owner capital shells share only the painter's z-order. They do
+    ; not collide, change lifecycle, or suppress either slot's world targets.
+    jmp @world_targets
+    .res 20,$00                 ; preserve reviewed BROADSIDE entry addresses
+@world_targets:
     jsr capital_shell_collision_flags
     lda BROAD_COLLISION,x
     and #$02                    ; first target is the ordinary Cylon fighter
@@ -7309,12 +7401,6 @@ schedule_broadside:
     lda turret_record_offsets,x
     sta BROAD_WORK_VALUE
     tay
-    lda capital_hull_turrets+CAPITAL_TURRET_SIDE_OFFSET,y
-    ldx BROAD_WORK_SLOT
-    cmp BROAD_OWNER,x
-    beq :+
-    jmp @next_candidate
-:
     ldx BROAD_WORK_COUNT
     lda MUZZLE_SCREEN_HI,x
     bne :+
@@ -7355,7 +7441,6 @@ schedule_broadside:
     sbc BROAD_X,x
     bcs :+
     eor #$FF
-    clc
     adc #$01
 :
     cmp #BROADSIDE_MIN_VERTICAL_SEPARATION
@@ -7679,17 +7764,22 @@ update_engine_animation:
 
 copy_engine_animation_phase:
     lda ENGINE_ANIMATION_PHASE
-    asl
-    asl
-    asl
+    bne @bright
+    lda #$AA
+    ldy #$FF
+    bne @values
+@bright:
+    lda #$55
     tay
+@values:
+    sta BROAD_WORK_VALUE
+    sty row_counter
     ldx #$00
 @byte:
-    lda engine_animation_frames,y
+    lda BROAD_WORK_VALUE
     sta CHARSET+CAPITAL_HULL_ALLIED_ENGINE_GLYPH*8,x
-    lda engine_animation_frames+CAPITAL_HULL_ENGINE_ANIMATION_PHASES*8,y
+    lda row_counter
     sta CHARSET+CAPITAL_HULL_ENEMY_ENGINE_GLYPH*8,x
-    iny
     inx
     cpx #$08
     bne @byte
@@ -7888,27 +7978,25 @@ begin_broadside_impact:
     lda #BROADSIDE_IMPACT_HEIGHT
     jmp draw_broadside_span
 
+.segment "BROADSIDE"
 count_broadside_hull_hit:
+    stx BROAD_WORK_SLOT
     lda BROAD_OWNER,x
-    bne @allied_hull
-    lda BROAD_ENEMY_HITS
+    eor #$01
+    tax
+    lda BROAD_ALLIED_HITS,x
     cmp #$FF
     beq @done
-    inc BROAD_ENEMY_HITS
-    rts
-@allied_hull:
-    lda BROAD_ALLIED_HITS
-    cmp #$FF
-    beq @done
-    inc BROAD_ALLIED_HITS
+    inc BROAD_ALLIED_HITS,x
 @done:
     rts
 
+.segment "BROADSIDE"
 ; One bounded 3x3 character overlay per target hull. The projectile row pointer
 ; selects the impact row; each active overlay then receives the same +40-byte
 ; step as its parent hull. The source collision boundaries remain authoritative.
 begin_capital_hull_explosion:
-    stx BROAD_WORK_SLOT
+    ldx BROAD_WORK_SLOT
     lda BROAD_OWNER,x
     beq @target_enemy
     ldx #$00                    ; enemy fire impacts the allied hull
@@ -8049,20 +8137,25 @@ restore_capital_explosion:
     lda #CAPITAL_EXPLOSION_HEIGHT
     sta row_counter
 @row:
-    lda #CAPITAL_EXPLOSION_WIDTH
-    sta PLAYER_CONTACT_ROWS
-    ldy PLAYER_CONTACT_LEFT
-@cell:
     ldx BROAD_WORK_VALUE
+    ldy PLAYER_CONTACT_LEFT
     lda CAPITAL_EXPLOSION_BACKUP,x
     sta (dst_ptr),y
-    inc BROAD_WORK_VALUE
+    inx
     iny
-    dec PLAYER_CONTACT_ROWS
-    bne @cell
-    jsr advance_dst_to_next_physical_row
+    lda CAPITAL_EXPLOSION_BACKUP,x
+    sta (dst_ptr),y
+    inx
+    iny
+    lda CAPITAL_EXPLOSION_BACKUP,x
+    sta (dst_ptr),y
+    inx
+    stx BROAD_WORK_VALUE
     dec row_counter
-    bne @row
+    beq @done
+    jsr advance_dst_to_next_physical_row
+    jmp @row
+@done:
     ldx BROAD_WORK_SLOT
     rts
 
@@ -8100,10 +8193,7 @@ render_capital_explosion:
     lda #CAPITAL_EXPLOSION_HEIGHT
     sta row_counter
 @row:
-    lda #CAPITAL_EXPLOSION_WIDTH
-    sta PLAYER_CONTACT_ROWS
     ldy PLAYER_CONTACT_LEFT
-@cell:
     lda (dst_ptr),y
     ldx BROAD_WORK_VALUE
     sta CAPITAL_EXPLOSION_BACKUP,x
@@ -8120,11 +8210,42 @@ render_capital_explosion:
     inc BROAD_WORK_VALUE
     inc PLAYER_CONTACT_RIGHT
     iny
-    dec PLAYER_CONTACT_ROWS
-    bne @cell
-    jsr advance_dst_to_next_physical_row
+    lda (dst_ptr),y
+    ldx BROAD_WORK_VALUE
+    sta CAPITAL_EXPLOSION_BACKUP,x
+    and #$7F
+    cmp #CAPITAL_HULL_GLYPH_BASE
+    bcc @skip_second
+    cmp #(CAPITAL_HULL_GLYPH_BASE+CAPITAL_HULL_GLYPH_COUNT)
+    bcs @skip_second
+    ldx PLAYER_CONTACT_RIGHT
+    lda capital_explosion_phases,x
+    beq @skip_second
+    sta (dst_ptr),y
+@skip_second:
+    inc BROAD_WORK_VALUE
+    inc PLAYER_CONTACT_RIGHT
+    iny
+    lda (dst_ptr),y
+    ldx BROAD_WORK_VALUE
+    sta CAPITAL_EXPLOSION_BACKUP,x
+    and #$7F
+    cmp #CAPITAL_HULL_GLYPH_BASE
+    bcc @skip_third
+    cmp #(CAPITAL_HULL_GLYPH_BASE+CAPITAL_HULL_GLYPH_COUNT)
+    bcs @skip_third
+    ldx PLAYER_CONTACT_RIGHT
+    lda capital_explosion_phases,x
+    beq @skip_third
+    sta (dst_ptr),y
+@skip_third:
+    inc BROAD_WORK_VALUE
+    inc PLAYER_CONTACT_RIGHT
     dec row_counter
-    bne @row
+    beq @done
+    jsr advance_dst_to_next_physical_row
+    jmp @row
+@done:
     ldx BROAD_WORK_SLOT
     rts
 
@@ -8196,7 +8317,7 @@ capital_shell_hits_player:
     lda frontend_data_ptr
     adc #(PLAYER_COLLISION_LAST_ROW+CAPITAL_PROJECTILE_VISIBLE_HEIGHT)
     sta frontend_data_ptr+1
-    jmp capital_shell_hits_target
+    jmp CAPITAL_PLAYER_COLLISION
 
 .segment "PICKUP_CODE"
 ; Both capital factions share one final-raster collision compositor. The shell
@@ -8232,8 +8353,8 @@ capital_shell_collision_flags_shared:
     lda #$00
     sta BROAD_COLLISION,x
     jsr capital_shell_hits_player
-    bcc :+
     ldx BROAD_WORK_SLOT
+    bcc :+
     lda #$01
     sta BROAD_COLLISION,x
 :
@@ -8270,6 +8391,8 @@ capital_shell_collision_flags_shared:
 @done:
     ldx BROAD_WORK_SLOT
     rts
+
+.segment "BROADSIDE"
 
 .segment "BROADSIDE"
 
@@ -8441,18 +8564,36 @@ visible_hull_sector_row:
     sec
     sbc loader_repeat_value
     tay
-    dey
+    lda CORRIDOR_PHASE_HI
+    sbc #$00
+    tax
+    tya
+    sec
+    sbc #$01
+    tay
+    txa
+    sbc #$00
+    tax
     clc
     rts
 @draining:
     lda loader_repeat_value
     cmp CAPITAL_SECTOR_DRAIN_ROWS
     bcc @invalid
-    lda #(CAPITAL_HULL_STREAM_ROWS-1)
+    lda #<(CAPITAL_HULL_STREAM_ROWS-1)
     sbc loader_repeat_value
+    sta HULL_DRAW_ROW_LO
+    lda #>(CAPITAL_HULL_STREAM_ROWS-1)
+    sbc #$00
+    sta HULL_DRAW_ROW_HI
+    lda HULL_DRAW_ROW_LO
     clc
     adc CAPITAL_SECTOR_DRAIN_ROWS
     tay
+    lda HULL_DRAW_ROW_HI
+    adc #$00
+    tax
+    clc
     rts
 @invalid:
     sec
@@ -8500,18 +8641,29 @@ handle_player_hull_contact:
     lda row_counter
     jsr visible_hull_sector_row
     bcs @next_row
-    tya
-    pha
-    cmp #CAPITAL_HULL_SECTION_FORWARD_END
+    sty HULL_DRAW_ROW_LO
+    stx HULL_DRAW_ROW_HI
+    cpx #>CAPITAL_HULL_SECTION_FORWARD_END
     bcc @allied_module
-    cmp #CAPITAL_HULL_SECTION_PROW_END
+    bne :+
+    cpy #<CAPITAL_HULL_SECTION_FORWARD_END
+    bcc @allied_module
+:
+    cpx #>CAPITAL_HULL_SECTION_PROW_END
+    bcc :+
+    bne @enemy_row
+    cpy #<CAPITAL_HULL_SECTION_PROW_END
     bcs @enemy_row
+:
+    tya
     sec
-    sbc #CAPITAL_HULL_SECTION_FORWARD_END
+    sbc #<CAPITAL_HULL_SECTION_FORWARD_END
     tay
     lda allied_prow_collision_boundaries,y
     jmp @allied_boundary
 @allied_module:
+    lda HULL_DRAW_ROW_LO
+    ldx HULL_DRAW_ROW_HI
     jsr resolve_allied_sector_row
     bcs @enemy_row
     tay
@@ -8522,21 +8674,34 @@ handle_player_hull_contact:
     sta PLAYER_CONTACT_LEFT
 :
 @enemy_row:
-    pla
-    cmp #CAPITAL_HULL_SIDE_PHASE_ROWS
-    bcc @next_row
+    lda HULL_DRAW_ROW_LO
     sec
     sbc #CAPITAL_HULL_SIDE_PHASE_ROWS
-    cmp #CAPITAL_HULL_SECTION_FORWARD_END
+    tay
+    lda HULL_DRAW_ROW_HI
+    sbc #$00
+    tax
+    bcc @next_row
+    cpx #>CAPITAL_HULL_SECTION_FORWARD_END
     bcc @enemy_module
-    cmp #CAPITAL_HULL_SECTION_PROW_END
+    bne :+
+    cpy #<CAPITAL_HULL_SECTION_FORWARD_END
+    bcc @enemy_module
+:
+    cpx #>CAPITAL_HULL_SECTION_PROW_END
+    bcc :+
+    bne @next_row
+    cpy #<CAPITAL_HULL_SECTION_PROW_END
     bcs @next_row
+:
+    tya
     sec
-    sbc #CAPITAL_HULL_SECTION_FORWARD_END
+    sbc #<CAPITAL_HULL_SECTION_FORWARD_END
     tay
     lda enemy_prow_collision_boundaries,y
     jmp @enemy_boundary
 @enemy_module:
+    tya
     jsr resolve_enemy_sector_row
     bcs @next_row
     tay
@@ -8549,7 +8714,9 @@ handle_player_hull_contact:
 @next_row:
     inc row_counter
     dec PLAYER_CONTACT_ROWS
-    bne @row
+    beq :+
+    jmp @row
+:
 
     lda player_x
     cmp PLAYER_CONTACT_LEFT
@@ -8574,22 +8741,30 @@ handle_player_hull_contact:
     ldx #$00
     jmp apply_broadside_player_damage
 
+; Preserve the reviewed integration-glue target after replacing the former
+; periodic cannon-mask decoder with the smaller encoded-layout selector.
+free_broadside_slot_layout_lead_pad:
 free_broadside_slot:
-    ldx BROAD_WORK_SLOT           ; Director release uses X for the hazard id
     jsr erase_broadside_slot
     lda #BROAD_FREE
     sta BROAD_STATE,x
     sta BROAD_TIMER,x
     sta HPOSM1,x
     rts
+free_broadside_slot_layout_pad:
+    .byte $AE,$62,$4E            ; displaced LDX BROAD_WORK_SLOT, unreachable
+.assert free_broadside_slot = $76C1, error, "integration release target moved"
+
+.segment "BROADSIDE"
 
 erase_broadside_slot:
+broadside_erase_begin:
     stx BROAD_WORK_SLOT
     lda BROAD_PREV_H,x
-    beq @done
+    beq broadside_erase_end
     lda BROAD_STATE,x
     cmp #BROAD_FLYING
-    bne @missile_span
+    bne broadside_erase_missile_span
     lda BROAD_ROW_LO,x
     sta dst_ptr
     lda BROAD_ROW_HI,x
@@ -8603,23 +8778,26 @@ erase_broadside_slot:
     iny
     lda BROAD_COLLISION,x
     sta (dst_ptr),y
-    jmp @clear_previous
-@missile_span:
+broadside_erase_cells_restored:
+    jmp broadside_erase_clear_previous
+broadside_erase_missile_span:
     lda BROAD_PREV_H,x
     sta BROAD_WORK_COUNT
     ldy BROAD_PREV_Y,x
-@line:
+broadside_erase_missile_line:
     ldx BROAD_WORK_SLOT
     lda MISSILES,y
     and missile_clear_masks,x
     sta MISSILES,y
     iny
     dec BROAD_WORK_COUNT
-    bne @line
-@clear_previous:
+    bne broadside_erase_missile_line
+broadside_erase_clear_previous:
     lda #$00
     sta BROAD_PREV_H,x
-@done:
+    sta BROAD_PREV_Y,x
+    sta BROAD_COLLISION,x
+broadside_erase_end:
     ldx BROAD_WORK_SLOT
     rts
 
@@ -8641,47 +8819,6 @@ render_capital_shell_overlays:
     rts
 
 .segment "BROADSIDE"
-render_capital_shell_overlay:
-    lda BROAD_ROW_LO,x
-    sta dst_ptr
-    lda BROAD_ROW_HI,x
-    sta dst_ptr+1
-    lda BROAD_X,x
-    sec
-    sbc #48
-    lsr
-    lsr
-    tay
-    tya
-    clc
-    adc #$01
-    sta BROAD_PREV_H,x           ; nonzero previous screen column token
-    lda (dst_ptr),y
-    sta BROAD_PREV_Y,x
-    iny
-    lda (dst_ptr),y
-    sta BROAD_COLLISION,x        ; second backing byte; GTIA snapshots are unused
-    dey
-    lda frame_counter
-    lsr
-    and #$01
-    clc
-    adc #CAPITAL_SHELL_PHASE0
-    pha
-    lda BROAD_OWNER,x
-    beq @colonial
-    pla
-    ora #CAPITAL_PROJECTILE_CYLON_ATTRIBUTE
-    bne @draw
-@colonial:
-    pla
-@draw:
-    sta (dst_ptr),y
-    iny
-    sta (dst_ptr),y
-    rts
-
-
 draw_broadside_span:
     pha
     lda BROAD_X,x
@@ -8715,6 +8852,7 @@ set_broadside_slot_normal:
     sta SIZEM
     rts
 
+.segment "ENTITY_CODE"
 set_broadside_slot_double:
     lda SIZEM
     and missile_clear_masks,x
@@ -8722,14 +8860,19 @@ set_broadside_slot_double:
     sta SIZEM
     rts
 
-.segment "BROADSIDE"
+.segment "PICKUP_CODE"
 set_broadside_slot_quad:
     lda SIZEM
     and missile_clear_masks,x
     ora missile_quad_size_bits,x
     sta SIZEM
     rts
+; Preserve the accepted linked-runtime accounting while the collision helper
+; moves into late-published GLUE; unreachable after the tail return above.
+broadside_glue_accounting_pad:
+    .byte $00,$00
 
+.segment "BROADSIDE"
 enemy_frame_heights:
     EMIT_ENEMY_FRAME_HEIGHTS
 enemy_size_modes:
@@ -10153,12 +10296,13 @@ hud_booster_label:
 hud_hull_segment_thresholds:
     .byte 3,5,8,10
 layout_d_publish_glue:
-    ldy #(LAYOUT_D_GLUE_BYTES-1)
+    ldy #$00
 @copy:
     lda LAYOUT_D_GLUE_HOLDING,y
     sta LAYOUT_D_GLUE_FINAL,y
-    dey
-    bpl @copy
+    iny
+    cpy #LAYOUT_D_GLUE_BYTES
+    bne @copy
 layout_d_publish_glue_end:
 layout_d_glue_publish_complete:
     jmp finish_startup_after_loader
@@ -10445,10 +10589,12 @@ integration_broadside_due:
 @done:
     rts
 
-integration_broadside_release:
-    ldx #DIRECTOR_HAZARD_BROADSIDE
-    jsr DIRECTOR_RELEASE
-    jmp free_broadside_slot
+turret_layout_a2_compat_pad:
+    .byte $00,$00,$00
+turret_warning_last_safe_rows:
+    EMIT_TURRET_WARNING_LAST_SAFE_ROWS
+integration_broadside_glue_accounting_pad:
+    .byte $00,$00
 
 .segment "BROADSIDE"
 ; The moved development encounter spans the ordinary phase-0/1 boundary.
@@ -10489,6 +10635,12 @@ provisional_capital_broadside_request:
 ; phase table: EASY 3, MEDIUM 4, HARD 5.
 provisional_capital_budgets:
     .byte $03,$04,$05
+
+.segment "ENTITY_CODE"
+allied_engine_overlay_masks:
+    EMIT_ALLIED_ENGINE_OVERLAY_MASKS
+enemy_engine_overlay_masks:
+    EMIT_ENEMY_ENGINE_OVERLAY_MASKS
 
 .segment "A2_KERNEL"
 integration_pickup_pending_tick:
@@ -10558,10 +10710,10 @@ CHUNK_STAGING_BROAD   = 1
 CHUNK_STAGING_ADDRESS = $8100
 CHUNK_FINAL_ADDRESS   = $5E10
 CHUNK_STAGING_SECTORS_MAX = 50
-LAYOUT_D_GLUE_STAGING = $5259
+LAYOUT_D_GLUE_STAGING = $5261
 LAYOUT_D_GLUE_FINAL = $4EFE
 LAYOUT_D_GLUE_HOLDING = $7F16
-LAYOUT_D_GLUE_BYTES = 39
+LAYOUT_D_GLUE_BYTES = 234
 
 .macro STAGE2_FAIL_NE
     .local ok

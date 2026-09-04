@@ -497,7 +497,8 @@ test("menu Viper is charset-only, frontend PMG stays disabled, and gameplay setu
   assert.doesNotMatch(routine("draw_main_menu_scene"), /PLAYER[0-3]|HPOSP|SIZEP/);
 
   const frontendEntry = routine("enter_frontend_state");
-  assert.match(frontendEntry, /sta GRACTL[\s\S]+sta NMIEN[\s\S]+jsr select_frontend_display/);
+  assert.match(frontendEntry,
+    /sta GRACTL[\s\S]+jsr clear_pmg_graphics_latches[\s\S]+jsr select_frontend_display/);
   assert.doesNotMatch(frontendEntry, /lda #\$02[\s\S]+sta GRACTL/);
   assert.match(frontendEntry, /cpx #STATE_OPTIONS[\s\S]+cpx #STATE_MAIN_MENU[\s\S]+lda #\$80[\s\S]+sta NMIEN/);
   assert.equal(hardwareState.get("SIZEP0"), 1);
@@ -517,4 +518,30 @@ test("menu Viper is charset-only, frontend PMG stays disabled, and gameplay setu
     routine("select_frontend_display"),
     /cmp #STATE_MAIN_MENU[\s\S]+main_menu_display_list[\s\S]+frontend_text_display_list/,
   );
+});
+
+test("frontend entry clears stale player and missile graphics latches before DMA resumes", () => {
+  const entry = routine("enter_frontend_state");
+  const pauseEntry = routine("enter_pause");
+  const clear = routine("clear_pmg_graphics_latches");
+  assert.match(source, /GRAFP0\s*=\s*\$D00D/);
+  assert.match(entry,
+    /sta DMACTL\s+sta GRACTL\s+jsr clear_pmg_graphics_latches[\s\S]+jsr select_frontend_display/,
+    "main frontend entry must clear PMG graphics latches while display DMA is blanked",
+  );
+  assert.match(pauseEntry,
+    /sta DMACTL\s+sta GRACTL\s+jsr clear_pmg_graphics_latches\s+jsr pause_silence_audio/,
+    "pause frontend entry must clear PMG graphics latches while display DMA is blanked",
+  );
+  assert.match(clear,
+    /sta NMIEN\s+ldx #\$04\s+@loop:\s+sta GRAFP0,x\s+dex\s+bpl @loop\s+rts/);
+
+  assert.deepEqual(readXexBytes(labels.get("clear_pmg_graphics_latches"), 12), Buffer.from([
+    0x8d, 0x0e, 0xd4, // STA NMIEN
+    0xa2, 0x04,       // LDX #4
+    0x9d, 0x0d, 0xd0, // STA GRAFP0,X (GRAFP0..3 and GRAFM)
+    0xca,             // DEX
+    0x10, 0xfa,       // BPL back to the store
+    0x60,             // RTS
+  ]), "assembled helper must clear all five PMG graphics latches");
 });

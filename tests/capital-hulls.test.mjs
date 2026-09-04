@@ -298,7 +298,7 @@ test("generated include, packed maps, codebooks, and turret records match assemb
   );
   assert.deepEqual(
     readXexBytes(labels.get("turret_warning_last_safe_rows"), 3),
-    Buffer.from([12, 10, 9]),
+    Buffer.from(asset.warningLastSafeRowBytes),
     "assembled firing bounds reserve the complete 25-frame warning plus one hull row",
   );
   for (const side of ["allied", "enemy"]) {
@@ -534,7 +534,7 @@ test("runtime map reservation and payload remain bounded and do not consume PMG 
     [0x4c00, 0x4d20, 0x4e40],
   );
   assert.equal(asset.runtimeMapBytes, 576);
-  assert.equal(asset.packedDataBytes, 945);
+  assert.equal(asset.packedDataBytes, 1005);
   assert.deepEqual(
     Uint8Array.from(readXexBytes(labels.get("allied_collision_boundaries"), asset.segmentRows)),
     asset.collisionBoundaries.get("allied"),

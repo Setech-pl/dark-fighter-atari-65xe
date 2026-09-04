@@ -99,7 +99,7 @@ const acceptedRuntimeCompactionReserveBytes = 1097;
 const minimumWeaponPickupReserveBytes = 512;
 const residentRuntimeSuffixAddressExpected = 0x21c1;
 const packedResidentStagingAddress = 0x8100;
-const entityPackedStagingAddress = 0x5300;
+const entityPackedStagingAddress = 0x534b;
 const weaponPickupPhaseBankAddress = 0x8800;
 const weaponPickupPackedStagingAddress = 0x8c80;
 const bootA2StagingAddress = 0x7f16;
@@ -167,16 +167,20 @@ const broadsideRuntimeReservedBytes = 0x1a00;
 const starfieldStagingAddress = 0x7810;
 const starfieldStagingBytes = 0x706;
 const encounterDirectorEnabled = true;
-const glueStagingAddress = 0x5259;
+const glueStagingAddress = 0x5261;
 const glueFinalAddress = 0x4efe;
 const directorRunAddress = 0x9d75;
 const directorGuardAddress = 0x9ffa;
-const expectedInitialContentBytes = 12797;
-const expectedLinkedRuntimeBytes = 16989;
+// Both frontend entry paths now clear the five stale GTIA PMG graphics latches
+// before menu DMA resumes. The twelve resident bytes stay inside the existing
+// 101-sector initial envelope; extension chunk topology remains frozen.
+const expectedInitialContentBytes = 12901;
+const expectedLinkedRuntimeBytes = 17203;
 const expectedDirectorRawBytes = 645;
 const expectedDirectorPackedBytes = 585;
-const expectedGlueRawBytes = 39;
-const expectedGluePackedBytes = 41;
+const expectedGlueRawBytes = 234;
+const expectedGluePackedBytes = 229;
+const capitalPlayerCollisionAddress = 0x8e61;
 
 function ensureDirectory(fsApi, directory) {
   const parts = directory.split("/").filter(Boolean);
@@ -261,13 +265,13 @@ function writeFile(targetPath, bytes) {
   fs.writeFileSync(targetPath, bytes);
 }
 
-async function buildResidentModule({ sourcePath, configPath, stem }) {
+async function buildResidentModule({ sourcePath, configPath, stem, extraInputs = {} }) {
   const source = fs.readFileSync(sourcePath);
   const config = fs.readFileSync(configPath);
   const base = `/project/build/${stem}`;
   const assembled = await runWasmTool(
     "ca65",
-    { [`${base}.s`]: source },
+    { [`${base}.s`]: source, ...extraInputs },
     ["--cpu", "6502", "-g", "-l", `${base}.lst`, "-o", `${base}.o`, `${base}.s`],
     [`${base}.o`, `${base}.lst`],
   );
@@ -610,10 +614,31 @@ async function build() {
     pickupCodeRuntime.length !== pickupCodeBytes || pickupCodeBytes > 0x0380) {
     throw new Error("Pickup compositor code does not fit its reviewed $8C80-$8FFF range");
   }
-  const weaponPickupPhaseRuntime = Buffer.concat([weaponPickupPhaseBank, pickupCodeRuntime]);
+  const capitalPlayerCollisionModule = await buildResidentModule({
+    sourcePath: path.join(rootDirectory, "src", "capital-player-collision.s"),
+    configPath: path.join(rootDirectory, "cfg", "capital-player-collision.cfg"),
+    stem: "capital-player-collision",
+  });
+  if (capitalPlayerCollisionModule.raw.length > 0x1b) {
+    throw new Error(`Capital/player collision module exceeds $8E61-$8E7B: ` +
+      `${capitalPlayerCollisionModule.raw.length} B`);
+  }
+  if (weaponPickupPhaseBankAddress + weaponPickupPhaseBank.length + pickupCodeRuntime.length !==
+    capitalPlayerCollisionAddress) {
+    throw new Error("Capital/player collision does not immediately follow pickup runtime");
+  }
+  const weaponPickupPhaseRuntime = Buffer.concat([
+    weaponPickupPhaseBank, pickupCodeRuntime, capitalPlayerCollisionModule.raw,
+  ]);
   const packedWeaponPickupPhaseBank = packBroadsideLzss(weaponPickupPhaseRuntime);
   if (!unpackBroadsideLzss(packedWeaponPickupPhaseBank).equals(weaponPickupPhaseRuntime)) {
     throw new Error("Weapon-pickup phase runtime LZSS round trip failed");
+  }
+  if (packedWeaponPickupPhaseBank.length > 0x03ff) {
+    throw new Error(`Packed pickup runtime ${packedWeaponPickupPhaseBank.length} B from ` +
+      `${pickupCodeBytes} B code plus ${capitalPlayerCollisionModule.raw.length} B collision ` +
+      `exceeds the reviewed 1023 B cold staging range; ` +
+      `BROADSIDE=${broadsideRuntimeBytes} B, ENTITY_CODE=${entityCodeBytes} B`);
   }
   const bootStage2Runtime = Buffer.from(linkedPayload.subarray(
     bootStage2FileOffset,
@@ -639,6 +664,7 @@ async function build() {
     sourcePath: path.join(rootDirectory, "src", "integration-glue.s"),
     configPath: path.join(rootDirectory, "cfg", "integration-glue.cfg"),
     stem: "integration-glue",
+    extraInputs: { "/project/build/capital-hulls.inc": capitalHullsInclude },
   });
   if (directorModule.raw.length !== expectedDirectorRawBytes ||
     directorModule.packed.length !== expectedDirectorPackedBytes) {
@@ -684,6 +710,15 @@ async function build() {
   const entityStagedEndAddress = entityStagedSourceAddress + packedEntityCodeRuntime.length;
   const initialPackedSourcesEnd = entityPackedSourceAddress + packedEntityCodeRuntime.length;
   const initialPackedSourcesLastAddress = initialPackedSourcesEnd - 1;
+  if (!(initialPackedSourcesEnd <= glueStagingAddress &&
+    glueStagingAddress + glueModule.raw.length <= entityStagedSourceAddress)) {
+    throw new Error(
+      `Cold sources/staging overlap: initial ends $${initialPackedSourcesEnd.toString(16)}, ` +
+      `GLUE is $${glueStagingAddress.toString(16)}-$${
+        (glueStagingAddress + glueModule.raw.length - 1).toString(16)}, ` +
+      `ENTITY staging starts $${entityStagedSourceAddress.toString(16)}`,
+    );
+  }
   if (!(initialPackedSourcesEnd <= entityStagedSourceAddress)) {
     throw new Error(
       `Initial packed sources ending exclusively at $${initialPackedSourcesEnd.toString(16)} ` +
@@ -764,7 +799,9 @@ async function build() {
   const placeholderInitial = Buffer.concat(initialContentParts(bootStage2Runtime));
   if (placeholderInitial.length !== expectedInitialContentBytes) {
     throw new Error(`Layout D.2 initial content changed: ${placeholderInitial.length} B; ` +
-      `expected ${expectedInitialContentBytes} B`);
+      `expected ${expectedInitialContentBytes} B; packed ENTITY_CODE ` +
+      `${packedEntityCodeRuntime.length} B; BROADSIDE ${broadsideRuntimeBytes} B; ` +
+      `ENTITY_CODE ${entityCodeBytes} B; PICKUP_CODE ${pickupCodeBytes} B`);
   }
   const buildTag = (bytes) => crypto.createHash("sha256").update(bytes).digest().subarray(0, 5);
   const transport = buildDfmcV1Transport({
@@ -826,12 +863,13 @@ async function build() {
     record.startSector, record.sectorCount, record.packedLength,
     record.rawLength, record.finalDestination,
   ]);
-  if (bootSectors !== 101 || totalTransportSectors !== 158 ||
-    transportPayload.length !== 20224 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
-      [102, 44, 5581, 6557, 0x5e10],
-      [146, 7, 873, 873, weaponPickupPackedStagingAddress],
-      [153, 1, 41, 39, glueStagingAddress],
-      [154, 5, 585, 645, directorRunAddress],
+  if (bootSectors !== 101 || totalTransportSectors !== 161 ||
+    transportPayload.length !== 20608 || JSON.stringify(frozenRecordShape) !== JSON.stringify([
+      [102, 45, 5641, 6643, 0x5e10],
+      [147, 8, packedWeaponPickupPhaseBank.length, packedWeaponPickupPhaseBank.length,
+        weaponPickupPackedStagingAddress],
+      [155, 2, 229, 234, glueStagingAddress],
+      [157, 5, 585, 645, directorRunAddress],
     ])) {
     throw new Error(`Layout D.2 transport topology changed: ${JSON.stringify(frozenRecordShape)}`);
   }
@@ -870,6 +908,8 @@ async function build() {
     integrationGlueRunAddress: glueFinalAddress,
     directorRuntime: directorModule.raw,
     directorRunAddress,
+    capitalPlayerCollisionRuntime: capitalPlayerCollisionModule.raw,
+    capitalPlayerCollisionRunAddress: capitalPlayerCollisionAddress,
     labels,
     segmentSizes: {
       code: codeBytes,
@@ -947,8 +987,8 @@ async function build() {
       phaseCount: 8,
       initialContentBytes: expectedInitialContentBytes,
       linkedRuntimeBytes: expectedLinkedRuntimeBytes,
-      simultaneousResidencyBytes: 18787,
-      safeResidencyBytes: 3400,
+      simultaneousResidencyBytes: 18800 + capitalPlayerCollisionModule.raw.length,
+      safeResidencyBytes: 3387 - capitalPlayerCollisionModule.raw.length,
       glue: {
         stagingAddress: glueStagingAddress,
         holdingAddress: 0x7f16,
@@ -961,6 +1001,15 @@ async function build() {
         endExclusive: directorGuardAddress,
         rawBytes: directorModule.raw.length,
         packedBytes: directorModule.packed.length,
+      },
+      capitalPlayerCollision: {
+        address: capitalPlayerCollisionAddress,
+        transportAddress: weaponPickupPackedStagingAddress,
+        packedStreamOffset: weaponPickupPhaseBank.length + pickupCodeRuntime.length,
+        endExclusive: capitalPlayerCollisionAddress + capitalPlayerCollisionModule.raw.length,
+        rawBytes: capitalPlayerCollisionModule.raw.length,
+        packedBytes: capitalPlayerCollisionModule.packed.length,
+        record: pickupPhaseRecord,
       },
       guard: { address: directorGuardAddress, bytes: 6 },
     },
@@ -1073,7 +1122,8 @@ async function build() {
       maximumChunkCount: chunkLoaderConstants.maxChunks,
       maximumNewSimultaneousResidencyBytes: 6841,
       remainingSafeResidencyBytes:
-        6841 - (destructibleDebrisRuntimeCodeBytes - shieldBoosterBaselineRuntimeCodeBytes),
+        6841 - (destructibleDebrisRuntimeCodeBytes - shieldBoosterBaselineRuntimeCodeBytes) -
+          capitalPlayerCollisionModule.raw.length,
       bootOnlyStaging: { address: packedResidentStagingAddress, bytes: 0x1954 },
       loaderResidentBytes: 0,
       stage2: {
@@ -1148,6 +1198,19 @@ async function build() {
         sectors: directorChunk.sectors,
         transportBytes: directorChunk.bytes.length,
         crc16: directorChunk.storageCrc16,
+      },
+    },
+    capitalPlayerCollisionRuntime: {
+      runAddress: capitalPlayerCollisionAddress,
+      transportAddress: weaponPickupPackedStagingAddress,
+      packedStreamOffset: weaponPickupPhaseBank.length + pickupCodeRuntime.length,
+      bytes: capitalPlayerCollisionModule.raw.length,
+      packedBytes: capitalPlayerCollisionModule.packed.length,
+      externalChunk: {
+        startSector: pickupPhaseRecord.startSector,
+        sectors: pickupPhaseChunk.sectors,
+        transportBytes: pickupPhaseChunk.bytes.length,
+        crc16: pickupPhaseChunk.storageCrc16,
       },
     },
     starfieldRuntime: {
@@ -1525,6 +1588,12 @@ async function build() {
           .reduce((sum, bytes) => sum + bytes.length, 0),
         moduleSequenceBytes: [...capitalHullsAsset.sector.moduleSequences.values()]
           .reduce((sum, bytes) => sum + bytes.length, 0),
+        turretLayoutSeed: capitalHullsAsset.sector.layoutSeed,
+        turretRowsByDifficulty: Object.fromEntries(["easy", "medium", "hard"].map(
+          (difficulty) => [difficulty, Object.fromEntries(["allied", "enemy"].map(
+            (side) => [side,
+              capitalHullsAsset.sector.cannonRowsByDifficulty.get(side).get(difficulty)]))],
+        )),
         engineOverlayBytes: [...capitalHullsAsset.sector.engineOverlayMasks.values()]
           .reduce((sum, bytes) => sum + bytes.length, 0),
         prowOccupancyBytes: [...capitalHullsAsset.sector.prowOccupancyMasks.values()]
@@ -1732,6 +1801,18 @@ async function build() {
   writeFile(path.join(buildDirectory, "encounter-director.lbl"), directorModule.labels);
   writeFile(path.join(buildDirectory, "encounter-director.bin"), directorModule.raw);
   writeFile(path.join(buildDirectory, "encounter-director-packed.bin"), directorModule.packed);
+  writeFile(path.join(buildDirectory, "capital-player-collision.o"),
+    capitalPlayerCollisionModule.object);
+  writeFile(path.join(buildDirectory, "capital-player-collision.lst"),
+    capitalPlayerCollisionModule.listing);
+  writeFile(path.join(buildDirectory, "capital-player-collision.map"),
+    capitalPlayerCollisionModule.map);
+  writeFile(path.join(buildDirectory, "capital-player-collision.lbl"),
+    capitalPlayerCollisionModule.labels);
+  writeFile(path.join(buildDirectory, "capital-player-collision.bin"),
+    capitalPlayerCollisionModule.raw);
+  writeFile(path.join(buildDirectory, "capital-player-collision-packed.bin"),
+    capitalPlayerCollisionModule.packed);
   writeFile(path.join(buildDirectory, "starfield-runtime.bin"), starfieldRuntime);
   writeFile(path.join(buildDirectory, "starfield-runtime-packed.bin"), packedStarfieldRuntime);
   writeFile(path.join(buildDirectory, "a2-kernel-runtime.bin"), a2KernelRuntime);
@@ -1762,7 +1843,7 @@ async function build() {
       ? `Dark Fighter ${gameVersion} candidate artifacts built; runtime evidence pending`
       : `Dark Fighter ${gameVersion} built successfully`);
     console.log(`  boot    : ${initialBoot.bytes.length} bytes / ${bootSectors} sectors @ $${loadAddress.toString(16)}`);
-    console.log(`  chunks  : ${broadsideChunk.bytes.length} bytes / ${broadsideChunk.sectors} sectors`);
+    console.log(`  chunks  : ${transportPayload.length - initialBoot.bytes.length} bytes / ${extensionSectors} sectors`);
     console.log(`  total   : ${transportPayload.length} bytes / ${totalTransportSectors} occupied sectors`);
     console.log(`  entry   : $${startAddress.toString(16)}`);
     console.log(`  XEX     : ${xex.length} bytes`);

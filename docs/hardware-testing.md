@@ -58,7 +58,8 @@ For both XEX and ATR:
       ten HULL units, leaves LIFE unchanged when nonlethal, starts the existing
       25-frame post-hit cooldown, and consumes the shell once. A one-HPOS near
       miss must leave HULL unchanged; affiliation must not suppress Colonial
-      friendly fire.
+      friendly fire. The complete 16x15 gameplay rectangle is solid, including
+      transparent corners and internal PMG gaps.
 - [ ] Raider fire, collisions, scoring, debris contact, destructible debris,
       Raider breakup, and debris breakup behave normally.
 - [ ] Without Shield, an accepted direct Raider contact destroys the Viper

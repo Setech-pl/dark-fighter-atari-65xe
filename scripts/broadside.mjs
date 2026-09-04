@@ -279,7 +279,9 @@ export function resetExitedTurretLifecycles(state, asset, world) {
     if (leftRow === null) continue;
     for (const turret of asset.turrets) {
       const sideRow = sectorRowForSide(asset, turret.side, leftRow);
-      if (sideRow !== null && asset.sector.cannonRowsBySide.get(turret.side).includes(sideRow)) {
+      const cannonRows = asset.sector.cannonRowsByDifficulty
+        .get(turret.side).get(world.difficulty);
+      if (sideRow !== null && cannonRows.includes(sideRow)) {
         visible.add(`${turret.id}:${sideRow}`);
       }
     }
@@ -305,7 +307,8 @@ export function selectOldestEligibleTurret(state, asset, world, side) {
     world.visibleRows.forEach((leftRow, visibleOffset) => {
       if (leftRow === null) return;
       const sideRow = sectorRowForSide(asset, side, leftRow);
-      if (sideRow === null || !asset.sector.cannonRowsBySide.get(side).includes(sideRow)) return;
+      const cannonRows = asset.sector.cannonRowsByDifficulty.get(side).get(world.difficulty);
+      if (sideRow === null || !cannonRows.includes(sideRow)) return;
       const lifecycleId = `${turret.id}:${sideRow}`;
       if (state.firedTurrets.has(lifecycleId)) return;
     const visibleScreenRow = GAMEPLAY_FIRST_HULL_ROW + visibleOffset;
@@ -541,7 +544,9 @@ export function heavyShellVisual(slot, asset, frame) {
     height: visual.height,
     width: visual.widthHpos,
     occupiedPixels: visual.widthHpos * visual.height - 8,
-    phase: (frame >> 1) & 1,
+    phase: 0,
+    connectedObjects: 1,
+    glyphs: [126, 127],
     renderer: "ANTIC4_PLAYFIELD_OVERLAY",
     color: faction === "colonial" ? visual.colonialValue : visual.cylonValue,
     attribute: faction === "colonial" ? visual.colonialAttribute : visual.cylonAttribute,
@@ -879,12 +884,11 @@ export function simulateBroadsideCadence(asset, { frames = 1000, difficulty = "h
         state.scheduleTimer = asset.broadside.retryDelayFrames;
       } else {
         const schedule = asset.schedule[state.scheduleIndex];
-        const selected = selectOldestEligibleTurret(
-          state,
-          asset,
-          world,
-          schedule.side,
-        );
+        const selected = ["allied", "enemy"]
+          .map((side) => selectOldestEligibleTurret(state, asset, world, side))
+          .filter(Boolean)
+          .sort((left, right) => right.visibleScreenRow - left.visibleScreenRow ||
+            left.turretIndex - right.turretIndex)[0];
         if (!selected) {
           deferred.invisible += 1;
           state.scheduleTimer = asset.broadside.retryDelayFrames;
@@ -916,6 +920,13 @@ export function simulateBroadsideCadence(asset, { frames = 1000, difficulty = "h
     advanceWorldScroll(world, asset);
     if (advanceHullScroll(world, asset)) {
       resetExitedTurretLifecycles(state, asset, world);
+      const newTopRow = world.visibleRows[0];
+      const newStation = newTopRow !== null && ["allied", "enemy"].some((side) => {
+        const sideRow = sectorRowForSide(asset, side, newTopRow);
+        return sideRow !== null &&
+          asset.sector.cannonRowsByDifficulty.get(side).get(difficulty).includes(sideRow);
+      });
+      if (newStation) state.scheduleTimer = 1;
       scrollEvents.push(frame);
       for (const slot of state.slots) {
         if (slot.state !== BROADSIDE_STATES.WARNING) continue;

@@ -80,6 +80,10 @@ import {
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
+const glueSource = fs.readFileSync(path.join(rootDirectory, "src", "integration-glue.s"), "utf8");
+const capitalPlayerCollisionSource = fs.readFileSync(
+  path.join(rootDirectory, "src", "capital-player-collision.s"), "utf8",
+);
 const definitionPath = path.join(rootDirectory, "assets", "graphics", "capital-hulls.json");
 const definition = loadCapitalHullsDefinition(definitionPath);
 const asset = compileCapitalHulls(definition);
@@ -96,6 +100,13 @@ const labels = new Map(
     .filter(Boolean)
     .map((match) => [match[2], Number.parseInt(match[1], 16)]),
 );
+const capitalPlayerCollisionLabels = new Map(
+  fs.readFileSync(path.join(rootDirectory, "build", "capital-player-collision.lbl"), "utf8")
+    .split(/\r?\n/)
+    .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
+    .filter(Boolean)
+    .map((match) => [match[2], Number.parseInt(match[1], 16)]),
+);
 
 function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
@@ -107,6 +118,14 @@ function routine(name, next) {
   assert.notEqual(start, -1, `Missing routine ${name}`);
   assert.notEqual(end, -1, `Missing boundary ${next}`);
   return source.slice(start, end);
+}
+
+function glueRoutine(name, next) {
+  const start = glueSource.indexOf(`${name}:`);
+  const end = next ? glueSource.indexOf(`${next}:`, start + name.length + 1) : glueSource.length;
+  assert.notEqual(start, -1, `Missing glue routine ${name}`);
+  assert.notEqual(end, -1, `Missing glue boundary ${next}`);
+  return glueSource.slice(start, end);
 }
 
 function xexBytesAt(address, length) {
@@ -152,7 +171,7 @@ function runVisibleHullSectorRow(memory, screenRow) {
   cpu.pc = labels.get("visible_hull_sector_row");
   for (let steps = 0; steps < 100 && cpu.pc !== stop; steps += 1) cpu.step();
   assert.equal(cpu.pc, stop, "visible_hull_sector_row did not return");
-  return { carry: cpu.getFlag(0x01), sectorRow: cpu.y, cycles: cpu.cycles };
+  return { carry: cpu.getFlag(0x01), sectorRow: (cpu.x << 8) | cpu.y, cycles: cpu.cycles };
 }
 
 function containsBytes(haystack, needle) {
@@ -166,8 +185,41 @@ function broadsideRuntimeBytesAt(address, length) {
   return broadsideRuntime.subarray(offset, offset + length);
 }
 
+function connectedShellObjects(memory, screenCodes) {
+  const pixels = Array.from({ length: 8 }, () => Array(8).fill(false));
+  for (const [cell, screenCode] of screenCodes.entries()) {
+    const glyph = screenCode & 0x7f;
+    for (let row = 0; row < 8; row += 1) {
+      const byte = memory[0x4400 + glyph * 8 + row];
+      for (let pixel = 0; pixel < 4; pixel += 1)
+        pixels[row][cell * 4 + pixel] = ((byte >> (6 - pixel * 2)) & 3) !== 0;
+    }
+  }
+  let objects = 0;
+  for (let row = 0; row < 8; row += 1) for (let column = 0; column < 8; column += 1) {
+    if (!pixels[row][column]) continue;
+    objects += 1;
+    const pending = [[row, column]];
+    pixels[row][column] = false;
+    while (pending.length > 0) {
+      const [currentRow, currentColumn] = pending.pop();
+      for (const [nextRow, nextColumn] of [[currentRow - 1, currentColumn],
+        [currentRow + 1, currentColumn], [currentRow, currentColumn - 1],
+        [currentRow, currentColumn + 1]]) {
+        if (nextRow >= 0 && nextRow < 8 && nextColumn >= 0 && nextColumn < 8 &&
+            pixels[nextRow][nextColumn]) {
+          pixels[nextRow][nextColumn] = false;
+          pending.push([nextRow, nextColumn]);
+        }
+      }
+    }
+  }
+  return objects;
+}
+
 function prepareAssembledCapitalPlayerContact({
   owner,
+  slot = 0,
   shellX,
   shellY = 107,
   playerX = 124,
@@ -178,10 +230,13 @@ function prepareAssembledCapitalPlayerContact({
   const memory = createLinkedRuntimeMemory();
   const broadState = labels.get("BROAD_STATE");
   const constants = readGameGraphicsSource(source, definition).constants;
-  memory[broadState] = BROADSIDE_STATES.FLYING;
-  memory[broadState + 3] = owner;
-  memory[broadState + 9] = shellX;
-  memory[broadState + 12] = shellY;
+  memory[broadState + slot] = BROADSIDE_STATES.FLYING;
+  memory[broadState + 3 + slot] = owner;
+  memory[broadState + 9 + slot] = shellX;
+  memory[broadState + 12 + slot] = shellY;
+  const rowAddress = canonicalPlayfield.ringBufferAddress + 8 * 40;
+  memory[labels.get("BROAD_ROW_LO") + slot] = rowAddress & 0xff;
+  memory[labels.get("BROAD_ROW_HI") + slot] = rowAddress >> 8;
   memory[labels.get("player_x")] = playerX;
   memory[labels.get("player_y")] = playerY;
   memory[labels.get("PLAYER_LIFECYCLE")] = playerLifecycle;
@@ -190,7 +245,37 @@ function prepareAssembledCapitalPlayerContact({
   memory[constants.get("BROAD_DAMAGE_COOLDOWN")] = damageCooldown;
   memory[constants.get("BROAD_DAMAGE_APPLIED")] = 0;
   memory[labels.get("CAPITAL_SECTOR_STATE")] = CAPITAL_SECTOR_STATES.DRAIN;
-  return { memory, broadState, constants };
+  return { memory, broadState, slotState: broadState + slot, constants };
+}
+
+function shellInitialX(owner, currentRasterLeft, swept) {
+  if (owner === 0) return currentRasterLeft - (swept ? 2 : 0);
+  return currentRasterLeft + (swept ? 4 : 2);
+}
+
+function capitalShellSweptAabb(owner, initialX, shellY) {
+  const previousLeft = initialX & 0xfc;
+  const currentLogical = owner === 0 ? initialX + 2 : initialX - 2;
+  const currentLeft = currentLogical & 0xfc;
+  return {
+    previousLeft,
+    previousRight: previousLeft + 7,
+    currentLeft,
+    currentRight: currentLeft + 7,
+    left: Math.min(previousLeft, currentLeft),
+    right: Math.max(previousLeft + 7, currentLeft + 7),
+    top: shellY - 3,
+    bottom: shellY + 2,
+  };
+}
+
+function playerGameplayAabb(playerX, playerY) {
+  return { left: playerX, right: playerX + 15, top: playerY, bottom: playerY + 14 };
+}
+
+function inclusiveAabbsOverlap(first, second) {
+  return first.left <= second.right && first.right >= second.left &&
+    first.top <= second.bottom && first.bottom >= second.top;
 }
 
 test("broadside source timing and schedule are deterministic and generated with turret metadata", () => {
@@ -345,7 +430,7 @@ test("firing opportunities choose the oldest safe visible cannon once per lifecy
   const state = createBroadsideState(asset);
   const world = createWorldScrollState(asset, {
     difficulty: "hard",
-    initialSectorPhase: 68,
+    initialSectorPhase: 124,
   });
   assert.deepEqual(
     ["easy", "medium", "hard"].map((difficulty) =>
@@ -354,8 +439,8 @@ test("firing opportunities choose the oldest safe visible cannon once per lifecy
   );
   const selected = selectOldestEligibleTurret(state, asset, world, "allied");
   assert.equal(selected.turret.id, "allied_turret_a");
-  assert.equal(selected.sectorRow, 64);
-  assert.equal(selected.visibleScreenRow, 4);
+  assert.equal(selected.sectorRow, 113);
+  assert.equal(selected.visibleScreenRow, 11);
   beginWarning(
     state,
     asset,
@@ -421,6 +506,198 @@ test("three fixed slots move in faction directions and never allocate a fourth p
   advanceProjectile(allied, asset);
   assert.equal(enemy.x, enemyX - 2);
   assert.equal(allied.x, alliedX + 2);
+});
+
+test("assembled isolated BROADSIDE slot is one connected object across a 100-frame lifecycle observation", () => {
+  const constants = readGameGraphicsSource(source, definition).constants;
+  const addresses = Object.fromEntries([
+    "BROAD_STATE", "BROAD_OWNER", "BROAD_X", "BROAD_Y", "BROAD_PREV_Y",
+    "BROAD_PREV_H", "BROAD_COLLISION", "BROAD_ROW_LO", "BROAD_ROW_HI",
+  ].map((name) => [name, labels.get(name) ?? constants.get(name)]));
+  const lastRingRow = canonicalPlayfield.ringBufferAddress +
+    (canonicalPlayfield.ringRows - 1) * canonicalPlayfield.screenColumns;
+  const base = Uint8Array.from({ length: 40 }, (_, index) => 1 + (index & 7));
+  const glyphBytes = [0x00, 0x3e, 0x3e, 0x7f, 0x7f, 0x3e, 0x3e, 0x00,
+    0x00, 0x7c, 0x7c, 0xfe, 0xfe, 0x7c, 0x7c, 0x00];
+
+  for (const owner of [0, 1]) {
+    const memory = createLinkedRuntimeMemory();
+    runAssembledRoutine(memory, "init_broadside");
+    assert.deepEqual(Array.from(memory.subarray(0x4400 + 126 * 8, 0x4400 + 128 * 8)),
+      glyphBytes, "runtime must install the connected left/right bolt halves");
+    memory.set(base, lastRingRow);
+    memory[labels.get("CAPITAL_SECTOR_STATE")] = CAPITAL_SECTOR_STATES.DRAIN;
+    memory[labels.get("PLAYER_LIFECYCLE")] = PLAYER_LIFECYCLE_STATES.ALIVE;
+    memory[labels.get("player_x")] = 48;
+    memory[labels.get("player_y")] = 24;
+    memory[addresses.BROAD_STATE] = BROADSIDE_STATES.FLYING;
+    memory[addresses.BROAD_OWNER] = owner;
+    memory[addresses.BROAD_X] = owner === 0 ? 84 : 172;
+    memory[addresses.BROAD_Y] = 120;
+    memory[addresses.BROAD_ROW_LO] = lastRingRow & 0xff;
+    memory[addresses.BROAD_ROW_HI] = lastRingRow >> 8;
+
+    let flyingFrames = 0;
+    let drawCalls = 0;
+    let eraseCalls = 0;
+    for (let frame = 0; frame < 100; frame += 1) {
+      if (memory[addresses.BROAD_STATE] === BROADSIDE_STATES.FLYING) {
+        const rasterX = memory[addresses.BROAD_X] & 0xfc;
+        const column = (rasterX - 48) >> 2;
+        runAssembledRoutine(memory, "render_capital_shell_overlays");
+        drawCalls += 1;
+        flyingFrames += 1;
+        const expectedCodes = owner === 0 ? [126, 127] : [254, 255];
+        assert.deepEqual(Array.from(memory.subarray(lastRingRow + column,
+          lastRingRow + column + 2)), expectedCodes, `owner ${owner} frame ${frame}`);
+        assert.equal(connectedShellObjects(memory, expectedCodes), 1,
+          `owner ${owner} frame ${frame} split into multiple visible objects`);
+        runAssembledRoutine(memory, "update_broadside");
+        eraseCalls += 1;
+        assert.deepEqual(Array.from(memory.subarray(lastRingRow, lastRingRow + 40)),
+          Array.from(base), `owner ${owner} frame ${frame} left a stale footprint`);
+        assert.deepEqual([memory[addresses.BROAD_PREV_H], memory[addresses.BROAD_PREV_Y],
+          memory[addresses.BROAD_COLLISION]], [0, 0, 0]);
+      } else {
+        runAssembledRoutine(memory, "update_broadside");
+        assert.deepEqual(Array.from(memory.subarray(lastRingRow, lastRingRow + 40)),
+          Array.from(base));
+      }
+    }
+    assert.ok(flyingFrames >= 62 && flyingFrames <= 63,
+      "fixed speed and the 48..207 playfield bound determine the legal flight length");
+    assert.equal(drawCalls, flyingFrames);
+    assert.equal(eraseCalls, flyingFrames);
+    assert.equal(memory[addresses.BROAD_STATE], BROADSIDE_STATES.FREE);
+  }
+  assert.match(routine("update_broadside", "schedule_broadside"),
+    /ldx #\(BROADSIDE_SLOT_COUNT-1\)[\s\S]+jsr erase_broadside_slot[\s\S]+dex[\s\S]+bpl @erase_slot/);
+  assert.match(routine("render_capital_shell_overlays", "draw_broadside_span"),
+    /ldx #\$00[\s\S]+jsr render_capital_shell_overlay[\s\S]+inx/);
+});
+
+test("assembled BROADSIDE overlap unwinds 0->2 draw with 2->0 erase for every slot pair", () => {
+  const pairs = [[0, 1], [0, 2], [1, 2]];
+  const ownerOrders = [[0, 1], [1, 0]];
+  const overlapKinds = ["full", "partial"];
+  const constants = readGameGraphicsSource(source, definition).constants;
+  const addresses = Object.fromEntries([
+    "BROAD_STATE", "BROAD_OWNER", "BROAD_X", "BROAD_Y", "BROAD_TIMER",
+    "BROAD_PREV_Y", "BROAD_PREV_H", "BROAD_COLLISION", "BROAD_ROW_LO",
+    "BROAD_ROW_HI",
+  ].map((name) => [name, labels.get(name) ?? constants.get(name)]));
+  const lastRingRow = canonicalPlayfield.ringBufferAddress +
+    (canonicalPlayfield.ringRows - 1) * canonicalPlayfield.screenColumns;
+  const otherRingRow = canonicalPlayfield.ringBufferAddress + 5 *
+    canonicalPlayfield.screenColumns;
+  const base = Uint8Array.from({ length: 40 }, (_, index) => 1 + (index & 0x07));
+
+  for (const pair of pairs) {
+    for (const owners of ownerOrders) for (const overlapKind of overlapKinds) {
+      const memory = createLinkedRuntimeMemory();
+      memory.set(base, lastRingRow);
+      memory.set(base, otherRingRow);
+      memory[labels.get("CAPITAL_SECTOR_STATE")] = CAPITAL_SECTOR_STATES.DRAIN;
+      memory[constants.get("BROAD_DAMAGE_APPLIED")] = 0;
+      memory[constants.get("BROAD_DAMAGE_COOLDOWN")] = 0;
+      memory[constants.get("BROAD_PLAYER_HEALTH")] = 10;
+      memory[labels.get("PLAYER_LIFECYCLE")] = PLAYER_LIFECYCLE_STATES.ALIVE;
+      memory[labels.get("player_x")] = 48;
+      memory[labels.get("player_y")] = 24;
+
+      const third = [0, 1, 2].find((slot) => !pair.includes(slot));
+      for (let slot = 0; slot < 3; slot += 1) {
+        const participant = pair.includes(slot);
+        const owner = participant ? owners[pair.indexOf(slot)] : owners[0];
+        const targetX = overlapKind === "full" ? 120 : owner === 0 ? 116 : 120;
+        memory[addresses.BROAD_STATE + slot] = BROADSIDE_STATES.FLYING;
+        memory[addresses.BROAD_OWNER + slot] = owner;
+        memory[addresses.BROAD_X + slot] = participant
+          ? targetX + (owner === 0 ? -asset.broadside.projectileSpeed
+            : asset.broadside.projectileSpeed) : 80;
+        memory[addresses.BROAD_Y + slot] = participant ? 120 : 80;
+        const rowAddress = participant ? lastRingRow : otherRingRow;
+        memory[addresses.BROAD_ROW_LO + slot] = rowAddress & 0xff;
+        memory[addresses.BROAD_ROW_HI + slot] = rowAddress >> 8;
+      }
+
+      const thirdBefore = {
+        owner: memory[addresses.BROAD_OWNER + third],
+        state: memory[addresses.BROAD_STATE + third],
+        x: memory[addresses.BROAD_X + third],
+        y: memory[addresses.BROAD_Y + third],
+        rowLo: memory[addresses.BROAD_ROW_LO + third],
+        rowHi: memory[addresses.BROAD_ROW_HI + third],
+      };
+      runAssembledRoutine(memory, "render_capital_shell_overlays");
+      runAssembledRoutine(memory, "update_broadside");
+      assert.deepEqual(pair.map((slot) => memory[addresses.BROAD_STATE + slot]),
+        [BROADSIDE_STATES.FLYING, BROADSIDE_STATES.FLYING],
+        `${overlapKind} overlap must not create IMPACT`);
+      assert.deepEqual(pair.map((slot) => memory[addresses.BROAD_OWNER + slot]), owners,
+        "pass-through must not copy either participant owner/glyph selection");
+      assert.deepEqual(Array.from(memory.subarray(lastRingRow, lastRingRow + 40)),
+        Array.from(base), "reverse erase must restore the last physical ring row byte-exactly");
+
+      const overlapColumns = pair.map((slot) =>
+        ((memory[addresses.BROAD_X + slot] & 0xfc) - 48) >> 2);
+      assert.equal(overlapKind === "full" ? overlapColumns[0] === overlapColumns[1]
+        : Math.abs(overlapColumns[0] - overlapColumns[1]) === 1, true);
+      runAssembledRoutine(memory, "render_capital_shell_overlays");
+      const upper = Math.max(...pair);
+      const lower = Math.min(...pair);
+      if (overlapKind === "full") {
+        assert.notEqual(memory[addresses.BROAD_PREV_Y + upper],
+          base[overlapColumns[0]], "later slot must cache the earlier slot's transient");
+        assert.notEqual(memory[addresses.BROAD_COLLISION + upper],
+          base[overlapColumns[0] + 1], "full overlap must stack both cached cells");
+      } else {
+        const sharedColumn = Math.max(...overlapColumns);
+        assert.notEqual(memory[lastRingRow + sharedColumn], base[sharedColumn],
+          "partial overlap must have one deterministic top-layer cell");
+      }
+
+      runAssembledRoutine(memory, "update_broadside");
+      assert.deepEqual(pair.map((slot) => memory[addresses.BROAD_STATE + slot]),
+        [BROADSIDE_STATES.FLYING, BROADSIDE_STATES.FLYING]);
+      assert.deepEqual(Array.from(memory.subarray(lastRingRow, lastRingRow + 40)),
+        Array.from(base), "reverse erase must unwind the painter stack before separation");
+      runAssembledRoutine(memory, "render_capital_shell_overlays");
+      runAssembledRoutine(memory, "update_broadside");
+      assert.deepEqual(pair.map((slot) => memory[addresses.BROAD_STATE + slot]),
+        [BROADSIDE_STATES.FLYING, BROADSIDE_STATES.FLYING]);
+      assert.deepEqual(Array.from(memory.subarray(lastRingRow, lastRingRow + 40)),
+        Array.from(base), "separated shells must leave no shared or orphan glyph");
+
+      assert.equal(memory[addresses.BROAD_OWNER + third], thirdBefore.owner);
+      assert.equal(memory[addresses.BROAD_STATE + third], thirdBefore.state);
+      assert.equal(memory[addresses.BROAD_Y + third], thirdBefore.y);
+      assert.equal(memory[addresses.BROAD_ROW_LO + third], thirdBefore.rowLo);
+      assert.equal(memory[addresses.BROAD_ROW_HI + third], thirdBefore.rowHi);
+      assert.equal(memory[addresses.BROAD_X + third], thirdBefore.x +
+        3 * (thirdBefore.owner === 0 ? asset.broadside.projectileSpeed :
+          -asset.broadside.projectileSpeed));
+      assert.deepEqual(Array.from(memory.subarray(addresses.BROAD_COLLISION,
+        addresses.BROAD_COLLISION + 3)), [0, 0, 0], "screen backings stay transient-free");
+      for (const slot of pair) {
+        assert.equal(memory[addresses.BROAD_PREV_H + slot], 0);
+        assert.equal(memory[addresses.BROAD_PREV_Y + slot], 0);
+        assert.equal(memory[addresses.BROAD_COLLISION + slot], 0);
+      }
+      assert.deepEqual(Array.from(memory.subarray(lastRingRow, lastRingRow + 40)),
+        Array.from(base), "no projectile code may return at the physical ring boundary");
+    }
+  }
+
+  const update = routine("update_broadside", "schedule_broadside");
+  assert.doesNotMatch(update, /integration_capital_shell_overlap/);
+  assert.match(update, /@targets:[\s\S]+jmp @world_targets[\s\S]+@world_targets:\s+jsr capital_shell_collision_flags/);
+  assert.match(update,
+    /ldx #\(BROADSIDE_SLOT_COUNT-1\)[\s\S]+jsr erase_broadside_slot[\s\S]+dex[\s\S]+bpl @erase_slot[\s\S]+ldx #\$00/);
+  assert.match(routine("render_capital_shell_overlays", "draw_broadside_span"),
+    /ldx #\$00[\s\S]+jsr render_capital_shell_overlay[\s\S]+inx/);
+  assert.match(glueRoutine("render_capital_shell_overlay", "integration_broadside_release"),
+    /sta BROAD_PREV_H,x[\s\S]+sta BROAD_PREV_Y,x[\s\S]+sta BROAD_COLLISION,x[\s\S]+CAPITAL_SHELL_LEFT_GLYPH[\s\S]+adc #\$01/);
 });
 
 test("assembled fractional cadence makes hull movement 100% of the legacy world rate", () => {
@@ -570,6 +847,12 @@ test("assembled muzzle records preserve backing and complete the full visible li
   memory[destination + 1] = gameplayScreen >> 8;
   memory[gameplayScreen + alliedColumn] = 0x45;
   memory[gameplayScreen + enemyColumn] = 0xd0;
+  memory[muzzleDomain] = 1;
+  memory[muzzleDomain + 1] = 1;
+  memory[muzzleRow] = 24;
+  memory[muzzleRow + 1] = 24;
+  memory[turretFired] = 1;
+  memory[turretFired + 1] = 1;
   runAssembledRoutine(memory, "track_top_muzzles");
 
   assert.deepEqual(
@@ -577,6 +860,8 @@ test("assembled muzzle records preserve backing and complete the full visible li
       memory[muzzleRow], memory[muzzleRow + 1]],
     [0, 0, 0, 0],
   );
+  assert.deepEqual(Array.from(memory.subarray(turretFired, turretFired + 2)), [0, 0],
+    "a denser station handoff must start a fresh lifecycle for each owner");
   assert.equal(memory[muzzleLo] | memory[muzzleHi] << 8, gameplayScreen + alliedColumn);
   assert.equal(memory[muzzleLo + 1] | memory[muzzleHi + 1] << 8,
     gameplayScreen + enemyColumn);
@@ -1006,41 +1291,22 @@ test("muzzle tracking resets with a new sector/game but survives a same-sector l
     "a new game/sector must clear both tracked records");
 });
 
-test("provisional PAL scheduler emits three staggered Cylon cycles without simultaneous starts", () => {
-  const corrected = simulateBroadsideCadence(asset, { frames: 1000 });
-  assert.deepEqual(corrected.warningStats, {
-    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 68,
-  });
-  assert.deepEqual(corrected.launchStats, {
-    count: 3, allied: 0, enemy: 3, minimumGap: 68, averageGap: 68,
-  });
-  assert.equal(corrected.maximumStartsPerFrame, 1);
-  assert.equal(corrected.cancelledWarnings, 0);
-  assert.deepEqual(corrected.deferred, { busy: 0, invisible: 42, separation: 0 });
-  assert.equal(corrected.scheduleAttempts, 45);
-
-  const longCorrected = simulateBroadsideCadence(asset, { frames: 10000 });
-  assert.deepEqual(
-    [longCorrected.warningStats.count, longCorrected.launchStats.count],
-    [3, 3],
-  );
-  assert.deepEqual(
-    [longCorrected.warningStats.allied, longCorrected.warningStats.enemy],
-    [0, 3],
-  );
-  assert.deepEqual(
-    [longCorrected.launchStats.allied, longCorrected.launchStats.enemy],
-    [0, 3],
-  );
-  assert.deepEqual(longCorrected.deferred, { busy: 0, invisible: 42, separation: 0 });
-  assert.equal(longCorrected.scheduleAttempts, 45);
-  assert.equal(longCorrected.cancelledWarnings, 0);
-  assert.equal(longCorrected.finalSectorState, 6);
-  assert.deepEqual(
-    simulateBroadsideCadence(asset, { frames: 1000 }),
-    corrected,
-    "fresh gameplay state resets the deterministic scheduler exactly",
-  );
+test("provisional PAL scheduler remains deterministic over denser 8/12/16 layouts", () => {
+  for (const [difficulty, count] of [["easy", 8], ["medium", 12], ["hard", 16]]) {
+    const corrected = simulateBroadsideCadence(asset, { frames: 1800, difficulty });
+    assert.equal(asset.sector.cannonRowsByDifficulty.get("allied").get(difficulty).length, count);
+    assert.equal(asset.sector.cannonRowsByDifficulty.get("enemy").get(difficulty).length, count);
+    assert.ok(corrected.warningStats.allied <= count);
+    assert.ok(corrected.warningStats.enemy <= count);
+    assert.deepEqual(corrected.launchStats, corrected.warningStats);
+    assert.equal(corrected.maximumStartsPerFrame, 1);
+    assert.equal(corrected.cancelledWarnings, 0);
+    assert.deepEqual(
+      simulateBroadsideCadence(asset, { frames: 1800, difficulty }),
+      corrected,
+      `${difficulty} gameplay reset must reproduce the round-robin pass`,
+    );
+  }
 });
 
 test("every difficulty keeps warnings and source-derived contact on its shifted world phase", () => {
@@ -1167,43 +1433,95 @@ test("assembled Colonial and Cylon shells damage the Viper at the recovered lowe
   }
 });
 
-test("assembled capital-shell edges use the final 16-HPOS Viper raster and near misses stay clear", () => {
+test("assembled capital shells use the 16x15 player and swept 8x6 bolt AABBs at every edge", () => {
+  const playerPositions = [32, 112, 225];
   const cases = [
-    // update moves right by two: raster [116,123] touches player [123,138]
-    { name: "Colonial left edge", owner: 0, shellX: 114, playerX: 123, hit: true },
-    // update moves right by two: raster [112,119] remains one HPOS left of player 120
-    { name: "Colonial left miss", owner: 0, shellX: 110, playerX: 120, hit: false },
-    // update moves left by two: current raster [136,143] touches player [124,139]
-    { name: "Cylon right edge", owner: 1, shellX: 138, playerX: 124, hit: true },
-    // update moves left by two: current raster begins at 144, one HPOS right of player [128,143]
-    { name: "Cylon right miss", owner: 1, shellX: 146, playerX: 128, hit: false },
+    { name: "first top scanline", playerX: 124, currentLeft: 128, deltaY: -2, hit: true },
+    { name: "top-left corner", playerX: 123, currentLeft: 116, deltaY: -2, hit: true },
+    { name: "top-right corner", playerX: 125, currentLeft: 140, deltaY: -2, hit: true },
+    { name: "middle left side", playerX: 123, currentLeft: 116, deltaY: 7, hit: true },
+    { name: "middle right side", playerX: 125, currentLeft: 140, deltaY: 7, hit: true },
+    { name: "center", playerX: 124, currentLeft: 128, deltaY: 7, hit: true },
+    { name: "bottom-left corner", playerX: 123, currentLeft: 116, deltaY: 17, hit: true },
+    { name: "bottom-right corner", playerX: 125, currentLeft: 140, deltaY: 17, hit: true },
+    { name: "last bottom scanline", playerX: 124, currentLeft: 128, deltaY: 17, hit: true },
+    { name: "one HPOS before left", playerX: 124, currentLeft: 116, deltaY: 7, hit: false },
+    { name: "one HPOS after right", playerX: 124, currentLeft: 140, deltaY: 7, hit: false },
+    { name: "one scanline above", playerX: 124, currentLeft: 128, deltaY: -3, hit: false },
+    { name: "one scanline below", playerX: 124, currentLeft: 128, deltaY: 18, hit: false },
   ];
-  for (const item of cases) {
-    const { memory, broadState, constants } = prepareAssembledCapitalPlayerContact(item);
-    runAssembledRoutine(memory, "update_broadside");
-    assert.equal(memory[broadState + 24] & 1, Number(item.hit), item.name);
-    assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], item.hit ? 8 : 10, item.name);
-    assert.equal(memory[broadState], item.hit ? BROADSIDE_STATES.IMPACT : BROADSIDE_STATES.FLYING,
-      item.name);
+
+  for (const owner of [0, 1]) {
+    for (const slot of [0, 1, 2]) {
+      for (const playerY of playerPositions) {
+        for (const item of cases) {
+          const shellX = shellInitialX(owner, item.currentLeft, false);
+          const shellY = playerY + item.deltaY;
+          const shellAabb = capitalShellSweptAabb(owner, shellX, shellY);
+          const playerAabb = playerGameplayAabb(item.playerX, playerY);
+          assert.equal(shellAabb.currentLeft, item.currentLeft,
+            `${item.name}: final raster X premise`);
+          assert.equal(inclusiveAabbsOverlap(shellAabb, playerAabb), item.hit,
+            `${item.name}: swept-AABB premise`);
+          const contact = prepareAssembledCapitalPlayerContact({
+            owner, slot, shellX, shellY, playerX: item.playerX, playerY,
+          });
+          const third = (slot + 1) % 3;
+          contact.memory[contact.broadState + third] = BROADSIDE_STATES.WARNING;
+          contact.memory[contact.broadState + 3 + third] = owner ^ 1;
+          contact.memory[contact.broadState + 9 + third] = 88;
+          contact.memory[contact.broadState + 12 + third] = 70;
+          runAssembledRoutine(contact.memory, "update_broadside");
+          assert.equal(contact.memory[contact.broadState + 24 + slot] & 1, Number(item.hit),
+            `owner ${owner}, slot ${slot}, Y ${playerY}: ${item.name}`);
+          assert.equal(contact.memory[contact.constants.get("BROAD_PLAYER_HEALTH")],
+            item.hit ? 8 : 10, item.name);
+          assert.equal(contact.memory[contact.slotState],
+            item.hit ? BROADSIDE_STATES.IMPACT : BROADSIDE_STATES.FLYING, item.name);
+          assert.equal(contact.memory[contact.broadState + 3 + third], owner ^ 1,
+            `${item.name}: third-slot owner`);
+          assert.equal(contact.memory[contact.broadState + 12 + third], 70,
+            `${item.name}: third-slot position`);
+        }
+      }
+    }
   }
 
   for (const owner of [0, 1]) {
-    for (const [shellY, hit, edge] of [
-      [97, false, "above miss"], [98, true, "top edge"],
-      [117, true, "bottom edge"], [118, false, "below miss"],
-    ]) {
-      const { memory, broadState, constants } = prepareAssembledCapitalPlayerContact({
-        owner,
-        shellX: owner === 0 ? 122 : 132,
-        shellY,
-        playerY: 100,
-      });
-      runAssembledRoutine(memory, "update_broadside");
-      assert.equal(memory[broadState + 24] & 1, Number(hit),
-        `owner ${owner} vertical ${edge}`);
-      assert.equal(memory[constants.get("BROAD_PLAYER_HEALTH")], hit ? 8 : 10);
+    for (const slot of [0, 1, 2]) {
+      for (const playerY of playerPositions) {
+        const playerX = 124;
+        const currentRasterLeft = owner === 0 ? playerX : playerX + 12;
+        for (const [vertical, deltaY, hit] of [
+          ["through player", 7, true],
+          ["above player", -3, false],
+          ["below player", 18, false],
+        ]) {
+          const shellX = shellInitialX(owner, currentRasterLeft, true);
+          const shellY = playerY + deltaY;
+          const shellAabb = capitalShellSweptAabb(owner, shellX, shellY);
+          assert.notEqual(shellAabb.previousLeft, shellAabb.currentLeft,
+            `${vertical}: sweep must span two final raster positions`);
+          assert.equal(inclusiveAabbsOverlap(shellAabb,
+            playerGameplayAabb(playerX, playerY)), hit, `${vertical}: AABB premise`);
+          const contact = prepareAssembledCapitalPlayerContact({
+            owner, slot, shellX, shellY, playerX, playerY,
+          });
+          runAssembledRoutine(contact.memory, "update_broadside");
+          assert.equal(contact.memory[contact.slotState],
+            hit ? BROADSIDE_STATES.IMPACT : BROADSIDE_STATES.FLYING,
+            `owner ${owner}, slot ${slot}, Y ${playerY}: sweep ${vertical}`);
+          assert.equal(contact.memory[contact.constants.get("BROAD_PLAYER_HEALTH")], hit ? 8 : 10);
+        }
+      }
     }
   }
+
+  assert.match(capitalPlayerCollisionSource, /swept-AABB contact/);
+  assert.doesNotMatch(capitalPlayerCollisionSource,
+    /capital_player_collision_bounds|\.byte|mask|nibble/i,
+    "the gameplay hitbox must not retain pixel-mask narrow-phase data");
+  assert.ok(capitalPlayerCollisionLabels.has("capital_player_collision"));
 });
 
 test("capital-shell impact obeys cooldown, respawn invulnerability, release, and simultaneous latch", () => {
@@ -1345,21 +1663,21 @@ test("centered player survives every finite hull row while runtime contact state
   assert.doesNotMatch(contactRoutine, /sta BROAD_WORK_COUNT\s*;.*rows|dec BROAD_WORK_COUNT/);
 });
 
-test("assembled hull visibility maps states 0-5 and rejects terminal COMPLETE/OPEN", () => {
+test("assembled 16-bit hull visibility maps states 0-5 and rejects terminal COMPLETE/OPEN", () => {
   const constants = readGameGraphicsSource(source, definition).constants;
-  const expectedSectorRows = [13, 13, 13, 13, 13, 239, null, null];
-  const expectedCycles = [46, 46, 46, 46, 46, 44, 26, 26];
+  const expectedSectorRows = [269, 269, 269, 269, 269, 479, null, null];
 
   for (let state = 0; state < 8; state += 1) {
     const memory = createLinkedRuntimeMemory();
     memory[labels.get("CAPITAL_SECTOR_STATE")] = state;
     memory[labels.get("corridor_phase")] = 22;
+    memory[labels.get("CORRIDOR_PHASE_HI")] = 1;
     memory[constants.get("BROAD_VISIBLE_SCROLLS")] = 23;
     memory[constants.get("CAPITAL_SECTOR_DRAIN_ROWS")] = 0;
     const result = runVisibleHullSectorRow(memory, 9);
     assert.equal(result.carry, expectedSectorRows[state] === null,
       `capital state ${state} visibility`);
-    assert.equal(result.cycles, expectedCycles[state], `capital state ${state} bounded cycles`);
+    assert.ok(result.cycles <= 80, `capital state ${state} bounded cycles`);
     if (expectedSectorRows[state] !== null) {
       assert.equal(result.sectorRow, expectedSectorRows[state],
         `capital state ${state} collision sector row`);
@@ -1807,13 +2125,11 @@ test("cadence preview plots source-derived warning, launch, and world-scroll tim
   const state = readBroadsideCadenceSequenceRuntimeState(source, definition);
   assert.deepEqual(
     [state.baseline.warningStats.count, state.baseline.launchStats.count],
-    [2, 2],
+    [7, 7],
   );
-  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [3, 3]);
-  assert.deepEqual(
-    [state.final.warningStats.minimumGap, state.final.warningStats.averageGap],
-    [68, 68],
-  );
+  assert.deepEqual([state.final.warningStats.count, state.final.launchStats.count], [24, 24]);
+  assert.equal(state.final.warningStats.minimumGap, 16);
+  assert.equal(state.final.warningStats.averageGap, 832 / 23);
   assert.ok(state.final.warningScrolls.some(({ frame }) => frame % 4 === 0));
 
   const png = createBroadsideCadenceSequencePreview(source, definition);

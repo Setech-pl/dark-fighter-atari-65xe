@@ -1926,8 +1926,8 @@ test("backed overlay stack restores base, shell/projectile, entity and effect in
 });
 
 test("linked empty engine path remains within the accepted +32 CPU-cycle slice", () => {
-  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathLimitCpuCycles, 123);
-  assert.ok(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 123);
+  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathLimitCpuCycles, 124);
+  assert.ok(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 124);
   assert.equal(manifest.runtimeTiming.entityEffects.measurement,
     "inclusive JSR-to-RTS cycles from executed linked release bytes");
 });

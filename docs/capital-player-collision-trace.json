@@ -1,0 +1,2685 @@
+{
+  "schema_version": 1,
+  "generated_by": "scripts/runtime-wall-trace.mjs --capital-player-collision-only",
+  "artifacts": {
+    "dark-fighter-boot.bin": {
+      "path": "dist/dark-fighter-boot.bin",
+      "bytes": 20608,
+      "sha256": "2bd2177720536baf4d68f042ea6a14569f7485a58244a4b7195344e056db8338"
+    },
+    "dark-fighter.xex": {
+      "path": "dist/dark-fighter.xex",
+      "bytes": 21393,
+      "sha256": "4d0ea0de63f01b736e846adaf88aa67fa9545462bae4127e7bf60bf4b3f6b2e0"
+    },
+    "dark-fighter.atr": {
+      "path": "dist/dark-fighter.atr",
+      "bytes": 92176,
+      "sha256": "50d6c9aec0f4872ace9378dbe557a8d9ef9eb066f856f02d8dbaaf9765b2a343"
+    },
+    "dark-fighter-manifest.json": {
+      "path": "dist/dark-fighter-manifest.json",
+      "bytes": 818468,
+      "sha256": "df59a6c246dc9a22c0c48e2b329c8855589dde6ccb76a42b439fa4d5f5550f78"
+    }
+  },
+  "geometry": {
+    "player": {
+      "width_hpos": 16,
+      "height_scanlines": 15,
+      "inclusive": true,
+      "transparent_sprite_pixels_are_solid_for_gameplay": true
+    },
+    "bolt": {
+      "width_hpos": 8,
+      "height_scanlines": 6,
+      "inclusive": true,
+      "top": "BROAD_Y-3",
+      "bottom": "BROAD_Y+2",
+      "raster_x_alignment": "BROAD_X & $FC"
+    }
+  },
+  "sessions": [
+    {
+      "session": "capital-player-xex-1-colonial-top",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Colonial",
+      "contact": "top",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19661912
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 110,
+          "bottom": 124
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 110,
+          "bottom": 110
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 167,
+          "player": {
+            "x": 124,
+            "y": 110,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 108,
+            "raster_x": 116,
+            "physical_row_pointer": 33808,
+            "collision_or_backing": 4
+          }
+        },
+        "contact": {
+          "frame": 168,
+          "player": {
+            "x": 124,
+            "y": 110,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 169,
+          "player": {
+            "x": 124,
+            "y": 110,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23197,
+        "gate_headroom": 9371,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7353,
+        "sha256": "961ba4c84fb0c8f74d39223b2042ac404697c5f4e92874172fca16685d357ab9"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-top-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-colonial-side",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Colonial",
+      "contact": "side",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19661906
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 101,
+          "bottom": 115
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 105,
+          "bottom": 110
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 167,
+          "player": {
+            "x": 124,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 108,
+            "raster_x": 116,
+            "physical_row_pointer": 33808,
+            "collision_or_backing": 4
+          }
+        },
+        "contact": {
+          "frame": 168,
+          "player": {
+            "x": 124,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 169,
+          "player": {
+            "x": 124,
+            "y": 101,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23145,
+        "gate_headroom": 9423,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-side-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-side-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7371,
+        "sha256": "51c8da80846e0721f10ec192bfa6a2baedbbf07319a5d679b5c902c0733427d1"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-side.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-side-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-colonial-bottom",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Colonial",
+      "contact": "bottom",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19661906
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 91,
+          "bottom": 105
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 105,
+          "bottom": 105
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 167,
+          "player": {
+            "x": 124,
+            "y": 91,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 108,
+            "raster_x": 116,
+            "physical_row_pointer": 33808,
+            "collision_or_backing": 4
+          }
+        },
+        "contact": {
+          "frame": 168,
+          "player": {
+            "x": 124,
+            "y": 91,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 169,
+          "player": {
+            "x": 124,
+            "y": 91,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23145,
+        "gate_headroom": 9423,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7349,
+        "sha256": "0df2f7a894801f1ee605ed22e1004fcc9b4fd81218e2997e96fcfcd61eabcf99"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-bottom-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-colonial-near",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Colonial",
+      "contact": "near",
+      "expected_hit": false,
+      "collision_decision": {
+        "branch": "player_aabb_miss",
+        "pc": 36474,
+        "clock": 19661908
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 111,
+          "bottom": 125
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": null,
+        "hit": false
+      },
+      "frames": {
+        "before": {
+          "frame": 167,
+          "player": {
+            "x": 124,
+            "y": 111,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 108,
+            "raster_x": 116,
+            "physical_row_pointer": 33808,
+            "collision_or_backing": 4
+          }
+        },
+        "contact": {
+          "frame": 168,
+          "player": {
+            "x": 124,
+            "y": 111,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 0
+          }
+        },
+        "after": {
+          "frame": 169,
+          "player": {
+            "x": 124,
+            "y": 111,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 122,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 25047,
+        "gate_headroom": 7521,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 6246,
+        "sha256": "5d522d7a6b52f5fe6558718487d72e09e4a2223cac452ae04c62205f23d4c2a7"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-near-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-colonial-sweep",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Colonial",
+      "contact": "sweep",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19661906
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 101,
+          "bottom": 115
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 105,
+          "bottom": 110
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 167,
+          "player": {
+            "x": 124,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 108,
+            "raster_x": 116,
+            "physical_row_pointer": 33808,
+            "collision_or_backing": 4
+          }
+        },
+        "contact": {
+          "frame": 168,
+          "player": {
+            "x": 124,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 169,
+          "player": {
+            "x": 124,
+            "y": 101,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 108,
+            "raster_x": 120,
+            "physical_row_pointer": 33768,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23145,
+        "gate_headroom": 9423,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7371,
+        "sha256": "51c8da80846e0721f10ec192bfa6a2baedbbf07319a5d679b5c902c0733427d1"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-colonial-sweep-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-cylon-top",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Cylon",
+      "contact": "top",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19697764
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 110,
+          "bottom": 124
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 110,
+          "bottom": 110
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 168,
+          "player": {
+            "x": 154,
+            "y": 110,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 108,
+            "raster_x": 172,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 169,
+          "player": {
+            "x": 154,
+            "y": 110,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 170,
+          "player": {
+            "x": 154,
+            "y": 110,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23941,
+        "gate_headroom": 8627,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7056,
+        "sha256": "98d805e9fbdcf1d526dffeb6047f94fb1d468e72c211f10fb2359ff83d70e892"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-top-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-cylon-side",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Cylon",
+      "contact": "side",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19697764
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 101,
+          "bottom": 115
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 105,
+          "bottom": 110
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 168,
+          "player": {
+            "x": 154,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 108,
+            "raster_x": 172,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 169,
+          "player": {
+            "x": 154,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 170,
+          "player": {
+            "x": 154,
+            "y": 101,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23941,
+        "gate_headroom": 8627,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-side-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-side-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7058,
+        "sha256": "305df53c2f75c4c260fb8e1ca159b3872d2ef112deacc33878e043a75a00d840"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-side.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-side-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-cylon-bottom",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Cylon",
+      "contact": "bottom",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19697764
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 91,
+          "bottom": 105
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 105,
+          "bottom": 105
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 168,
+          "player": {
+            "x": 154,
+            "y": 91,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 108,
+            "raster_x": 172,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 169,
+          "player": {
+            "x": 154,
+            "y": 91,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 170,
+          "player": {
+            "x": 154,
+            "y": 91,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23941,
+        "gate_headroom": 8627,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7059,
+        "sha256": "d1838ef22446ebbce896b0930a0b792aec03f9fb5add5eaea54b5c8cc800d9fb"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-bottom-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-cylon-near",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Cylon",
+      "contact": "near",
+      "expected_hit": false,
+      "collision_decision": {
+        "branch": "player_aabb_miss",
+        "pc": 36474,
+        "clock": 19697760
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 111,
+          "bottom": 125
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": null,
+        "hit": false
+      },
+      "frames": {
+        "before": {
+          "frame": 168,
+          "player": {
+            "x": 154,
+            "y": 111,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 108,
+            "raster_x": 172,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 169,
+          "player": {
+            "x": 154,
+            "y": 111,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 210
+          }
+        },
+        "after": {
+          "frame": 170,
+          "player": {
+            "x": 154,
+            "y": 111,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 168,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 210
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 25047,
+        "gate_headroom": 7521,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 5333,
+        "sha256": "a1de956ec4bff0b610794361f455ba1b166ba56a8dc9189cdb4d9e2e1b5015f5"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-near-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-xex-1-cylon-sweep",
+      "artifact": "XEX",
+      "difficulty": "MEDIUM",
+      "owner": "Cylon",
+      "contact": "sweep",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 19697764
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 101,
+          "bottom": 115
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 105,
+          "bottom": 110
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 105,
+          "bottom": 110
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 168,
+          "player": {
+            "x": 154,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 108,
+            "raster_x": 172,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 169,
+          "player": {
+            "x": 154,
+            "y": 101,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 170,
+          "player": {
+            "x": 154,
+            "y": 101,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 108,
+            "raster_x": 168,
+            "physical_row_pointer": 33728,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23941,
+        "gate_headroom": 8627,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7058,
+        "sha256": "305df53c2f75c4c260fb8e1ca159b3872d2ef112deacc33878e043a75a00d840"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-xex-1-cylon-sweep-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-colonial-top",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Colonial",
+      "contact": "top",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24321459
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 118,
+          "bottom": 132
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 118,
+          "bottom": 118
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 158,
+          "player": {
+            "x": 124,
+            "y": 118,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 116,
+            "raster_x": 116,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 0
+          }
+        },
+        "contact": {
+          "frame": 159,
+          "player": {
+            "x": 124,
+            "y": 118,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 160,
+          "player": {
+            "x": 124,
+            "y": 118,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23787,
+        "gate_headroom": 8781,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7438,
+        "sha256": "73b446d2bcdc6f9d80742a25eb4203a6043ef0914eefdd135c1ce4e3c7c4f9a1"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-top-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-colonial-side",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Colonial",
+      "contact": "side",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24321464
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 109,
+          "bottom": 123
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 113,
+          "bottom": 118
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 158,
+          "player": {
+            "x": 124,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 116,
+            "raster_x": 116,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 0
+          }
+        },
+        "contact": {
+          "frame": 159,
+          "player": {
+            "x": 124,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 160,
+          "player": {
+            "x": 124,
+            "y": 109,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23787,
+        "gate_headroom": 8781,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-side-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-side-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7445,
+        "sha256": "791277e526214225061dbb09cb269335ccd4277685921cbfb47e62aae8ffdb22"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-side.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-side-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-colonial-bottom",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Colonial",
+      "contact": "bottom",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24321464
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 99,
+          "bottom": 113
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 113,
+          "bottom": 113
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 158,
+          "player": {
+            "x": 124,
+            "y": 99,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 116,
+            "raster_x": 116,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 0
+          }
+        },
+        "contact": {
+          "frame": 159,
+          "player": {
+            "x": 124,
+            "y": 99,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 160,
+          "player": {
+            "x": 124,
+            "y": 99,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23775,
+        "gate_headroom": 8793,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7404,
+        "sha256": "2eed89f3c3b3241700a5cda6fdde4e3042df4d74b379f3070ded75cc8bad2aca"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-bottom-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-colonial-near",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Colonial",
+      "contact": "near",
+      "expected_hit": false,
+      "collision_decision": {
+        "branch": "player_aabb_miss",
+        "pc": 36474,
+        "clock": 24321455
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 119,
+          "bottom": 133
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": null,
+        "hit": false
+      },
+      "frames": {
+        "before": {
+          "frame": 158,
+          "player": {
+            "x": 124,
+            "y": 119,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 116,
+            "raster_x": 116,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 0
+          }
+        },
+        "contact": {
+          "frame": 159,
+          "player": {
+            "x": 124,
+            "y": 119,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        },
+        "after": {
+          "frame": 160,
+          "player": {
+            "x": 124,
+            "y": 119,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 122,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 26993,
+        "gate_headroom": 5575,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 6254,
+        "sha256": "271291084d2101e65929667379a66595c21a9c3e8c0dd2fc6e40def851a53549"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-near-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-colonial-sweep",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Colonial",
+      "contact": "sweep",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24321464
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 124,
+          "right": 139,
+          "top": 109,
+          "bottom": 123
+        },
+        "bolt": {
+          "previous_left": 116,
+          "previous_right": 123,
+          "current_left": 120,
+          "current_right": 127,
+          "sweep_left": 116,
+          "sweep_right": 127,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 124,
+          "right": 127,
+          "top": 113,
+          "bottom": 118
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 158,
+          "player": {
+            "x": 124,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 2,
+            "logical_x": 118,
+            "logical_y": 116,
+            "raster_x": 116,
+            "physical_row_pointer": 33688,
+            "collision_or_backing": 0
+          }
+        },
+        "contact": {
+          "frame": 159,
+          "player": {
+            "x": 124,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 160,
+          "player": {
+            "x": 124,
+            "y": 109,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 0,
+            "owner": 0,
+            "state": 3,
+            "logical_x": 120,
+            "logical_y": 116,
+            "raster_x": 120,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 23787,
+        "gate_headroom": 8781,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7445,
+        "sha256": "791277e526214225061dbb09cb269335ccd4277685921cbfb47e62aae8ffdb22"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-colonial-sweep-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-cylon-top",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Cylon",
+      "contact": "top",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24286038
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 118,
+          "bottom": 132
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 118,
+          "bottom": 118
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 157,
+          "player": {
+            "x": 154,
+            "y": 118,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 116,
+            "raster_x": 172,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 158,
+          "player": {
+            "x": 154,
+            "y": 118,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 159,
+          "player": {
+            "x": 154,
+            "y": 118,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 24057,
+        "gate_headroom": 8511,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7418,
+        "sha256": "701ba9ee3b78a974d955e80aa144f1545527a706682e3f661dcef4a9864b64e2"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-top.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-top-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-cylon-side",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Cylon",
+      "contact": "side",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24286034
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 109,
+          "bottom": 123
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 113,
+          "bottom": 118
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 157,
+          "player": {
+            "x": 154,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 116,
+            "raster_x": 172,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 158,
+          "player": {
+            "x": 154,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 159,
+          "player": {
+            "x": 154,
+            "y": 109,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 24051,
+        "gate_headroom": 8517,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-side-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-side-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7411,
+        "sha256": "b8a91de76f279a2e83f9be75dc29b8493c1464b6b60443d9adb57269f28469fc"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-side.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-side-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-cylon-bottom",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Cylon",
+      "contact": "bottom",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24286034
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 99,
+          "bottom": 113
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 113,
+          "bottom": 113
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 157,
+          "player": {
+            "x": 154,
+            "y": 99,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 116,
+            "raster_x": 172,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 158,
+          "player": {
+            "x": 154,
+            "y": 99,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 159,
+          "player": {
+            "x": 154,
+            "y": 99,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 24050,
+        "gate_headroom": 8518,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7414,
+        "sha256": "49190059461d264773fef2ae14498fbc72a7d9f14dea2bd169f299b5b8f936a3"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-bottom-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-cylon-near",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Cylon",
+      "contact": "near",
+      "expected_hit": false,
+      "collision_decision": {
+        "branch": "player_aabb_miss",
+        "pc": 36474,
+        "clock": 24286034
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 119,
+          "bottom": 133
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": null,
+        "hit": false
+      },
+      "frames": {
+        "before": {
+          "frame": 157,
+          "player": {
+            "x": 154,
+            "y": 119,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 116,
+            "raster_x": 172,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 158,
+          "player": {
+            "x": 154,
+            "y": 119,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 210
+          }
+        },
+        "after": {
+          "frame": 159,
+          "player": {
+            "x": 154,
+            "y": 119,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 168,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 210
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 26993,
+        "gate_headroom": 5575,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 6235,
+        "sha256": "b0c76fa126f9022e05526a9b14af089ce61669003a4caa46ac847fed8de05762"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-near.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-near-broadside-compositor.jsonl"
+    },
+    {
+      "session": "capital-player-atr-2-cylon-sweep",
+      "artifact": "ATR",
+      "difficulty": "HARD",
+      "owner": "Cylon",
+      "contact": "sweep",
+      "expected_hit": true,
+      "collision_decision": {
+        "branch": "player_aabb_hit",
+        "pc": 36472,
+        "clock": 24286034
+      },
+      "raster_geometry": {
+        "rule": "inclusive swept-AABB",
+        "player": {
+          "left": 154,
+          "right": 169,
+          "top": 109,
+          "bottom": 123
+        },
+        "bolt": {
+          "previous_left": 172,
+          "previous_right": 179,
+          "current_left": 168,
+          "current_right": 175,
+          "sweep_left": 168,
+          "sweep_right": 179,
+          "top": 113,
+          "bottom": 118
+        },
+        "overlap": {
+          "left": 168,
+          "right": 169,
+          "top": 113,
+          "bottom": 118
+        },
+        "hit": true
+      },
+      "frames": {
+        "before": {
+          "frame": 157,
+          "player": {
+            "x": 154,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 10,
+            "life": 3,
+            "cooldown": 0
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 2,
+            "logical_x": 172,
+            "logical_y": 116,
+            "raster_x": 172,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 207
+          }
+        },
+        "contact": {
+          "frame": 158,
+          "player": {
+            "x": 154,
+            "y": 109,
+            "hull_before": 10,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 25
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 1
+          }
+        },
+        "after": {
+          "frame": 159,
+          "player": {
+            "x": 154,
+            "y": 109,
+            "hull_before": 8,
+            "hull_after": 8,
+            "life": 3,
+            "cooldown": 24
+          },
+          "projectile": {
+            "slot": 1,
+            "owner": 1,
+            "state": 3,
+            "logical_x": 170,
+            "logical_y": 116,
+            "raster_x": 168,
+            "physical_row_pointer": 33648,
+            "collision_or_backing": 0
+          }
+        }
+      },
+      "timing": {
+        "maximum_wall_cycles": 24051,
+        "gate_headroom": 8517,
+        "missed_frames": 0,
+        "extra_vbi_boundaries": 0,
+        "physical_overruns": 0
+      },
+      "orphan_glyphs": 0,
+      "transient_backing_glyphs": 0,
+      "screenshot_sequence": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep-sequence.png",
+      "hitbox_screenshot_sequence": {
+        "path": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep-hitboxes.png",
+        "frames": [
+          "before",
+          "contact",
+          "after"
+        ],
+        "legend": {
+          "player_16x15": "cyan",
+          "bolt_current_8x6": "yellow",
+          "bolt_sweep": "red"
+        },
+        "width": 1008,
+        "height": 240,
+        "bytes": 7411,
+        "sha256": "b8a91de76f279a2e83f9be75dc29b8493c1464b6b60443d9adb57269f28469fc"
+      },
+      "raw_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep.csv",
+      "compositor_trace": "build/runtime-wall-trace/capital-player-atr-2-cylon-sweep-broadside-compositor.jsonl"
+    }
+  ],
+  "passed": true
+}

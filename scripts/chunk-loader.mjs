@@ -12,9 +12,12 @@ const CHUNK_TYPE_LZ = 1;
 const STAGING_BROADSIDE = 1;
 const STAGING_EXTENSION = 2;
 const SAFE_EXTENSION_RANGES = Object.freeze([
-  [0x4efe, 0x5000], [0x5259, 0x5280], [0x5de2, 0x5e06], [0x77b9, 0x7810], [0x7bd0, 0x7f10],
+  [0x4efe, 0x5000], [0x5261, 0x534b],
+  [0x5de2, 0x5e06], [0x77b9, 0x7810],
+  [0x7bd0, 0x7f10],
   [0x7fdb, 0x8000], [0x8130, 0x9000], [0x90cf, 0x9100], [0x992a, 0xa000],
 ]);
+const PICKUP_COLD_RANGE = Object.freeze([0x8c80, 0x9062]);
 
 const INITIAL_ENVELOPE_MAGIC = Buffer.from("DFI2", "ascii");
 const INITIAL_ENVELOPE_MIN_BYTES = 12;
@@ -66,8 +69,10 @@ function validateDestination(record) {
     invariant(record.sectorCount * ATR_SECTOR_BYTES <= 0x1954,
       "extension chunk exceeds $8100-$9A53 staging");
     invariant(SAFE_EXTENSION_RANGES.some(([start, rangeEnd]) =>
-      record.finalDestination >= start && end <= rangeEnd),
-    "extension final range is not in reviewed free residency");
+      record.finalDestination >= start && end <= rangeEnd) ||
+      record.finalDestination === PICKUP_COLD_RANGE[0] && end <= PICKUP_COLD_RANGE[1],
+    `extension final range $${record.finalDestination.toString(16)}-$${(end - 1).toString(16)} ` +
+      "is not in reviewed free residency");
     const stagingEnd = record.destination + record.sectorCount * ATR_SECTOR_BYTES;
     invariant(end <= record.destination || record.finalDestination >= stagingEnd,
       "extension source and destination overlap");

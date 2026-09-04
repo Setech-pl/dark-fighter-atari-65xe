@@ -27,6 +27,8 @@ specification.
 | Current addresses, ranges, sizes, and reserves | [memory-map.md](memory-map.md) |
 | Current PAL result and measurement method | [runtime-headroom.md](runtime-headroom.md) |
 | Machine-readable PAL evidence | [runtime-wall-trace.json](runtime-wall-trace.json) |
+| Native capital-shell/player collision evidence | [capital-player-collision-trace.json](capital-player-collision-trace.json) |
+| Native menu lifecycle/raster evidence | [menu-raster-trace.json](menu-raster-trace.json) |
 | Visual and colour rules | [art-direction.md](art-direction.md) |
 | Atari800 and real-hardware checklist | [hardware-testing.md](hardware-testing.md) |
 | Current next tasks and future plans | [roadmap.md](roadmap.md) |

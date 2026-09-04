@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseChunkManifest } from "./chunk-loader.mjs";
+import { unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 const ATR_MAGIC = 0x0296;
 const ATR_HEADER_SIZE = 16;
@@ -188,7 +189,8 @@ export function validateBuildDirectory(rootDirectory) {
     transport.remainingAtrTransportBytes === transport.remainingAtrSectors * ATR_SECTOR_SIZE &&
     transport.maximumNewSimultaneousResidencyBytes === 6841 &&
     transport.remainingSafeResidencyBytes ===
-      6841 - manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes &&
+      6841 - manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes -
+        (manifest.capitalPlayerCollisionRuntime?.bytes ?? 0) &&
     transport.loaderResidentBytes === 0,
   "Transport and runtime residency capacities are conflated or inconsistent");
   invariant(manifest.broadsideRuntime?.loadAddress === 0x4000,
@@ -221,7 +223,7 @@ export function validateBuildDirectory(rootDirectory) {
     manifest.entityEffects.codeBytes > 0 &&
     manifest.entityEffects.codeBytes <= manifest.entityEffects.codeReservedBytes,
   "ENTITY_CODE exceeds its $9100-$9FFF runtime reservation");
-  invariant(manifest.entityEffects.stagedSourceAddress === 0x5300 &&
+  invariant(manifest.entityEffects.stagedSourceAddress === 0x534b &&
     manifest.entityEffects.initialPackedSourcesEndExclusive <=
       manifest.entityEffects.stagedSourceAddress &&
     manifest.entityEffects.stagedEndExclusive <= manifest.broadsideRuntime.runAddress &&
@@ -313,7 +315,7 @@ export function validateBuildDirectory(rootDirectory) {
   invariant(manifest.runtimeCodeBudget?.frontendH31?.baselineBytes ===
     SHIELD_BOOSTER_RUNTIME_BASELINE_BYTES &&
     (manifest.encounterDirector?.enabled === true
-      ? manifest.encounterDirector.linkedRuntimeBytes === 16989
+      ? manifest.encounterDirector.linkedRuntimeBytes === 17203
       : manifest.runtimeCodeBudget.frontendH31.actualDeltaBytes <=
         FRONTEND_H31_RUNTIME_HARD_DELTA_BYTES),
   "H3.1 exceeds its linked runtime hard budget");
@@ -365,6 +367,14 @@ export function validateBuildDirectory(rootDirectory) {
       glueSegment.data.equals(glueRuntime), "XEX GLUE staging segment is invalid");
     invariant(directorSegment.start === manifest.directorRuntime.runAddress &&
       directorSegment.data.equals(directorRuntime), "XEX DIRECTOR segment is invalid");
+    const pickupPhaseRuntime = unpackBroadsideLzss(packedPickupPhaseRuntime);
+    const capitalPlayerCollisionRuntime = fs.readFileSync(path.join(rootDirectory,
+      "build", "capital-player-collision.bin"));
+    const collisionOffset = manifest.capitalPlayerCollisionRuntime.packedStreamOffset;
+    invariant(pickupPhaseRuntime.subarray(collisionOffset,
+      collisionOffset + capitalPlayerCollisionRuntime.length)
+      .equals(capitalPlayerCollisionRuntime),
+    "Packed pickup stream does not publish the capital/player collision module");
   }
   invariant(runSegment.start === 0x02e0 && runSegment.end === 0x02e1, "XEX RUNAD record is missing");
   invariant(readWord(runSegment.data, 0) === transport.stage2.runAddress +

@@ -316,15 +316,17 @@
     }
   },
   "sector": {
+    "baselineSectorRows": 240,
+    "lengthMultiplier": 2,
     "moduleRows": 8,
     "sidePhaseRows": 8,
-    "previewSectorRow": 78,
+    "previewSectorRow": 134,
     "engineAnimationFrames": 8,
     "launchFlashFrames": 4,
     "modules": {
       "allied": {
         "combat_0": { "sourceRows": [0, 1, 2, 3, 4, 5, 6, 7] },
-        "combat_1": { "sourceRows": [8, 9, 10, 11, 12, 13, 14, 15] },
+        "combat_1": { "sourceRows": [7, 8, 9, 10, 11, 12, 13, 14] },
         "combat_2": { "sourceRows": [16, 17, 18, 19, 20, 21, 22, 23] },
         "combat_3": { "sourceRows": [24, 25, 26, 27, 28, 29, 30, 31] },
         "prow_0": { "sourceRows": [12, 12, 15, 14, 13, 15, 14, 13] },
@@ -344,7 +346,7 @@
       },
       "enemy": {
         "combat_0": { "sourceRows": [0, 1, 2, 3, 4, 5, 6, 7] },
-        "combat_1": { "sourceRows": [8, 9, 10, 11, 12, 13, 14, 15] },
+        "combat_1": { "sourceRows": [11, 12, 13, 14, 15, 16, 17, 18] },
         "combat_2": { "sourceRows": [16, 17, 18, 19, 20, 21, 22, 23] },
         "combat_3": { "sourceRows": [24, 25, 26, 27, 28, 29, 30, 31] },
         "prow_0": { "sourceRows": [6, 5, 9, 8, 7, 9, 8, 7] },
@@ -405,30 +407,29 @@
       },
       {
         "id": "aft",
-        "rows": 24,
-        "weaponEligible": false,
+        "rows": 80,
+        "weaponEligible": true,
         "modules": {
-          "allied": ["aft_0", "aft_1", "aft_2"],
-          "enemy": ["aft_0", "aft_1", "aft_2"]
+          "allied": ["aft_0", "aft_1", "aft_2", "aft_0", "aft_1", "aft_2", "aft_0", "aft_1", "aft_2", "aft_0"],
+          "enemy": ["aft_0", "aft_1", "aft_2", "aft_0", "aft_1", "aft_2", "aft_0", "aft_1", "aft_2", "aft_0"]
         }
       },
       {
         "id": "combat",
-        "rows": 128,
+        "rows": 256,
         "weaponEligible": true,
-        "weaponShutdownRows": 8,
         "modules": {
-          "allied": ["combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3"],
-          "enemy": ["combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3"]
+          "allied": ["combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3"],
+          "enemy": ["combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3", "combat_0", "combat_1", "combat_2", "combat_3"]
         }
       },
       {
         "id": "forward",
-        "rows": 24,
-        "weaponEligible": false,
+        "rows": 80,
+        "weaponEligible": true,
         "modules": {
-          "allied": ["combat_0", "combat_2", "combat_3"],
-          "enemy": ["combat_0", "combat_2", "combat_3"]
+          "allied": ["combat_0", "combat_2", "combat_3", "combat_0", "combat_2", "combat_3", "combat_0", "combat_2", "combat_3", "combat_0"],
+          "enemy": ["combat_0", "combat_2", "combat_3", "combat_0", "combat_2", "combat_3", "combat_0", "combat_2", "combat_3", "combat_0"]
         }
       },
       {
@@ -440,7 +441,21 @@
           "enemy": ["prow_3", "prow_2", "prow_1", "prow_0"]
         }
       }
-    ]
+    ],
+    "turretLayout": {
+      "seed": 109,
+      "counts": { "easy": 8, "medium": 12, "hard": 16 },
+      "minimumSpacingRows": 24,
+      "maximumGapRows": { "easy": 80, "medium": 56, "hard": 40 },
+      "turretModule": {
+        "allied": "combat_1",
+        "enemy": "combat_1"
+      },
+      "disabledModule": {
+        "allied": "combat_2",
+        "enemy": "combat_2"
+      }
+    }
   },
   "turretTypes": {
     "allied_heavy_line": 1,

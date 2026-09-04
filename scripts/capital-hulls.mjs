@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { canonicalPlayfield } from "./playfield.mjs";
 
 const SIDES = ["allied", "enemy"];
+const DIFFICULTIES = ["easy", "medium", "hard"];
 const SIDE_IDS = new Map([["allied", 0], ["enemy", 1]]);
 const DIRECTIONS = new Map([["right", 0], ["left", 1]]);
 const SCREEN_BANKS = new Map([["pf2", 0x00], ["pf3", 0x80]]);
@@ -19,6 +20,70 @@ function invariant(condition, message) {
 
 function byteHex(value) {
   return `$${value.toString(16).padStart(2, "0").toUpperCase()}`;
+}
+
+// Match Encounter Director's private full-period byte LCG (5*x+1). Layout
+// generation is host-side, so it does not consume or perturb runtime policy RNG.
+export function nextDirectorLayoutRng(value) {
+  invariant(Number.isInteger(value) && value >= 0 && value <= 0xff,
+    "Director layout RNG state must be one byte");
+  return (value * 5 + 1) & 0xff;
+}
+
+function generateTurretModuleIndices({
+  firstModule, lastModule, count, minimumSpacingModules, maximumGapModules, seed,
+}) {
+  invariant(count >= 2 && firstModule < lastModule, "Turret layout span is too short");
+  const result = [firstModule];
+  let state = seed;
+  const averageGap = (lastModule - firstModule) / (count - 1);
+  const jitterRadius = Math.max(1, Math.floor((averageGap - minimumSpacingModules) / 2));
+  for (let ordinal = 1; ordinal < count - 1; ordinal += 1) {
+    state = nextDirectorLayoutRng(state);
+    const ideal = Math.round(firstModule + ordinal * averageGap);
+    const jitter = (state % (jitterRadius * 2 + 1)) - jitterRadius;
+    const remainingGaps = count - 1 - ordinal;
+    const low = Math.max(
+      result.at(-1) + minimumSpacingModules,
+      lastModule - remainingGaps * maximumGapModules,
+    );
+    const high = Math.min(
+      result.at(-1) + maximumGapModules,
+      lastModule - remainingGaps * minimumSpacingModules,
+    );
+    invariant(low <= high, "Turret layout spacing constraints cannot be satisfied");
+    result.push(Math.max(low, Math.min(high, ideal + jitter)));
+  }
+  result.push(lastModule);
+  invariant(result.every((moduleIndex, index) => index === 0 ||
+    moduleIndex - result[index - 1] >= minimumSpacingModules),
+  "Generated turret layout violates minimum spacing");
+  invariant(result.every((moduleIndex, index) => index === 0 ||
+    moduleIndex - result[index - 1] <= maximumGapModules),
+  "Generated turret layout contains an excessive gap");
+  return result;
+}
+
+function validTurretSubsets(candidates, required, count, maximumGapModules) {
+  const requiredSet = new Set(required);
+  const optional = candidates.filter((value) => !requiredSet.has(value));
+  const needed = count - required.length;
+  const valid = [];
+  const visit = (start, selected) => {
+    if (selected.length === needed) {
+      const result = [...required, ...selected].sort((left, right) => left - right);
+      if (result.every((value, index) => index === 0 ||
+        value - result[index - 1] <= maximumGapModules)) valid.push(result);
+      return;
+    }
+    for (let index = start; index <= optional.length - (needed - selected.length); index += 1) {
+      selected.push(optional[index]);
+      visit(index + 1, selected);
+      selected.pop();
+    }
+  };
+  visit(0, []);
+  return valid;
 }
 
 function normalizeGlyphPixels(glyph) {
@@ -186,15 +251,17 @@ export function loadCapitalHullsDefinition(filePath) {
   };
 }
 
-function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes) {
+function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes, options = {}) {
   const source = definition.sector;
   invariant(source && typeof source === "object", "Capital hull source must define a sector");
+  invariant(source.baselineSectorRows === 240 && source.lengthMultiplier === 2,
+    "Capital hull sector must declare the provisional exact 2x length contract");
   invariant(source.moduleRows === 8, "Capital hull modules must contain eight character rows");
   invariant(Number.isInteger(source.sidePhaseRows) && source.sidePhaseRows >= 0 &&
     source.sidePhaseRows <= 16, "sector.sidePhaseRows must be a bounded row offset");
   invariant(source.visibleRows === 28, "The PAL gameplay viewport must expose 28 hull rows");
   invariant(Number.isInteger(source.previewSectorRow) && source.previewSectorRow >= source.visibleRows &&
-    source.previewSectorRow < 240, "sector.previewSectorRow must expose a complete visible ship span");
+    source.previewSectorRow < 480, "sector.previewSectorRow must expose a complete visible ship span");
   invariant(Number.isInteger(source.engineAnimationFrames) &&
     source.engineAnimationFrames >= 6 && source.engineAnimationFrames <= 8,
   "Engine animation cadence must be six through eight PAL frames");
@@ -206,9 +273,9 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
 
   const expectedSections = [
     ["engines", 32],
-    ["aft", 24],
-    ["combat", 128],
-    ["forward", 24],
+    ["aft", 80],
+    ["combat", 256],
+    ["forward", 80],
     ["prow", 32],
   ];
   let sectionStart = 0;
@@ -220,14 +287,12 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
       `Sector section ${section.id} must contain complete modules`);
     invariant(typeof section.weaponEligible === "boolean",
       `Sector section ${section.id} must declare weapon eligibility`);
-    invariant(section.weaponEligible === (section.id === "combat"),
-      "Only the combat section may be weapon eligible");
+    invariant(section.weaponEligible === !["engines", "prow"].includes(section.id),
+      "Every post-engine linear-hull section, and only those sections, must be weapon eligible");
     const weaponShutdownRows = section.weaponShutdownRows ?? 0;
     invariant(Number.isInteger(weaponShutdownRows) && weaponShutdownRows >= 0 &&
       weaponShutdownRows <= section.rows,
     `Sector section ${section.id} has an invalid weapon shutdown margin`);
-    invariant(section.id !== "combat" || weaponShutdownRows === 8,
-      "The combat section must reserve its final eight rows for weapon shutdown");
     const result = {
       id: section.id,
       state: index,
@@ -241,8 +306,29 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
     sectionStart += section.rows;
     return result;
   });
-  invariant(sectionStart === 240, "Capital hull sector must contain exactly 240 rows");
+  invariant(sectionStart === source.baselineSectorRows * source.lengthMultiplier,
+    "Capital hull sector must contain exactly twice the 240-row baseline");
 
+  const turretLayout = source.turretLayout;
+  invariant(turretLayout && typeof turretLayout === "object",
+    "Capital hull sector must define seeded difficulty-scaled turret geometry");
+  const expectedTurretCounts = { easy: 8, medium: 12, hard: 16 };
+  for (const [difficulty, count] of Object.entries(expectedTurretCounts)) {
+    invariant(turretLayout.counts?.[difficulty] === count,
+      `${difficulty} hulls must expose exactly ${count} functional turrets`);
+  }
+  const layoutSeed = options.layoutSeed ?? turretLayout.seed;
+  invariant(Number.isInteger(layoutSeed) && layoutSeed >= 0 && layoutSeed <= 0xff,
+    "Capital hull turret layout seed must be one byte");
+  invariant(Number.isInteger(turretLayout.minimumSpacingRows) &&
+    turretLayout.minimumSpacingRows >= source.moduleRows &&
+    turretLayout.minimumSpacingRows % source.moduleRows === 0,
+  "Turret minimum spacing must be a positive whole-module distance");
+  for (const difficulty of DIFFICULTIES) {
+    invariant(Number.isInteger(turretLayout.maximumGapRows?.[difficulty]) &&
+      turretLayout.maximumGapRows[difficulty] % source.moduleRows === 0,
+    `${difficulty} maximum turret gap must be a whole-module distance`);
+  }
   const moduleNamesBySide = new Map();
   const moduleIdsBySide = new Map();
   const moduleSourceRowsBySide = new Map();
@@ -301,8 +387,37 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
     engineOverlayMasks.set(side, engineMasks);
     engineGlyphs.set(side, engineGlyph);
   }
+  const disabledTurretModuleIds = new Map();
+  const turretModuleIds = new Map();
+  const turretLocalRows = new Map();
+  for (const side of SIDES) {
+    const moduleName = turretLayout.disabledModule?.[side];
+    invariant(moduleIdsBySide.get(side).has(moduleName),
+      `${side} disabled turret replacement must name a reusable module`);
+    const moduleId = moduleIdsBySide.get(side).get(moduleName);
+    const sourceRows = moduleSourceRowsBySide.get(side).subarray(
+      moduleId * source.moduleRows, (moduleId + 1) * source.moduleRows);
+    invariant([...sourceRows].every((row) =>
+      projectionGlyph(side, rowsBySide.get(side)[row]) === "space"),
+    `${side} disabled turret replacement module must contain no muzzle projection`);
+    disabledTurretModuleIds.set(side, moduleId);
 
-  const moduleSequences = new Map();
+    const turretModuleName = turretLayout.turretModule?.[side];
+    invariant(moduleIdsBySide.get(side).has(turretModuleName),
+      `${side} turret layout must name a reusable turret module`);
+    const turretModuleId = moduleIdsBySide.get(side).get(turretModuleName);
+    const turretSources = moduleSourceRowsBySide.get(side).subarray(
+      turretModuleId * source.moduleRows, (turretModuleId + 1) * source.moduleRows);
+    const projectionRows = [...turretSources].map((row, localRow) =>
+      projectionGlyph(side, rowsBySide.get(side)[row]) === "space" ? -1 : localRow)
+      .filter((localRow) => localRow >= 0);
+    invariant(projectionRows.length === 1 && projectionRows[0] <= 1,
+      `${side} turret module must expose one muzzle within one row of its start`);
+    turretModuleIds.set(side, turretModuleId);
+    turretLocalRows.set(side, projectionRows[0]);
+  }
+
+  const baseModuleSequences = new Map();
   for (const side of SIDES) {
     const sequence = [];
     const ids = moduleIdsBySide.get(side);
@@ -312,12 +427,89 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
         `${side} section ${section.id} has the wrong module count`);
       for (const name of names) {
         invariant(ids.has(name), `${side} section ${section.id} uses unknown module ${name}`);
-        sequence.push(ids.get(name));
+        const moduleId = ids.get(name);
+        const moduleSources = moduleSourceRowsBySide.get(side).subarray(
+          moduleId * source.moduleRows, (moduleId + 1) * source.moduleRows);
+        const containsMuzzle = [...moduleSources].some((row) =>
+          projectionGlyph(side, rowsBySide.get(side)[row]) !== "space");
+        sequence.push(containsMuzzle ? disabledTurretModuleIds.get(side) : moduleId);
       }
     }
     invariant(sequence.length === sectionStart / source.moduleRows,
       `${side} sector module sequence does not cover all rows`);
-    moduleSequences.set(side, Uint8Array.from(sequence));
+    baseModuleSequences.set(side, Uint8Array.from(sequence));
+  }
+
+  const eligibleModules = sections.flatMap((section) => {
+    if (!section.weaponEligible) return [];
+    const end = section.end - section.weaponShutdownRows;
+    return Array.from({ length: (end - section.start) / source.moduleRows }, (_, index) =>
+      section.start / source.moduleRows + index);
+  });
+  invariant(eligibleModules.every((moduleIndex, index) => index === 0 ||
+    moduleIndex === eligibleModules[index - 1] + 1),
+  "Weapon-eligible linear-hull modules must form one contiguous span");
+  const firstEligibleModule = eligibleModules[0];
+  const lastEligibleModule = eligibleModules.at(-1);
+  const minimumSpacingModules = turretLayout.minimumSpacingRows / source.moduleRows;
+  const moduleSequencesByDifficulty = new Map();
+  const cannonModuleIndicesByDifficulty = new Map();
+  const layoutSeedsByDifficulty = new Map();
+  const moduleSequences = new Map();
+  for (const side of SIDES) {
+    const sequences = new Map();
+    const indicesByDifficulty = new Map();
+    const seeds = new Map();
+    // Each owner starts an independent domain of the Director LCG. Neither
+    // owner's positions or terminal RNG state feed the other owner.
+    const ownerSeed = layoutSeed ^ (side === "allied" ? 0x2e : 0xfc);
+    const hardModules = generateTurretModuleIndices({
+      firstModule: firstEligibleModule,
+      lastModule: lastEligibleModule,
+      count: expectedTurretCounts.hard,
+      minimumSpacingModules,
+      maximumGapModules: turretLayout.maximumGapRows.hard / source.moduleRows,
+      seed: ownerSeed,
+    });
+    const mediumCandidates = validTurretSubsets(
+      hardModules,
+      [hardModules[0], hardModules.at(-1)],
+      expectedTurretCounts.medium,
+      turretLayout.maximumGapRows.medium / source.moduleRows,
+    );
+    const nestedLayouts = mediumCandidates.flatMap((mediumModules) =>
+      validTurretSubsets(
+        mediumModules,
+        [hardModules[0], hardModules.at(-1)],
+        expectedTurretCounts.easy,
+        turretLayout.maximumGapRows.easy / source.moduleRows,
+      ).map((easyModules) => ({ easyModules, mediumModules })));
+    invariant(nestedLayouts.length > 0,
+      `${side} has no nested EASY/MEDIUM/HARD turret layout satisfying every gap bound`);
+    const selectedLayouts = nestedLayouts[nextDirectorLayoutRng(ownerSeed) % nestedLayouts.length];
+    const { easyModules, mediumModules } = selectedLayouts;
+    const layouts = new Map([
+      ["easy", easyModules], ["medium", mediumModules], ["hard", hardModules],
+    ]);
+    for (const difficulty of DIFFICULTIES) {
+      const moduleIndices = layouts.get(difficulty);
+      const sequence = Uint8Array.from(baseModuleSequences.get(side));
+      for (const moduleIndex of moduleIndices) sequence[moduleIndex] = turretModuleIds.get(side);
+      sequences.set(difficulty, sequence);
+      indicesByDifficulty.set(difficulty, moduleIndices);
+      seeds.set(difficulty, layoutSeed);
+    }
+    const encodedSequence = Uint8Array.from(baseModuleSequences.get(side));
+    for (const moduleIndex of hardModules) encodedSequence[moduleIndex] =
+      (encodedSequence[moduleIndex] & 0x0f) | 0x40;
+    for (const moduleIndex of mediumModules) encodedSequence[moduleIndex] =
+      (encodedSequence[moduleIndex] & 0x0f) | 0x80;
+    for (const moduleIndex of easyModules) encodedSequence[moduleIndex] =
+      (encodedSequence[moduleIndex] & 0x0f) | 0xc0;
+    moduleSequences.set(side, encodedSequence);
+    moduleSequencesByDifficulty.set(side, sequences);
+    cannonModuleIndicesByDifficulty.set(side, indicesByDifficulty);
+    layoutSeedsByDifficulty.set(side, seeds);
   }
 
   const prowSection = sections.find(({ id }) => id === "prow");
@@ -381,79 +573,105 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
 
   const sectionForRow = (row) => sections.find((section) =>
     row >= section.start && row < section.end);
-  const sourceRowFor = (side, sectorRow) => {
+  const sourceRowFor = (side, sectorRow, difficulty = "hard") => {
     if (!Number.isInteger(sectorRow) || sectorRow < 0 || sectorRow >= sectionStart) return null;
     const moduleIndex = Math.floor(sectorRow / source.moduleRows);
     const localRow = sectorRow % source.moduleRows;
-    const moduleId = moduleSequences.get(side)[moduleIndex];
+    const moduleId = moduleSequencesByDifficulty.get(side).get(difficulty)[moduleIndex];
     return moduleSourceRowsBySide.get(side)[moduleId * source.moduleRows + localRow];
   };
-  const moduleIdFor = (side, sectorRow) => {
+  const moduleIdFor = (side, sectorRow, difficulty = "hard") => {
     if (!Number.isInteger(sectorRow) || sectorRow < 0 || sectorRow >= sectionStart) return null;
-    return moduleSequences.get(side)[Math.floor(sectorRow / source.moduleRows)];
+    return moduleSequencesByDifficulty.get(side).get(difficulty)
+      [Math.floor(sectorRow / source.moduleRows)];
   };
+  const sectorRowsByDifficulty = new Map();
+  const sectorScreenRowsByDifficulty = new Map();
+  const cannonRowsByDifficulty = new Map();
   const sectorRowsBySide = new Map();
   const sectorDepthsBySide = new Map();
   const sectorScreenRowsBySide = new Map();
   const cannonRowsBySide = new Map();
   for (const side of SIDES) {
-    const rows = [];
-    const depths = [];
-    const screenRows = [];
-    const cannonRows = [];
-    for (let sectorRow = 0; sectorRow < sectionStart; sectorRow += 1) {
-      const sourceRow = sourceRowFor(side, sectorRow);
-      const row = [...rowsBySide.get(side)[sourceRow]];
-      const moduleId = moduleIdFor(side, sectorRow);
-      if (moduleId === engineModuleIds.get(side)) {
-        const mask = engineOverlayMasks.get(side)[sectorRow % source.moduleRows];
-        for (let baseColumn = 0; baseColumn < 8; baseColumn += 1) {
-          if (!(mask & (1 << baseColumn))) continue;
-          const mapColumn = side === "allied" ? baseColumn : baseColumn + 1;
-          invariant(row[mapColumn] !== "space",
-            `${side} engine energy cannot create collision in an empty hull cell`);
-          row[mapColumn] = engineGlyphs.get(side).name;
-        }
-      }
-      const section = sectionForRow(sectorRow);
-      if (section.id === "prow") {
-        const mask = prowOccupancyMasks.get(side)[sectorRow - prowSection.start];
-        const fillName = prowFillGlyphs.get(side).name;
-        for (let baseColumn = 0; baseColumn < BASE_HULL_COLUMNS; baseColumn += 1) {
-          const mapColumn = side === "allied" ? baseColumn : baseColumn + 1;
-          if (!(mask & (1 << baseColumn))) {
-            row[mapColumn] = "space";
-          } else if (row[mapColumn] === "space") {
-            row[mapColumn] = fillName;
+    const rowsByDifficulty = new Map();
+    const screenRowsByDifficulty = new Map();
+    const cannonsByDifficulty = new Map();
+    for (const difficulty of DIFFICULTIES) {
+      const rows = [];
+      const depths = [];
+      const screenRows = [];
+      const cannonRows = [];
+      for (let sectorRow = 0; sectorRow < sectionStart; sectorRow += 1) {
+        const sourceRow = sourceRowFor(side, sectorRow, difficulty);
+        const row = [...rowsBySide.get(side)[sourceRow]];
+        const moduleId = moduleIdFor(side, sectorRow, difficulty);
+        if (moduleId === engineModuleIds.get(side)) {
+          const mask = engineOverlayMasks.get(side)[sectorRow % source.moduleRows];
+          for (let baseColumn = 0; baseColumn < 8; baseColumn += 1) {
+            if (!(mask & (1 << baseColumn))) continue;
+            const mapColumn = side === "allied" ? baseColumn : baseColumn + 1;
+            invariant(row[mapColumn] !== "space",
+              `${side} engine energy cannot create collision in an empty hull cell`);
+            row[mapColumn] = engineGlyphs.get(side).name;
           }
         }
-        const occupiedColumns = Array.from({ length: BASE_HULL_COLUMNS }, (_, column) => column)
-          .filter((column) => mask & (1 << column));
-        const edgeColumn = side === "allied"
-          ? Math.max(...occupiedColumns)
-          : Math.min(...occupiedColumns);
-        row[side === "allied" ? edgeColumn : edgeColumn + 1] = prowEdgeGlyphs.get(side).name;
+        const section = sectionForRow(sectorRow);
+        if (section.id === "prow") {
+          const mask = prowOccupancyMasks.get(side)[sectorRow - prowSection.start];
+          const fillName = prowFillGlyphs.get(side).name;
+          for (let baseColumn = 0; baseColumn < BASE_HULL_COLUMNS; baseColumn += 1) {
+            const mapColumn = side === "allied" ? baseColumn : baseColumn + 1;
+            if (!(mask & (1 << baseColumn))) {
+              row[mapColumn] = "space";
+            } else if (row[mapColumn] === "space") {
+              row[mapColumn] = fillName;
+            }
+          }
+          const occupiedColumns = Array.from({ length: BASE_HULL_COLUMNS }, (_, column) => column)
+            .filter((column) => mask & (1 << column));
+          const edgeColumn = side === "allied"
+            ? Math.max(...occupiedColumns)
+            : Math.min(...occupiedColumns);
+          row[side === "allied" ? edgeColumn : edgeColumn + 1] = prowEdgeGlyphs.get(side).name;
+        }
+        const hasProjection = projectionGlyph(side, row) !== "space";
+        if (hasProjection) {
+          const eligibleEnd = section.end - section.weaponShutdownRows;
+          invariant(section.weaponEligible && sectorRow < eligibleEnd,
+            `${side} sector row ${sectorRow} creates a cannon outside its eligible hull span`);
+          cannonRows.push(sectorRow);
+        }
+        const depth = derivedInnerDepth(side, row);
+        rows.push(row);
+        depths.push(depth);
+        screenRows.push(row.map((name) => screenCodes.get(name)));
       }
-      const hasProjection = projectionGlyph(side, row) !== "space";
-      if (hasProjection) {
-        const eligibleEnd = section.end - section.weaponShutdownRows;
-        invariant(section.weaponEligible && sectorRow < eligibleEnd,
-          `${side} sector row ${sectorRow} creates a cannon outside its eligible combat span`);
-        cannonRows.push(sectorRow);
-      }
-      const depth = derivedInnerDepth(side, row);
-      rows.push(row);
-      depths.push(depth);
-      screenRows.push(row.map((name) => screenCodes.get(name)));
+      invariant(cannonRows.length === expectedTurretCounts[difficulty],
+        `${side}/${difficulty} hull must expose exactly ${expectedTurretCounts[difficulty]} cannons`);
+      invariant(cannonRows[0] - sections[0].end <= 1,
+        `${side}/${difficulty} first cannon is too far behind the engine section`);
+      invariant(cannonRows.every((row, index) => index === 0 ||
+        row - cannonRows[index - 1] >= turretLayout.minimumSpacingRows),
+      `${side}/${difficulty} cannon spacing is unsafe`);
+      invariant(cannonRows.every((row, index) => index === 0 ||
+        row - cannonRows[index - 1] <= turretLayout.maximumGapRows[difficulty]),
+      `${side}/${difficulty} cannon layout contains an excessive gap`);
+      const muzzleCode = screenCodes.get([...glyphs.values()].find((glyph) =>
+        glyph.faction === side && glyph.tags.includes("muzzle")).name);
+      invariant(screenRows.flat().filter((code) => code ===
+        muzzleCode).length === cannonRows.length,
+      `${side}/${difficulty} runtime geometry must contain one muzzle per station`);
+      rowsByDifficulty.set(difficulty, rows);
+      screenRowsByDifficulty.set(difficulty, screenRows);
+      cannonsByDifficulty.set(difficulty, cannonRows);
+      if (difficulty === "hard") sectorDepthsBySide.set(side, depths);
     }
-    invariant(cannonRows.length === 4,
-      `${side} combat section must retain four reduced-density cannon instances`);
-    invariant(cannonRows.every((row, index) => index === 0 || row - cannonRows[index - 1] >= 32),
-      `${side} cannon instances must remain at least 32 rows apart`);
-    sectorRowsBySide.set(side, rows);
-    sectorDepthsBySide.set(side, depths);
-    sectorScreenRowsBySide.set(side, screenRows);
-    cannonRowsBySide.set(side, cannonRows);
+    sectorRowsByDifficulty.set(side, rowsByDifficulty);
+    sectorScreenRowsByDifficulty.set(side, screenRowsByDifficulty);
+    cannonRowsByDifficulty.set(side, cannonsByDifficulty);
+    sectorRowsBySide.set(side, rowsByDifficulty.get("hard"));
+    sectorScreenRowsBySide.set(side, screenRowsByDifficulty.get("hard"));
+    cannonRowsBySide.set(side, cannonsByDifficulty.get("hard"));
   }
 
   const streamRows = sectionStart + source.sidePhaseRows;
@@ -476,6 +694,8 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
 
   return {
     moduleRows: source.moduleRows,
+    baselineSectorRows: source.baselineSectorRows,
+    lengthMultiplier: source.lengthMultiplier,
     sidePhaseRows: source.sidePhaseRows,
     visibleRows: source.visibleRows,
     previewSectorRow: source.previewSectorRow,
@@ -488,6 +708,15 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
     moduleIdsBySide,
     moduleSourceRowsBySide,
     moduleSequences,
+    moduleSequencesByDifficulty,
+    cannonModuleIndicesByDifficulty,
+    turretModuleIds,
+    layoutSeed,
+    layoutSeedsByDifficulty,
+    minimumTurretSpacingRows: turretLayout.minimumSpacingRows,
+    maximumTurretGapRows: Object.freeze({ ...turretLayout.maximumGapRows }),
+    firstEligibleRow: firstEligibleModule * source.moduleRows,
+    lastEligibleRow: (lastEligibleModule + 1) * source.moduleRows - 1,
     engineModuleIds,
     engineOverlayMasks,
     engineGlyphs,
@@ -499,12 +728,17 @@ function compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes
     sectorDepthsBySide,
     sectorScreenRowsBySide,
     cannonRowsBySide,
+    cannonRowsByDifficulty,
+    sectorRowsByDifficulty,
+    sectorScreenRowsByDifficulty,
+    turretCounts: Object.freeze({ ...expectedTurretCounts }),
+    disabledTurretModuleIds,
     sourceRowFor,
     moduleIdFor,
   };
 }
 
-export function compileCapitalHulls(definition) {
+export function compileCapitalHulls(definition, options = {}) {
   invariant(definition?.formatVersion === 1, "Unsupported capital-hulls formatVersion");
   invariant(definition.displayMode === "ANTIC 4", "Capital hulls must use ANTIC 4");
   invariant(Number.isInteger(definition.charsetBaseIndex) && definition.charsetBaseIndex >= 0,
@@ -675,7 +909,7 @@ export function compileCapitalHulls(definition) {
       `Row ${rowIndex} leaves fewer than 22 free central cells`);
   }
 
-  const sector = compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes);
+  const sector = compileSector(definition, rowsBySide, depthsBySide, glyphs, screenCodes, options);
 
   const codebooks = new Map();
   const packedMaps = new Map();
@@ -1043,6 +1277,10 @@ export function renderCapitalHullsCa65Include(asset) {
     `CAPITAL_HULL_PACKED_ROW_BYTES = ${asset.packedRowBytes}`,
     `CAPITAL_HULL_PACKED_SIDE_BYTES = ${asset.packedMaps.get("allied").length}`,
     `CAPITAL_HULL_TURRET_COUNT = ${asset.turrets.length}`,
+    `CAPITAL_HULL_CANNON_COUNT = ${asset.sector.turretCounts.hard}`,
+    `CAPITAL_HULL_CANNON_COUNT_EASY = ${asset.sector.turretCounts.easy}`,
+    `CAPITAL_HULL_CANNON_COUNT_MEDIUM = ${asset.sector.turretCounts.medium}`,
+    `CAPITAL_HULL_CANNON_COUNT_HARD = ${asset.sector.turretCounts.hard}`,
     `CAPITAL_HULL_SECTOR_MODULE_ROWS = ${asset.sector.moduleRows}`,
     `CAPITAL_HULL_SECTOR_MODULE_COUNT = ${asset.sector.moduleSequences.get("allied").length}`,
     `CAPITAL_HULL_SECTOR_ROWS = ${asset.sector.totalRows}`,
@@ -1067,6 +1305,9 @@ export function renderCapitalHullsCa65Include(asset) {
     `CAPITAL_HULL_ENEMY_FLASH_CODE = ${byteHex(enemyFlash.screenCode)}`,
     `CAPITAL_HULL_ALLIED_MUZZLE_CODE = ${byteHex(alliedTurret.muzzleScreenCode)}`,
     `CAPITAL_HULL_ENEMY_MUZZLE_CODE = ${byteHex(enemyTurret.muzzleScreenCode)}`,
+    `CAPITAL_HULL_TURRET_LAYOUT_SEED = ${byteHex(asset.sector.layoutSeed)}`,
+    `CAPITAL_HULL_ALLIED_TURRET_MODULE = ${asset.sector.turretModuleIds.get("allied")}`,
+    `CAPITAL_HULL_ENEMY_TURRET_MODULE = ${asset.sector.turretModuleIds.get("enemy")}`,
     `CAPITAL_HULL_SECTION_ENGINES_END = ${sectionById.get("engines").end}`,
     `CAPITAL_HULL_SECTION_AFT_END = ${sectionById.get("aft").end}`,
     `CAPITAL_HULL_SECTION_COMBAT_END = ${sectionById.get("combat").end}`,

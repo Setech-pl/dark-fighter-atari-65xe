@@ -3,7 +3,7 @@ import { packBroadsideLzss, unpackBroadsideLzss } from "./broadside-lzss.mjs";
 
 const BITMAP_WIDTH = 320;
 const BITMAP_HEIGHT = 192;
-export const LOADER_DISPLAY_LIST_ADDRESS = 0x3800;
+export const LOADER_DISPLAY_LIST_ADDRESS = 0x3c00;
 const BITMAP_BYTES_PER_ROW = 40;
 const BITMAP_BYTES = BITMAP_BYTES_PER_ROW * BITMAP_HEIGHT;
 const COLOR_REGISTERS = ["COLBK", "COLPF1", "COLPF2"];

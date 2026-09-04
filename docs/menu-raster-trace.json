@@ -1,0 +1,3553 @@
+{
+  "emulator": "Atari800 7.1.2 PAL/XL",
+  "guest_instrumentation_bytes": 0,
+  "cold_ram_range": "$8000-$9FFF",
+  "cold_ram_fills": [
+    0,
+    165,
+    90,
+    255
+  ],
+  "input": "production FIRE and OPTION/joystick pause-quit path",
+  "menu_generations_per_session": 4,
+  "gameplay_to_menu_transitions_per_session": 3,
+  "minimum_stable_menu_frames": 500,
+  "expected": {
+    "screen": "$4000-$43FF generated main-menu state",
+    "charset": "$4800-$4BFF generated frontend charset",
+    "display_list": "$9400",
+    "canonical_raster_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04",
+    "screen_sha256": "6cee41783e1f6519ca7ebe617670b7aeaf9c1ab3d1180ee8661086bab9733152",
+    "charset_sha256": "3da52d8d1f360a24f246b0363fc5817f7b8de2f36caafba40da0de5922351f9d",
+    "display_list_sha256": "64a08acb2e68e4fb61c2626ea4f9cb9eba668162358c4262d7a19f0f156f3eec"
+  },
+  "memory_audit": {
+    "boot_stage_streams": [
+      {
+        "source": 18278,
+        "destination": 32534,
+        "bytes": 255
+      },
+      {
+        "source": 18533,
+        "destination": 21320,
+        "bytes": 2543
+      },
+      {
+        "source": 35968,
+        "destination": 18433,
+        "bytes": 888
+      },
+      {
+        "source": 9832,
+        "destination": 33024,
+        "bytes": 6653
+      },
+      {
+        "source": 16485,
+        "destination": 30736,
+        "bytes": 1793
+      }
+    ],
+    "dfmc_records": [
+      {
+        "start_sector": 102,
+        "sectors": 45,
+        "packed_bytes": 5639,
+        "raw_bytes": 6643,
+        "destination": 24080,
+        "staging_id": 1
+      },
+      {
+        "start_sector": 147,
+        "sectors": 8,
+        "packed_bytes": 888,
+        "raw_bytes": 888,
+        "destination": 35968,
+        "staging_id": 2
+      },
+      {
+        "start_sector": 155,
+        "sectors": 2,
+        "packed_bytes": 229,
+        "raw_bytes": 234,
+        "destination": 21081,
+        "staging_id": 2
+      },
+      {
+        "start_sector": 157,
+        "sectors": 5,
+        "packed_bytes": 585,
+        "raw_bytes": 645,
+        "destination": 40309,
+        "staging_id": 2
+      }
+    ],
+    "ranges": {
+      "frontend_screen": {
+        "start": 16384,
+        "end_exclusive": 17408
+      },
+      "gameplay_charset": {
+        "start": 17408,
+        "end_exclusive": 18432
+      },
+      "frontend_charset": {
+        "start": 18432,
+        "end_exclusive": 19456
+      },
+      "glue_transport": {
+        "start": 21081,
+        "end_exclusive": 21315
+      },
+      "glue_final": {
+        "start": 20222,
+        "end_exclusive": 20456
+      },
+      "broadside": {
+        "start": 24080,
+        "end_exclusive": 30723
+      },
+      "post_loader_workspace": {
+        "start": 30736,
+        "end_exclusive": 32768
+      },
+      "glue_holding": {
+        "start": 32534,
+        "end_exclusive": 32768
+      },
+      "entity_state_bss": {
+        "start": 32768,
+        "end_exclusive": 33024
+      },
+      "pickup_phase_bank": {
+        "start": 34816,
+        "end_exclusive": 35968
+      },
+      "pickup_code": {
+        "start": 35968,
+        "end_exclusive": 36449
+      },
+      "a2_runtime": {
+        "start": 36864,
+        "end_exclusive": 37119
+      },
+      "entity_code": {
+        "start": 37120,
+        "end_exclusive": 40232
+      },
+      "main_menu_display_list": {
+        "start": 37888,
+        "end_exclusive": 37939
+      },
+      "director": {
+        "start": 40309,
+        "end_exclusive": 40954
+      }
+    },
+    "entity_packed_source": {
+      "start": 18533,
+      "end_exclusive": 21076,
+      "staged_start": 21320,
+      "staged_end_exclusive": 23863,
+      "source_to_staging_margin_bytes": 244,
+      "staging_to_broadside_margin_bytes": 217,
+      "released_before_starfield_expansion": true
+    },
+    "staged_source_lifetimes": [
+      {
+        "name": "A2 initial source",
+        "start": 18278,
+        "end_exclusive": 18533,
+        "last_read": 1
+      },
+      {
+        "name": "packed ENTITY_CODE",
+        "start": 18533,
+        "end_exclusive": 21076,
+        "last_read": 2
+      },
+      {
+        "name": "packed pickup",
+        "start": 35968,
+        "end_exclusive": 36856,
+        "last_read": 3
+      },
+      {
+        "name": "packed resident suffix",
+        "start": 9832,
+        "end_exclusive": 16485,
+        "last_read": 4
+      },
+      {
+        "name": "packed starfield",
+        "start": 16485,
+        "end_exclusive": 18278,
+        "last_read": 5
+      }
+    ],
+    "glyph_126_127": {
+      "gameplay_charset_addresses": [
+        18416,
+        18431
+      ],
+      "frontend_charset_addresses": [
+        19440,
+        19455
+      ],
+      "frontend_max_used_glyph": 63,
+      "separate_charsets": true,
+      "frontend_full_charset_restored": true
+    },
+    "live_source_overwrites": [],
+    "no_live_source_overwrite": true,
+    "passed": true
+  },
+  "sessions": [
+    {
+      "id": "xex-00",
+      "medium": "XEX",
+      "cold_ram_fill": 0,
+      "artifact": {
+        "path": "dist/dark-fighter.xex",
+        "bytes": 21366,
+        "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/xex-00.json",
+      "first_complete_menu_frame": 381,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 381,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 398,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 878,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 950,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 967,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1039,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1056,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1128,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1145,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1625,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-00-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "xex-a5",
+      "medium": "XEX",
+      "cold_ram_fill": 165,
+      "artifact": {
+        "path": "dist/dark-fighter.xex",
+        "bytes": 21366,
+        "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/xex-a5.json",
+      "first_complete_menu_frame": 381,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 381,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 398,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 878,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 950,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 967,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1039,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1056,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1128,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1145,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1625,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-a5-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "xex-5a",
+      "medium": "XEX",
+      "cold_ram_fill": 90,
+      "artifact": {
+        "path": "dist/dark-fighter.xex",
+        "bytes": 21366,
+        "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/xex-5a.json",
+      "first_complete_menu_frame": 381,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 381,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 398,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 878,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 950,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 967,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1039,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1056,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1128,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1145,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1625,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-5a-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "xex-ff",
+      "medium": "XEX",
+      "cold_ram_fill": 255,
+      "artifact": {
+        "path": "dist/dark-fighter.xex",
+        "bytes": 21366,
+        "sha256": "6ae79dd43f585cfcf694c7328c1fbac4c9513bbd0b48220f73394fd212a71aa0"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/xex-ff.json",
+      "first_complete_menu_frame": 381,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 381,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 398,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 878,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 950,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 967,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1039,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1056,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1128,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1145,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1625,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/xex-ff-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "atr-00",
+      "medium": "ATR",
+      "cold_ram_fill": 0,
+      "artifact": {
+        "path": "dist/dark-fighter.atr",
+        "bytes": 92176,
+        "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/atr-00.json",
+      "first_complete_menu_frame": 505,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 505,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 522,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 1002,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 1074,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 1091,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1163,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1180,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1252,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1269,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1749,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-00-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "atr-a5",
+      "medium": "ATR",
+      "cold_ram_fill": 165,
+      "artifact": {
+        "path": "dist/dark-fighter.atr",
+        "bytes": 92176,
+        "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/atr-a5.json",
+      "first_complete_menu_frame": 505,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 505,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 522,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 1002,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 1074,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 1091,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1163,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1180,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1252,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1269,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1749,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-a5-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "atr-5a",
+      "medium": "ATR",
+      "cold_ram_fill": 90,
+      "artifact": {
+        "path": "dist/dark-fighter.atr",
+        "bytes": 92176,
+        "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/atr-5a.json",
+      "first_complete_menu_frame": 505,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 505,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 522,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 1002,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 1074,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 1091,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1163,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1180,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1252,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1269,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1749,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-5a-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "atr-ff",
+      "medium": "ATR",
+      "cold_ram_fill": 255,
+      "artifact": {
+        "path": "dist/dark-fighter.atr",
+        "bytes": 92176,
+        "sha256": "d6379ea57d87b81920f767088fdece368b65c3469170764e136599fae0f2d67c"
+      },
+      "raw_trace": "build/runtime-wall-trace/menu-raster/atr-ff.json",
+      "first_complete_menu_frame": 505,
+      "transitions_completed": 3,
+      "pause_entries": 3,
+      "pause_latch_failures": 0,
+      "checks": [
+        {
+          "generation": 0,
+          "menu_age": 3,
+          "host_frame": 505,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu0-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 20,
+          "host_frame": 522,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu0-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 0,
+          "menu_age": 500,
+          "host_frame": 1002,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu0-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 3,
+          "host_frame": 1074,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu1-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 1,
+          "menu_age": 20,
+          "host_frame": 1091,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu1-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 3,
+          "host_frame": 1163,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu2-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 2,
+          "menu_age": 20,
+          "host_frame": 1180,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu2-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 3,
+          "host_frame": 1252,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu3-age003.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 20,
+          "host_frame": 1269,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu3-age020.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        },
+        {
+          "generation": 3,
+          "menu_age": 500,
+          "host_frame": 1749,
+          "screen_difference": -1,
+          "charset_difference": -1,
+          "display_list_difference": -1,
+          "registers": {
+            "sdlst": 37888,
+            "chbase": 18432,
+            "dmactl": 34,
+            "gractl": 0,
+            "prior": 0,
+            "vscroll": 0,
+            "hscroll": 0,
+            "nmien": 128,
+            "vdslst": 9175,
+            "colpf": [
+              14,
+              30,
+              132,
+              216
+            ],
+            "colbk": 0,
+            "grafp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "grafm": 0
+          },
+          "pmg_nonzero": 0,
+          "brightest_run": {
+            "horizontal": 14,
+            "vertical": 11
+          },
+          "screenshot": "build/runtime-wall-trace/menu-raster/atr-ff-menu3-age500.png",
+          "screenshot_sha256": "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "passed": true
+}

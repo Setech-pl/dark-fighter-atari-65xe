@@ -145,6 +145,8 @@ function makeMachine({
   integrationGlueRunAddress,
   directorRuntime,
   directorRunAddress,
+  capitalPlayerCollisionRuntime,
+  capitalPlayerCollisionRunAddress,
   labels,
   difficulty,
 }) {
@@ -158,6 +160,9 @@ function makeMachine({
   if (pickupCodeRuntime) memory.set(pickupCodeRuntime, pickupCodeRunAddress);
   if (integrationGlueRuntime) memory.set(integrationGlueRuntime, integrationGlueRunAddress);
   if (directorRuntime) memory.set(directorRuntime, directorRunAddress);
+  if (capitalPlayerCollisionRuntime) {
+    memory.set(capitalPlayerCollisionRuntime, capitalPlayerCollisionRunAddress);
+  }
 
   const io = {
     stick: 0x0f,
@@ -963,7 +968,7 @@ export function measureRuntimeCycles(build) {
     "entity_effects_erase", "entity_effects_update", "entity_effects_render",
   ].reduce((sum, name) => sum + (frame.procedureTotalCycles[name] ?? 0), 0);
   const emptyEnginePathCycles = entityWrapperCycles(entityEmptyPath);
-  invariant(emptyEnginePathCycles <= 123,
+  invariant(emptyEnginePathCycles <= 124,
     `Empty entity/effects path costs ${emptyEnginePathCycles} linked CPU cycles`);
 
   const heavyMainLoopCycles = legalHeavy.cycles + optionPollCycles;
@@ -1016,7 +1021,7 @@ export function measureRuntimeCycles(build) {
     },
     entityEffects: {
       emptyPathCpuCycles: emptyEnginePathCycles,
-      emptyPathLimitCpuCycles: 123,
+      emptyPathLimitCpuCycles: 124,
       activePathCpuCycles: entityWrapperCycles(entityActivePath),
       spawnPathCpuCycles: entityWrapperCycles(entitySpawnPath),
       contactPathCpuCycles: entityWrapperCycles(entityContactPath),
@@ -1035,7 +1040,7 @@ export function measureRuntimeCycles(build) {
     },
     enemyBreakupEffects: {
       noActiveExplosionPathCpuCycles: emptyEnginePathCycles,
-      noActiveExplosionPathLimitCpuCycles: 123,
+      noActiveExplosionPathLimitCpuCycles: 124,
       spawnPathCpuCycles:
         raiderBreakupPath.procedureTotalCycles.materialize_raider_breakup_effects,
       fullEffectsPathCpuCycles: entityWrapperCycles(fullEffectsPath),

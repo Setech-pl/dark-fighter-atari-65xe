@@ -28,20 +28,26 @@ read, CRC16-CCITT checked, and only then copied or decompressed to its manifest-
 controlled destination. Any failure blanks DMA, selects a fixed red error
 background, and halts before partially loaded code can execute.
 
-The four ordered DFMC records are BROADSIDE in sectors 102-145, the packed
-pickup phase/code stream in sectors 146-152, 39-byte integration glue in sector
-153, and the Encounter Director in sectors 154-158. ATR stages each record at
-`$8100`; BROADSIDE expands 6,557 bytes to `$5E10-$77AC`, the pickup stream is
-published temporarily at `$8C80`, glue expands first to `$5259-$527F`, and the
-645-byte Director expands to `$9D75-$9FF9`. The last BROADSIDE source read makes `$8100` reusable;
+The four ordered DFMC records are BROADSIDE in sectors 102-146, the packed
+pickup phase/code/collision stream in sectors 147-154, 234-byte integration glue
+in sectors 155-156, and the Encounter Director in sectors 157-161. ATR stages
+each record at `$8100`; BROADSIDE expands 6,643 bytes to `$5E10-$7802`, the
+915-byte pickup stream is published temporarily at `$8C80-$9012`, and glue
+expands to `$5261-$534A`. Packed ENTITY_CODE stages at `$534B-$5D39`, directly
+after glue. Startup holds glue at `$7F16-$7FFF` after publishing
+the A2 kernel, then copies it to `$4EFE-$4FE7`; the 645-byte Director expands to
+`$9D75-$9FF9`. The last BROADSIDE source read makes `$8100` reusable;
 only then does startup copy the packed resident suffix and stage it at
 `$8100-$9A53`. The 7,743-byte suffix is stored as a 6,584-byte LZ-10/5 stream
 and restores `$21C1-$3FFF`, overwriting all stage-2 code and its maximum
-eight-record manifest. No loader byte remains resident or enters gameplay.
+eight-record manifest. The pickup stream is preserved at `$4801-$4B93` before
+its cold source overlaps the future A2 range, then expands atomically to
+`$8800-$8E7B`; the final 27 bytes are the capital/player collision module.
+No loader byte remains resident or enters gameplay.
 
 The manifest uses 16-bit sector numbers, supports eight sequential chunks, and
-accepts RAW or LZ records. The current initial block and four records use 158
-sectors (20,224 B). The ATR itself has 562 unused sectors (71,936 B); runtime
+accepts RAW or LZ records. The current initial block and four records use 161
+sectors (20,608 B). The ATR itself has 559 unused sectors (71,552 B); runtime
 residency remains a separate constraint.
 
 ### DFMC v1 byte format
@@ -62,20 +68,21 @@ Each 16-byte record stores, in order: 16-bit start sector, 16-bit sector count,
 16-bit packed length, 16-bit raw length, 16-bit final destination, 16-bit CRC of
 the complete sector image, one-byte type (`0=RAW`, `1=LZ`), one-byte controlled
 staging identifier, and a 16-bit staging address. All words are little-endian.
-Production records begin at sectors 102, 146, 153, and 154. Their packed/raw
-lengths are respectively 5,581/6,557 B, 873/873 B, 41/39 B, and 585/645 B.
+Production records begin at sectors 102, 147, 155, and 157. Their packed/raw
+lengths are respectively 5,641/6,643 B, 915/915 B, 229/234 B, and 585/645 B.
 The second record carries the compressed immutable pickup phase bank plus its
-late compositor. Its cold copy at `$8C80-$8FE8` is first preserved at
-`$4801-$4B69`, then decompressed to `$8800-$8E49`; source and destination never
-overlap while live. Glue is transported to `$5259`, held at `$7F16-$7F3C` while
-ENTITY_CODE is unpacked, and late-published to `$4EFE-$4F24`. The Director ends
+late compositor and the 27-byte collision module. Its cold copy at
+`$8C80-$9012` is first preserved at `$4801-$4B93`, then decompressed to
+`$8800-$8E7B`; source and destination never overlap while live. Glue is
+transported to `$5261`, held at `$7F16-$7FFF` while ENTITY_CODE is unpacked,
+and late-published to `$4EFE-$4FE7`. The Director ends
 at `$9FF9`; `$9FFA-$9FFF` is a six-byte untouched guard.
 
 The loader bitmap source is declarative. The build rasterizes 7,680 bytes for a
 mixed ANTIC F/E screen and packs them to **1,997 bytes**. It expands to
 `$4010-$5E0F`; a second LMS at `$5000` prevents a 4 KiB ANTIC boundary crossing.
 A separate 35-byte stream expands the 202-byte loader display list to
-`$3800-$38C9` only after the overlapping bitmap source has been consumed.
+`$3C00-$3CC9` only after the overlapping bitmap source has been consumed.
 
 PMG DMA is disabled during the loader. Two DLIs select the title, ship, and
 footer palette zones. The loader remains visible for 250 complete PAL frames
@@ -121,6 +128,9 @@ rows use ANTIC 6, structural rows use ANTIC 4, and the two small control hints
 use ANTIC 2. Main Menu and Options each have one DLI to select the monochrome
 hint palette; TOP SCORES and Game Over use no DLI. The menu Viper is a 3x2
 ANTIC 4 character figure in glyphs 58-63, so frontend PMG remains disabled.
+Frontend entry also clears the five GTIA graphics latches `GRAFP0-3/GRAFM`
+while DMA is blanked. Disabling PMG DMA alone does not clear the last fetched
+graphics byte, which would otherwise repeat vertically through the menu.
 
 New Game performs a bounded state reset. Life loss resets life-scoped combat
 state, while a live sector transition preserves session-scoped score and
@@ -158,6 +168,14 @@ at one physical cadence through the entire capital exit.
 Capital hulls are two independent 32x9 expanded maps assembled from engines,
 aft, combat, forward, and prow modules. The broadside system owns warnings,
 launch flashes, heavy projectiles, hull damage, and the sector lifecycle.
+The 480-row linear hull uses one seed-controlled layout per owner: EASY,
+MEDIUM, and HARD decode 8, 12, and 16 stations respectively from a compact
+two-bit threshold in each 60-byte module sequence. The first muzzle is one
+character row after the engine section; the remaining nested positions span
+the aft, combat, and forward sections with at least 24 rows of same-side
+separation. Colonial and Cylon positions start from independent domains of the
+Director's `5*x+1` byte LCG, generated at build time so gameplay does not
+consume or perturb the Director RNG stream.
 Engine pixels have two phases, `dim` and `bright`, held for eight active frames
 each. Phase changes update source glyph rows atomically before a recycled base
 row is published.
@@ -172,12 +190,24 @@ never enter ring backing.
 
 BROADSIDE shell contact is owner-independent: Colonial/BSG and Cylon fire both
 enter one collision dispatcher. Owner selects travel direction and spatial
-ordering only. The dispatcher sweeps the two character-aligned shell positions
-actually used by the renderer against the complete 16-HPOS double-width Viper
-envelope, then consumes a hit through the existing impact and canonical
-two-unit player-damage path. Collision runs after shell update and before the
-late shell render; the 25-frame cooldown and per-frame latch prevent repeat
-damage while the impact lifecycle releases the projectile normally.
+ordering only. One inclusive swept-AABB test compares the previous/current
+character-aligned 8x6 bolt envelope with the complete 16x15 gameplay rectangle
+of the Viper. Transparent PMG corners and internal gaps deliberately remain
+solid gameplay contact; exactly one HPOS or scanline outside either rectangle
+remains a miss. Collision runs after shell update and before the late shell
+render; a hit enters the existing IMPACT and canonical two-unit damage path.
+The 25-frame cooldown and per-frame latch prevent repeat damage while the
+correct slot releases normally.
+
+Flying capital shells are a three-entry painter's stack. Each slot draws one
+continuous 8x6 bolt from dedicated left/right glyph halves 126-127. The late
+renderer draws slots `0 -> 2`; the next frame restores their exact cached
+physical footprints in the inverse order `2 -> 0` before movement or state
+transitions. Opposite-owner shells deliberately have no mutual gameplay
+collision: a shared cell uses the deterministic painter order, both slots stay
+FLYING, and reverse erase exposes both intact trajectories after separation.
+Only player, fighter, hull, offscreen, and lifecycle events may consume them;
+a ring-head wrap cannot preserve a transient shell code as backing.
 
 ## Gameplay layers and backing
 
@@ -322,7 +352,7 @@ phases 11-46, Spread Shot composite scratch 47-56, capital hulls 59-89,
 Raider/projectile phases 90-109, debris 110-117, and fragments 118-119. Glyphs
 120-125 are the single-owner dynamic pickup compositor bank; one of the three
 type-specific, eight-phase sources is copied there before the sole late draw.
-Glyphs 126-127 are free.
+Glyphs 126-127 are the dedicated connected left/right BROADSIDE bolt halves.
 
 The separate `$5000-$53FF` HUD charset keeps glyph 0 as the blank/separator,
 uses glyphs 5 and 12 for the two low HULL plate states, glyph 7 for weapon

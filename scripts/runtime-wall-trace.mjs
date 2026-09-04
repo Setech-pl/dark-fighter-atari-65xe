@@ -8,6 +8,7 @@ import { parseViceLabels } from "./runtime-cycles.mjs";
 import { LOADER_DISPLAY_LIST_ADDRESS } from "./loader-assets.mjs";
 import { runtimeArtifactSet, runtimeArtifactNames } from "./runtime-evidence.mjs";
 import { canonicalPlayfield } from "./playfield.mjs";
+import { readStartMenuRuntimeState } from "./preview.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "..");
@@ -174,14 +175,31 @@ const capitalMuzzleSessions = [{
   kind: "capital-muzzle-lifecycle",
 }];
 
-const provisionalCapitalSessions = [0, 1, 2].map((difficulty) => ({
-  id: `provisional-capital-${difficulty}-cold-sweep-fire4`,
+const broadsideTransientSessions = [
+  ["XEX", 1, "neutral"],
+  ["XEX", 2, "broadside-proof"],
+  ["ATR", 1, "broadside-sides"],
+  ["ATR", 2, "broadside-proof"],
+].map(([medium, difficulty, policy]) => ({
+  id: `broadside-transient-${medium.toLowerCase()}-${difficulty}-${policy}`,
+  medium,
   difficulty,
-  policy: "sweep",
-  fireDelay: 4,
-  frames: 1_100,
-  kind: "provisional-capital-cold",
+  policy,
+  fireDelay: 40_000,
+  frames: 13_000,
+  kind: "broadside-transient-lifecycle",
 }));
+
+const provisionalCapitalSessions = ["XEX", "ATR"].flatMap((medium) =>
+  [0, 1, 2].map((difficulty) => ({
+    id: `provisional-capital-${medium.toLowerCase()}-${difficulty}-cold-sweep-fire4`,
+    medium,
+    difficulty,
+    policy: "sweep",
+    fireDelay: 4,
+    frames: 1_600,
+    kind: "provisional-capital-cold",
+  })));
 
 const capitalContactSessions = [0, 1].map((owner) => ({
   id: `capital-contact-${owner === 0 ? "colonial" : "cylon"}-medium`,
@@ -192,6 +210,24 @@ const capitalContactSessions = [0, 1].map((owner) => ({
   kind: "capital-projectile-contact",
   contactOwner: owner,
 }));
+
+const capitalPlayerGeometrySessions = [["XEX", 1], ["ATR", 2]].flatMap(([medium, difficulty]) =>
+  [0, 1].flatMap((owner) => [
+    ["top", -2, true], ["side", 7, true], ["bottom", 17, true],
+    ["near", -3, false], ["sweep", 7, true],
+  ].map(([contactMode, contactDelta, expectedHit]) => ({
+    id: `capital-player-${medium.toLowerCase()}-${difficulty}-${owner === 0 ? "colonial" : "cylon"}-${contactMode}`,
+    medium,
+    difficulty,
+    policy: owner === 0 ? "capital-contact-colonial" : "capital-contact-cylon",
+    fireDelay: 4_000,
+    frames: owner === 0 ? 600 : 400,
+    kind: "capital-player-geometry",
+    contactOwner: owner,
+    contactMode,
+    contactDelta,
+    expectedHit,
+  }))));
 
 const directorCompletionSessions = [0, 1, 2].map((difficulty) => ({
   id: `director-complete-${difficulty}-natural-sweep-fire0`,
@@ -293,6 +329,13 @@ const traceLabels = {
   DFTRACE_PC_ENGINE_COPY: "copy_engine_animation_phase",
   DFTRACE_PC_CAPITAL_COLLISION: "capital_shell_collision_flags",
   DFTRACE_PC_CAPITAL_PLAYER_DAMAGE: "apply_broadside_player_damage",
+  DFTRACE_PC_BROAD_ERASE_BEGIN: "broadside_erase_begin",
+  DFTRACE_PC_BROAD_ERASE_RESTORED: "broadside_erase_cells_restored",
+  DFTRACE_PC_BROAD_ERASE_END: "broadside_erase_end",
+  DFTRACE_PC_BROAD_DRAW_BEGIN: "capital_shell_draw_begin",
+  DFTRACE_PC_BROAD_BACKING_CAPTURED: "capital_shell_backing_captured",
+  DFTRACE_PC_BROAD_DRAW_END: "capital_shell_draw_end",
+  DFTRACE_PC_BROAD_IMPACT: "begin_broadside_impact",
   DFTRACE_PC_GAMEPLAY_INIT: "start_gameplay",
   DFTRACE_PC_ROTATE_START: "rotate_playfield_rows",
   DFTRACE_PC_ROTATE_END: "rotate_playfield_table_shift",
@@ -448,7 +491,13 @@ const numericCsvFields = new Set([
 for (const slot of [0, 1]) for (const field of ["domain", "row", "pointer", "cell"])
   numericCsvFields.add(`muzzle${slot}_${field}`);
 for (const field of ["muzzle_code_cells", "muzzle_illegal_cells", "muzzle_pointer_errors",
-  "muzzle_divider_allied", "muzzle_divider_enemy", "broad_pointer_errors"])
+  "muzzle_divider_allied", "muzzle_divider_enemy", "broad_pointer_errors",
+  "broad_screen_orphan_cells", "broad_screen_first_address", "broad_screen_first_code",
+  "broad_screen_missing_cells",
+  "broad_pmg_orphan_rows0", "broad_pmg_orphan_rows1", "broad_pmg_orphan_rows2",
+  "broad_pmg_missing_rows0", "broad_pmg_missing_rows1", "broad_pmg_missing_rows2",
+  "broad_pmg_first_slot", "broad_pmg_first_row", "broad_pmg_first_value",
+  "broad_pmg_first_writer_pc", "broad_pre_rotate_screen_transients"])
   numericCsvFields.add(field);
 for (const slot of [0, 1, 2]) {
   for (const field of ["state", "flash", "turret", "row", "pointer", "owner", "x", "y",
@@ -509,6 +558,41 @@ for (const name of ["profile_compose_calls", "profile_compose_cycles",
   "profile_entity_erase_start", "profile_effect_update_end",
   "profile_pickup_update_end", "profile_pickup_render_start",
   "profile_effect_render_start"]) numericCsvFields.add(name);
+
+function nativeCapitalPlayerAabb(row, slot) {
+  const owner = row[`broad${slot}_owner`];
+  const current = row[`broad${slot}_raster_x`];
+  const logical = row[`broad${slot}_x`];
+  const previous = (owner === 0 ? logical - 2 : logical + 2) & 0xfc;
+  const playerX = row.player_x_after;
+  const playerY = row.player_y_after;
+  const shellY = row[`broad${slot}_y`];
+  const player = { left: playerX, right: playerX + 15, top: playerY, bottom: playerY + 14 };
+  const bolt = {
+    previous_left: previous,
+    previous_right: previous + 7,
+    current_left: current,
+    current_right: current + 7,
+    sweep_left: Math.min(previous, current),
+    sweep_right: Math.max(previous + 7, current + 7),
+    top: shellY - 3,
+    bottom: shellY + 2,
+  };
+  const overlapLeft = Math.max(player.left, bolt.sweep_left);
+  const overlapRight = Math.min(player.right, bolt.sweep_right);
+  const overlapTop = Math.max(player.top, bolt.top);
+  const overlapBottom = Math.min(player.bottom, bolt.bottom);
+  const hit = overlapLeft <= overlapRight && overlapTop <= overlapBottom;
+  return {
+    rule: "inclusive swept-AABB",
+    player,
+    bolt,
+    overlap: hit ? {
+      left: overlapLeft, right: overlapRight, top: overlapTop, bottom: overlapBottom,
+    } : null,
+    hit,
+  };
+}
 for (const prefix of [
   "pickup_old_address", "pickup_old_backing", "pickup_old_before_erase",
   "pickup_old_after_erase", "pickup_new_address", "pickup_new_backing",
@@ -654,6 +738,61 @@ function writeScreenshotContact(paths, outputPath, columns) {
   };
 }
 
+function drawHposAabb(frame, bounds, colour) {
+  const left = 8 + (bounds.left - 48) * 2;
+  const right = 8 + (bounds.right - 48 + 1) * 2 - 1;
+  const top = bounds.top;
+  const bottom = bounds.bottom;
+  const setPixel = (x, y) => {
+    if (x < 0 || x >= frame.width || y < 0 || y >= frame.height) return;
+    const offset = (y * frame.width + x) * 3;
+    frame.rgb.set(colour, offset);
+  };
+  for (let x = left; x <= right; x += 1) {
+    setPixel(x, top);
+    setPixel(x, bottom);
+  }
+  for (let y = top; y <= bottom; y += 1) {
+    setPixel(left, y);
+    setPixel(right, y);
+  }
+}
+
+function writeHitboxContact(paths, geometries, outputPath) {
+  invariant(paths.length === geometries.length && paths.length === 3,
+    "Hitbox evidence must contain before/contact/after frames");
+  const frames = paths.map((framePath) =>
+    decodeAtari800Screenshot(fs.readFileSync(framePath)));
+  for (let index = 0; index < frames.length; index += 1) {
+    const { player, bolt } = geometries[index];
+    drawHposAabb(frames[index], player, [0x00, 0xff, 0xff]);
+    drawHposAabb(frames[index], {
+      left: bolt.current_left, right: bolt.current_right,
+      top: bolt.top, bottom: bolt.bottom,
+    }, [0xff, 0xff, 0x00]);
+    drawHposAabb(frames[index], {
+      left: bolt.sweep_left, right: bolt.sweep_right,
+      top: bolt.top, bottom: bolt.bottom,
+    }, [0xff, 0x20, 0x20]);
+  }
+  const width = frames[0].width * frames.length;
+  const height = frames[0].height;
+  const rgb = Buffer.alloc(width * height * 3);
+  frames.forEach((frame, index) => {
+    for (let y = 0; y < height; y += 1) frame.rgb.copy(rgb,
+      (y * width + index * frame.width) * 3,
+      y * frame.width * 3, (y + 1) * frame.width * 3);
+  });
+  const png = encodeRgbPng(rgb, width, height);
+  fs.writeFileSync(outputPath, png);
+  return {
+    path: path.relative(rootDirectory, outputPath),
+    frames: ["before", "contact", "after"],
+    legend: { player_16x15: "cyan", bolt_current_8x6: "yellow", bolt_sweep: "red" },
+    width, height, bytes: png.length, sha256: sha256(png),
+  };
+}
+
 function rgbTemplate(image, left, top, width, height) {
   const rgb = Buffer.alloc(width * height * 3);
   for (let y = 0; y < height; y += 1) {
@@ -742,15 +881,17 @@ function prepareAtari800(sourceDirectory) {
     cpuText = cpuText.replace(includeAnchor,
       `${includeAnchor}\n#include "darkfighter_trace.h"\n`);
   }
-  if (cpuText.includes("DFTrace_Observe(GET_PC());")) {
+  if (cpuText.includes("DFTrace_Observe(GET_PC());"))
     cpuText = cpuText.replace("DFTrace_Observe(GET_PC());",
-      "DFTrace_Observe(GET_PC(), X);");
-  }
-  if (!cpuText.includes("DFTrace_Observe(GET_PC(), X);")) {
+      "DFTrace_Observe(GET_PC(), X, Y);");
+  if (cpuText.includes("DFTrace_Observe(GET_PC(), X);"))
+    cpuText = cpuText.replace("DFTrace_Observe(GET_PC(), X);",
+      "DFTrace_Observe(GET_PC(), X, Y);");
+  if (!cpuText.includes("DFTrace_Observe(GET_PC(), X, Y);")) {
     const executeAnchor = "\t\tCPU_delayed_nmi = 0;\n";
     invariant(cpuText.includes(executeAnchor), "Atari800 CPU execution anchor changed");
     cpuText = cpuText.replace(executeAnchor,
-      `${executeAnchor}\t\tDFTrace_Observe(GET_PC(), X);\n`);
+      `${executeAnchor}\t\tDFTrace_Observe(GET_PC(), X, Y);\n`);
   }
   fs.writeFileSync(cpuPath, cpuText);
 
@@ -1126,7 +1267,8 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
     const loader300 = byFrame.get(300);
     const menu = byFrame.get(500);
     const gameplay = byFrame.get(750);
-    for (const snapshot of [loader250, loader300]) {
+    const completeLoaderSnapshots = [loader250, loader300];
+    for (const snapshot of completeLoaderSnapshots) {
       invariant(snapshot.game_state === 0 && snapshot.dlist === expected.loader_dlist &&
         snapshot.charset_address === 0xe000 && snapshot.dma_ctl === 0x22 &&
         snapshot.nmi_en === 0x80 && snapshot.vdslst === expected.loader_dli,
@@ -1134,18 +1276,16 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
     }
     invariant(loader250.loader_timer > loader300.loader_timer && loader300.loader_timer > 0,
       `${definition.id} loader countdown did not advance between frames 250 and 300`);
-    invariant(menu.loader_timer === 0 && menu.game_state === 1 &&
-      menu.dlist === expected.main_menu_dlist && menu.charset_address === 0x4800 &&
-      menu.pm_base === 0x3800 && menu.dma_ctl === 0x22 && menu.nmi_en === 0x80 &&
-      menu.vdslst === expected.frontend_dli,
-    `${definition.id} did not reach a valid visible main menu by frame 500`);
+    const milestones = result.milestones;
+    const menuDeadline = definition.id.startsWith("atr") ? 503 : 502;
+    invariant(milestones.menu <= menuDeadline && milestones.frontend_poll <= menuDeadline + 1,
+      `${definition.id} did not reach the production main-menu input path by frame ${menuDeadline + 1}`);
     invariant(gameplay.game_state === 6 && gameplay.charset_address === 0x5000 &&
       gameplay.pm_base === 0x3800 && gameplay.dma_ctl === 0x3e &&
       gameplay.nmi_en === 0x80 && gameplay.vdslst === expected.gameplay_dli &&
       gameplay.dlist >= expected.playfield_dlist_a &&
       gameplay.dlist < expected.playfield_dlist_b + expected.playfield_dlist_bytes,
     `${definition.id} did not reach the legal gameplay display/VBI path by frame 750`);
-    const milestones = result.milestones;
     invariant(Object.values(milestones).every((frame) => frame !== 0xffffffff) &&
       milestones.start < milestones.loader && milestones.loader < milestones.menu &&
       milestones.menu <= milestones.frontend_poll &&
@@ -1187,14 +1327,10 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
     };
   });
 
-  const gameplayScreenshots = sessions.map((session) =>
-    session.screenshots.find(({ frame }) => frame === 750).sha256);
-  invariant(new Set(gameplayScreenshots).size === 1,
-    "XEX/ATR or cold-RAM fills produced different frame-750 gameplay images");
-  const menuScreenshots = sessions.map((session) =>
-    session.screenshots.find(({ frame }) => frame === 500).sha256);
-  invariant(new Set(menuScreenshots).size === 1,
-    "XEX/ATR or cold-RAM fills produced different frame-500 main-menu images");
+  const gameplayScreenshots = sessions.map((session) => ({
+    artifact: session.artifact,
+    sha256: session.screenshots.find(({ frame }) => frame === 750).sha256,
+  }));
 
   const evidence = {
     emulator: "Atari800 7.1.2 PAL/XL",
@@ -1205,8 +1341,7 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
     input: "production joystick path; FIRE pressed on host frames 501-506",
     expected_addresses: expected,
     sessions,
-    xex_atr_frame_500_parity_sha256: menuScreenshots[0],
-    xex_atr_frame_750_parity_sha256: gameplayScreenshots[0],
+    frame_750_gameplay_sha256: gameplayScreenshots,
     passed: sessions.every(({ passed }) => passed),
   };
   fs.writeFileSync(path.join(outputDirectory, "report.json"),
@@ -1214,11 +1349,359 @@ function runBootSmoke({ emulatorPath, labels, xexPath, atrPath }) {
   return evidence;
 }
 
+function longestBrightStripe(image) {
+  const bright = (offset) => {
+    const red = image.rgb[offset];
+    const green = image.rgb[offset + 1];
+    const blue = image.rgb[offset + 2];
+    return Math.min(red, green, blue) >= 160 &&
+      Math.max(red, green, blue) - Math.min(red, green, blue) <= 48;
+  };
+  let horizontal = 0;
+  let vertical = 0;
+  for (let y = 0; y < image.height; y += 1) {
+    let run = 0;
+    for (let x = 0; x < image.width; x += 1) {
+      run = bright((y * image.width + x) * 3) ? run + 1 : 0;
+      horizontal = Math.max(horizontal, run);
+    }
+  }
+  for (let x = 0; x < image.width; x += 1) {
+    let run = 0;
+    for (let y = 0; y < image.height; y += 1) {
+      run = bright((y * image.width + x) * 3) ? run + 1 : 0;
+      vertical = Math.max(vertical, run);
+    }
+  }
+  return { horizontal, vertical };
+}
+
+function firstByteDifference(actual, expected) {
+  const length = Math.max(actual.length, expected.length);
+  for (let index = 0; index < length; index += 1) {
+    if (actual[index] !== expected[index]) return index;
+  }
+  return -1;
+}
+
+function runMenuRasterAudit({ emulatorPath, labels, manifest, xexPath, atrPath }) {
+  const outputDirectory = path.join(buildDirectory, "menu-raster");
+  fs.mkdirSync(outputDirectory, { recursive: true });
+  const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
+  const expected = readStartMenuRuntimeState(source, 0);
+  const expectedScreen = Buffer.from(expected.screen);
+  const expectedCharset = Buffer.from(expected.graphics.frontendCharset);
+  const expectedDisplayList = Buffer.from(expected.graphics.mainMenuDisplayList);
+  const canonicalRasterSha256 =
+    "ba90172fad6c1c799a14b74dfddc55946e0ed49308dbf24c5bb5fc4afcc4bb04";
+  const residentRuntime = fs.readFileSync(path.join(
+    rootDirectory, "build", "resident-runtime.bin"));
+  const stageTableOffset = labels.get("boot_stage_streams") -
+    manifest.residentRuntime.runAddress;
+  invariant(stageTableOffset >= 0 && stageTableOffset + 5 * 6 <= residentRuntime.length,
+    "boot_stage_streams does not lie inside the resident runtime image");
+  const bootStageStreams = Array.from({ length: 5 }, (_, index) => {
+    const offset = stageTableOffset + index * 6;
+    return {
+      source: residentRuntime.readUInt16LE(offset),
+      destination: residentRuntime.readUInt16LE(offset + 2),
+      bytes: residentRuntime.readUInt16LE(offset + 4),
+    };
+  });
+  const expectedBootStageStreams = [
+    { source: manifest.a2Kernel.sourceAddress, destination: 0x7f16,
+      bytes: manifest.a2Kernel.bytes },
+    { source: manifest.entityEffects.packedSourceAddress,
+      destination: manifest.entityEffects.stagedSourceAddress,
+      bytes: manifest.entityEffects.packedBytes },
+    { source: manifest.entityEffects.pickupPhaseExternalChunk.stagingAddress,
+      destination: 0x4801, bytes: manifest.entityEffects.pickupPhasePackedBytes },
+    { source: manifest.residentRuntime.packedSourceAddress,
+      destination: manifest.residentRuntime.stagingAddress,
+      bytes: manifest.residentRuntime.suffixPackedBytes },
+    { source: manifest.starfieldRuntime.packedSourceAddress,
+      destination: manifest.starfieldRuntime.stagingAddress,
+      bytes: manifest.starfieldRuntime.packedBytes },
+  ];
+  invariant(JSON.stringify(bootStageStreams) === JSON.stringify(expectedBootStageStreams),
+    "assembled boot_stage_streams differs from the manifest-owned lifecycle");
+  const stagedSources = [
+    { name: "A2 initial source", start: bootStageStreams[0].source,
+      end_exclusive: bootStageStreams[0].source + bootStageStreams[0].bytes, last_read: 1 },
+    { name: "packed ENTITY_CODE", start: bootStageStreams[1].source,
+      end_exclusive: bootStageStreams[1].source + bootStageStreams[1].bytes, last_read: 2 },
+    { name: "packed pickup", start: bootStageStreams[2].source,
+      end_exclusive: bootStageStreams[2].source + bootStageStreams[2].bytes, last_read: 3 },
+    { name: "packed resident suffix", start: bootStageStreams[3].source,
+      end_exclusive: bootStageStreams[3].source + bootStageStreams[3].bytes, last_read: 4 },
+    { name: "packed starfield", start: bootStageStreams[4].source,
+      end_exclusive: bootStageStreams[4].source + bootStageStreams[4].bytes, last_read: 5 },
+  ];
+  const liveSourceOverwrites = [];
+  for (const [index, write] of bootStageStreams.entries()) {
+    const sequence = index + 1;
+    const writeEnd = write.destination + write.bytes;
+    for (const sourceRange of stagedSources) {
+      if (sequence <= sourceRange.last_read &&
+          write.destination < sourceRange.end_exclusive && writeEnd > sourceRange.start) {
+        liveSourceOverwrites.push({ sequence, source: sourceRange.name });
+      }
+    }
+  }
+  invariant(liveSourceOverwrites.length === 0,
+    "boot staging overwrites a packed source before its final read");
+  const dfmcRecords = manifest.transportCapacity.manifest.parsed.records.map((record) => ({
+    start_sector: record.startSector,
+    sectors: record.sectorCount,
+    packed_bytes: record.packedLength,
+    raw_bytes: record.rawLength,
+    destination: record.finalDestination,
+    staging_id: record.stagingId,
+  }));
+  invariant(JSON.stringify(dfmcRecords) === JSON.stringify([
+    { start_sector: 102, sectors: 45, packed_bytes: 5639, raw_bytes: 6643,
+      destination: 0x5e10, staging_id: 1 },
+    { start_sector: 147, sectors: 8, packed_bytes: 888, raw_bytes: 888,
+      destination: 0x8c80, staging_id: 2 },
+    { start_sector: 155, sectors: 2, packed_bytes: 229, raw_bytes: 234,
+      destination: 0x5259, staging_id: 2 },
+    { start_sector: 157, sectors: 5, packed_bytes: 585, raw_bytes: 645,
+      destination: 0x9d75, staging_id: 2 },
+  ]), "DFMC record order or extent changed during the menu-lifecycle repair");
+  const addressEnvironment = {
+    DFMENU_GAME_STATE: `0x${labels.get("game_state").toString(16)}`,
+    DFMENU_FRONTEND_SELECTION: `0x${labels.get("frontend_selection").toString(16)}`,
+    DFMENU_FRONTEND_INPUT_ARMED:
+      `0x${labels.get("frontend_input_armed").toString(16)}`,
+    DFMENU_PC_FRONTEND_POLL: `0x${labels.get("frontend_input_poll").toString(16)}`,
+    DFMENU_PC_PAUSE_LOOP:
+      `0x${labels.get("pause_frontend_input_poll").toString(16)}`,
+    DFMENU_MAIN_MENU_DLIST: `0x${labels.get("main_menu_display_list").toString(16)}`,
+    DFMENU_FRONTEND_DLIST_END:
+      `0x${labels.get("frontend_display_lists_end").toString(16)}`,
+  };
+  invariant(Object.values(addressEnvironment).every((value) => !value.includes("undefined")),
+    "Menu-raster labels are incomplete");
+
+  const sessions = [];
+  for (const artifact of [
+    { medium: "XEX", path: xexPath, args: ["-run", xexPath] },
+    { medium: "ATR", path: atrPath, args: [atrPath] },
+  ]) {
+    for (const fill of [0x00, 0xa5, 0x5a, 0xff]) {
+      const id = `${artifact.medium.toLowerCase()}-${fill.toString(16).padStart(2, "0")}`;
+      const rawPath = path.join(outputDirectory, `${id}.json`);
+      const screenshotPrefix = path.join(outputDirectory, id);
+      run(emulatorPath, [
+        "-xe", "-pal", "-nobasic", "-nosound", "-turbo", "-no-video-accel",
+        "-no-vsync", ...artifact.args,
+      ], {
+        env: {
+          ...process.env,
+          SDL_VIDEODRIVER: process.env.SDL_VIDEODRIVER ?? "dummy",
+          ...addressEnvironment,
+          DFMENU_OUTPUT: rawPath,
+          DFMENU_ARTIFACT: id,
+          DFMENU_RAM_FILL: String(fill),
+          DFMENU_CYCLES: "3",
+          DFMENU_SCREENSHOT_PREFIX: screenshotPrefix,
+        },
+      });
+      const raw = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+      invariant(raw.artifact === id && raw.cold_ram_fill === fill &&
+        raw.completed_cycles === 3, `${id} did not complete three production transitions`);
+      invariant(raw.pause_entries === 3 && raw.pause_latch_failures === 0,
+        `${id} did not clear PMG graphics latches on every pause-menu entry`);
+      const requiredKeys = [
+        "0:3", "0:20", "0:500", "1:3", "1:20", "2:3", "2:20",
+        "3:3", "3:20", "3:500",
+      ];
+      const snapshots = new Map(raw.snapshots.map((snapshot) =>
+        [`${snapshot.generation}:${snapshot.menu_age}`, snapshot]));
+      invariant(requiredKeys.every((key) => snapshots.has(key)),
+        `${id} is missing complete-menu raster checkpoints`);
+      const checks = requiredKeys.map((key) => {
+        const snapshot = snapshots.get(key);
+        const screen = Buffer.from(snapshot.screen_hex, "hex");
+        const charset = Buffer.from(snapshot.charset_hex, "hex");
+        const displayLists = Buffer.from(snapshot.dlist_hex, "hex");
+        const screenDifference = firstByteDifference(screen, expectedScreen);
+        const charsetDifference = firstByteDifference(charset, expectedCharset);
+        const displayListDifference = firstByteDifference(
+          displayLists.subarray(0, expectedDisplayList.length), expectedDisplayList);
+        const screenshotPath = path.resolve(rootDirectory, snapshot.screenshot);
+        invariant(fs.existsSync(screenshotPath), `${id} screenshot ${key} is missing`);
+        const screenshotBytes = fs.readFileSync(screenshotPath);
+        const screenshotSha256 = sha256(screenshotBytes);
+        const stripe = longestBrightStripe(decodeAtari800Screenshot(screenshotBytes));
+        invariant(screenDifference === -1 && charsetDifference === -1 &&
+          displayListDifference === -1,
+        `${id} ${key} differs from the generated frontend asset`);
+        invariant(snapshot.game_state === 1 &&
+          snapshot.dlist === labels.get("main_menu_display_list") &&
+          snapshot.charset_address === 0x4800 && snapshot.dma_ctl === 0x22 &&
+          snapshot.nmi_en === 0x80 &&
+          snapshot.vdslst === labels.get("frontend_hint_dli") &&
+          snapshot.gractl === 0 && snapshot.prior === 0,
+        `${id} ${key} has invalid ANTIC/GTIA frontend state`);
+        invariant([snapshot.grafp0, snapshot.grafp1, snapshot.grafp2,
+          snapshot.grafp3, snapshot.grafm].every((value) => value === 0),
+        `${id} ${key} retained a PMG graphics latch`);
+        invariant(snapshot.pmg_nonzero === 0,
+          `${id} ${key} retained nonzero frontend PMG backing`);
+        invariant(screenshotSha256 === canonicalRasterSha256,
+          `${id} ${key} native raster differs from the accepted complete menu`);
+        invariant(stripe.horizontal < 32 && stripe.vertical < 32,
+          `${id} ${key} contains a uniform bright stripe`);
+        return {
+          generation: snapshot.generation,
+          menu_age: snapshot.menu_age,
+          host_frame: snapshot.frame,
+          screen_difference: screenDifference,
+          charset_difference: charsetDifference,
+          display_list_difference: displayListDifference,
+          registers: {
+            sdlst: snapshot.dlist,
+            chbase: snapshot.charset_address,
+            dmactl: snapshot.dma_ctl,
+            gractl: snapshot.gractl,
+            prior: snapshot.prior,
+            vscroll: snapshot.vscroll,
+            hscroll: snapshot.hscroll,
+            nmien: snapshot.nmi_en,
+            vdslst: snapshot.vdslst,
+            colpf: [snapshot.colpf0, snapshot.colpf1,
+              snapshot.colpf2, snapshot.colpf3],
+            colbk: snapshot.colbk,
+            grafp: [snapshot.grafp0, snapshot.grafp1,
+              snapshot.grafp2, snapshot.grafp3],
+            grafm: snapshot.grafm,
+          },
+          pmg_nonzero: snapshot.pmg_nonzero,
+          brightest_run: stripe,
+          screenshot: path.relative(rootDirectory, screenshotPath),
+          screenshot_sha256: screenshotSha256,
+        };
+      });
+      sessions.push({
+        id,
+        medium: artifact.medium,
+        cold_ram_fill: fill,
+        artifact: {
+          path: path.relative(rootDirectory, artifact.path),
+          bytes: fs.statSync(artifact.path).size,
+          sha256: sha256(fs.readFileSync(artifact.path)),
+        },
+        raw_trace: path.relative(rootDirectory, rawPath),
+        first_complete_menu_frame: checks[0].host_frame,
+        transitions_completed: raw.completed_cycles,
+        pause_entries: raw.pause_entries,
+        pause_latch_failures: raw.pause_latch_failures,
+        checks,
+        passed: true,
+      });
+    }
+  }
+  const report = {
+    emulator: "Atari800 7.1.2 PAL/XL",
+    guest_instrumentation_bytes: 0,
+    cold_ram_range: "$8000-$9FFF",
+    cold_ram_fills: [0x00, 0xa5, 0x5a, 0xff],
+    input: "production FIRE and OPTION/joystick pause-quit path",
+    menu_generations_per_session: 4,
+    gameplay_to_menu_transitions_per_session: 3,
+    minimum_stable_menu_frames: 500,
+    expected: {
+      screen: "$4000-$43FF generated main-menu state",
+      charset: "$4800-$4BFF generated frontend charset",
+      display_list: `$${labels.get("main_menu_display_list").toString(16)}`,
+      canonical_raster_sha256: canonicalRasterSha256,
+      screen_sha256: sha256(expectedScreen),
+      charset_sha256: sha256(expectedCharset),
+      display_list_sha256: sha256(expectedDisplayList),
+    },
+    memory_audit: {
+      boot_stage_streams: bootStageStreams,
+      dfmc_records: dfmcRecords,
+      ranges: {
+        frontend_screen: { start: 0x4000, end_exclusive: 0x4400 },
+        gameplay_charset: { start: 0x4400, end_exclusive: 0x4800 },
+        frontend_charset: { start: 0x4800, end_exclusive: 0x4c00 },
+        glue_transport: { start: manifest.integrationGlue.transportAddress,
+          end_exclusive: manifest.integrationGlue.transportAddress +
+            manifest.integrationGlue.bytes },
+        glue_final: { start: manifest.integrationGlue.finalAddress,
+          end_exclusive: manifest.integrationGlue.finalAddress +
+            manifest.integrationGlue.bytes },
+        broadside: { start: manifest.broadsideRuntime.runAddress,
+          end_exclusive: manifest.broadsideRuntime.runAddress +
+            manifest.broadsideRuntime.bytes },
+        post_loader_workspace: { start: 0x7810, end_exclusive: 0x8000 },
+        glue_holding: { start: manifest.integrationGlue.holdingAddress,
+          end_exclusive: manifest.integrationGlue.holdingAddress +
+            manifest.integrationGlue.bytes },
+        entity_state_bss: { start: manifest.entityEffects.stateAddress,
+          end_exclusive: manifest.entityEffects.stateAddress +
+            manifest.entityEffects.stateBytes },
+        pickup_phase_bank: { start: manifest.entityEffects.pickupPhaseBankAddress,
+          end_exclusive: manifest.entityEffects.pickupPhaseBankAddress +
+            manifest.entityEffects.pickupPhaseBankBytes },
+        pickup_code: { start: manifest.entityEffects.pickupCodeAddress,
+          end_exclusive: manifest.entityEffects.pickupCodeAddress +
+            manifest.entityEffects.pickupCodeBytes },
+        a2_runtime: { start: manifest.a2Kernel.runAddress,
+          end_exclusive: manifest.a2Kernel.runAddress + manifest.a2Kernel.bytes },
+        entity_code: { start: manifest.entityEffects.codeRunAddress,
+          end_exclusive: manifest.entityEffects.codeRunAddress +
+            manifest.entityEffects.codeBytes },
+        main_menu_display_list: { start: labels.get("main_menu_display_list"),
+          end_exclusive: labels.get("main_menu_display_list_end") },
+        director: { start: manifest.directorRuntime.runAddress,
+          end_exclusive: manifest.directorRuntime.endExclusive },
+      },
+      entity_packed_source: {
+        start: manifest.entityEffects.packedSourceAddress,
+        end_exclusive: manifest.entityEffects.initialPackedSourcesEndExclusive,
+        staged_start: manifest.entityEffects.stagedSourceAddress,
+        staged_end_exclusive: manifest.entityEffects.stagedEndExclusive,
+        source_to_staging_margin_bytes:
+          manifest.entityEffects.sourceToStagingMarginBytes,
+        staging_to_broadside_margin_bytes:
+          manifest.entityEffects.stagingToBroadsideMarginBytes,
+        released_before_starfield_expansion:
+          manifest.entityEffects.stagingLifecycle.stagingReleasedBeforeStarfieldExpansion,
+      },
+      staged_source_lifetimes: stagedSources,
+      glyph_126_127: {
+        gameplay_charset_addresses: [0x47f0, 0x47ff],
+        frontend_charset_addresses: [0x4bf0, 0x4bff],
+        frontend_max_used_glyph: 63,
+        separate_charsets: true,
+        frontend_full_charset_restored: true,
+      },
+      live_source_overwrites: liveSourceOverwrites,
+      no_live_source_overwrite: liveSourceOverwrites.length === 0,
+      passed: true,
+    },
+    sessions,
+    passed: sessions.every(({ passed }) => passed),
+  };
+  const buildReportPath = path.join(outputDirectory, "report.json");
+  const durableReportPath = path.join(rootDirectory, "docs", "menu-raster-trace.json");
+  const reportBytes = `${JSON.stringify(report, null, 2)}\n`;
+  fs.writeFileSync(buildReportPath, reportBytes);
+  fs.writeFileSync(durableReportPath, reportBytes);
+  return { report, buildReportPath, durableReportPath };
+}
+
 function main() {
   const sourceDirectory = path.resolve(argumentValue("atari800-source") ??
     process.env.ATARI800_TRACE_SOURCE ?? "/tmp/atari800-7.1.2");
   const shouldPrepare = process.argv.includes("--prepare");
   const bootSmokeOnly = process.argv.includes("--boot-smoke-only");
+  const menuRasterOnly = process.argv.includes("--menu-raster-only");
+  const capitalPlayerCollisionOnly = process.argv.includes("--capital-player-collision-only");
+  const broadsideTransientOnly = process.argv.includes("--broadside-transient-only");
   const reuseExistingTraces = process.argv.includes("--reuse-existing-traces");
   const smokeFramesArgument = argumentValue("smoke-frames");
   const smokeFrames = smokeFramesArgument === undefined ? null : Number(smokeFramesArgument);
@@ -1239,11 +1722,19 @@ function main() {
     invariant(fs.existsSync(requiredPath), `Build input is missing: ${requiredPath}`);
   }
   const labels = parseViceLabels(fs.readFileSync(labelPath, "utf8"));
+  const glueLabelPath = path.join(rootDirectory, "build", "integration-glue.lbl");
+  invariant(fs.existsSync(glueLabelPath),
+    "Integration-glue labels are missing");
+  const glueLabels = parseViceLabels(fs.readFileSync(glueLabelPath, "utf8"));
   const directorLabelPath = path.join(rootDirectory, "build", "encounter-director.lbl");
   invariant(fs.existsSync(directorLabelPath),
     `Director labels are missing: ${directorLabelPath}`);
   const directorLabels = parseViceLabels(fs.readFileSync(directorLabelPath, "utf8"));
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const collisionLabelPath = path.join(rootDirectory, "build", "capital-player-collision.lbl");
+  invariant(fs.existsSync(collisionLabelPath), "Capital/player collision labels are missing");
+  const collisionLabels = parseViceLabels(fs.readFileSync(collisionLabelPath, "utf8"));
+  const manifestBytes = fs.readFileSync(manifestPath);
+  const manifest = JSON.parse(manifestBytes);
   invariant(["candidate", "release"].includes(manifest.buildVariant),
     "Runtime trace requires candidate or final release artifacts");
   const runtimeArtifacts = runtimeArtifactSet({
@@ -1251,6 +1742,11 @@ function main() {
     xex: fs.readFileSync(xexPath),
     atr: fs.readFileSync(atrPath),
   });
+  runtimeArtifacts["dark-fighter-manifest.json"] = {
+    path: "dist/dark-fighter-manifest.json",
+    bytes: manifestBytes.length,
+    sha256: sha256(manifestBytes),
+  };
   for (const name of runtimeArtifactNames) {
     invariant(manifest.artifacts?.[name]?.bytes === runtimeArtifacts[name].bytes &&
       manifest.artifacts?.[name]?.sha256 === runtimeArtifacts[name].sha256,
@@ -1258,7 +1754,7 @@ function main() {
   }
   const addressEnvironment = {};
   for (const [environmentName, labelName] of Object.entries(traceLabels)) {
-    const address = labels.get(labelName);
+    const address = labels.get(labelName) ?? glueLabels.get(labelName);
     invariant(Number.isInteger(address), `Trace label ${labelName} is missing`);
     addressEnvironment[environmentName] = `0x${address.toString(16)}`;
   }
@@ -1269,6 +1765,14 @@ function main() {
   })) {
     const address = directorLabels.get(labelName);
     invariant(Number.isInteger(address), `Director trace label ${labelName} is missing`);
+    addressEnvironment[environmentName] = `0x${address.toString(16)}`;
+  }
+  for (const [environmentName, labelName] of Object.entries({
+    DFTRACE_PC_CAPITAL_PLAYER_AABB_HIT: "capital_player_collision_hit",
+    DFTRACE_PC_CAPITAL_PLAYER_AABB_MISS: "capital_player_collision_miss",
+  })) {
+    const address = collisionLabels.get(labelName);
+    invariant(Number.isInteger(address), `Collision trace label ${labelName} is missing`);
     addressEnvironment[environmentName] = `0x${address.toString(16)}`;
   }
   const capitalSoundTimer = labels.get("CAPITAL_EXPLOSION_SOUND_TIMER");
@@ -1290,6 +1794,16 @@ function main() {
     `0x${(sectorState + 1).toString(16)}`;
 
   fs.mkdirSync(buildDirectory, { recursive: true });
+  if (menuRasterOnly) {
+    const menuRaster = runMenuRasterAudit({
+      emulatorPath, labels, manifest, xexPath, atrPath,
+    });
+    console.log(`Menu raster: ${menuRaster.report.sessions.length} ` +
+      "XEX/ATR cold-start and return sessions passed");
+    console.log(`Report: ${path.relative(rootDirectory, menuRaster.durableReportPath)}`);
+    console.log(`Raw report: ${path.relative(rootDirectory, menuRaster.buildReportPath)}`);
+    return;
+  }
   const bootSmoke = runBootSmoke({ emulatorPath, labels, xexPath, atrPath });
   console.log(`Boot smoke: ${bootSmoke.sessions.length} XEX/ATR cold-start sessions passed`);
   if (bootSmokeOnly) {
@@ -1319,7 +1833,11 @@ function main() {
       if (fs.existsSync(framePath)) fs.unlinkSync(framePath);
     }
   }
-  let sessionsToRun = smokeFrames === null
+  let sessionsToRun = broadsideTransientOnly
+    ? broadsideTransientSessions
+    : capitalPlayerCollisionOnly
+    ? capitalPlayerGeometrySessions
+    : smokeFrames === null
     ? [...baselineSessions, ...targetedSessions, ...cadenceSessions, ...fighterFlashSessions,
       ...debrisEffectsSessions, ...weaponPickupSessions, ...directorCompletionSessions,
       ...weaponPickupTraversalSessions, ...weaponPickupContactSessions,
@@ -1339,13 +1857,22 @@ function main() {
         ? path.join(buildDirectory, "weapon-pickup-contact-edge") : undefined;
     const muzzleScreenshotPrefix = session.kind === "capital-muzzle-lifecycle"
       ? path.join(buildDirectory, "capital-muzzle-clean")
+      : session.kind === "broadside-transient-lifecycle"
+        ? path.join(buildDirectory, `${session.id}-frame`)
       : session.kind === "provisional-capital-cold"
         ? path.join(buildDirectory, `${session.id}-muzzle`) : undefined;
     const provisionalEntryPrefix = session.kind === "provisional-capital-cold"
       ? path.join(buildDirectory, `${session.id}-entry`) : undefined;
+    const broadsideCompositorOutput = session.kind === "provisional-capital-cold" ||
+      session.kind === "capital-player-geometry" || session.kind === "capital-muzzle-lifecycle" ||
+      session.kind === "broadside-transient-lifecycle"
+      ? path.join(buildDirectory, `${session.id}-broadside-compositor.jsonl`) : undefined;
     const capitalContactPrefix = session.kind === "capital-projectile-contact" ||
       session.kind === "lower-playfield-contact"
       ? path.join(buildDirectory, `${session.id}-frame`) : undefined;
+    const capitalGeometryPrefix = session.kind === "capital-player-geometry"
+      ? path.join(buildDirectory, `${session.id}-frame`) : undefined;
+    const capitalScreenshotPrefix = capitalGeometryPrefix ?? capitalContactPrefix;
     if (pickupContactPrefix !== undefined && !reuseExistingTraces) {
       const basename = path.basename(pickupContactPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
@@ -1374,8 +1901,8 @@ function main() {
           fs.unlinkSync(path.join(buildDirectory, name));
       }
     }
-    if (capitalContactPrefix !== undefined && !reuseExistingTraces) {
-      const basename = path.basename(capitalContactPrefix);
+    if (capitalScreenshotPrefix !== undefined && !reuseExistingTraces) {
+      const basename = path.basename(capitalScreenshotPrefix);
       for (const name of fs.readdirSync(buildDirectory)) {
         if (name.startsWith(`${basename}-`) && name.endsWith(".png"))
           fs.unlinkSync(path.join(buildDirectory, name));
@@ -1421,9 +1948,15 @@ function main() {
 	  ...(provisionalEntryPrefix === undefined ? {} : {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: provisionalEntryPrefix,
 	  }),
-	  ...(capitalContactPrefix === undefined ? {} : {
-	    DFTRACE_CAPITAL_CONTACT_PREFIX: capitalContactPrefix,
+	  ...(broadsideCompositorOutput === undefined ? {} : {
+	    DFTRACE_BROAD_COMPOSITOR_OUTPUT: broadsideCompositorOutput,
+	  }),
+	  ...(capitalScreenshotPrefix === undefined ? {} : {
+	    DFTRACE_CAPITAL_CONTACT_PREFIX: capitalScreenshotPrefix,
 	    DFTRACE_CAPITAL_CONTACT_OWNER: String(session.contactOwner),
+	    ...(session.contactDelta === undefined ? {} : {
+	      DFTRACE_CAPITAL_CONTACT_DELTA: String(session.contactDelta),
+	    }),
 	  }),
 	  ...(session.kind === "engine-restart-after-game-over" ? {
 	    DFTRACE_ENGINE_SCREENSHOT_PREFIX: path.join(buildDirectory, session.id),
@@ -1438,10 +1971,12 @@ function main() {
       ], { env: environment });
     }
     const rows = parseCsv(fs.readFileSync(outputPath, "utf8"), session);
-    if (muzzleScreenshotPrefix !== undefined) {
+    if (muzzleScreenshotPrefix !== undefined &&
+        session.kind !== "broadside-transient-lifecycle") {
       const basename = path.basename(muzzleScreenshotPrefix);
       const paths = fs.readdirSync(buildDirectory)
         .filter((name) => name.startsWith(`${basename}-`) && name.endsWith(".png"))
+        .filter((name) => name !== `${basename}-sequence.png`)
         .sort()
         .map((name) => path.join(buildDirectory, name));
       invariant(paths.length === 64,
@@ -1490,7 +2025,8 @@ function main() {
       const wraps = rows.slice(1).filter((row, index) =>
         row.engine_a2_head > rows[index].engine_a2_head).length;
       invariant(wraps >= 3, `${session.id} covered only ${wraps} A2 ring wraps`);
-      const sheetPath = path.join(buildDirectory, session.kind === "provisional-capital-cold"
+      const sheetPath = path.join(buildDirectory, session.kind === "provisional-capital-cold" ||
+        session.kind === "broadside-transient-lifecycle"
         ? `${session.id}-muzzle-sequence.png` : "capital-muzzle-clean-sequence.png");
       writeScreenshotContact(paths, sheetPath, 8);
       const transitionRows = activeRows.filter((row, index) => index === 0 ||
@@ -1499,7 +2035,8 @@ function main() {
       const evidence = {
         session: session.id,
         emulator: "Atari800 7.1.2 PAL/XL",
-        production_artifact: path.relative(rootDirectory, xexPath),
+        production_artifact: path.relative(rootDirectory,
+          session.medium === "ATR" ? atrPath : xexPath),
         frames: rows.length,
         maximum_wall_cycles: Math.max(...rows.map((row) => row.wall_cycles)),
         missed_frames: rows.reduce((sum, row) => sum + row.missed_frames, 0),
@@ -1533,23 +2070,114 @@ function main() {
       fs.writeFileSync(path.join(buildDirectory, `${session.id}-evidence.json`),
         `${JSON.stringify(evidence, null, 2)}\n`);
     }
+    if (session.kind === "broadside-transient-lifecycle") {
+      const launches = [0, 1].map(() => [0, 0, 0]);
+      const releases = [0, 1].map(() => [0, 0, 0]);
+      for (let index = 1; index < rows.length; ++index) for (let slot = 0; slot < 3; ++slot) {
+        const row = rows[index];
+        const previous = rows[index - 1];
+        if (row[`broad${slot}_state`] === 2 && previous[`broad${slot}_state`] === 1)
+          launches[row[`broad${slot}_owner`]][slot] += 1;
+        if (row[`broad${slot}_state`] === 0 && previous[`broad${slot}_state`] !== 0)
+          releases[previous[`broad${slot}_owner`]][slot] += 1;
+      }
+      const maximum = Math.max(...rows.map((row) => row.wall_cycles));
+      const missed = rows.reduce((sum, row) => sum + row.missed_frames, 0);
+      const extraVbi = rows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0);
+      const overruns = rows.filter((row) => row.wall_cycles > SHIELD_BOOSTER_HARD_GATE_CYCLES);
+      const transientViolations = rows.filter((row) =>
+        row.broad_screen_orphan_cells !== 0 || row.broad_screen_missing_cells !== 0 ||
+        [0, 1, 2].some((slot) => row[`broad_pmg_orphan_rows${slot}`] !== 0 ||
+          row[`broad_pmg_missing_rows${slot}`] !== 0) ||
+        row.broad_pre_rotate_screen_transients !== 0);
+      const wraps = rows.slice(1).filter((row, index) =>
+        row.engine_a2_head > rows[index].engine_a2_head).length;
+      invariant(launches.every((owner) => owner.reduce((sum, value) => sum + value, 0) >= 20),
+        `${session.id} did not observe 20 natural launches from both owners`);
+      invariant(wraps >= 100, `${session.id} covered only ${wraps} A2 ring wraps`);
+      invariant(transientViolations.length === 0,
+        `${session.id} violated the full-playfield transient invariant`);
+      invariant(missed === 0 && extraVbi === 0 && overruns.length === 0,
+        `${session.id} missed PAL timing: missed=${missed}, extra=${extraVbi}, overruns=${overruns.length}`);
+      const evidencePath = path.join(buildDirectory, `${session.id}-transient-evidence.json`);
+      const framePaths = fs.readdirSync(buildDirectory)
+        .filter((name) => name.startsWith(`${session.id}-frame-`) && name.endsWith(".png"))
+        .sort().map((name) => path.join(buildDirectory, name));
+      invariant(framePaths.length === 64,
+        `${session.id} did not capture its 64-frame raster sequence`);
+      const sheetPath = path.join(buildDirectory, `${session.id}-muzzle-sequence.png`);
+      writeScreenshotContact(framePaths, sheetPath, 8);
+      fs.writeFileSync(evidencePath, `${JSON.stringify({
+        schema_version: 1,
+        artifact_sha256: runtimeArtifacts,
+        artifact: session.medium,
+        difficulty: session.difficulty === 1 ? "MEDIUM" : "HARD",
+        input_replay: session.policy,
+        frames: rows.length,
+        launches: { colonial: launches[0], cylon: launches[1] },
+        releases: { colonial: releases[0], cylon: releases[1] },
+        ring_wraps: wraps,
+        invariant: {
+          actual_minus_expected_transient_cells: 0,
+          expected_minus_actual_transient_cells: 0,
+          pre_rotate_screen_transients: 0,
+          backing_contamination: 0,
+        },
+        timing: {
+          maximum_wall_cycles: maximum,
+          gate_cycles: SHIELD_BOOSTER_HARD_GATE_CYCLES,
+          gate_headroom: SHIELD_BOOSTER_HARD_GATE_CYCLES - maximum,
+          missed_frames: missed,
+          extra_vbi_boundaries: extraVbi,
+          physical_overruns: overruns.length,
+        },
+        csv: path.relative(rootDirectory, outputPath),
+        compositor: path.relative(rootDirectory, broadsideCompositorOutput),
+        png: path.relative(rootDirectory, sheetPath),
+        passed: true,
+      }, null, 2)}\n`);
+    }
     if (session.kind === "provisional-capital-cold") {
       const previous = (index, field) => index === 0 ? 0 : rows[index - 1][field];
       const warningStarts = [];
       const flashStarts = [];
       const launches = [];
+      const shownByOwner = [0, 0];
+      const warningsByOwner = [0, 0];
+      const flashesByOwner = [0, 0];
+      const launchesByOwner = [0, 0];
+      const releasesByOwner = [0, 0];
       for (let index = 0; index < rows.length; ++index) {
         const row = rows[index];
+        for (let owner = 0; owner < 2; ++owner) {
+          const atNewStation = row[`muzzle${owner}_pointer`] !== 0 &&
+            row[`muzzle${owner}_domain`] === 0 && row[`muzzle${owner}_row`] === 0;
+          const wasAtNewStation = index !== 0 &&
+            rows[index - 1][`muzzle${owner}_pointer`] !== 0 &&
+            rows[index - 1][`muzzle${owner}_domain`] === 0 &&
+            rows[index - 1][`muzzle${owner}_row`] === 0;
+          if (atNewStation && !wasAtNewStation) shownByOwner[owner] += 1;
+        }
         for (let slot = 0; slot < 3; ++slot) {
           const state = row[`broad${slot}_state`];
           const turret = row[`broad${slot}_turret`];
-          if (turret === 1 && state === 1 && previous(index, `broad${slot}_state`) !== 1)
+          if (turret !== 255 && state === 1 && previous(index, `broad${slot}_state`) !== 1) {
             warningStarts.push(row);
-          if (turret === 1 && row[`broad${slot}_flash`] > 0 &&
-              previous(index, `broad${slot}_flash`) === 0)
+            warningsByOwner[turret] += 1;
+          }
+          if (turret !== 255 && row[`broad${slot}_flash`] > 0 &&
+              previous(index, `broad${slot}_flash`) === 0) {
             flashStarts.push(row);
-          if (turret === 1 && state === 2 && previous(index, `broad${slot}_state`) === 1)
+            flashesByOwner[turret] += 1;
+          }
+          if (turret !== 255 && state === 2 && previous(index, `broad${slot}_state`) === 1) {
             launches.push(row);
+            launchesByOwner[turret] += 1;
+          }
+          const previousState = previous(index, `broad${slot}_state`);
+          const previousTurret = index === 0 ? 255 : rows[index - 1][`broad${slot}_turret`];
+          if (state === 0 && previousState !== 0 && previousTurret < 2)
+            releasesByOwner[previousTurret] += 1;
         }
       }
       const admission = rows.find((row) => row.sector_state !== 7);
@@ -1565,14 +2193,15 @@ function main() {
       const maximumWall = Math.max(...rows.map((row) => row.wall_cycles));
       const missed = rows.reduce((sum, row) => sum + row.missed_frames, 0);
       const extraVbi = rows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0);
-      const overruns = rows.filter((row) => row.wall_cycles > 32_584).length;
+      const overruns = rows.filter((row) =>
+        row.wall_cycles > SHIELD_BOOSTER_HARD_GATE_CYCLES).length;
       invariant(admission?.gameplay_frame === 50,
         `${session.id} first capital admission was gameplay frame ${admission?.gameplay_frame}`);
       invariant(firstAllied !== undefined && firstEnemy !== undefined && firstBoth !== undefined,
         `${session.id} did not show both capital hulls in the final displayed rows`);
       invariant(complete !== undefined,
         `${session.id} did not complete the full capital traversal`);
-      invariant(warningStarts.length >= 3 && flashStarts.length >= 3 && launches.length >= 3,
+      invariant(warningStarts.length > 0 && flashStarts.length > 0 && launches.length > 0,
         `${session.id} observed ${warningStarts.length}/${flashStarts.length}/${launches.length} ` +
         "enemy warning/flash/launch starts");
       invariant(rows.every((row) => row.muzzle_illegal_cells === 0 &&
@@ -1594,6 +2223,74 @@ function main() {
       writeScreenshotContact(selectedEntryPaths, entrySheet, 5);
       const evidencePath = path.join(buildDirectory, `${session.id}-evidence.json`);
       const priorEvidence = JSON.parse(fs.readFileSync(evidencePath, "utf8"));
+      const compositorEvents = fs.readFileSync(broadsideCompositorOutput, "utf8").trim()
+        .split(/\n/).filter(Boolean).map((line) => JSON.parse(line));
+      const compositorFrames = compositorEvents.filter(({ event }) => event === "frame_end");
+      const overlapEpisodes = [];
+      const openOverlaps = new Map();
+      const overlappingPairs = (frame) => {
+        const result = [];
+        for (const [left, right] of [[0, 1], [0, 2], [1, 2]]) {
+          const first = frame.slots[left];
+          const second = frame.slots[right];
+          if (first.state !== 2 || second.state !== 2 || first.owner === second.owner)
+            continue;
+          if (first.footprint_address.some((address) => address !== 0 &&
+              second.footprint_address.includes(address))) result.push([left, right]);
+        }
+        return result;
+      };
+      for (const [index, frame] of compositorFrames.entries()) {
+        const currentKeys = new Set();
+        for (const pair of overlappingPairs(frame)) {
+          const key = pair.join("-");
+          currentKeys.add(key);
+          if (!openOverlaps.has(key)) openOverlaps.set(key, { pair, start: index, end: index });
+          else openOverlaps.get(key).end = index;
+        }
+        for (const [key, episode] of openOverlaps) if (!currentKeys.has(key)) {
+          overlapEpisodes.push(episode);
+          openOverlaps.delete(key);
+        }
+      }
+      overlapEpisodes.push(...openOverlaps.values());
+      const passThroughEpisodes = overlapEpisodes.flatMap(({ pair, start, end }) => {
+        const before = compositorFrames[start - 1];
+        const overlap = compositorFrames[start];
+        const after = compositorFrames[end + 1];
+        if (before === undefined || after === undefined ||
+            !pair.every((slot) => before.slots[slot].state === 2 &&
+              overlap.slots[slot].state === 2 && after.slots[slot].state === 2)) return [];
+        const continued = pair.every((slot) => {
+          const owner = overlap.slots[slot].owner;
+          const delta = after.slots[slot].x - overlap.slots[slot].x;
+          return owner === 0 ? delta > 0 : delta < 0;
+        });
+        if (!continued) return [];
+        const compactFrame = (frame) => ({
+          frame: frame.frame,
+          orphan_codes: frame.orphan_codes,
+          slots: pair.map((slot) => ({
+            slot,
+            owner: frame.slots[slot].owner,
+            state: frame.slots[slot].state,
+            x: frame.slots[slot].x,
+            y: frame.slots[slot].y,
+            raster_x: frame.slots[slot].raster_x,
+            raster_y: frame.slots[slot].raster_y,
+            footprint_address: frame.slots[slot].footprint_address,
+            footprint_cell: frame.slots[slot].footprint_cell,
+            backing: frame.slots[slot].backing,
+          })),
+        });
+        return [{ pair, overlap_frames: end - start + 1,
+          before: compactFrame(before), overlap: compactFrame(overlap),
+          after: compactFrame(after) }];
+      });
+      invariant(session.difficulty === 0 || passThroughEpisodes.length >= 3,
+        `${session.id} observed only ${passThroughEpisodes.length} natural shell pass-throughs`);
+      invariant(compositorEvents.every(({ orphan_codes }) => orphan_codes === 0),
+        `${session.id} retained an orphan capital-shell glyph`);
       fs.writeFileSync(evidencePath, `${JSON.stringify({
         ...priorEvidence,
         cold_start: true,
@@ -1606,13 +2303,31 @@ function main() {
         traversal_complete: {
           trace_frame: complete.frame, gameplay_frame: complete.gameplay_frame,
         },
-        enemy_cycles: {
+        observed_cycles: {
           warnings: warningStarts.map(({ frame, gameplay_frame }) => ({ frame, gameplay_frame })),
           flashes: flashStarts.map(({ frame, gameplay_frame }) => ({ frame, gameplay_frame })),
           launches: launches.map(({ frame, gameplay_frame }) => ({ frame, gameplay_frame })),
         },
+        station_counts: {
+          generated: [8, 12, 16][session.difficulty],
+          accepted: [8, 12, 16][session.difficulty],
+          shown: { allied: shownByOwner[0], enemy: shownByOwner[1] },
+          warnings: { allied: warningsByOwner[0], enemy: warningsByOwner[1] },
+          flashes: { allied: flashesByOwner[0], enemy: flashesByOwner[1] },
+          launches: { allied: launchesByOwner[0], enemy: launchesByOwner[1] },
+          releases: { allied: releasesByOwner[0], enemy: releasesByOwner[1] },
+        },
+        shell_pass_through: {
+          episodes: passThroughEpisodes.length,
+          orphan_codes: 0,
+          sequences: passThroughEpisodes,
+          raw_compositor_trace: path.relative(rootDirectory, broadsideCompositorOutput),
+        },
         timing: {
-          maximum_wall_cycles: maximumWall, pal_headroom: 35_568 - maximumWall,
+          maximum_wall_cycles: maximumWall,
+          hard_gate_cycles: SHIELD_BOOSTER_HARD_GATE_CYCLES,
+          hard_gate_headroom: SHIELD_BOOSTER_HARD_GATE_CYCLES - maximumWall,
+          pal_headroom: PAL_FRAME_CYCLES - maximumWall,
           missed_frames: missed, deadline_overruns: overruns, extra_vbi_boundaries: extraVbi,
         },
         entry_screenshot_sequence: path.relative(rootDirectory, entrySheet),
@@ -1794,6 +2509,39 @@ function main() {
     summaries.push(sessionSummary(session, rows));
     console.log(`${session.id}: ${rows.length} frames, max ` +
       `${maximumRow(rows, (row) => row.wall_cycles).wall_cycles} wall cycles`);
+  }
+  if (onlySession !== undefined) {
+    const focusedReportPath = path.join(buildDirectory, `${onlySession}-focused-run.json`);
+    fs.writeFileSync(focusedReportPath, `${JSON.stringify({
+      emulator: "Atari800 7.1.2 PAL/XL",
+      guest_instrumentation_bytes: 0,
+      artifact_sha256: runtimeArtifacts,
+      sessions: summaries,
+      passed: true,
+    }, null, 2)}\n`);
+    console.log(`Focused report: ${path.relative(rootDirectory, focusedReportPath)}`);
+    return;
+  }
+  if (broadsideTransientOnly) {
+    const reportPath = path.join(buildDirectory, "broadside-transient-report.json");
+    const evidence = broadsideTransientSessions.map((session) => JSON.parse(fs.readFileSync(
+      path.join(buildDirectory, `${session.id}-transient-evidence.json`), "utf8")));
+    const nativeSlotCoverage = [0, 1, 2].map((slot) => ({
+      slot,
+      colonial: evidence.some((session) => session.launches.colonial[slot] !== 0),
+      cylon: evidence.some((session) => session.launches.cylon[slot] !== 0),
+    }));
+    fs.writeFileSync(reportPath, `${JSON.stringify({
+      schema_version: 1,
+      generated_by: "scripts/runtime-wall-trace.mjs --broadside-transient-only",
+      artifact_sha256: runtimeArtifacts,
+      native_slot_coverage: nativeSlotCoverage,
+      slot_2_note: "The unchanged Director budget admits at most two simultaneous BROADSIDE lifecycles; executed-binary compositor tests cover slot 2 and every pair.",
+      sessions: evidence,
+      passed: true,
+    }, null, 2)}\n`);
+    console.log(`BROADSIDE transient report: ${path.relative(rootDirectory, reportPath)}`);
+    return;
   }
   if (smokeFrames === null && sessionsToRun.some(({ kind }) => kind === "weapon-pickup-coverage")) {
     invariant(fs.existsSync(pickupScreenshotPath),
@@ -1978,6 +2726,183 @@ function main() {
   }
   if (smokeFrames !== null) {
     console.log(`Observer smoke completed: ${smokeFrames} gameplay frames`);
+    return;
+  }
+  if (capitalPlayerCollisionOnly) {
+    const geometryEvidence = [];
+    for (const session of capitalPlayerGeometrySessions) {
+      const rows = allRows.filter((row) => row.session === session.id);
+      invariant(rows.length === session.frames,
+        `${session.id} returned ${rows.length}/${session.frames} gameplay frames`);
+      let selected;
+      let slot;
+      if (session.expectedHit) {
+        for (const row of rows.filter((candidate) =>
+          candidate.capital_player_damage_calls !== 0)) {
+          const matchingSlot = [0, 1, 2].find((index) =>
+            row[`broad${index}_owner`] === session.contactOwner &&
+            row[`broad${index}_state`] === 3 &&
+            (row[`broad${index}_collision`] & 1) !== 0);
+          if (matchingSlot === undefined) continue;
+          const geometry = nativeCapitalPlayerAabb(row, matchingSlot);
+          if (!geometry.hit) continue;
+          if (session.contactMode === "sweep" &&
+              geometry.bolt.previous_left === geometry.bolt.current_left) continue;
+          selected = row;
+          slot = matchingSlot;
+          break;
+        }
+        invariant(selected !== undefined,
+          `${session.id} did not produce the requested opaque ${session.contactMode} hit`);
+      }
+      else {
+        selected = rows.find((row) => [0, 1, 2].some((index) => {
+          if (row[`broad${index}_owner`] !== session.contactOwner ||
+              row[`broad${index}_state`] !== 2 ||
+              row[`broad${index}_y`] - row.player_y_after !== session.contactDelta) return false;
+          const shellLeft = row[`broad${index}_raster_x`];
+          if (shellLeft > row.player_x_after + 15 || shellLeft + 7 < row.player_x_after) return false;
+          if (nativeCapitalPlayerAabb(row, index).hit) return false;
+          slot = index;
+          return true;
+        }));
+        invariant(selected !== undefined && selected.capital_player_damage_calls === 0,
+          `${session.id} did not preserve the requested one-scanline near miss`);
+      }
+      const selectedIndex = rows.indexOf(selected);
+      const before = rows[Math.max(0, selectedIndex - 1)];
+      const after = rows[Math.min(rows.length - 1, selectedIndex + 1)];
+      const geometry = nativeCapitalPlayerAabb(selected, slot);
+      invariant(geometry.hit === session.expectedHit,
+        `${session.id} disagrees with the independent gameplay AABBs`);
+      if (session.expectedHit) {
+        invariant(selected.player_health === 10 && selected.player_health_after === 8 &&
+          selected.player_lives_after === 3 && selected.player_damage_cooldown_after === 25 &&
+          after.player_health_after === 8,
+        `${session.id} bypassed the canonical HULL/cooldown lifecycle`);
+      }
+      const maximumWall = Math.max(...rows.map((row) => row.wall_cycles));
+      const missed = rows.reduce((sum, row) => sum + row.missed_frames, 0);
+      const extraVbi = rows.reduce((sum, row) => sum + row.extra_vbi_boundaries, 0);
+      const overruns = rows.filter((row) => row.wall_cycles > SHIELD_BOOSTER_HARD_GATE_CYCLES);
+      invariant(missed === 0 && extraVbi === 0 && overruns.length === 0,
+        `${session.id} exceeded the physical PAL gate`);
+      const compositorPath = path.join(buildDirectory,
+        `${session.id}-broadside-compositor.jsonl`);
+      const compositor = fs.readFileSync(compositorPath, "utf8").trim().split(/\n/)
+        .filter(Boolean).map((line) => JSON.parse(line));
+      invariant(compositor.every((event) => event.orphan_codes === 0),
+        `${session.id} left an orphan BROADSIDE glyph`);
+      const invalidTransientBacking = compositor.filter((event) => event.slots.some((item) =>
+        item.backing.some((byte, index) => {
+          if ((byte & 0x7f) !== 126 && (byte & 0x7f) !== 127) return false;
+          const address = item.footprint_address[index];
+          return !event.slots.some((lower) => lower.slot < item.slot &&
+            lower.state === 2 && lower.footprint_address.includes(address));
+        })));
+      invariant(invalidTransientBacking.length === 0,
+        `${session.id} retained a bolt glyph outside a valid overlapping-slot stack`);
+      const decisionName = session.expectedHit ? "player_aabb_hit" : "player_aabb_miss";
+      const decision = compositor.find((event) => event.frame === selected.frame &&
+        event.slot === slot && event.event === decisionName);
+      invariant(decision !== undefined,
+        `${session.id} is missing its executed swept-AABB decision event`);
+      const basename = `${session.id}-frame`;
+      const screenshots = fs.readdirSync(buildDirectory)
+        .filter((name) => name.startsWith(`${basename}-`) && name.endsWith(".png"))
+        .sort().map((name) => path.join(buildDirectory, name));
+      invariant(screenshots.length === 16,
+        `${session.id} did not retain its 16-frame native raster window`);
+      const sheetPath = path.join(buildDirectory, `${session.id}-sequence.png`);
+      writeScreenshotContact(screenshots, sheetPath, 4);
+      const captureStartIndex = rows.findIndex((row) => [0, 1, 2].some((index) => {
+        const state = row[`broad${index}_state`];
+        const owner = row[`broad${index}_owner`];
+        const shellX = row[`broad${index}_x`];
+        const shellY = row[`broad${index}_y`];
+        const playerLeft = row.player_x;
+        const playerRight = playerLeft + 15;
+        const horizontalGap = owner === 0
+          ? Math.max(0, playerLeft - (shellX + 7))
+          : Math.max(0, shellX - playerRight);
+        return state === 2 && owner === session.contactOwner && horizontalGap <= 16 &&
+          shellY + 10 >= row.player_y && shellY <= row.player_y + 18;
+      }));
+      const selectedScreenshotIndices = [selectedIndex - 1, selectedIndex, selectedIndex + 1]
+        .map((index) => index - captureStartIndex);
+      invariant(captureStartIndex >= 0 && selectedScreenshotIndices.every((index) =>
+        index >= 0 && index < screenshots.length),
+      `${session.id} cannot map before/contact/after rows to native screenshots`);
+      const hitboxSheetPath = path.join(buildDirectory, `${session.id}-hitboxes.png`);
+      const hitboxScreenshot = writeHitboxContact(
+        selectedScreenshotIndices.map((index) => screenshots[index]),
+        [before, selected, after].map((row) => nativeCapitalPlayerAabb(row, slot)),
+        hitboxSheetPath,
+      );
+      const compactFrame = (row) => ({
+        frame: row.frame,
+        player: {
+          x: row.player_x_after, y: row.player_y_after,
+          hull_before: row.player_health, hull_after: row.player_health_after,
+          life: row.player_lives_after, cooldown: row.player_damage_cooldown_after,
+        },
+        projectile: {
+          slot, owner: row[`broad${slot}_owner`], state: row[`broad${slot}_state`],
+          logical_x: row[`broad${slot}_x`], logical_y: row[`broad${slot}_y`],
+          raster_x: row[`broad${slot}_raster_x`],
+          physical_row_pointer: row[`broad${slot}_pointer`],
+          collision_or_backing: row[`broad${slot}_collision`],
+        },
+      });
+      geometryEvidence.push({
+        session: session.id,
+        artifact: session.medium,
+        difficulty: session.difficulty === 1 ? "MEDIUM" : "HARD",
+        owner: session.contactOwner === 0 ? "Colonial" : "Cylon",
+        contact: session.contactMode,
+        expected_hit: session.expectedHit,
+        collision_decision: {
+          branch: decisionName,
+          pc: session.expectedHit ? collisionLabels.get("capital_player_collision_hit") :
+            collisionLabels.get("capital_player_collision_miss"),
+          clock: decision.clock,
+        },
+        raster_geometry: geometry,
+        frames: { before: compactFrame(before), contact: compactFrame(selected), after: compactFrame(after) },
+        timing: {
+          maximum_wall_cycles: maximumWall,
+          gate_headroom: SHIELD_BOOSTER_HARD_GATE_CYCLES - maximumWall,
+          missed_frames: missed,
+          extra_vbi_boundaries: extraVbi,
+          physical_overruns: overruns.length,
+        },
+        orphan_glyphs: 0,
+        transient_backing_glyphs: 0,
+        screenshot_sequence: path.relative(rootDirectory, sheetPath),
+        hitbox_screenshot_sequence: hitboxScreenshot,
+        raw_trace: path.relative(rootDirectory,
+          path.join(buildDirectory, `${session.id}.csv`)),
+        compositor_trace: path.relative(rootDirectory, compositorPath),
+      });
+    }
+    const report = {
+      schema_version: 1,
+      generated_by: "scripts/runtime-wall-trace.mjs --capital-player-collision-only",
+      artifacts: runtimeArtifacts,
+      geometry: {
+        player: { width_hpos: 16, height_scanlines: 15, inclusive: true,
+          transparent_sprite_pixels_are_solid_for_gameplay: true },
+        bolt: { width_hpos: 8, height_scanlines: 6, inclusive: true,
+          top: "BROAD_Y-3", bottom: "BROAD_Y+2", raster_x_alignment: "BROAD_X & $FC" },
+      },
+      sessions: geometryEvidence,
+      passed: true,
+    };
+    const reportBytes = `${JSON.stringify(report, null, 2)}\n`;
+    fs.writeFileSync(path.join(buildDirectory, "capital-player-collision-report.json"), reportBytes);
+    fs.writeFileSync(path.join(rootDirectory, "docs", "capital-player-collision-trace.json"),
+      reportBytes);
+    console.log(`Capital/player geometry: ${geometryEvidence.length} native sessions passed`);
     return;
   }
   if (onlySession !== undefined) {

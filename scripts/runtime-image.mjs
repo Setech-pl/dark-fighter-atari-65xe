@@ -31,6 +31,9 @@ export function loadRuntimeSegments(rootDirectory) {
         manifest.integrationGlue.bytes],
       ["encounterDirector", "encounter-director.bin", manifest.directorRuntime.runAddress,
         manifest.directorRuntime.bytes],
+      ["capitalPlayerCollision", "capital-player-collision.bin",
+        manifest.capitalPlayerCollisionRuntime.runAddress,
+        manifest.capitalPlayerCollisionRuntime.bytes],
     ] : []),
   ];
   const segments = definitions.map(([name, fileName, start, expectedBytes]) => {

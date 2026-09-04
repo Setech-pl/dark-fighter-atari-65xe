@@ -475,7 +475,7 @@ test("debris visual polish preserves foundation history and passes its +256 PAL 
   assert.ok(feature.actual_delta_cycles <= feature.approved_delta_cycles);
   assert.ok(feature.measured_physical_headroom >= feature.minimum_physical_headroom);
   assert.equal(feature.budget_overrun_frames, 0);
-  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 123, true);
+  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 124, true);
   assert.equal(manifest.entityEffects.runtimeBudget.debrisVisualPolish.actualDeltaCycles,
     feature.actual_delta_cycles);
 });

@@ -291,12 +291,25 @@ test("assembled display list contains 164 ANTIC F and 28 ANTIC E lines", () => {
   const displayListAddress = LOADER_DISPLAY_LIST_ADDRESS;
   assert.equal(displayListAddress & 0x3ff, 0);
   const expected = createLoaderDisplayListBytes(compiled, displayListAddress);
+  const memory = executeLoaderUnpack(labels);
   assert.equal(expected.length, 202);
   assert.deepEqual(
-    Buffer.from(executeLoaderUnpack(labels).subarray(
+    Buffer.from(memory.subarray(
       displayListAddress, displayListAddress + expected.length)),
     Buffer.from(expected),
   );
+
+  const missileMasks = labels.get("missile_masks");
+  const missileTables = Buffer.from([
+    0x0c, 0x30, 0xc0, 0xf3, 0xcf, 0x3f,
+    0x04, 0x10, 0x40, 0x0c, 0x30, 0xc0,
+  ]);
+  assert.equal(missileMasks, 0x37fe);
+  assert.ok(displayListAddress >= missileMasks + missileTables.length,
+    "loader display-list publication must not overlap runtime PMG tables");
+  assert.deepEqual(Buffer.from(memory.subarray(
+    missileMasks, missileMasks + missileTables.length)), missileTables,
+  "executed loader unpack must preserve every BROADSIDE draw/erase/size mask");
 
   let offset = 3;
   let anticFLines = 0;

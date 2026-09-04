@@ -54,7 +54,7 @@ function stageArtifact(artifact, fill) {
   assert.deepEqual(Buffer.from(memory.subarray(0x9100, 0x9100 + entity.length)), entity);
   run(memory, "stage_a2_kernel");
   const finalAfterCopy = Buffer.from(memory.subarray(0x9000, 0x90ff));
-  assert.deepEqual(Buffer.from(memory.subarray(0x7f16, 0x7f3d)), glue);
+  assert.deepEqual(Buffer.from(memory.subarray(0x7f16, 0x7f16 + glue.length)), glue);
   run(memory, "init_entity_effects");
   const finalAfterClear = Buffer.from(memory.subarray(0x9000, 0x90ff));
   run(memory, "unpack_weapon_pickup_phase_runtime");
@@ -77,47 +77,46 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
     /boot_stage_streams:[\s\S]+a2_kernel_source:[\s\S]+entity_packed_source:[\s\S]+pickup_packed_source:[\s\S]+resident_packed_source:[\s\S]+starfield_packed_source:/,
     "pickup must be preserved after A2/ENTITY sources and before resident staging overwrites $8C80");
   const resident = fs.readFileSync(path.join(root, "build/resident-runtime.bin"));
-  assert.deepEqual([...resident.subarray(0x40, 0x46)], [0x20, 0x8f, 0x21, 0x20, 0xb9, 0x9a]);
+  assert.deepEqual([...resident.subarray(0x40, 0x46)], [0x20, 0x44, 0x21, 0x20, 0xb9, 0x9a]);
 });
 
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
-  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12797);
+  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12901);
   assert.equal(manifest.transportCapacity.initialBootBytes, 12928);
-  assert.equal(manifest.transportCapacity.totalTransportSectors, 158);
-  assert.equal(manifest.transportCapacity.totalTransportBytes, 20224);
+  assert.equal(manifest.transportCapacity.totalTransportSectors, 161);
+  assert.equal(manifest.transportCapacity.totalTransportBytes, 20608);
   assert.equal(manifest.transportCapacity.stage2.bytes, 1191);
   assert.deepEqual(manifest.transportCapacity.manifest.parsed.records.map((record) =>
     [record.startSector, record.sectorCount, record.packedLength, record.rawLength,
       record.finalDestination]), [
-    [102, 44, 5581, 6557, 0x5e10],
-    [146, 7, 873, 873, 0x8c80],
-    [153, 1, 41, 39, 0x5259],
-    [154, 5, 585, 645, 0x9d75],
+    [102, 45, 5641, 6643, 0x5e10],
+    [147, 8, 915, 915, 0x8c80],
+    [155, 2, 229, 234, 0x5261],
+    [157, 5, 585, 645, 0x9d75],
   ]);
-  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 16989);
-  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18787);
-  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3400);
+  assert.equal(manifest.encounterDirector.linkedRuntimeBytes, 17203);
+  assert.equal(manifest.encounterDirector.simultaneousResidencyBytes, 18827);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 3360);
 });
 
 test("XEX and ATR preserve full A2, GLUE lifecycle, ENTITY_CODE, DIRECTOR and guard", () => {
   assert.equal(a2.length, 255);
-  assert.equal(sha256(a2), "71891e0ce4ff6ce72ebdc02cb49bad9ed1fe51825e2fcf279e8e6b5dc010c3d6");
+  assert.equal(sha256(a2), "780788840940a5fbe5dc4a8e0068fe2b01095ac65d2d31598f4519c4a0b879d7");
   for (const artifact of ["xex", "atr"]) for (const fill of [0xa5, 0x5a]) {
     const staged = stageArtifact(artifact, fill);
     assert.equal(sha256(staged.sourceA2), sha256(a2), `${artifact} staged A2`);
     assert.equal(sha256(staged.finalAfterCopy), sha256(a2), `${artifact} published A2`);
     assert.equal(sha256(staged.finalAfterClear), sha256(a2), `${artifact} A2 after clear`);
-    assert.deepEqual(Buffer.from(staged.memory.subarray(0x4efe, 0x4f25)), glue);
+    assert.deepEqual(Buffer.from(staged.memory.subarray(0x4efe, 0x4efe + glue.length)), glue);
     assert.deepEqual(Buffer.from(staged.memory.subarray(0x9d75, 0x9ffa)), director);
     assert.deepEqual([...staged.memory.subarray(0x9ffa, 0xa000)], Array(6).fill(fill));
     assert.equal(staged.memory[0x90ea], 0xce);
   }
 });
 
-test("all 11 A2 entry points retain their frozen opcodes", () => {
+test("all 10 A2 entry points and relocated release glue retain their frozen opcodes", () => {
   const entries = [
     ["integration_broadside_due", 0x90cf, 0xce],
-    ["integration_broadside_release", 0x90e2, 0xa2],
     ["integration_pickup_pending_tick", 0x90ea, 0xce],
     ["render_far_star_next", 0x90c9, 0xe8],
     ["render_far_star_slot", 0x9081, 0xbd],
@@ -128,11 +127,13 @@ test("all 11 A2 entry points retain their frozen opcodes", () => {
     ["erase_far_star_overlays", 0x905f, 0xa2],
     ["prebuild_next_playfield_display_list", 0x9000, 0xa2],
   ];
-  assert.equal(entries.length, 11);
+  assert.equal(entries.length, 10);
   for (const [name, address, opcode] of entries) {
     assert.equal(labels.get(name), address, name);
     assert.equal(a2[address - 0x9000], opcode, name);
   }
+  assert.equal(labels.get("integration_broadside_release"), 0x4fdc);
+  assert.equal(glue[0x4fdc - 0x4efe], 0x8a);
 });
 
 test("pickup hook executes $90EA → $90ED → $90FB, decrements 2 to 1 and returns", () => {
@@ -146,18 +147,18 @@ test("pickup hook executes $90EA → $90ED → $90FB, decrements 2 to 1 and retu
 
 test("startup writes never intersect a source before its last read", () => {
   const sources = [
-    { name: "A2 initial source", start: 0x4718, end: 0x4817, lastRead: 1 },
-    { name: "packed ENTITY_CODE", start: 0x4817, end: 0x51de, lastRead: 2 },
-    { name: "packed pickup cold source", start: 0x8c80, end: 0x8fd9, lastRead: 3 },
-    { name: "packed resident source", start: 0x2668, end: 0x4018, lastRead: 4 },
-    { name: "packed starfield source", start: 0x4018, end: 0x4718, lastRead: 5 },
+    { name: "A2 initial source", start: 0x4773, end: 0x4872, lastRead: 1 },
+    { name: "packed ENTITY_CODE", start: 0x4872, end: 0x5261, lastRead: 2 },
+    { name: "packed pickup cold source", start: 0x8c80, end: 0x9062, lastRead: 3 },
+    { name: "packed resident source", start: 0x2668, end: 0x4072, lastRead: 4 },
+    { name: "packed starfield source", start: 0x4072, end: 0x4773, lastRead: 5 },
   ];
   const writes = [
     { sequence: 1, start: 0x7f16, end: 0x8015 },
-    { sequence: 2, start: 0x5300, end: 0x5cc7 },
-    { sequence: 3, start: 0x4801, end: 0x4b5a },
-    { sequence: 4, start: 0x8100, end: 0x9ab0 },
-    { sequence: 5, start: 0x7810, end: 0x7f10 },
+    { sequence: 2, start: 0x534b, end: 0x5d3a },
+    { sequence: 3, start: 0x4801, end: 0x4be3 },
+    { sequence: 4, start: 0x8100, end: 0x9b0a },
+    { sequence: 5, start: 0x7810, end: 0x7f11 },
   ];
   for (const write of writes) for (const live of sources) {
     const active = write.sequence <= live.lastRead;

@@ -106,6 +106,17 @@ typedef struct {
 	unsigned broad_row[3];
 	unsigned broad_pointer[3];
 	unsigned broad_pointer_errors;
+	unsigned broad_screen_orphan_cells;
+	unsigned broad_screen_first_address;
+	unsigned broad_screen_first_code;
+	unsigned broad_screen_missing_cells;
+	unsigned broad_pmg_orphan_rows[3];
+	unsigned broad_pmg_missing_rows[3];
+	unsigned broad_pmg_first_slot;
+	unsigned broad_pmg_first_row;
+	unsigned broad_pmg_first_value;
+	unsigned broad_pmg_first_writer_pc;
+	unsigned broad_pre_rotate_screen_transients;
 	unsigned capital_collision_calls;
 	unsigned capital_player_damage_calls;
 	unsigned entity_active;
@@ -343,6 +354,15 @@ static unsigned dftrace_pc_engine_update;
 static unsigned dftrace_pc_engine_copy;
 static unsigned dftrace_pc_capital_collision;
 static unsigned dftrace_pc_capital_player_damage;
+static unsigned dftrace_pc_capital_player_aabb_hit;
+static unsigned dftrace_pc_capital_player_aabb_miss;
+static unsigned dftrace_pc_broad_erase_begin;
+static unsigned dftrace_pc_broad_erase_restored;
+static unsigned dftrace_pc_broad_erase_end;
+static unsigned dftrace_pc_broad_draw_begin;
+static unsigned dftrace_pc_broad_backing_captured;
+static unsigned dftrace_pc_broad_draw_end;
+static unsigned dftrace_pc_broad_impact;
 static unsigned dftrace_pc_gameplay_init;
 static unsigned dftrace_pc_dlist_publish;
 static unsigned dftrace_pc_rotate_start;
@@ -391,6 +411,7 @@ static unsigned dftrace_broad_row_lo;
 static unsigned dftrace_broad_row_hi;
 static unsigned dftrace_broad_flash_timer;
 static unsigned dftrace_playfield_broad_row;
+static FILE *dftrace_broad_compositor_file;
 static unsigned dftrace_entity_active_count;
 static unsigned dftrace_entity_x;
 static unsigned dftrace_entity_y;
@@ -431,6 +452,7 @@ static unsigned dftrace_engine_screenshot_limit;
 static unsigned dftrace_gameplay_generation;
 static int dftrace_restart_game_over_seeded;
 static unsigned dftrace_previous_pc;
+static unsigned dftrace_pmg_last_writer[256];
 static unsigned dftrace_engine_previous[16];
 static int dftrace_engine_previous_valid;
 static unsigned dftrace_frontend_delay;
@@ -459,6 +481,7 @@ static unsigned dftrace_muzzle_screenshot_count;
 static int dftrace_muzzle_screenshot_primed;
 static const char *dftrace_capital_contact_prefix;
 static unsigned dftrace_capital_contact_owner;
+static int dftrace_capital_contact_delta = 7;
 static unsigned dftrace_capital_contact_count;
 static int dftrace_capital_contact_primed;
 static const char *dftrace_rapid_screenshot;
@@ -529,6 +552,8 @@ static unsigned dfboot_main_menu_dlist;
 static unsigned dfboot_frontend_dlist_end;
 static unsigned dfboot_snapshots_count;
 static unsigned dfboot_loader_dli_count;
+static uint64_t dfboot_same_frame_instructions;
+static unsigned dfboot_instruction_frame = 0xffffffffu;
 static DFBootSnapshot dfboot_snapshots[5];
 
 static unsigned dfboot_env_u(const char *name)
@@ -678,9 +703,28 @@ static void dfboot_init(void)
 static void dfboot_observe(unsigned pc)
 {
 	unsigned frame;
+	unsigned fire_start;
 	if (!dfboot_initialised)
 		dfboot_init();
 	frame = (unsigned) Atari800_nframes;
+	if (frame > 500u && MEMORY_mem[pc] == 0x00u) {
+		fprintf(stderr, "darkfighter boot smoke: unexpected BRK frame=%u pc=$%04x "
+			"state=%u module=%02x,%02x,%02x,%02x\n", frame, pc,
+			MEMORY_mem[dfboot_game_state], MEMORY_mem[0x8e61u], MEMORY_mem[0x8e62u],
+			MEMORY_mem[0x8e63u], MEMORY_mem[0x8e64u]);
+		exit(98);
+	}
+	if (frame != dfboot_instruction_frame) {
+		dfboot_instruction_frame = frame;
+		dfboot_same_frame_instructions = 0u;
+	}
+	else if (++dfboot_same_frame_instructions == 20000000u) {
+		fprintf(stderr, "darkfighter boot smoke: stalled at frame %u pc=$%04x state=%u "
+			"module=%02x,%02x,%02x,%02x\n", frame, pc,
+			MEMORY_mem[dfboot_game_state], MEMORY_mem[0x8e61u], MEMORY_mem[0x8e62u],
+			MEMORY_mem[0x8e63u], MEMORY_mem[0x8e64u]);
+		exit(2);
+	}
 	if (MEMORY_mem[dfboot_game_state] == 0u && pc == dfboot_word(0x0200u))
 		++dfboot_loader_dli_count;
 	if (pc == dfboot_pc_start && dfboot_seen_start == 0xffffffffu)
@@ -701,7 +745,9 @@ static void dfboot_observe(unsigned pc)
 	/* Drive the production menu input path: neutral through the loader/menu,
 	 * then a short FIRE press after the frame-500 proof snapshot. */
 	PIA_PORT_input[0] = (PIA_PORT_input[0] & 0xf0u) | 0x0fu;
-	GTIA_TRIG[0] = (UBYTE) (frame >= 501u && frame <= 506u ? 0 : 1);
+	fire_start = dfboot_seen_frontend == 0xffffffffu ? 0xffffffffu :
+		(dfboot_seen_frontend + 2u < 501u ? 501u : dfboot_seen_frontend + 2u);
+	GTIA_TRIG[0] = (UBYTE) (frame >= fire_start && frame <= fire_start + 5u ? 0 : 1);
 	if (frame != dfboot_last_frame) {
 		dfboot_last_frame = frame;
 		if (dfboot_target_frame(frame))
@@ -710,6 +756,400 @@ static void dfboot_observe(unsigned pc)
 			dfboot_write();
 			fflush(NULL);
 			exit(0);
+		}
+	}
+}
+
+/* Focused frontend-raster audit. This host-only observer drives the released
+ * joystick/OPTION paths and records the exact machine state after complete
+ * menu rasters. It never seeds guest state or patches guest memory. */
+typedef struct {
+	unsigned frame;
+	unsigned generation;
+	unsigned menu_age;
+	unsigned pc;
+	int scanline;
+	int cycle;
+	unsigned game_state;
+	unsigned dlist;
+	unsigned charset_address;
+	unsigned pm_base;
+	unsigned dma_ctl;
+	unsigned nmi_en;
+	unsigned vdslst;
+	unsigned gractl;
+	unsigned prior;
+	unsigned grafp0;
+	unsigned grafp1;
+	unsigned grafp2;
+	unsigned grafp3;
+	unsigned grafm;
+	unsigned hposp0;
+	unsigned hposp1;
+	unsigned hposp2;
+	unsigned hposp3;
+	unsigned sizep0;
+	unsigned sizep1;
+	unsigned sizep2;
+	unsigned sizep3;
+	unsigned vscroll;
+	unsigned hscroll;
+	unsigned colpm0;
+	unsigned colpm1;
+	unsigned colpm2;
+	unsigned colpm3;
+	unsigned colpf0;
+	unsigned colpf1;
+	unsigned colpf2;
+	unsigned colpf3;
+	unsigned colbk;
+	unsigned pmg_nonzero;
+	char screenshot[FILENAME_MAX];
+	UBYTE screen[0x400];
+	UBYTE charset[0x400];
+	UBYTE dlist_bytes[0x200];
+} DFMenuSnapshot;
+
+typedef struct {
+	unsigned pc;
+	unsigned frame;
+	int scanline;
+	int cycle;
+	unsigned old_value;
+	unsigned new_value;
+} DFMenuWrite;
+
+static int dfmenu_initialised;
+static FILE *dfmenu_file;
+static const char *dfmenu_artifact;
+static const char *dfmenu_screenshot_prefix;
+static unsigned dfmenu_fill;
+static unsigned dfmenu_game_state;
+static unsigned dfmenu_frontend_selection;
+static unsigned dfmenu_frontend_input_armed;
+static unsigned dfmenu_pc_frontend_poll;
+static unsigned dfmenu_pc_pause_loop;
+static unsigned dfmenu_main_menu_dlist;
+static unsigned dfmenu_frontend_dlist_end;
+static unsigned dfmenu_cycles;
+static unsigned dfmenu_generation = 0xffffffffu;
+static unsigned dfmenu_menu_start_frame;
+static unsigned dfmenu_gameplay_start_frame;
+static unsigned dfmenu_last_state = 0xffffffffu;
+static unsigned dfmenu_last_frame = 0xffffffffu;
+static unsigned dfmenu_snapshots_count;
+static unsigned dfmenu_watch_address = 0xffffffffu;
+static unsigned dfmenu_watch_value;
+static unsigned dfmenu_previous_pc;
+static unsigned dfmenu_writes_count;
+static unsigned dfmenu_pause_entries;
+static unsigned dfmenu_pause_latch_failures;
+static DFMenuSnapshot dfmenu_snapshots[32];
+static DFMenuWrite dfmenu_writes[64];
+
+static void dfmenu_set_input(unsigned stick, unsigned trigger);
+
+static unsigned dfmenu_env_u(const char *name)
+{
+	const char *value = getenv(name);
+	char *end;
+	unsigned long parsed;
+	if (value == NULL || *value == '\0') {
+		fprintf(stderr, "darkfighter menu audit: missing %s\n", name);
+		exit(2);
+	}
+	parsed = strtoul(value, &end, 0);
+	if (*end != '\0' || parsed > 0xffffu) {
+		fprintf(stderr, "darkfighter menu audit: invalid %s=%s\n", name, value);
+		exit(2);
+	}
+	return (unsigned) parsed;
+}
+
+static void dfmenu_write_hex(FILE *file, const UBYTE *bytes, unsigned length)
+{
+	static const char digits[] = "0123456789abcdef";
+	unsigned index;
+	for (index = 0; index < length; ++index) {
+		fputc(digits[bytes[index] >> 4], file);
+		fputc(digits[bytes[index] & 0x0fu], file);
+	}
+}
+
+static void dfmenu_capture(unsigned frame, unsigned pc)
+{
+	DFMenuSnapshot *snapshot;
+	unsigned address;
+	unsigned dlist_length = dfmenu_frontend_dlist_end - dfmenu_main_menu_dlist;
+	if (dfmenu_snapshots_count >= sizeof(dfmenu_snapshots) / sizeof(dfmenu_snapshots[0]) ||
+		dlist_length > sizeof(snapshot->dlist_bytes)) {
+		fprintf(stderr, "darkfighter menu audit: snapshot capacity exceeded\n");
+		exit(2);
+	}
+	snapshot = &dfmenu_snapshots[dfmenu_snapshots_count++];
+	memset(snapshot, 0, sizeof(*snapshot));
+	snapshot->frame = frame;
+	snapshot->generation = dfmenu_generation;
+	snapshot->menu_age = frame - dfmenu_menu_start_frame;
+	snapshot->pc = pc;
+	snapshot->scanline = ANTIC_ypos;
+	snapshot->cycle = ANTIC_XPOS;
+	snapshot->game_state = MEMORY_mem[dfmenu_game_state];
+	snapshot->dlist = ANTIC_dlist;
+	snapshot->charset_address = (unsigned) ANTIC_CHBASE << 8;
+	snapshot->pm_base = (unsigned) ANTIC_PMBASE << 8;
+	snapshot->dma_ctl = ANTIC_DMACTL;
+	snapshot->nmi_en = ANTIC_NMIEN;
+	snapshot->vdslst = MEMORY_mem[0x0200u] | ((unsigned) MEMORY_mem[0x0201u] << 8);
+	snapshot->gractl = GTIA_GRACTL;
+	snapshot->prior = GTIA_PRIOR;
+	snapshot->grafp0 = GTIA_GRAFP0;
+	snapshot->grafp1 = GTIA_GRAFP1;
+	snapshot->grafp2 = GTIA_GRAFP2;
+	snapshot->grafp3 = GTIA_GRAFP3;
+	snapshot->grafm = GTIA_GRAFM;
+	snapshot->hposp0 = GTIA_HPOSP0;
+	snapshot->hposp1 = GTIA_HPOSP1;
+	snapshot->hposp2 = GTIA_HPOSP2;
+	snapshot->hposp3 = GTIA_HPOSP3;
+	snapshot->sizep0 = GTIA_SIZEP0;
+	snapshot->sizep1 = GTIA_SIZEP1;
+	snapshot->sizep2 = GTIA_SIZEP2;
+	snapshot->sizep3 = GTIA_SIZEP3;
+	snapshot->vscroll = ANTIC_VSCROL;
+	snapshot->hscroll = ANTIC_HSCROL;
+	snapshot->colpm0 = GTIA_COLPM0;
+	snapshot->colpm1 = GTIA_COLPM1;
+	snapshot->colpm2 = GTIA_COLPM2;
+	snapshot->colpm3 = GTIA_COLPM3;
+	snapshot->colpf0 = GTIA_COLPF0;
+	snapshot->colpf1 = GTIA_COLPF1;
+	snapshot->colpf2 = GTIA_COLPF2;
+	snapshot->colpf3 = GTIA_COLPF3;
+	snapshot->colbk = GTIA_COLBK;
+	memcpy(snapshot->screen, MEMORY_mem + 0x4000u, sizeof(snapshot->screen));
+	memcpy(snapshot->charset, MEMORY_mem + 0x4800u, sizeof(snapshot->charset));
+	memcpy(snapshot->dlist_bytes, MEMORY_mem + dfmenu_main_menu_dlist, dlist_length);
+	for (address = 0x3b00u; address < 0x4000u; ++address)
+		if (MEMORY_mem[address] != 0u)
+			++snapshot->pmg_nonzero;
+	if (dfmenu_screenshot_prefix != NULL && *dfmenu_screenshot_prefix != '\0') {
+		snprintf(snapshot->screenshot, sizeof(snapshot->screenshot),
+			"%s-menu%u-age%03u.png", dfmenu_screenshot_prefix,
+			snapshot->generation, snapshot->menu_age);
+		if (!Screen_SaveScreenshot(snapshot->screenshot, 0)) {
+			fprintf(stderr, "darkfighter menu audit: screenshot failed: %s\n",
+				snapshot->screenshot);
+			exit(2);
+		}
+	}
+}
+
+static void dfmenu_write(void)
+{
+	unsigned index;
+	unsigned dlist_length = dfmenu_frontend_dlist_end - dfmenu_main_menu_dlist;
+	fprintf(dfmenu_file,
+		"{\n  \"artifact\":\"%s\",\n  \"cold_ram_fill\":%u,\n"
+		"  \"completed_cycles\":%u,\n  \"pause_entries\":%u,\n"
+		"  \"pause_latch_failures\":%u,\n  \"snapshots\":[\n",
+		dfmenu_artifact, dfmenu_fill, dfmenu_generation,
+		dfmenu_pause_entries, dfmenu_pause_latch_failures);
+	for (index = 0; index < dfmenu_snapshots_count; ++index) {
+		DFMenuSnapshot *snapshot = &dfmenu_snapshots[index];
+		fprintf(dfmenu_file,
+			"    {\"frame\":%u,\"generation\":%u,\"menu_age\":%u,"
+			"\"pc\":%u,\"scanline\":%d,\"cycle\":%d,\"game_state\":%u,"
+			"\"dlist\":%u,\"charset_address\":%u,\"pm_base\":%u,"
+			"\"dma_ctl\":%u,\"nmi_en\":%u,\"vdslst\":%u,"
+			"\"gractl\":%u,\"prior\":%u,"
+			"\"grafp0\":%u,\"grafp1\":%u,\"grafp2\":%u,\"grafp3\":%u,"
+			"\"grafm\":%u,\"hposp0\":%u,\"hposp1\":%u,"
+			"\"hposp2\":%u,\"hposp3\":%u,\"sizep0\":%u,"
+			"\"sizep1\":%u,\"sizep2\":%u,\"sizep3\":%u,"
+			"\"vscroll\":%u,\"hscroll\":%u,"
+			"\"colpm0\":%u,\"colpm1\":%u,\"colpm2\":%u,\"colpm3\":%u,"
+			"\"colpf0\":%u,\"colpf1\":%u,\"colpf2\":%u,\"colpf3\":%u,"
+			"\"colbk\":%u,\"pmg_nonzero\":%u,\"screenshot\":\"%s\","
+			"\"screen_hex\":\"",
+			snapshot->frame, snapshot->generation, snapshot->menu_age, snapshot->pc,
+			snapshot->scanline, snapshot->cycle, snapshot->game_state,
+			snapshot->dlist, snapshot->charset_address, snapshot->pm_base,
+			snapshot->dma_ctl, snapshot->nmi_en, snapshot->vdslst,
+			snapshot->gractl, snapshot->prior,
+			snapshot->grafp0, snapshot->grafp1, snapshot->grafp2, snapshot->grafp3,
+			snapshot->grafm, snapshot->hposp0, snapshot->hposp1,
+			snapshot->hposp2, snapshot->hposp3, snapshot->sizep0,
+			snapshot->sizep1, snapshot->sizep2, snapshot->sizep3,
+			snapshot->vscroll, snapshot->hscroll,
+			snapshot->colpm0, snapshot->colpm1, snapshot->colpm2, snapshot->colpm3,
+			snapshot->colpf0, snapshot->colpf1, snapshot->colpf2, snapshot->colpf3,
+			snapshot->colbk, snapshot->pmg_nonzero, snapshot->screenshot);
+		dfmenu_write_hex(dfmenu_file, snapshot->screen, sizeof(snapshot->screen));
+		fputs("\",\"charset_hex\":\"", dfmenu_file);
+		dfmenu_write_hex(dfmenu_file, snapshot->charset, sizeof(snapshot->charset));
+		fputs("\",\"dlist_hex\":\"", dfmenu_file);
+		dfmenu_write_hex(dfmenu_file, snapshot->dlist_bytes, dlist_length);
+		fprintf(dfmenu_file, "\"}%s\n",
+			index + 1u == dfmenu_snapshots_count ? "" : ",");
+	}
+	fputs("  ],\n  \"watched_writes\":[\n", dfmenu_file);
+	for (index = 0; index < dfmenu_writes_count; ++index) {
+		DFMenuWrite *write = &dfmenu_writes[index];
+		fprintf(dfmenu_file,
+			"    {\"address\":%u,\"pc\":%u,\"frame\":%u,\"scanline\":%d,"
+			"\"cycle\":%d,\"old\":%u,\"new\":%u}%s\n",
+			dfmenu_watch_address, write->pc, write->frame, write->scanline,
+			write->cycle, write->old_value, write->new_value,
+			index + 1u == dfmenu_writes_count ? "" : ",");
+	}
+	fputs("  ]\n}\n", dfmenu_file);
+	if (fclose(dfmenu_file) != 0) {
+		perror("darkfighter menu audit close");
+		exit(2);
+	}
+}
+
+static void dfmenu_init(void)
+{
+	const char *watch = getenv("DFMENU_WATCH_ADDRESS");
+	unsigned address;
+	dfmenu_file = fopen(getenv("DFMENU_OUTPUT"), "w");
+	if (dfmenu_file == NULL) {
+		perror("darkfighter menu audit output");
+		exit(2);
+	}
+	dfmenu_artifact = getenv("DFMENU_ARTIFACT");
+	dfmenu_screenshot_prefix = getenv("DFMENU_SCREENSHOT_PREFIX");
+	if (dfmenu_artifact == NULL || *dfmenu_artifact == '\0') {
+		fprintf(stderr, "darkfighter menu audit: missing artifact\n");
+		exit(2);
+	}
+	dfmenu_fill = dfmenu_env_u("DFMENU_RAM_FILL");
+	dfmenu_cycles = dfmenu_env_u("DFMENU_CYCLES");
+	if (dfmenu_fill > 0xffu || dfmenu_cycles == 0u || dfmenu_cycles > 3u) {
+		fprintf(stderr, "darkfighter menu audit: invalid fill/cycle count\n");
+		exit(2);
+	}
+	for (address = 0x8000u; address < 0xa000u; ++address)
+		MEMORY_mem[address] = (UBYTE) dfmenu_fill;
+	dfmenu_game_state = dfmenu_env_u("DFMENU_GAME_STATE");
+	dfmenu_frontend_selection = dfmenu_env_u("DFMENU_FRONTEND_SELECTION");
+	dfmenu_frontend_input_armed = dfmenu_env_u("DFMENU_FRONTEND_INPUT_ARMED");
+	dfmenu_pc_frontend_poll = dfmenu_env_u("DFMENU_PC_FRONTEND_POLL");
+	dfmenu_pc_pause_loop = dfmenu_env_u("DFMENU_PC_PAUSE_LOOP");
+	dfmenu_main_menu_dlist = dfmenu_env_u("DFMENU_MAIN_MENU_DLIST");
+	dfmenu_frontend_dlist_end = dfmenu_env_u("DFMENU_FRONTEND_DLIST_END");
+	if (watch != NULL && *watch != '\0') {
+		dfmenu_watch_address = dfmenu_env_u("DFMENU_WATCH_ADDRESS");
+		dfmenu_watch_value = MEMORY_mem[dfmenu_watch_address];
+	}
+	dfmenu_set_input(0x0fu, 1u);
+	dfmenu_initialised = 1;
+}
+
+static void dfmenu_track_watch(unsigned pc)
+{
+	unsigned value;
+	if (dfmenu_watch_address == 0xffffffffu)
+		return;
+	value = MEMORY_mem[dfmenu_watch_address];
+	if (value != dfmenu_watch_value) {
+		if (dfmenu_writes_count < sizeof(dfmenu_writes) / sizeof(dfmenu_writes[0])) {
+			DFMenuWrite *write = &dfmenu_writes[dfmenu_writes_count++];
+			write->pc = dfmenu_previous_pc;
+			write->frame = (unsigned) Atari800_nframes;
+			write->scanline = ANTIC_ypos;
+			write->cycle = ANTIC_XPOS;
+			write->old_value = dfmenu_watch_value;
+			write->new_value = value;
+		}
+		dfmenu_watch_value = value;
+	}
+	dfmenu_previous_pc = pc;
+}
+
+static void dfmenu_set_input(unsigned stick, unsigned trigger)
+{
+	PIA_PORT_input[0] = (PIA_PORT_input[0] & 0xf0u) | (stick & 0x0fu);
+	GTIA_TRIG[0] = (UBYTE) (trigger != 0u);
+}
+
+static void dfmenu_observe(unsigned pc)
+{
+	unsigned frame;
+	unsigned state;
+	unsigned selection;
+	unsigned armed;
+	unsigned menu_age = 0u;
+	unsigned stick;
+	unsigned trigger;
+	if (!dfmenu_initialised)
+		dfmenu_init();
+	dfmenu_track_watch(pc);
+	frame = (unsigned) Atari800_nframes;
+	state = MEMORY_mem[dfmenu_game_state];
+	selection = MEMORY_mem[dfmenu_frontend_selection];
+	armed = MEMORY_mem[dfmenu_frontend_input_armed];
+	INPUT_key_consol = INPUT_CONSOL_NONE;
+
+	if (state == 1u && dfmenu_last_state != 1u) {
+		++dfmenu_generation;
+		dfmenu_menu_start_frame = frame;
+	}
+	if (state == 6u && dfmenu_last_state != 6u)
+		dfmenu_gameplay_start_frame = frame;
+	if (state == 8u && dfmenu_last_state != 8u) {
+		++dfmenu_pause_entries;
+		if (GTIA_GRAFP0 != 0u || GTIA_GRAFP1 != 0u || GTIA_GRAFP2 != 0u ||
+			GTIA_GRAFP3 != 0u || GTIA_GRAFM != 0u)
+			++dfmenu_pause_latch_failures;
+	}
+	if (state != dfmenu_last_state)
+		dfmenu_set_input(0x0fu, 1u);
+	dfmenu_last_state = state;
+
+	if (state == 1u) {
+		menu_age = frame - dfmenu_menu_start_frame;
+		if (pc == dfmenu_pc_frontend_poll) {
+			stick = 0x0fu;
+			trigger = 1u;
+			if (dfmenu_generation < dfmenu_cycles &&
+				menu_age >= (dfmenu_generation == 0u ? 505u : 25u) && armed != 0u)
+				trigger = 0u;
+			dfmenu_set_input(stick, trigger);
+		}
+	}
+	else if (state == 6u && frame >= dfmenu_gameplay_start_frame + 50u &&
+		frame <= dfmenu_gameplay_start_frame + 51u) {
+		INPUT_key_consol &= ~INPUT_CONSOL_OPTION;
+	}
+	else if ((state == 8u || state == 9u) && pc == dfmenu_pc_pause_loop) {
+		stick = 0x0fu;
+		trigger = 1u;
+		if (armed != 0u) {
+			if (selection < (state == 8u ? 2u : 1u))
+				stick = 0x0du;
+			else
+				trigger = 0u;
+		}
+		dfmenu_set_input(stick, trigger);
+	}
+
+	if (frame != dfmenu_last_frame) {
+		dfmenu_last_frame = frame;
+		if (state == 1u && ((menu_age >= 1u && menu_age <= 6u) ||
+			menu_age == 20u || menu_age == 500u))
+			dfmenu_capture(frame, pc);
+		if (dfmenu_generation == dfmenu_cycles && state == 1u && menu_age > 500u) {
+			dfmenu_write();
+			fflush(NULL);
+			exit(0);
+		}
+		if (frame > 2500u) {
+			dfmenu_write();
+			fflush(NULL);
+			exit(3);
 		}
 	}
 }
@@ -939,26 +1379,33 @@ static void dftrace_set_gameplay_input(unsigned frame)
 		strcmp(dftrace_policy, "capital-contact-cylon") == 0) {
 		unsigned slot;
 		unsigned target_owner = strcmp(dftrace_policy, "capital-contact-cylon") == 0;
-		unsigned target_x = 124u;
-		unsigned target_y = DFTRACE_PLAYER_MAX_Y;
+		unsigned target_x = target_owner ? 154u : 124u;
+		/* Natural capital bolts use centre scanline 108/116 on MEDIUM/HARD. Begin moving
+		 * through the production joystick path before launch; the 1-HPOS player
+		 * cadence cannot otherwise reach a left-launched Cylon bolt in time. */
+		int target_y = (dftrace_difficulty == 2u ? 116 : 108) -
+			dftrace_capital_contact_delta;
 		for (slot = 0u; slot < 3u; ++slot) {
 			unsigned state = MEMORY_mem[dftrace_broad_state + slot];
 			if ((state == 1u || state == 2u) &&
 				MEMORY_mem[dftrace_broad_state + 3u + slot] == target_owner) {
-				unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
-				target_y = shell_y > 7u ? shell_y - 7u : 40u;
-				if (target_y < 40u) target_y = 40u;
-				if (target_y > DFTRACE_PLAYER_MAX_Y) target_y = DFTRACE_PLAYER_MAX_Y;
+				if (state == 2u) {
+					unsigned shell_y = MEMORY_mem[dftrace_broad_state + 12u + slot];
+					target_y = (int) shell_y - dftrace_capital_contact_delta;
+				}
+				if (target_y < 40) target_y = 40;
+				if (target_y > (int) DFTRACE_PLAYER_MAX_Y)
+					target_y = (int) DFTRACE_PLAYER_MAX_Y;
 				break;
 			}
 		}
-		if (x + 1u < target_x)
+		if (x < target_x)
 			stick = 0x07u;
-		else if (x > target_x + 1u)
+		else if (x > target_x)
 			stick = 0x0bu;
-		if (y > target_y + 1u)
+		if ((int) y > target_y)
 			stick &= 0x0eu;
-		else if (y + 1u < target_y)
+		else if ((int) y < target_y)
 			stick &= 0x0du;
 	}
 	else if (strcmp(dftrace_policy, "vertical-boundary") == 0) {
@@ -998,6 +1445,13 @@ static void dftrace_set_gameplay_input(unsigned frame)
 		int target_right = ((frame / 72u) & 1u) == 0;
 		stick = target_right ? (x < 154u ? 0x07u : 0x0fu) :
 			(x > 94u ? 0x0bu : 0x0fu);
+	}
+	else if (strcmp(dftrace_policy, "broadside-sides") == 0) {
+		/* Long ordinary-joystick dwells expose both capital-side corridors while
+		 * retaining natural scheduling, collision, release and slot reuse. */
+		int target_right = ((frame / 640u) & 1u) == 0;
+		unsigned target_x = target_right ? 190u : 58u;
+		stick = x < target_x ? 0x07u : x > target_x ? 0x0bu : 0x0fu;
 	}
 	else if (strcmp(dftrace_policy, "evasive") == 0) {
 		int target_right = ((frame / 48u) & 1u) == 0;
@@ -1458,6 +1912,226 @@ static uint64_t dftrace_clock(void)
 	return (uint64_t) ANTIC_CPU_CLOCK;
 }
 
+static int dftrace_is_capital_shell_code(unsigned value)
+{
+	value &= 0xffu;
+	return value == 126u || value == 127u || value == 254u || value == 255u;
+}
+
+#define DFTRACE_MISSILES 0x3b00u
+
+static unsigned dftrace_broad_pmg_orphan_rows_for_slot(unsigned slot)
+{
+	unsigned row;
+	unsigned count = 0u;
+	unsigned mask = 0x0cu << (slot * 2u);
+	unsigned state = MEMORY_mem[dftrace_broad_state + slot];
+	unsigned height = MEMORY_mem[dftrace_broad_state + 21u + slot];
+	unsigned first = MEMORY_mem[dftrace_broad_state + 18u + slot];
+	for (row = 0u; row < 256u; ++row) {
+		unsigned expected = state != 2u && height != 0u &&
+			row >= first && row < first + height;
+		if ((MEMORY_mem[DFTRACE_MISSILES + row] & mask) != 0u && !expected)
+			++count;
+	}
+	return count;
+}
+
+static int dftrace_broad_live_owns_address(unsigned address)
+{
+	unsigned slot;
+	for (slot = 0u; slot < 3u; ++slot) {
+		unsigned pointer;
+		unsigned token;
+		unsigned first;
+		if (MEMORY_mem[dftrace_broad_state + slot] != 2u)
+			continue;
+		token = MEMORY_mem[dftrace_broad_state + 21u + slot];
+		if (token == 0u)
+			continue;
+		pointer = MEMORY_mem[dftrace_broad_row_lo + slot] |
+			((unsigned) MEMORY_mem[dftrace_broad_row_hi + slot] << 8);
+		first = pointer + token - 1u;
+		if (address == first || address == first + 1u)
+			return 1;
+	}
+	return 0;
+}
+
+static unsigned dftrace_broad_orphan_codes(void)
+{
+	unsigned row;
+	unsigned column;
+	unsigned count = 0u;
+	for (column = 8u; column < 32u; ++column) {
+		unsigned address = DFTRACE_DIVIDER_SCREEN + column;
+		if (dftrace_is_capital_shell_code(MEMORY_mem[address]) &&
+			!dftrace_broad_live_owns_address(address))
+			++count;
+	}
+	for (row = 0u; row < DFTRACE_RING_ROWS; ++row) {
+		for (column = 8u; column < 32u; ++column) {
+			unsigned address = DFTRACE_RING_SCREEN + row * 40u + column;
+			if (dftrace_is_capital_shell_code(MEMORY_mem[address]) &&
+				!dftrace_broad_live_owns_address(address))
+				++count;
+		}
+	}
+	return count;
+}
+
+static unsigned dftrace_broad_screen_transient_cells(void)
+{
+	unsigned address;
+	unsigned count = 0u;
+	for (address = DFTRACE_DIVIDER_SCREEN;
+		address < DFTRACE_DIVIDER_SCREEN + 40u; ++address)
+		if (dftrace_is_capital_shell_code(MEMORY_mem[address]))
+			++count;
+	for (address = DFTRACE_RING_SCREEN; address < DFTRACE_RING_END; ++address)
+		if (dftrace_is_capital_shell_code(MEMORY_mem[address]))
+			++count;
+	return count;
+}
+
+static void dftrace_snapshot_broad_transients(DFTraceFrame *frame)
+{
+	unsigned address;
+	unsigned slot;
+	frame->broad_screen_orphan_cells = 0u;
+	frame->broad_screen_first_address = 0u;
+	frame->broad_screen_first_code = 0u;
+	frame->broad_screen_missing_cells = 0u;
+	for (address = DFTRACE_DIVIDER_SCREEN;
+		address < DFTRACE_DIVIDER_SCREEN + 40u; ++address) {
+		if (dftrace_is_capital_shell_code(MEMORY_mem[address]) &&
+			!dftrace_broad_live_owns_address(address)) {
+			if (frame->broad_screen_orphan_cells == 0u) {
+				frame->broad_screen_first_address = address;
+				frame->broad_screen_first_code = MEMORY_mem[address];
+			}
+			++frame->broad_screen_orphan_cells;
+		}
+	}
+	for (address = DFTRACE_RING_SCREEN; address < DFTRACE_RING_END; ++address) {
+		if (dftrace_is_capital_shell_code(MEMORY_mem[address]) &&
+			!dftrace_broad_live_owns_address(address)) {
+			if (frame->broad_screen_orphan_cells == 0u) {
+				frame->broad_screen_first_address = address;
+				frame->broad_screen_first_code = MEMORY_mem[address];
+			}
+			++frame->broad_screen_orphan_cells;
+		}
+	}
+	for (slot = 0u; slot < 3u; ++slot) {
+		unsigned pointer;
+		unsigned token;
+		unsigned first;
+		unsigned cell;
+		if (MEMORY_mem[dftrace_broad_state + slot] != 2u)
+			continue;
+		token = MEMORY_mem[dftrace_broad_state + 21u + slot];
+		if (token == 0u)
+			continue;
+		pointer = MEMORY_mem[dftrace_broad_row_lo + slot] |
+			((unsigned) MEMORY_mem[dftrace_broad_row_hi + slot] << 8);
+		first = pointer + token - 1u;
+		for (cell = 0u; cell < 2u; ++cell)
+			if (!dftrace_is_capital_shell_code(MEMORY_mem[first + cell]))
+				++frame->broad_screen_missing_cells;
+	}
+	frame->broad_pmg_first_slot = 0xffffffffu;
+	frame->broad_pmg_first_row = 0xffffffffu;
+	frame->broad_pmg_first_value = 0u;
+	frame->broad_pmg_first_writer_pc = 0u;
+	for (slot = 0u; slot < 3u; ++slot) {
+		unsigned row;
+		unsigned mask = 0x0cu << (slot * 2u);
+		unsigned state = MEMORY_mem[dftrace_broad_state + slot];
+		unsigned height = MEMORY_mem[dftrace_broad_state + 21u + slot];
+		unsigned first = MEMORY_mem[dftrace_broad_state + 18u + slot];
+		frame->broad_pmg_orphan_rows[slot] =
+			dftrace_broad_pmg_orphan_rows_for_slot(slot);
+		frame->broad_pmg_missing_rows[slot] = 0u;
+		if (state != 2u && height != 0u)
+			for (row = first; row < first + height && row < 256u; ++row)
+				if ((MEMORY_mem[DFTRACE_MISSILES + row] & mask) == 0u)
+					++frame->broad_pmg_missing_rows[slot];
+		if (frame->broad_pmg_first_slot != 0xffffffffu ||
+			frame->broad_pmg_orphan_rows[slot] == 0u)
+			continue;
+		for (row = 0u; row < 256u; ++row) {
+			unsigned expected = state != 2u && height != 0u &&
+				row >= first && row < first + height;
+			if ((MEMORY_mem[DFTRACE_MISSILES + row] & mask) != 0u && !expected) {
+				frame->broad_pmg_first_slot = slot;
+				frame->broad_pmg_first_row = row;
+				frame->broad_pmg_first_value = MEMORY_mem[DFTRACE_MISSILES + row];
+				frame->broad_pmg_first_writer_pc = dftrace_pmg_last_writer[row];
+				break;
+			}
+		}
+	}
+}
+
+static void dftrace_broad_compositor_event(const char *event, unsigned slot)
+{
+	unsigned index;
+	unsigned pointer = 0u;
+	unsigned token = 0u;
+	unsigned first = 0u;
+	if (dftrace_broad_compositor_file == NULL)
+		return;
+	if (slot < 3u) {
+		pointer = MEMORY_mem[dftrace_broad_row_lo + slot] |
+			((unsigned) MEMORY_mem[dftrace_broad_row_hi + slot] << 8);
+		token = MEMORY_mem[dftrace_broad_state + 21u + slot];
+		if (token != 0u)
+			first = pointer + token - 1u;
+		else {
+			unsigned x = MEMORY_mem[dftrace_broad_state + 9u + slot];
+			first = pointer + (((x - 48u) & 0xffu) >> 2);
+		}
+	}
+	fprintf(dftrace_broad_compositor_file,
+		"{\"frame\":%u,\"host_frame\":%u,\"clock\":%llu,\"event\":\"%s\","
+		"\"slot\":%u,\"address\":[%u,%u],\"cell\":[%u,%u],\"orphan_codes\":%u,"
+		"\"pmg_tables\":[%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u],\"slots\":[",
+		dftrace_count, (unsigned) Atari800_nframes,
+		(unsigned long long) dftrace_clock(), event, slot, first, first + 1u,
+		first == 0u ? 0u : MEMORY_mem[first],
+		first == 0u ? 0u : MEMORY_mem[first + 1u], dftrace_broad_orphan_codes(),
+		MEMORY_mem[0x37feu], MEMORY_mem[0x37ffu], MEMORY_mem[0x3800u],
+		MEMORY_mem[0x3801u], MEMORY_mem[0x3802u], MEMORY_mem[0x3803u],
+		MEMORY_mem[0x3804u], MEMORY_mem[0x3805u], MEMORY_mem[0x3806u],
+		MEMORY_mem[0x3807u], MEMORY_mem[0x3808u], MEMORY_mem[0x3809u]);
+	for (index = 0u; index < 3u; ++index) {
+		unsigned row_pointer = MEMORY_mem[dftrace_broad_row_lo + index] |
+			((unsigned) MEMORY_mem[dftrace_broad_row_hi + index] << 8);
+		unsigned previous = MEMORY_mem[dftrace_broad_state + 21u + index];
+		unsigned cell_address = previous == 0u ? 0u : row_pointer + previous - 1u;
+		if (index != 0u)
+			fputc(',', dftrace_broad_compositor_file);
+		fprintf(dftrace_broad_compositor_file,
+			"{\"slot\":%u,\"owner\":%u,\"state\":%u,\"x\":%u,\"y\":%u,"
+			"\"raster_x\":%u,\"raster_y\":%u,"
+			"\"row_pointer\":%u,\"previous_token\":%u,\"backing\":[%u,%u],"
+			"\"footprint_address\":[%u,%u],\"footprint_cell\":[%u,%u]}",
+			index, MEMORY_mem[dftrace_broad_state + 3u + index],
+			MEMORY_mem[dftrace_broad_state + index],
+			MEMORY_mem[dftrace_broad_state + 9u + index],
+			MEMORY_mem[dftrace_broad_state + 12u + index],
+			MEMORY_mem[dftrace_broad_state + 9u + index] & 0xfcu,
+			MEMORY_mem[dftrace_broad_state + 12u + index], row_pointer, previous,
+			MEMORY_mem[dftrace_broad_state + 18u + index],
+			MEMORY_mem[dftrace_broad_state + 24u + index], cell_address,
+			cell_address == 0u ? 0u : cell_address + 1u,
+			cell_address == 0u ? 0u : MEMORY_mem[cell_address],
+			cell_address == 0u ? 0u : MEMORY_mem[cell_address + 1u]);
+	}
+	fprintf(dftrace_broad_compositor_file, "]}\n");
+}
+
 static void dftrace_snapshot(DFTraceFrame *frame)
 {
 	frame->dma_ctl = ANTIC_DMACTL;
@@ -1612,6 +2286,7 @@ static void dftrace_snapshot_muzzles(DFTraceFrame *frame)
 			pointer != dftrace_logical_row_address(row))
 			++frame->broad_pointer_errors;
 	}
+	dftrace_snapshot_broad_transients(frame);
 }
 
 static void dftrace_snapshot_flash(DFTraceFrame *frame)
@@ -1702,6 +2377,12 @@ static void dftrace_write(void)
 			",broad%u_owner,broad%u_x,broad%u_y,broad%u_collision,broad%u_raster_x,broad%u_raster_row",
 			index, index, index, index, index, index, index, index, index, index, index);
 	fprintf(file, ",broad_pointer_errors,player_health,player_lives,player_invulnerability"
+		",broad_screen_orphan_cells,broad_screen_first_address,broad_screen_first_code"
+		",broad_screen_missing_cells"
+		",broad_pmg_orphan_rows0,broad_pmg_orphan_rows1,broad_pmg_orphan_rows2"
+		",broad_pmg_missing_rows0,broad_pmg_missing_rows1,broad_pmg_missing_rows2"
+		",broad_pmg_first_slot,broad_pmg_first_row,broad_pmg_first_value,broad_pmg_first_writer_pc"
+		",broad_pre_rotate_screen_transients"
 		",player_damage_cooldown,player_damage_applied,capital_collision_calls"
 		",capital_player_damage_calls,player_lifecycle_after,player_x_after,player_y_after"
 		",player_health_after,player_lives_after,player_invulnerability_after"
@@ -1862,9 +2543,20 @@ static void dftrace_write(void)
 				frame->broad_owner[slot], frame->broad_x[slot], frame->broad_y[slot],
 				frame->broad_collision[slot], frame->broad_raster_x[slot],
 				frame->broad_raster_row[slot]);
-		fprintf(file, ",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+		fprintf(file, ",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
+			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u"
+			",%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
 			frame->broad_pointer_errors,
 			frame->player_health, frame->player_lives, frame->player_invulnerability,
+			frame->broad_screen_orphan_cells, frame->broad_screen_first_address,
+			frame->broad_screen_first_code, frame->broad_screen_missing_cells,
+			frame->broad_pmg_orphan_rows[0],
+			frame->broad_pmg_orphan_rows[1], frame->broad_pmg_orphan_rows[2],
+			frame->broad_pmg_missing_rows[0], frame->broad_pmg_missing_rows[1],
+			frame->broad_pmg_missing_rows[2],
+			frame->broad_pmg_first_slot, frame->broad_pmg_first_row,
+			frame->broad_pmg_first_value, frame->broad_pmg_first_writer_pc,
+			frame->broad_pre_rotate_screen_transients,
 			frame->player_damage_cooldown, frame->player_damage_applied,
 			frame->capital_collision_calls, frame->capital_player_damage_calls,
 			frame->player_lifecycle_after, frame->player_x_after, frame->player_y_after,
@@ -1975,6 +2667,17 @@ static void dftrace_init(void)
 	DFTRACE_ADDRESS(dftrace_pc_engine_copy, "DFTRACE_PC_ENGINE_COPY");
 	DFTRACE_ADDRESS(dftrace_pc_capital_collision, "DFTRACE_PC_CAPITAL_COLLISION");
 	DFTRACE_ADDRESS(dftrace_pc_capital_player_damage, "DFTRACE_PC_CAPITAL_PLAYER_DAMAGE");
+	DFTRACE_ADDRESS(dftrace_pc_capital_player_aabb_hit,
+		"DFTRACE_PC_CAPITAL_PLAYER_AABB_HIT");
+	DFTRACE_ADDRESS(dftrace_pc_capital_player_aabb_miss,
+		"DFTRACE_PC_CAPITAL_PLAYER_AABB_MISS");
+	DFTRACE_ADDRESS(dftrace_pc_broad_erase_begin, "DFTRACE_PC_BROAD_ERASE_BEGIN");
+	DFTRACE_ADDRESS(dftrace_pc_broad_erase_restored, "DFTRACE_PC_BROAD_ERASE_RESTORED");
+	DFTRACE_ADDRESS(dftrace_pc_broad_erase_end, "DFTRACE_PC_BROAD_ERASE_END");
+	DFTRACE_ADDRESS(dftrace_pc_broad_draw_begin, "DFTRACE_PC_BROAD_DRAW_BEGIN");
+	DFTRACE_ADDRESS(dftrace_pc_broad_backing_captured, "DFTRACE_PC_BROAD_BACKING_CAPTURED");
+	DFTRACE_ADDRESS(dftrace_pc_broad_draw_end, "DFTRACE_PC_BROAD_DRAW_END");
+	DFTRACE_ADDRESS(dftrace_pc_broad_impact, "DFTRACE_PC_BROAD_IMPACT");
 	DFTRACE_ADDRESS(dftrace_pc_gameplay_init, "DFTRACE_PC_GAMEPLAY_INIT");
 	DFTRACE_ADDRESS(dftrace_pc_rotate_start, "DFTRACE_PC_ROTATE_START");
 	DFTRACE_ADDRESS(dftrace_pc_rotate_end, "DFTRACE_PC_ROTATE_END");
@@ -2061,7 +2764,10 @@ static void dftrace_init(void)
 	dftrace_muzzle_screenshot_prefix = getenv("DFTRACE_MUZZLE_SCREENSHOT_PREFIX");
 	dftrace_capital_contact_prefix = getenv("DFTRACE_CAPITAL_CONTACT_PREFIX");
 	if (dftrace_capital_contact_prefix != NULL && *dftrace_capital_contact_prefix != '\0') {
+		const char *delta = getenv("DFTRACE_CAPITAL_CONTACT_DELTA");
 		dftrace_capital_contact_owner = dftrace_env_u("DFTRACE_CAPITAL_CONTACT_OWNER");
+		if (delta != NULL && *delta != '\0')
+			dftrace_capital_contact_delta = atoi(delta);
 		if (dftrace_capital_contact_owner > 1u) {
 			fprintf(stderr, "darkfighter trace: invalid capital contact owner %u\n",
 				dftrace_capital_contact_owner);
@@ -2072,12 +2778,34 @@ static void dftrace_init(void)
 	dftrace_spread_screenshot = getenv("DFTRACE_SPREAD_SCREENSHOT");
 	dftrace_pause_test_enabled = getenv("DFTRACE_PAUSE_TEST") != NULL;
 	dftrace_engine_screenshot_prefix = getenv("DFTRACE_ENGINE_SCREENSHOT_PREFIX");
+	{
+		const char *compositor_output = getenv("DFTRACE_BROAD_COMPOSITOR_OUTPUT");
+		if (compositor_output != NULL && *compositor_output != '\0') {
+			dftrace_broad_compositor_file = fopen(compositor_output, "w");
+			if (dftrace_broad_compositor_file == NULL) {
+				perror("darkfighter broadside compositor output");
+				exit(2);
+			}
+		}
+	}
 	dftrace_initialised = 1;
 }
 
-static void DFTrace_Observe(unsigned pc, unsigned x_register)
+static void DFTrace_Observe(unsigned pc, unsigned x_register, unsigned y_register)
 {
 	unsigned host_frame = (unsigned) Atari800_nframes;
+	/* The hook runs immediately before PC.  A preceding STA $3B00,Y has
+	 * therefore completed and Y is still the effective PMG row.  Retain the
+	 * exact production writer for every missile byte without changing guest
+	 * code or sampling only the final framebuffer. */
+	if (dftrace_previous_pc != 0u && MEMORY_mem[dftrace_previous_pc] == 0x99u &&
+		MEMORY_mem[(dftrace_previous_pc + 1u) & 0xffffu] == 0x00u &&
+		MEMORY_mem[(dftrace_previous_pc + 2u) & 0xffffu] == 0x3bu)
+		dftrace_pmg_last_writer[y_register & 0xffu] = dftrace_previous_pc;
+	if (getenv("DFMENU_OUTPUT") != NULL) {
+		dfmenu_observe(pc);
+		return;
+	}
 	if (getenv("DFBOOT_OUTPUT") != NULL) {
 		dfboot_observe(pc);
 		return;
@@ -2316,7 +3044,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 				unsigned player_top = MEMORY_mem[dftrace_player_y];
 				if (state == 2u && owner == dftrace_capital_contact_owner &&
 					horizontal_gap <= 16u && shell_y + 10u >= player_top &&
-					shell_y < player_top + 18u) {
+					shell_y <= player_top + 18u) {
 					dftrace_capital_contact_primed = 1;
 					break;
 				}
@@ -2397,6 +3125,31 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		++dftrace_current.capital_collision_calls;
 	if (pc == dftrace_pc_capital_player_damage)
 		++dftrace_current.capital_player_damage_calls;
+	if (pc == dftrace_pc_capital_player_aabb_hit)
+		dftrace_broad_compositor_event("player_aabb_hit",
+			MEMORY_mem[dftrace_broad_state + 34u]);
+	else if (pc == dftrace_pc_capital_player_aabb_miss)
+		dftrace_broad_compositor_event("player_aabb_miss",
+			MEMORY_mem[dftrace_broad_state + 34u]);
+	if (pc == dftrace_pc_broad_erase_begin)
+		dftrace_broad_compositor_event("erase_begin", x_register);
+	else if (pc == dftrace_pc_broad_erase_restored)
+		dftrace_broad_compositor_event("erase_cells_restored", x_register);
+	else if (pc == dftrace_pc_broad_erase_end)
+		dftrace_broad_compositor_event("erase_end", MEMORY_mem[dftrace_broad_state + 34u]);
+	else if (pc == dftrace_pc_broad_draw_begin)
+		dftrace_broad_compositor_event("draw_begin", x_register);
+	else if (pc == dftrace_pc_broad_backing_captured)
+		dftrace_broad_compositor_event("backing_captured", x_register);
+	else if (pc == dftrace_pc_broad_draw_end)
+		dftrace_broad_compositor_event("draw_end", x_register);
+	else if (pc == dftrace_pc_broad_impact)
+		dftrace_broad_compositor_event("impact_begin", x_register);
+	if (pc == dftrace_pc_rotate_start) {
+		dftrace_current.broad_pre_rotate_screen_transients =
+			dftrace_broad_screen_transient_cells();
+		dftrace_broad_compositor_event("before_rotate", 0xffffffffu);
+	}
 
 	if (dftrace_current.profile_next < DFTRACE_PROFILE_COUNT &&
 		pc == dftrace_pc_profile[dftrace_current.profile_next]) {
@@ -2546,6 +3299,7 @@ static void DFTrace_Observe(unsigned pc, unsigned x_register)
 		dftrace_current.events |= DFTRACE_EVENT_DIRECTOR_EVENT;
 
 	if (pc == dftrace_pc_end) {
+		dftrace_broad_compositor_event("frame_end", 0xffffffffu);
 		dftrace_snapshot_flash(&dftrace_current);
 		dftrace_snapshot_engine(&dftrace_current);
 		dftrace_snapshot_muzzles(&dftrace_current);
