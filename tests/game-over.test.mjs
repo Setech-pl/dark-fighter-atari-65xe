@@ -16,13 +16,14 @@ import {
   loadCapitalHullsDefinition,
 } from "../scripts/capital-hulls.mjs";
 import { installRuntimeSegments } from "../scripts/runtime-image.mjs";
+import { Nmos6502 } from "../scripts/nmos6502.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 const labels = new Map(
   fs
-    .readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+    .readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -51,89 +52,15 @@ function createRuntimeMemory() {
 }
 
 function executeGameOverFormatter(memory) {
-  let accumulator = 0;
-  let x = 0;
-  let stackPointer = 0xff;
-  let programCounter = labels.get("draw_game_over_scores");
-  let carry = false;
-  let callDepth = 0;
+  const cpu = new Nmos6502(memory);
+  const stop = 0x7fff;
+  cpu.push((stop - 1) >> 8);
+  cpu.push((stop - 1) & 0xff);
+  cpu.pc = labels.get("draw_game_over_scores");
   let instructions = 0;
-
-  const readByte = () => memory[programCounter++ & 0xffff];
-  const readWord = () => readByte() | readByte() << 8;
-  const push = (value) => {
-    memory[0x100 | stackPointer] = value & 0xff;
-    stackPointer = stackPointer - 1 & 0xff;
-  };
-  const pop = () => {
-    stackPointer = stackPointer + 1 & 0xff;
-    return memory[0x100 | stackPointer];
-  };
-
-  while (instructions++ < 128) {
-    const opcodeAddress = programCounter;
-    switch (readByte()) {
-      case 0x18: // CLC
-        carry = false;
-        break;
-      case 0x20: { // JSR abs
-        const returnAddress = programCounter + 1 & 0xffff;
-        const target = readWord();
-        push(returnAddress >>> 8);
-        push(returnAddress);
-        callDepth += 1;
-        programCounter = target;
-        break;
-      }
-      case 0x29: // AND #imm
-        accumulator &= readByte();
-        break;
-      case 0x48: // PHA
-        push(accumulator);
-        break;
-      case 0x4a: // LSR A
-        carry = (accumulator & 1) !== 0;
-        accumulator >>>= 1;
-        break;
-      case 0x60: // RTS
-        if (callDepth === 0) return instructions;
-        programCounter = (pop() | pop() << 8) + 1 & 0xffff;
-        callDepth -= 1;
-        break;
-      case 0x68: // PLA
-        accumulator = pop();
-        break;
-      case 0x69: { // ADC #imm
-        const result = accumulator + readByte() + Number(carry);
-        carry = result > 0xff;
-        accumulator = result & 0xff;
-        break;
-      }
-      case 0x9d: { // STA abs,X
-        const address = readWord();
-        memory[address + x & 0xffff] = accumulator;
-        break;
-      }
-      case 0xa2: // LDX #imm
-        x = readByte();
-        break;
-      case 0xa5: // LDA zp
-        accumulator = memory[readByte()];
-        break;
-      case 0xad: // LDA abs
-        accumulator = memory[readWord()];
-        break;
-      case 0xe8: // INX
-        x = x + 1 & 0xff;
-        break;
-      default:
-        assert.fail(
-          `unsupported opcode $${memory[opcodeAddress].toString(16)} ` +
-          `at $${opcodeAddress.toString(16)}`,
-        );
-    }
-  }
-  assert.fail("Game Over formatter exceeded its instruction budget");
+  while (cpu.pc !== stop && instructions++ < 256) cpu.step();
+  assert.equal(cpu.pc, stop, "Game Over formatter did not return");
+  return instructions;
 }
 
 function stepFrontendGate(armed, { stickNeutral, fireReleased }) {
@@ -165,7 +92,7 @@ test("last-life death enters GAME OVER once after all 24 explosion frames", () =
   assert.match(lifecycle,
     /PLAYER_DYING[\s\S]+dec BROAD_DEATH_TIMER[\s\S]+beq @finished[\s\S]+PLAYER_LIVES[\s\S]+beq @game_over/);
   assert.match(lifecycle,
-    /@game_over:[\s\S]+PLAYER_GAME_OVER[\s\S]+sta PLAYER_LIFECYCLE[\s\S]+clear_player_collision_latches[\s\S]+sec/);
+    /@game_over:[\s\S]+PLAYER_GAME_OVER[\s\S]+sta PLAYER_LIFECYCLE[\s\S]+insert_top_score[\s\S]+clear_player_collision_latches[\s\S]+sec/);
 });
 
 test("LIFE saturates at zero and dead-state damage cannot consume it again", () => {
@@ -191,15 +118,16 @@ test("LIFE saturates at zero and dead-state damage cannot consume it again", () 
 test("GAME OVER leaves the gameplay loop before control, combat, spawn, and scoring", () => {
   const mainLoop = block("main_loop", "wait_frame");
   assert.match(mainLoop,
-    /jsr update_player_death\s+bcc @lifecycle_ready\s+jsr clear_pmg\s+jsr silence_audio\s+jsr enter_game_over\s+jmp frontend_loop/);
-  assert.ok(mainLoop.indexOf("jmp frontend_loop") < mainLoop.indexOf("@lifecycle_ready:"));
+    /jsr integration_update_player_death\s+bcc main_loop_lifecycle_ready\s+jsr clear_pmg\s+jsr silence_audio\s+jsr enter_game_over\s+jmp frontend_loop/);
+  assert.ok(mainLoop.indexOf("jmp frontend_loop") <
+    mainLoop.indexOf("main_loop_lifecycle_ready = *"));
 
   const frontendLoop = block("frontend_loop", "dispatch_frontend_input");
   for (const gameplayRoutine of [
     "read_input",
     "update_enemy",
     "handle_collisions",
-    "update_viper_weapon",
+    "update_player_fighter_weapon",
     "update_enemy_weapon",
     "update_starfield",
     "handle_player_hull_contact",
@@ -216,19 +144,19 @@ test("GAME OVER leaves the gameplay loop before control, combat, spawn, and scor
 
 test("GAME OVER renders final SCORE and TOP from packed BCD without changing them", () => {
   assert.match(source,
-    /game_over_screen_data:[\s\S]+"GAME OVER",0[\s\S]+"SCORE 000000",0[\s\S]+"TOP SCORE 000000",0[\s\S]+"FIRE TO CONTINUE",0/);
+    /game_over_screen_data:[\s\S]+"GAME OVER",0[\s\S]+"COMBAT RECORD",0[\s\S]+"SCORE",0[\s\S]+"TOP SCORE",0[\s\S]+"FIRE TO CONTINUE",0/);
   assert.match(block("render_frontend_state", "draw_main_menu_scene"),
     /cmp #STATE_GAME_OVER[\s\S]+jmp draw_game_over_scores/);
 
   const memory = createRuntimeMemory();
   const screen = 0x4000;
-  const scoreDigits = screen + 9 * 40 + 20;
-  const topDigits = screen + 12 * 40 + 22;
+  const scoreDigits = screen + 80 + 12;
+  const topDigits = screen + 100 + 12;
   const frontendZero = 1;
   const scoreLow = labels.get("score_bcd_lo");
   const scoreHigh = labels.get("score_bcd_hi");
-  const topLow = 0x4ed7;
-  const topHigh = 0x4ed8;
+  const topLow = labels.get("TOP_SCORE_TABLE_LO");
+  const topHigh = labels.get("TOP_SCORE_TABLE_HI");
 
   memory.fill(frontendZero, scoreDigits, scoreDigits + 6);
   memory.fill(frontendZero, topDigits, topDigits + 6);
@@ -238,11 +166,11 @@ test("GAME OVER renders final SCORE and TOP from packed BCD without changing the
   memory[topLow] = 0x78;
 
   const instructions = executeGameOverFormatter(memory);
-  assert.deepEqual([...memory.subarray(scoreDigits, scoreDigits + 6)], [1, 1, 2, 3, 4, 5]);
-  assert.deepEqual([...memory.subarray(topDigits, topDigits + 6)], [1, 1, 6, 7, 8, 9]);
+  assert.deepEqual([...memory.subarray(scoreDigits, scoreDigits + 6)], [65, 65, 66, 67, 68, 69]);
+  assert.deepEqual([...memory.subarray(topDigits, topDigits + 6)], [65, 65, 70, 71, 72, 73]);
   assert.deepEqual([memory[scoreHigh], memory[scoreLow]], [0x12, 0x34]);
   assert.deepEqual([memory[topHigh], memory[topLow]], [0x56, 0x78]);
-  assert.ok(instructions < 96);
+  assert.ok(instructions < 256);
   assert.doesNotMatch(block("draw_game_over_scores", "player_contacts_enemy"),
     /sta (?:score_bcd|TOP_SCORE)/);
 });

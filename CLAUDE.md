@@ -1,6 +1,6 @@
 # CLAUDE.md — review contract
 
-Claude Code acts as the independent reviewer for Dark Fighter. Review by default; do not rewrite the implementation unless explicitly asked.
+Claude Code acts as the independent reviewer for Void Strike 65. Review by default; do not rewrite the implementation unless explicitly asked.
 
 Review priorities, in order:
 

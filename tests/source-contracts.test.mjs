@@ -23,19 +23,19 @@ test("source keeps the documented PAL and PMG hardware contract", () => {
   assert.doesNotMatch(rotate, /sta DLISTL/,
     "visible-frame ring rotation must not publish DLISTL directly");
   assert.match(source,
-    /gameplay_dli:[\s\S]+lda gameplay_dli_phase\s+bne @sync_hud[\s\S]+lda PLAYFIELD_ACTIVE_DLIST_LO\s+clc\s+adc #\$03\s+sta DLISTL\s+@sync_gameplay:/,
+    /gameplay_dli:[\s\S]+lda gameplay_dli_phase\s+bne gameplay_dli_sync_hud[\s\S]+lda PLAYFIELD_ACTIVE_DLIST_LO\s+clc\s+adc #\$03\s+sta DLISTL\s+gameplay_dli_sync_gameplay\s*=\s*\*/,
     "the first gameplay DLI must select byte three of the active A2 list before playfield DMA");
   assert.match(source,
-    /@hud:[\s\S]+sta gameplay_dli_phase[\s\S]+publish_playfield_display_list = @hud\s+pla\s+rti/,
+    /gameplay_dli_hud\s*=\s*\*[\s\S]+sta gameplay_dli_phase[\s\S]+publish_playfield_display_list = gameplay_dli_hud\s+pla[\s\S]+rti/,
     "the final gameplay DLI must leave next-frame publication to the active list JVB");
-  assert.match(source, /\.byte \$47,<SCREEN,>SCREEN\s+; ANTIC 7 title/);
-  assert.match(source, /\.byte \$02\s+; 40-column ANTIC 2 control hint/);
+  assert.match(source, /main_menu_display_list:[\s\S]+\.byte \$70,\$70,\$70,\$47,<SCREEN,>SCREEN/);
+  assert.match(source, /\.byte \$42,<\(SCREEN\+300\),>\(SCREEN\+300\)/);
   assert.match(source, /lda #\$3E\s+; normal playfield, single-line PMG DMA/);
-  assert.match(source, /lda #\$70\s*\n@wait_for_line:/);
+  assert.match(source, /ldx #\$70\s*\nwait_frame_at_line:\s*\n@wait_for_line:/);
 });
 
 test("accepted gameplay screen reference and its mapping decision are versioned", () => {
-  assert.ok(fs.existsSync(path.join(rootDirectory, "assets", "graphics", "dark-fighter-screen-concept-v1.png")));
+  assert.ok(fs.existsSync(path.join(rootDirectory, "assets", "graphics", "void-strike-65-screen-concept-v1.png")));
   assert.ok(fs.existsSync(path.join(rootDirectory, "docs", "decisions", "ADR-002-gameplay-screen.md")));
 });
 
@@ -44,4 +44,36 @@ test("linker allows loader-only PMG tail but protects screen memory", () => {
   assert.match(config, /MAIN:\s+start = \$2000, size = \$2000/);
   assert.match(config, /BOOTTAIL:\s+start = \$4000/);
   assert.match(config, /BROADSIDE_RAM:\s+start = \$5E10/);
+});
+
+test("current documentation keeps implemented, planned and historical state distinct", () => {
+  const read = (name) => fs.readFileSync(path.join(rootDirectory, name), "utf8");
+  const gameDesign = read("docs/game-design.md");
+  const architecture = read("docs/architecture.md");
+  const artDirection = read("docs/art-direction.md");
+  const roadmap = read("docs/roadmap.md");
+  const runtimeHeadroom = read("docs/runtime-headroom.md");
+  const currentSources = [gameDesign, architecture, artDirection, roadmap,
+    runtimeHeadroom, read("docs/memory-map.md")].join("\n");
+
+  assert.match(gameDesign, /The gameplay HUD contains `SCORE`, `LIFE`, and `HULL`\./);
+  assert.match(gameDesign, /full `BOOST` label/);
+  assert.doesNotMatch(gameDesign, /\b(?:ARM|FUEL)\b/);
+  assert.match(gameDesign, /Rapid Fire — implemented/);
+  assert.match(gameDesign, /Spread Shot — implemented/);
+  assert.match(gameDesign, /Shield Booster — implemented/);
+  assert.doesNotMatch(currentSources, /\$8100-\$99A3/);
+  assert.doesNotMatch(currentSources, /\$8100-\$(?:9AA3|9A3D)/);
+  assert.match(architecture, /stage it at\s+`\$8100-\$9ACE`/);
+  assert.match(architecture, /packs them to \*\*1,929 bytes\*\*/);
+  assert.doesNotMatch(currentSources, /\b2,?027[- ]bytes\b/i);
+  assert.doesNotMatch(artDirection, /\bresidual\b/i);
+  assert.doesNotMatch(roadmap, /next[^\n]*entity\/effects foundation/i);
+  assert.doesNotMatch(runtimeHeadroom, /feature\/runtime-headroom/);
+  assert.match(gameDesign,
+    /Rapid Fire[\s\S]+projectiles retain the Player Fighter's established\s+yellow\/gold/);
+  assert.match(gameDesign,
+    /normal Player Fighter weapon fires an eight-projectile burst[\s\S]+Rapid Fire[\s\S]+burst to ten projectiles[\s\S]+normal eight-salvo burst/);
+  assert.doesNotMatch(gameDesign, /normal Player Fighter weapon fires a ten-projectile burst/);
+  assert.doesNotMatch(currentSources, /Rapid Fire projectile:[^\n]*red/i);
 });

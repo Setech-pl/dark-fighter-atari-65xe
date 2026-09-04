@@ -1,3 +1,5 @@
+import { canonicalPlayfield } from "./playfield.mjs";
+
 export const BROADSIDE_STATES = Object.freeze({ FREE: 0, WARNING: 1, FLYING: 2, IMPACT: 3 });
 export const BROADSIDE_OWNERS = Object.freeze({ allied: 0, enemy: 1 });
 export const MISSILE_MASKS = Object.freeze([0x03, 0x0c, 0x30, 0xc0]);
@@ -12,8 +14,8 @@ export const HULL_SCROLL_DIFFICULTIES = Object.freeze({
 export const PMG_LEFT_EDGE = 48;
 export const PMG_SCREEN_TOP = 8;
 export const GAMEPLAY_FIRST_HULL_ROW = 1;
-export const GAMEPLAY_HULL_ROWS = 23;
-export const BROADSIDE_WARNING_Y_MAX = 191;
+export const GAMEPLAY_HULL_ROWS = canonicalPlayfield.gameplayRows;
+export const BROADSIDE_WARNING_Y_MAX = canonicalPlayfield.gameplayBottom - 9;
 export const CAPITAL_SECTOR_STATES = Object.freeze({
   ENGINES: 0,
   AFT: 1,
@@ -31,7 +33,7 @@ export const PLAYER_LIFECYCLE_STATES = Object.freeze({
   GAME_OVER: 3,
 });
 export const PLAYER_RESPAWN_X = 124;
-export const PLAYER_RESPAWN_Y = 184;
+export const PLAYER_RESPAWN_Y = canonicalPlayfield.gameplayBottom - 15;
 export const SHARED_FIGHTER_EXPLOSION_TOTAL = 24;
 
 function invariant(condition, message) {
@@ -277,7 +279,9 @@ export function resetExitedTurretLifecycles(state, asset, world) {
     if (leftRow === null) continue;
     for (const turret of asset.turrets) {
       const sideRow = sectorRowForSide(asset, turret.side, leftRow);
-      if (sideRow !== null && asset.sector.cannonRowsBySide.get(turret.side).includes(sideRow)) {
+      const cannonRows = asset.sector.cannonRowsByDifficulty
+        .get(turret.side).get(world.difficulty);
+      if (sideRow !== null && cannonRows.includes(sideRow)) {
         visible.add(`${turret.id}:${sideRow}`);
       }
     }
@@ -303,7 +307,8 @@ export function selectOldestEligibleTurret(state, asset, world, side) {
     world.visibleRows.forEach((leftRow, visibleOffset) => {
       if (leftRow === null) return;
       const sideRow = sectorRowForSide(asset, side, leftRow);
-      if (sideRow === null || !asset.sector.cannonRowsBySide.get(side).includes(sideRow)) return;
+      const cannonRows = asset.sector.cannonRowsByDifficulty.get(side).get(world.difficulty);
+      if (sideRow === null || !cannonRows.includes(sideRow)) return;
       const lifecycleId = `${turret.id}:${sideRow}`;
       if (state.firedTurrets.has(lifecycleId)) return;
     const visibleScreenRow = GAMEPLAY_FIRST_HULL_ROW + visibleOffset;
@@ -531,7 +536,7 @@ export function heavyShellVisual(slot, asset, frame) {
   invariant(slot.state === BROADSIDE_STATES.FLYING,
     "Heavy-shell visual requires a FLYING slot");
   const visual = asset.broadside.projectileVisuals.capital;
-  const faction = slot.owner === "allied" ? "colonial" : "cylon";
+  const faction = slot.owner === "allied" ? "allied" : "hostile";
   return {
     x: slot.x,
     y: slot.y,
@@ -539,10 +544,12 @@ export function heavyShellVisual(slot, asset, frame) {
     height: visual.height,
     width: visual.widthHpos,
     occupiedPixels: visual.widthHpos * visual.height - 8,
-    phase: (frame >> 1) & 1,
+    phase: 0,
+    connectedObjects: 1,
+    glyphs: [126, 127],
     renderer: "ANTIC4_PLAYFIELD_OVERLAY",
-    color: faction === "colonial" ? visual.colonialValue : visual.cylonValue,
-    attribute: faction === "colonial" ? visual.colonialAttribute : visual.cylonAttribute,
+    color: faction === "allied" ? visual.alliedValue : visual.hostileValue,
+    attribute: faction === "allied" ? visual.alliedAttribute : visual.hostileAttribute,
   };
 }
 
@@ -877,12 +884,11 @@ export function simulateBroadsideCadence(asset, { frames = 1000, difficulty = "h
         state.scheduleTimer = asset.broadside.retryDelayFrames;
       } else {
         const schedule = asset.schedule[state.scheduleIndex];
-        const selected = selectOldestEligibleTurret(
-          state,
-          asset,
-          world,
-          schedule.side,
-        );
+        const selected = ["allied", "enemy"]
+          .map((side) => selectOldestEligibleTurret(state, asset, world, side))
+          .filter(Boolean)
+          .sort((left, right) => right.visibleScreenRow - left.visibleScreenRow ||
+            left.turretIndex - right.turretIndex)[0];
         if (!selected) {
           deferred.invisible += 1;
           state.scheduleTimer = asset.broadside.retryDelayFrames;
@@ -914,6 +920,13 @@ export function simulateBroadsideCadence(asset, { frames = 1000, difficulty = "h
     advanceWorldScroll(world, asset);
     if (advanceHullScroll(world, asset)) {
       resetExitedTurretLifecycles(state, asset, world);
+      const newTopRow = world.visibleRows[0];
+      const newStation = newTopRow !== null && ["allied", "enemy"].some((side) => {
+        const sideRow = sectorRowForSide(asset, side, newTopRow);
+        return sideRow !== null &&
+          asset.sector.cannonRowsByDifficulty.get(side).get(difficulty).includes(sideRow);
+      });
+      if (newStation) state.scheduleTimer = 1;
       scrollEvents.push(frame);
       for (const slot of state.slots) {
         if (slot.state !== BROADSIDE_STATES.WARNING) continue;

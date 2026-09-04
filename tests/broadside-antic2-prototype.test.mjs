@@ -113,8 +113,8 @@ test("ANTIC 2 palette is genuinely monochrome while PMG remains source-derived",
   );
   const changedPlayer = replaceOnce(
     source,
-    "player_shape:\n    .byte %00011000",
-    "player_shape:\n    .byte %00010000",
+    "    .byte %11111111\n    .byte %11011011",
+    "    .byte %11111110\n    .byte %11011011",
   );
   assert.notDeepEqual(
     createBroadsideAntic2PrototypePreview(
@@ -126,8 +126,8 @@ test("ANTIC 2 palette is genuinely monochrome while PMG remains source-derived",
   );
   const changedEngine = replaceOnce(
     source,
-    "lda #$28                    ; amber engine plume",
-    "lda #$2A                    ; amber engine plume",
+    "player_engine_shape:\n    .byte $00,$00,$00,$00\n    .byte %00011000",
+    "player_engine_shape:\n    .byte $00,$00,$00,$00\n    .byte %00011001",
   );
   assert.notDeepEqual(
     createBroadsideAntic2PrototypePreview(

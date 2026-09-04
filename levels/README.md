@@ -1,7 +1,7 @@
 # Level data
 
-Future level wave tables, formation descriptors and bounded encounter data will
-live here when roadmap milestone 5 is implemented. Gameplay remains one
+Future level wave tables, formation descriptors, and bounded encounter data will
+live here when level progression is prioritized on the current roadmap. Gameplay remains one
 resident program: these source definitions will be assembled into the
 self-contained XEX/ATR, not loaded as mission packages between normal levels.
 

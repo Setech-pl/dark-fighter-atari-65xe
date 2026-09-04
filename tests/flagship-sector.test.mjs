@@ -51,12 +51,14 @@ import {
   readCapitalHullExplosionSequenceRuntimeState,
   readProwSequenceRuntimeState,
 } from "../scripts/preview.mjs";
+import { readRuntimeBytes } from "../scripts/runtime-image.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const definitionPath = path.join(rootDirectory, "assets", "graphics", "capital-hulls.json");
 const sourcePath = path.join(rootDirectory, "src", "main.s");
 const source = fs.readFileSync(sourcePath, "utf8");
+const glueSource = fs.readFileSync(path.join(rootDirectory, "src", "integration-glue.s"), "utf8");
 const definition = loadCapitalHullsDefinition(definitionPath);
 const asset = compileCapitalHulls(definition);
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -122,7 +124,7 @@ function popcount(byte) {
 
 function readLabels() {
   const labels = new Map();
-  for (const line of fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  for (const line of fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)) {
     const match = /^al ([0-9A-Fa-f]{6}) \.([A-Za-z_][A-Za-z0-9_]*)$/.exec(line);
     if (match) labels.set(match[2], Number.parseInt(match[1], 16));
@@ -130,31 +132,31 @@ function readLabels() {
   return labels;
 }
 
-test("finite flagship descriptors traverse engines through prow in exactly 240 compact rows", () => {
+test("finite flagship descriptors traverse one stern and bow through exactly 480 compact rows", () => {
   assert.deepEqual(
     asset.sector.sections.map(({ id, rows, start, end, weaponEligible }) =>
       [id, rows, start, end, weaponEligible]),
     [
       ["engines", 32, 0, 32, false],
-      ["aft", 24, 32, 56, false],
-      ["combat", 128, 56, 184, true],
-      ["forward", 24, 184, 208, false],
-      ["prow", 32, 208, 240, false],
+      ["aft", 80, 32, 112, true],
+      ["combat", 256, 112, 368, true],
+      ["forward", 80, 368, 448, true],
+      ["prow", 32, 448, 480, false],
     ],
   );
-  assert.equal(asset.sector.totalRows, 240);
+  assert.equal(asset.sector.totalRows, 480);
   assert.equal(asset.sector.moduleRows, 8);
-  assert.deepEqual([...asset.sector.moduleSequences.values()].map(({ length }) => length), [30, 30]);
+  assert.deepEqual([...asset.sector.moduleSequences.values()].map(({ length }) => length), [60, 60]);
   assert.deepEqual([...asset.sector.moduleSourceRowsBySide.values()].map(({ length }) => length),
     [96, 96]);
-  assert.ok(60 + 192 < 240 * 16,
-    "module sequences and source-row dictionaries stay far below a raw 240x16 map");
-  assert.equal(asset.sector.sections[2].weaponShutdownRows, 8);
+  assert.ok(120 + 192 < 480 * 16,
+    "module sequences and source-row dictionaries stay far below a raw 480x16 map");
+  assert.equal(asset.sector.sections[2].weaponShutdownRows, 0);
 });
 
 test("both ships share one finite progression and retain an immutable eight-row phase", () => {
   assert.equal(asset.sector.sidePhaseRows, 8);
-  assert.equal(asset.sector.streamRows, 248);
+  assert.equal(asset.sector.streamRows, 488);
   const seen = { allied: [], enemy: [] };
   for (let streamRow = 0; streamRow < asset.sector.streamRows; streamRow += 1) {
     for (const side of ["allied", "enemy"]) {
@@ -165,26 +167,23 @@ test("both ships share one finite progression and retain an immutable eight-row 
     const enemyRow = sectorRowForSide(asset, "enemy", streamRow);
     if (alliedRow !== null && enemyRow !== null) assert.equal(alliedRow - enemyRow, 8);
   }
-  assert.deepEqual(seen.allied, Array.from({ length: 240 }, (_, row) => row));
-  assert.deepEqual(seen.enemy, Array.from({ length: 240 }, (_, row) => row));
+  assert.deepEqual(seen.allied, Array.from({ length: 480 }, (_, row) => row));
+  assert.deepEqual(seen.enemy, Array.from({ length: 480 }, (_, row) => row));
   const world = createWorldScrollState(asset, { difficulty: "hard" });
   let frame = 0;
   while (!world.hullDrained && frame < 2000) {
     frame += 1;
     advanceHullScroll(world, asset);
   }
-  assert.equal(world.corridorPhase, 248);
-  assert.equal(world.drainRows, 23);
-  assert.equal(world.hullAdvances, 271);
-  assert.equal(frame, 542);
+  assert.equal(world.corridorPhase, 488);
+  assert.equal(world.drainRows, 28);
+  assert.equal(world.hullAdvances, 516);
+  assert.equal(frame, 1032);
 });
 
-test("assembled sector dictionaries, sequences, overlays, and animation match the source asset", () => {
-  const runtime = fs.readFileSync(path.join(rootDirectory, "build", "broadside-runtime.bin"));
+test("assembled sector dictionaries, sequences, and overlays match the source asset", () => {
   const labels = readLabels();
-  const runAddress = labels.get("__BROADSIDE_RUN__");
-  const read = (label, length) => runtime.subarray(labels.get(label) - runAddress,
-    labels.get(label) - runAddress + length);
+  const read = (label, length) => readRuntimeBytes(rootDirectory, labels.get(label), length);
   for (const side of ["allied", "enemy"]) {
     assert.deepEqual(
       read(`${side}_sector_module_sources`, asset.sector.moduleSourceRowsBySide.get(side).length),
@@ -208,21 +207,24 @@ test("assembled sector dictionaries, sequences, overlays, and animation match th
       Buffer.from(asset.sector.prowCollisionBoundaries.get(side)),
     );
   }
-  const animations = ["allied", "enemy"].flatMap((side) =>
-    asset.sector.engineGlyphs.get(side).animationBytes.flatMap((frame) => [...frame]));
-  assert.deepEqual(read("engine_animation_frames", animations.length), Buffer.from(animations));
 });
 
-test("only reduced-density combat modules contain staggered functional cannons", () => {
+test("seeded layouts expose exact 8/12/16 independent functional cannons", () => {
   const allied = asset.sector.cannonRowsBySide.get("allied");
   const enemy = asset.sector.cannonRowsBySide.get("enemy");
-  assert.deepEqual(allied, [64, 96, 128, 160]);
-  assert.deepEqual(enemy, [68, 100, 132, 164]);
-  assert.equal(allied.some((row) => enemy.includes(row)), false);
+  assert.deepEqual(allied, [33, 65, 89, 113, 153, 177, 201, 225,
+    249, 289, 313, 337, 361, 385, 409, 441]);
+  assert.deepEqual(enemy, [33, 57, 97, 121, 145, 169, 193, 233,
+    257, 281, 305, 329, 353, 393, 417, 441]);
+  assert.equal(allied.filter((row) => enemy.includes(row)).length, 2);
   for (const rows of [allied, enemy]) {
-    assert.equal(rows.length, 4);
-    assert.equal(rows.every((row) => row >= 56 && row < 176), true);
-    assert.equal(rows.every((row, index) => index === 0 || row - rows[index - 1] === 32), true);
+    assert.equal(rows.length, 16);
+    assert.equal(rows.every((row) => row >= 32 && row < 448), true);
+    assert.equal(rows.every((row, index) => index === 0 || row - rows[index - 1] >= 24), true);
+  }
+  for (const side of ["allied", "enemy"]) {
+    assert.deepEqual(["easy", "medium", "hard"].map((difficulty) =>
+      asset.sector.cannonRowsByDifficulty.get(side).get(difficulty).length), [8, 12, 16]);
   }
   for (let phase = 0; phase <= asset.sector.totalRows; phase += 1) {
     for (const side of ["allied", "enemy"]) {
@@ -235,8 +237,8 @@ test("only reduced-density combat modules contain staggered functional cannons",
   }
 });
 
-test("flagship keeps the accepted cadence, warning, speed, damage, and M0 ownership", () => {
-  assert.deepEqual([...asset.scheduleBytes], [1, 68, 0, 126, 1, 68, 0, 138]);
+test("flagship keeps the provisional cadence, warning, speed, damage, and M0 ownership", () => {
+  assert.deepEqual([...asset.scheduleBytes], [1, 68, 1, 68, 1, 68, 0, 138]);
   assert.equal(asset.broadside.warningFrames, 25);
   assert.equal(asset.broadside.projectileSpeed, 2);
   assert.equal(asset.broadside.playerDamage, 20);
@@ -248,7 +250,7 @@ test("flagship keeps the accepted cadence, warning, speed, damage, and M0 owners
     "changing M1 size preserves M0's pair");
 });
 
-test("heavy slugs use a two-cell six-line playfield lozenge and restore exact backing", () => {
+test("heavy slugs use one connected two-cell six-line playfield lozenge", () => {
   const slot = {
     state: BROADSIDE_STATES.FLYING,
     missile: 2,
@@ -259,18 +261,20 @@ test("heavy slugs use a two-cell six-line playfield lozenge and restore exact ba
   assert.deepEqual([0, 1, 2, 3].map((frame) => heavyShellVisual(slot, asset, frame).height),
     [6, 6, 6, 6]);
   assert.deepEqual([0, 1, 2, 3].map((frame) => heavyShellVisual(slot, asset, frame).phase),
-    [0, 0, 1, 1]);
+    [0, 0, 0, 0]);
   const visual = heavyShellVisual(slot, asset, 0);
-  assert.deepEqual([visual.width, visual.height, visual.occupiedPixels, visual.renderer],
-    [8, 6, 40, "ANTIC4_PLAYFIELD_OVERLAY"]);
-  assert.equal(visual.width >= asset.broadside.projectileVisuals.raider.widthHpos * 2, true);
+  assert.deepEqual([visual.width, visual.height, visual.occupiedPixels,
+    visual.connectedObjects, visual.glyphs, visual.renderer],
+  [8, 6, 40, 1, [126, 127], "ANTIC4_PLAYFIELD_OVERLAY"]);
+  assert.equal(visual.width >= asset.broadside.projectileVisuals.interceptor.widthHpos * 2, true);
 
   const overlayRoutine = source.slice(
     source.indexOf("render_capital_shell_overlays:"),
     source.indexOf("draw_broadside_span:"),
-  );
+  ) + glueSource.slice(glueSource.indexOf("render_capital_shell_overlay:"),
+    glueSource.indexOf("integration_broadside_release:"));
   assert.match(overlayRoutine,
-    /BROAD_PREV_H,x[\s\S]+sta BROAD_PREV_Y,x[\s\S]+iny[\s\S]+sta BROAD_COLLISION,x[\s\S]+sta \(dst_ptr\),y[\s\S]+iny[\s\S]+sta \(dst_ptr\),y/);
+    /BROAD_PREV_H,x[\s\S]+sta BROAD_PREV_Y,x[\s\S]+iny[\s\S]+sta BROAD_COLLISION,x[\s\S]+CAPITAL_SHELL_LEFT_GLYPH[\s\S]+sta \(dst_ptr\),y[\s\S]+adc #\$01[\s\S]+sta \(dst_ptr\),y/);
   assert.doesNotMatch(overlayRoutine, /COLPM|COLPF|PRIOR|MISSILES/,
     "playfield overlay cannot flicker shared PMG colours or consume M0-M3");
 });
@@ -305,7 +309,7 @@ test("engine banks are character-animated, non-weapon modules with no PMG alloca
     assert.equal(engineGlyph.animationBytes.every((frame) =>
       [...frame].flatMap(decodeAntic4Byte).every((pixel) => pixel !== 0)), true,
     `${side} core glyph contains no checkerboard holes`);
-    assert.equal(asset.sector.cannonRowsBySide.get(side).some((row) => row >= 208), false);
+    assert.equal(asset.sector.cannonRowsBySide.get(side).some((row) => row >= 448), false);
     assert.ok(asset.sector.engineOverlayMasks.get(side).some((mask) => mask !== 0));
   }
   for (const [side, expectedApertures] of [["allied", 2], ["enemy", 2]]) {
@@ -333,6 +337,155 @@ test("engine banks are character-animated, non-weapon modules with no PMG alloca
   assert.equal(asset.sector.engineAnimationFrames, 8);
 });
 
+test("H4.2 C INDUSTRIAL preserves its structural and immutable data contracts", () => {
+  const structuralGlyphNames = [
+    "allied_plate_mass", "allied_plate_edge", "allied_plate_lip", "allied_vertical_rib",
+    "allied_vent", "allied_service", "allied_inner_edge", "allied_turret_base",
+    "allied_turret_housing", "enemy_slab_mass", "enemy_slab_void", "enemy_vertical_rib",
+    "enemy_slab_cap", "enemy_seam", "enemy_sensor", "enemy_inner_edge",
+    "enemy_turret_base", "enemy_turret_housing",
+  ];
+  assert.equal(sha256(Buffer.concat(structuralGlyphNames.map((name) =>
+    Buffer.from(asset.glyphs.find((glyph) => glyph.name === name).bytes)))),
+  "e5dd63f4a702e47000d30f946086b5f5694527338a00a2d854ebaecc19862b36",
+  "approved C INDUSTRIAL structural panels changed");
+
+  const changedGlyphNames = new Set([
+    "allied_plate_lip", "allied_vertical_rib", "allied_vent", "allied_service",
+    "allied_turret_base", "allied_turret_housing", "enemy_slab_void",
+    "enemy_vertical_rib", "enemy_slab_cap", "enemy_seam", "enemy_sensor",
+    "enemy_turret_base", "enemy_turret_housing",
+  ]);
+  let checkerboards = 0;
+  for (const glyph of asset.glyphs.filter(({ index }) => index <= 80 || index === 85 || index === 86)) {
+    const pixels = glyph.pixels.flat();
+    const base = glyph.faction === "allied" ? 2 : 3;
+    for (let y = 0; y < 7; y += 1) {
+      for (let x = 0; x < 3; x += 1) {
+        const [a, b, c, d] = [
+          pixels[y * 4 + x], pixels[y * 4 + x + 1],
+          pixels[(y + 1) * 4 + x], pixels[(y + 1) * 4 + x + 1],
+        ];
+        if (a === d && b === c && a !== b) checkerboards += 1;
+      }
+    }
+    if (changedGlyphNames.has(glyph.name)) {
+      const detailMask = Uint8Array.from(pixels, (pixel) => pixel === base ? 0 : 1);
+      assert.equal(connectedAreas(detailMask, 4, 8).includes(1), false,
+        `${glyph.name} must not contain singleton structural detail`);
+    }
+  }
+  assert.equal(checkerboards, 0, "C INDUSTRIAL must remain checkerboard-free");
+
+  let crossGlyphDetailPairs = 0;
+  let connectedCrossGlyphDetailPairs = 0;
+  const sourceGlyphs = new Map(definition.glyphs.map((glyph) => [glyph.name, glyph]));
+  for (const side of ["allied", "enemy"]) {
+    const base = side === "allied" ? 2 : 3;
+    for (const sourceRow of definition.maps[side].rows) {
+      const cells = typeof sourceRow === "string" ? sourceRow.trim().split(/\s+/) : sourceRow;
+      for (let column = 0; column < cells.length - 1; column += 1) {
+        const left = sourceGlyphs.get(cells[column]);
+        const right = sourceGlyphs.get(cells[column + 1]);
+        if (!left || !right) continue;
+        for (let y = 0; y < 8; y += 1) {
+          const a = Number(left.pixels[y][3]);
+          const b = Number(right.pixels[y][0]);
+          if (a !== base && b !== base) {
+            crossGlyphDetailPairs += 1;
+            if (a === b) connectedCrossGlyphDetailPairs += 1;
+          }
+        }
+      }
+    }
+  }
+  assert.deepEqual(
+    [crossGlyphDetailPairs, connectedCrossGlyphDetailPairs],
+    [157, 110],
+    "C INDUSTRIAL cross-glyph seams and ribs changed",
+  );
+
+  assert.equal(sha256(Buffer.concat([83, 84].flatMap((index) =>
+    asset.glyphs.find((glyph) => glyph.index === index).animationBytes.map(Buffer.from)))),
+  "19bcf1aadda6a0483653c2c21963d0c658c176760141f91c14154a85267dce70",
+  "engine glyphs 83/84 or their phase tables changed");
+  assert.equal(sha256(Buffer.concat([87, 88, 89].map((index) =>
+    Buffer.from(asset.glyphs.find((glyph) => glyph.index === index).bytes)))),
+  "67c5cb64a1d182665ffffbe3764bd7b1fd039fa3e70fed143da9d0e3cd3a15d5",
+  "explosion glyphs 87-89 changed");
+
+  const immutableDataHashes = {
+    allied: {
+      packedMap: "1a2023caff1990326716d34e908fee39d370f7578fe8822d2da660906853d57e",
+      codebook: "6a28f6c21aec3df87a49dc11bcd83ddbf7dfe8faaa454744bb41c9bffaa24bbd",
+      moduleSequence: "0e4e7aeadf4ad9e00c694478b5b38a192c01424553cf9cfe57d18a0ea1116eff",
+      engineMask: "3ca8b33addc3c2b7e5d0433933d35df72418834372d2936bf0c92a6d1fa90540",
+    },
+    enemy: {
+      packedMap: "34880d6f2f22235d6ab415fe52c061623d0d101401efe8041d464a639b7ef732",
+      codebook: "acdffb56b2be74db1c8368131226eaa0354de965f192b645e5bfb1f35604b006",
+      moduleSequence: "7699903ada6f5d3a1c973ed00fde7d4995de8a328ded8e54b0e8e4a70eba6707",
+      engineMask: "61d785f12bfc2cabf806d5bffa974c6bf641363c86b48ecaddc365bb48d9fd4c",
+    },
+  };
+  for (const side of ["allied", "enemy"]) {
+    assert.deepEqual({
+      packedMap: sha256(asset.packedMaps.get(side)),
+      codebook: sha256(asset.codebooks.get(side)),
+      moduleSequence: sha256(asset.sector.moduleSequences.get(side)),
+      engineMask: sha256(asset.sector.engineOverlayMasks.get(side)),
+    }, immutableDataHashes[side], `${side} maps/codebooks/module sequence/engine mask changed`);
+  }
+});
+
+test("capital-engine phases preserve H4.2 hull glyphs outside declared engine cells", () => {
+
+  for (const side of ["allied", "enemy"]) {
+    const engineGlyph = asset.sector.engineGlyphs.get(side);
+    const screenRows = asset.sector.sectorScreenRowsBySide.get(side);
+    const legalCells = new Set();
+    const observedCells = new Set();
+
+    for (let sectorRow = 0; sectorRow < asset.sector.totalRows; sectorRow += 1) {
+      const moduleId = asset.sector.moduleIdFor(side, sectorRow);
+      if (moduleId === asset.sector.engineModuleIds.get(side)) {
+        const mask = asset.sector.engineOverlayMasks.get(side)[sectorRow % asset.sector.moduleRows];
+        for (let baseColumn = 0; baseColumn < 8; baseColumn += 1) {
+          if (mask & (1 << baseColumn)) {
+            const mapColumn = side === "allied" ? baseColumn : baseColumn + 1;
+            legalCells.add(`${sectorRow}:${mapColumn}`);
+          }
+        }
+      }
+      for (let mapColumn = 0; mapColumn < screenRows[sectorRow].length; mapColumn += 1) {
+        if (screenRows[sectorRow][mapColumn] === engineGlyph.screenCode) {
+          observedCells.add(`${sectorRow}:${mapColumn}`);
+        }
+      }
+    }
+
+    assert.deepEqual(observedCells, legalCells,
+      `${side} engine glyph may occur only in declared engine-overlay cells`);
+    assert.equal(asset.decodedMaps.get(side).flat().includes(engineGlyph.screenCode), false,
+      `${side} reusable hull map must not share the animated engine glyph`);
+    assert.deepEqual(engineGlyph.animationBytes[0], engineGlyph.bytes,
+      `${side} phase zero must preserve the accepted c897cf0 engine/nozzle artwork`);
+
+    const stableGlyphs = asset.glyphs.filter(({ screenCode }) =>
+      screenCode !== engineGlyph.screenCode).map(({ bytes }) => Buffer.from(bytes));
+    for (const phase of [0, 1, 0]) {
+      assert.equal(engineGlyph.animationBytes[phase].length, 8,
+        `${side} phase ${phase} writes one complete glyph only`);
+      assert.deepEqual(
+        asset.glyphs.filter(({ screenCode }) => screenCode !== engineGlyph.screenCode)
+          .map(({ bytes }) => Buffer.from(bytes)),
+        stableGlyphs,
+        `${side} phase ${phase} must leave every non-engine hull glyph stable`,
+      );
+    }
+  }
+});
+
 test("stern-first modules expand from exhaust into nozzles and finish in tapered bow tips", () => {
   for (const side of ["allied", "enemy"]) {
     const masks = [...asset.sector.engineOverlayMasks.get(side)];
@@ -349,7 +502,7 @@ test("stern-first modules expand from exhaust into nozzles and finish in tapered
     assert.ok(new Set(widths.slice(-12)).size >= 3,
       `${side} has its strongest taper in the final twelve rows`);
     assert.equal(asset.sector.cannonRowsBySide.get(side)
-      .every((row) => row >= 56 && row < 176), true);
+      .every((row) => row >= 32 && row < 448), true);
     const edge = asset.sector.prowEdgeGlyphs.get(side);
     const edgeWidths = edge.pixels.map((row) => row.filter((pixel) => pixel !== 0).length);
     assert.ok(Math.min(...edgeWidths) < 4 && Math.max(...edgeWidths) === 4,
@@ -470,7 +623,7 @@ test("assembled explosion tables, restoration, collision isolation, and sound ow
     Buffer.from(explosion.runtimeControlBytes));
   const effectRoutine = source.slice(
     source.indexOf("begin_capital_hull_explosion:"),
-    source.indexOf("broadside_hits_opposite_hull:"),
+    source.indexOf("capital_shell_collision_flags:"),
   );
   assert.match(effectRoutine, /CAPITAL_EXPLOSION_BACKUP/);
   assert.match(effectRoutine, /cmp #CAPITAL_HULL_GLYPH_BASE/);
@@ -486,8 +639,8 @@ test("drain blocks new warnings and reaches COMPLETE only after every attached e
   const cadenceAtEnd = simulateBroadsideCadence(asset, { frames: 2000, difficulty: "hard" });
   const cadenceMuchLater = simulateBroadsideCadence(asset, { frames: 10000, difficulty: "hard" });
   assert.equal(cadenceAtEnd.finalSectorState, CAPITAL_SECTOR_STATES.COMPLETE);
-  assert.equal(cadenceAtEnd.finalCorridorPhase, 248);
-  assert.equal(cadenceAtEnd.drainRows, 23);
+  assert.equal(cadenceAtEnd.finalCorridorPhase, 488);
+  assert.equal(cadenceAtEnd.drainRows, 28);
   assert.deepEqual(cadenceMuchLater.warningStarts, cadenceAtEnd.warningStarts,
     "no cannon event is created after the engine section");
 
@@ -496,7 +649,7 @@ test("drain blocks new warnings and reaches COMPLETE only after every attached e
     initialSectorPhase: asset.sector.streamRows,
   });
   world.hullDrained = true;
-  world.drainRows = 23;
+  world.drainRows = 28;
   world.sectorState = CAPITAL_SECTOR_STATES.DRAIN;
   const state = createBroadsideState(asset);
   state.slots[0].state = BROADSIDE_STATES.FLYING;
@@ -511,9 +664,9 @@ test("drain blocks new warnings and reaches COMPLETE only after every attached e
   assert.equal(updateSectorCompletion(world, state), CAPITAL_SECTOR_STATES.COMPLETE);
 
   for (const [difficulty, completeFrame] of [
-    ["easy", 678],
-    ["medium", 603],
-    ["hard", 542],
+    ["easy", 1290],
+    ["medium", 1147],
+    ["hard", 1032],
   ]) {
     assert.notEqual(
       simulateBroadsideCadence(asset, { frames: completeFrame - 1, difficulty }).finalSectorState,

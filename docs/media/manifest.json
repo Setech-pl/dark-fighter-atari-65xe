@@ -3,60 +3,60 @@
   "generatedBy": "scripts/github-showcase.mjs",
   "runtimeEvidence": {
     "xex": {
-      "path": "dist/dark-fighter.xex",
-      "bytes": 16396,
-      "sha256": "a850f69478fee5e0847a04213cba0a23dfd9f6d1862574088354c4ba9cc6727d"
+      "path": "dist/void-strike-65.xex",
+      "bytes": 21399,
+      "sha256": "ab682d8477723c8b5b911a712a39d8cb54ab72d557c9a3ba50346730f1e51ed9"
     },
     "atr": {
-      "path": "dist/dark-fighter.atr",
+      "path": "dist/void-strike-65.atr",
       "bytes": 92176,
-      "sha256": "ea2b2d386b9e9ec2d6c533ea88b944e2c00c28c12f080864abc28f5485fa8183"
+      "sha256": "71feea6985c2fd552e9143cb1b716e331473f4da0e78f0cde7bf9aa67e893afc"
     },
     "wallTrace": {
       "path": "docs/runtime-wall-trace.json",
-      "sha256": "713f2f2b72068ec714d3ac6ec3dc154ed27c85b81ecf40995ab310bbc1407aa9"
+      "sha256": "40c1fae3b4472fb8a1942f75349315e45a29c7b40b453c81e681a6d780c22545"
     },
     "note": "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed."
   },
   "gameplay": [
     {
       "path": "docs/media/gameplay/01-title-loader.png",
-      "description": "Loader title and recovered BSG ship art",
+      "description": "Loader title and capital-ship art",
       "source": "build/runtime-wall-trace/boot-smoke/xex-a5-frame250.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
       "frame": 250,
       "width": 320,
       "height": 240,
-      "source_sha256": "f4b4571c6144e6beb5337d9859d15c40763c3b91fc99585b206fa7e06af5d4c2",
-      "sha256": "39d8ccccc805af63ecded6fd73b2a3f117f8c811c00ada76838f5c6c004326ed",
-      "bytes": 2730
+      "source_sha256": "6dd195c805e18797939c050935a40ef529a6a3439a784fe5847a22360ac5d040",
+      "sha256": "6bb03974c9d6f96dbb76bd38aa2af79bfa5dc4c82b512319b2694faa009d6bf9",
+      "bytes": 2679
     },
     {
       "path": "docs/media/gameplay/02-standard-combat.png",
-      "description": "Viper, Raider, starfield and capital hull corridor",
+      "description": "Player Fighter, Interceptor, starfield and capital hull corridor",
       "source": "build/github-showcase/neutral-combat-025.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
       "frame": 25,
       "width": 320,
       "height": 240,
-      "source_sha256": "59f13b84bca9ea17451fa9efc4962b6f9bf03c44fc187d56bbd54ca13b07a1e7",
-      "sha256": "fa83e980a668df63e62d3c651a1c073d91d6a1cf726f6a5f8da18644e52e1a65",
-      "bytes": 1322
+      "source_sha256": "752141e9e659ae90322b309cc804be86ea1cacf221c2e35a93f8febb867e33ec",
+      "sha256": "42f4c2dcea5592ca4efcd3579a3c375c00d15cd96113ee044e28f7a80d6e17c2",
+      "bytes": 979
     },
     {
-      "path": "docs/media/gameplay/03-raider-breakup.png",
-      "description": "Raider local breakup after a Viper projectile kill",
+      "path": "docs/media/gameplay/03-interceptor-breakup.png",
+      "description": "Interceptor local breakup after a Player Fighter projectile kill",
       "source": "build/github-showcase/neutral-combat-031.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
       "frame": 31,
       "width": 320,
       "height": 240,
-      "source_sha256": "c231289bb6eb122c1aae34a8ffe985b60cc9844c1981da228e4d48915a8e91d4",
-      "sha256": "7baceffc79fa36e5313b26957670be1d91c4c64c19adc4f72d2eb60b686e64c5",
-      "bytes": 1530
+      "source_sha256": "0cbe4883a11a7b2d68d133e312cc63ab5e9e53ea6694385909cdc984e32f9a78",
+      "sha256": "3b28f853ef660f963ac4ad7faa5d21a042e6e6fa7ae4a9b0f48a4a70b2dd7478",
+      "bytes": 972
     },
     {
       "path": "docs/media/gameplay/04-debris-breakup.png",
@@ -67,9 +67,9 @@
       "frame": 113,
       "width": 320,
       "height": 240,
-      "source_sha256": "d47e5708f5d19460a0174ad25db5753201bfe0b3ef538f286665d7b90220ad7a",
-      "sha256": "7f77ee550e7b3ea7075af28eac38e6e2157dcaf5da55dcc0619ceb28bc1ecfeb",
-      "bytes": 1742
+      "source_sha256": "e0f98cc54edebb19c2e8e68ece6672891820d8ccbea63e518e7c21b6ae89a0ff",
+      "sha256": "176d0b7d4bd96294705f85437f22ac1bee059e45d9e49159870ae89dfbba0b0f",
+      "bytes": 975
     },
     {
       "path": "docs/media/gameplay/05-rapid-fire-pickup.png",
@@ -80,22 +80,22 @@
       "frame": 385,
       "width": 320,
       "height": 240,
-      "source_sha256": "c70f333bc3e2ac4388730e70a5ad38eb2352b035f325147dc8bcca54093030bb",
-      "sha256": "36bf2dfda45f5d99af927fc215b3ce61515a351886c8e428ee960d69bdd80a94",
-      "bytes": 1752
+      "source_sha256": "77d2a70a794dc4900907f089caeefdb609ccbfd92cbff6770f1af0a201dd15d6",
+      "sha256": "bd7e30025e844335506e3ed80a757ef6ce15d1b9648a04e7e644e05b667ade76",
+      "bytes": 1081
     },
     {
       "path": "docs/media/gameplay/06-rapid-fire-active.png",
-      "description": "RF HUD countdown and red Rapid Fire projectiles",
+      "description": "Full BOOST HUD label, energy cells, and yellow Rapid Fire projectiles",
       "source": "build/runtime-wall-trace/weapon-pickup-rapid-projectiles-atari800.png",
       "source_medium": "XEX",
       "emulator": "Atari800 7.1.2 PAL XL",
       "frame": 449,
       "width": 320,
       "height": 240,
-      "source_sha256": "dafc78245b0a91be0c5c0efca511153e8dad99d573759119c1cc45ecab8c4511",
-      "sha256": "bad1778d97b572487da4928b62c1509cc240db6b836d311566d31f63506bb7e5",
-      "bytes": 1867
+      "source_sha256": "8318e1f79dacb132d8b8f71cde998cf1675786ef5ee176854ded8d5ab8a26db2",
+      "sha256": "680ef8ec339b0bcf4fbe76ff9cf239155d126789fff327c2f929089df887f25a",
+      "bytes": 1033
     },
     {
       "path": "docs/media/gameplay/07-capital-broadside.png",
@@ -106,9 +106,9 @@
       "frame": 100,
       "width": 320,
       "height": 240,
-      "source_sha256": "4722431faa1824a107e29f1e97a1840a2dd942b3a2df3cb1aaca61520240ea74",
-      "sha256": "86a78d2efb28576793201b4979336fac783d2542ca5cbcf7cf40d15af3d885ca",
-      "bytes": 1646
+      "source_sha256": "d999a31060a8a29b7caacd3c0d910b4840b13d991fae34576e2e32f94ff37142",
+      "sha256": "19fd78547276a781b447540817de21b56c5736efc8dc342601bbc3b35c4f75d9",
+      "bytes": 961
     },
     {
       "path": "docs/media/gameplay/08-capital-engines.png",
@@ -119,16 +119,29 @@
       "frame": 96,
       "width": 320,
       "height": 240,
-      "source_sha256": "1df52daf6f7987185f049bd3625a447cae865bbd07f32b2f86614a057d5617a9",
-      "sha256": "f948308b709ac88aaa55469369b664aa2449614358b4c9ac902b2485341d00a0",
-      "bytes": 1650
+      "source_sha256": "8d2e1902efc41b5511d358fb054510bc182ebf67080b85fba8b253191a81e982",
+      "sha256": "2f3be9f43f2cf0ead1504b7f98dd961f5b3cca3767db1f184803787d150f8c0b",
+      "bytes": 925
+    },
+    {
+      "path": "docs/media/gameplay/09-spread-shot-active.png",
+      "description": "Full BOOST HUD label, energy cells, and all-yellow three-projectile fan",
+      "source": "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png",
+      "source_medium": "XEX",
+      "emulator": "Atari800 7.1.2 PAL XL",
+      "frame": 3351,
+      "width": 320,
+      "height": 240,
+      "source_sha256": "a47de5d3a00a3178dbcc1e92f7a8066119f02500ac07f6334010c3016c3e9096",
+      "sha256": "d95345cb2c72add88a1d862c1bce76f01aed236f8f75c20840bb1c68e46ee5c8",
+      "bytes": 1057
     }
   ],
   "assetSheets": [
     {
       "path": "docs/media/assets/fighter-and-enemies.png",
-      "bytes": 4250,
-      "sha256": "a49384aa84d36f55039babcb54a8d414fbdf37fb41bdd06068c23f024ae402ea",
+      "bytes": 4498,
+      "sha256": "822905064e915e0a48c0c110b34d6c05cb5baca9107a1bedf319a700515f6b89",
       "width": 960,
       "height": 400,
       "sources": [
@@ -138,8 +151,8 @@
     },
     {
       "path": "docs/media/assets/weapons-and-effects.png",
-      "bytes": 6690,
-      "sha256": "9fc695d4312bb992797131205760ce58a19da484bdce1f9dd16bab062f051d6a",
+      "bytes": 7002,
+      "sha256": "54554b966fbafd45e8d716d08c6ecc3378a635499ea46ecd13f485340b41ba83",
       "width": 960,
       "height": 520,
       "sources": [
@@ -150,8 +163,8 @@
     },
     {
       "path": "docs/media/assets/debris-and-pickups.png",
-      "bytes": 5681,
-      "sha256": "72cfab0991611103997f43a4f4778e3d3c807db8880d1c92f030d77c5993845a",
+      "bytes": 5716,
+      "sha256": "c7f78d3f6dbabe5cf5c9f34831c78b858f94e6f45b1eaf69f5fc0e8ebb7ab5c1",
       "width": 960,
       "height": 560,
       "sources": [
@@ -161,8 +174,8 @@
     },
     {
       "path": "docs/media/assets/capital-ship-modules.png",
-      "bytes": 11088,
-      "sha256": "d675c052dc1626997d546decd9d2297d66a9747d0f0b5b85770765c34af2a86e",
+      "bytes": 11468,
+      "sha256": "fee1a6af3adc7198ad7bc66fc5f0810cd1e2d07b011f6595b0e44a435d3ed3c7",
       "width": 960,
       "height": 680,
       "sources": [
@@ -173,7 +186,7 @@
   ],
   "concepts": [
     {
-      "path": "docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg",
+      "path": "docs/media/concepts/void-strike-65-concept-from-floppy-to-stars.jpg",
       "title": "From Floppy to the Stars",
       "caption": "Concept art — From Floppy to the Stars. An AI-assisted visualization of the project’s journey from its 1990 origins to the current release. Not an in-game screenshot.",
       "classification": "owner-supplied AI-assisted concept art",
@@ -183,7 +196,7 @@
       "sha256": "8ed381f3d18ee292d6016ffd850988d01632aec7c97d1135ee54f69f00db2eb4"
     },
     {
-      "path": "docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg",
+      "path": "docs/media/concepts/void-strike-65-concept-gauntlet-run.jpg",
       "title": "Gauntlet Run",
       "caption": "Concept art — Gauntlet Run. An AI-assisted visualization of the intended scale, atmosphere and future battlefield composition. Not an in-game screenshot.",
       "classification": "owner-supplied AI-assisted concept art",

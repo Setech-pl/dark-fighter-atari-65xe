@@ -8,6 +8,23 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const report = JSON.parse(fs.readFileSync(
   path.join(root, "docs", "runtime-wall-trace.json"), "utf8"));
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
+const observerSource = fs.readFileSync(
+  path.join(root, "scripts", "atari800-wall-trace.h"), "utf8");
+
+test("wall trace uses the unambiguous current coverage schema", () => {
+  assert.equal(report.schema_version, 2);
+});
+
+test("wall-trace frontend driver can select non-default difficulty through OPTIONS", () => {
+  const gate = observerSource.slice(
+    observerSource.indexOf("BOOT_STAGE2 deliberately overlays"),
+    observerSource.indexOf("if (dftrace_dli_integrity_enabled"),
+  );
+  assert.match(gate, /dftrace_game_state\] == 1u/);
+  assert.match(gate, /dftrace_game_state\] == 2u/);
+  assert.match(gate, /dftrace_game_state\] == 7u/);
+  assert.match(gate, /dftrace_set_frontend_input\(\)/);
+});
 
 test("wall trace keeps CPU comparison, measured wall time and additive estimate distinct", () => {
   const values = report.semantics;
@@ -25,7 +42,17 @@ test("wall trace keeps CPU comparison, measured wall time and additive estimate 
 });
 
 test("wall trace is artifact-bound and adds no guest timing work", () => {
-  assert.equal(report.artifact.sha256, manifest.artifacts["dark-fighter.xex"].sha256);
+  assert.equal(report.evidence.status, "complete");
+  assert.equal(report.evidence.partial, false);
+  assert.equal(report.evidence.required_sessions, report.evidence.completed_sessions);
+  for (const name of ["void-strike-65-boot.bin", "void-strike-65.xex", "void-strike-65.atr"]) {
+    assert.deepEqual(report.artifacts[name], {
+      path: `dist/${name}`,
+      bytes: manifest.artifacts[name].bytes,
+      sha256: manifest.artifacts[name].sha256,
+    });
+  }
+  assert.equal(report.artifact.sha256, report.artifacts["void-strike-65.xex"].sha256);
   assert.equal(report.instrumentation.start_label, "main_loop_option_poll");
   assert.equal(report.instrumentation.end_label, "main_loop");
   assert.equal(report.instrumentation.guest_instructions_added, 0);
@@ -59,7 +86,7 @@ test("real Atari800 XEX/ATR cold boots reach visible gameplay by frame 750", () 
       byFrame.get(500).charset_address,
       byFrame.get(500).dma_ctl,
       byFrame.get(500).nmi_en,
-    ], [0, 1, smoke.expected_addresses.main_menu_dlist, 0x4800, 0x3a, 0x80]);
+    ], [0, 1, smoke.expected_addresses.main_menu_dlist, 0x4800, 0x22, 0x80]);
     assert.deepEqual([
       byFrame.get(750).game_state,
       byFrame.get(750).charset_address,
@@ -84,13 +111,14 @@ test("real Atari800 XEX/ATR cold boots reach visible gameplay by frame 750", () 
   assert.equal(smoke.passed, true);
 });
 
-test("wall trace covers legal short replays and 120-second XEX/ATR integrity runs", () => {
+test("wall trace covers legal short replays and 160-second XEX/ATR integrity runs", () => {
   assert.equal(report.replay.baseline_measured_frames, 9_040);
   assert.equal(report.replay.targeted_measured_frames, 920);
   assert.equal(report.replay.parallax_cadence_measured_frames, 1_200);
   assert.equal(report.replay.fighter_flash_measured_frames, 1_600);
-  assert.equal(report.replay.debris_effects_measured_frames, 1_200);
-  assert.equal(report.replay.memory_integrity_measured_frames, 12_000);
+  assert.equal(report.replay.debris_effects_measured_frames, 5_000);
+  assert.equal(report.replay.director_completion_measured_frames, 31_500);
+  assert.equal(report.replay.memory_integrity_measured_frames, 16_000);
   assert.equal(report.replay.engine_startup_measured_frames, 3_600);
   assert.equal(report.replay.sessions
     .filter((session) => session.kind === "baseline-9040")
@@ -102,20 +130,23 @@ test("wall trace covers legal short replays and 120-second XEX/ATR integrity run
     .filter((session) => session.kind === "parallax-cadence")
     .reduce((sum, session) => sum + session.measured_frames, 0), 1_200);
   const integrity = report.replay.sessions
-    .filter((session) => session.kind === "memory-integrity-120s");
+    .filter((session) => session.kind === "memory-integrity-160s");
   assert.deepEqual(integrity.map(({ medium, policy, measured_frames }) =>
     [medium, policy, measured_frames]), [
-    ["XEX", "evasive", 3_000], ["XEX", "hunt", 3_000],
-    ["ATR", "evasive", 3_000], ["ATR", "hunt", 3_000],
+    ["XEX", "evasive", 4_000], ["XEX", "hunt", 4_000],
+    ["ATR", "evasive", 4_000], ["ATR", "hunt", 4_000],
   ]);
   assert.equal(report.replay.sessions
     .filter((session) => session.kind === "fighter-flash-coverage")
     .reduce((sum, session) => sum + session.measured_frames, 0), 1_600);
   assert.equal(report.replay.sessions
     .filter((session) => session.kind === "debris-effects-coverage")
-    .reduce((sum, session) => sum + session.measured_frames, 0), 1_200);
+    .reduce((sum, session) => sum + session.measured_frames, 0), 5_000);
   assert.equal(report.ten_heaviest_frames_in_9040_replay.length, 10);
   assert.equal(report.five_heaviest_frames.length, 5);
+  assert.equal(report.five_heaviest_frames_scope, "all measured legal runtime replays");
+  assert.equal(report.five_heaviest_frames[0].wall_cycles,
+    report.gate.measured_wall_cycles_dma_on);
   assert.equal(report.replay.targeted_heaviest.frame,
     report.replay.targeted_reference_heaviest.frame);
   assert.equal(report.replay.targeted_heaviest.wall_cycles,
@@ -128,6 +159,19 @@ test("wall trace covers legal short replays and 120-second XEX/ATR integrity run
     report.replay.targeted_reference_heaviest.state);
 });
 
+test("PAL replay reaches the natural Director BOSS_HANDOFF and terminal LEVEL COMPLETE", () => {
+  const evidence = report.coverage.director_level_complete;
+  assert.deepEqual([
+    evidence.observed,
+    evidence.session,
+    evidence.boss_handoff_frame,
+    evidence.drain_frame,
+    evidence.level_complete_frame,
+    evidence.drain_frames,
+    evidence.terminal_complete_through_frame,
+  ], [true, "director-complete-2-natural-sweep-fire0", 7_445, 7_446, 7_447, 1, 10_499]);
+});
+
 test("long real-artifact replay preserves the exact two-DLI HUD/gameplay phase", () => {
   const integrity = report.gate.memory_integrity;
   assert.deepEqual([
@@ -138,7 +182,7 @@ test("long real-artifact replay preserves the exact two-DLI HUD/gameplay phase",
     integrity.maximum_dlis_per_host_frame,
     integrity.xex_atr_state_parity,
     integrity.passed,
-  ], [6_000, 6_000, 120, 0, 2, true, true]);
+  ], [8_000, 8_000, 160, 0, 2, true, true]);
   assert.ok(integrity.pickup_rf_cycles >= 10);
   assert.equal(integrity.pause_sessions.length, 2);
   assert.ok(integrity.pause_sessions.every(({ timer_before, timer_after }) =>
@@ -221,17 +265,78 @@ test("real XEX/ATR startup traces keep one atomic two-phase engine pulse", () =>
   }
 });
 
-test("real Atari800 pickup trace retains one 2x2 footprint through native A2 motion", () => {
+test("real Atari800 pickup trace retains one phased footprint through native A2 motion", () => {
   const pickup = report.gate.weapon_pickup_rapid_fire;
+  const colour = report.coverage.weapon_pickup_rapid_fire.yellow_projectiles;
   assert.deepEqual([
     pickup.maximum_simultaneous_footprints,
     pickup.maximum_pickup_glyph_cells,
     pickup.layer_fences_per_active_frame,
     pickup.maximum_stationary_active_frames,
     pickup.logical_step_scanlines,
-    pickup.physical_address_changes_during_native_motion,
-  ], [1, 4, 3, 4, 8, 0]);
+  ], [1, 6, 1, 0, 2]);
+  assert.ok(pickup.physical_address_changes_during_native_motion > 0);
   assert.ok(pickup.release_frames > 0);
+  assert.equal(colour.colour_register, "COLPF2");
+  assert.equal(colour.colour_value, 0x1e);
+  assert.equal(colour.all_screen_codes_select_colpf2, true);
+  assert.ok(colour.screen_code_minimum >= 11);
+  assert.ok(colour.screen_code_maximum < 47);
+});
+
+test("Spread Shot passes PAL wall budget with a legal capsule and projectile-heavy frame", () => {
+  const feature = report.gate.weapon_pickup_spread_shot;
+  assert.deepEqual([
+    feature.baseline_wall_cycles,
+    feature.baseline_physical_headroom,
+    feature.target_delta_cycles,
+    feature.hard_delta_cycles,
+    feature.target_wall_cycles,
+    feature.maximum_wall_cycles,
+    feature.minimum_physical_headroom,
+  ], [32_040, 3_528, 200, 500, 32_240, 32_540, 3_028]);
+  assert.deepEqual([
+    feature.measured_wall_cycles,
+    feature.measured_physical_headroom,
+    feature.actual_delta_cycles,
+    feature.remaining_target_cycles,
+    feature.remaining_hard_cycles,
+  ], [32_072, 3_496, 32, 168, 468]);
+  assert.deepEqual(feature.created_capsule_render_ids,
+    [120, 252, 124, 120, 252]);
+  assert.ok(feature.spread_frames > 0);
+  assert.ok(feature.spread_volley_frames > 0);
+  assert.ok(feature.active_capsule_three_projectile_frames > 0);
+  assert.ok(feature.active_capsule_during_booster_frames > 0);
+  assert.ok(feature.worst_legal_capsule_three_projectiles.state.player_fighter_projectiles >= 3);
+  assert.equal(feature.worst_legal_capsule_three_projectiles.state.weapon_pickup.state, 2);
+  assert.deepEqual([
+    feature.target_overrun_frames,
+    feature.hard_overrun_frames,
+    report.gate.missed_frames,
+    report.gate.deadline_overrun_frames,
+    report.gate.extra_vbi_boundaries,
+    feature.passed,
+  ], [0, 0, 0, 0, 0, true]);
+  assert.equal(report.coverage.weapon_pickup_spread_shot.logical_three_projectile_volley.observed,
+    true);
+  assert.equal(report.coverage.weapon_pickup_spread_shot
+    .active_capsule_with_three_player_fighter_projectiles.observed, true);
+  assert.equal(report.coverage.weapon_pickup_spread_shot
+    .active_capsule_during_booster.observed, true);
+  assert.deepEqual(manifest.entityEffects.runtimeBudget.weaponPickupSpreadShot, {
+    baselineWallCycles: 32_040,
+    baselinePhysicalHeadroomCycles: 3_528,
+    targetDeltaCycles: 200,
+    hardDeltaCycles: 500,
+    targetWallLimitCycles: 32_240,
+    hardWallLimitCycles: 32_540,
+    minimumPhysicalHeadroomCycles: 3_028,
+    measuredWallCycles: 32_072,
+    actualDeltaCycles: 32,
+    missedSynchronization: 0,
+    deadlineOverruns: 0,
+  });
 });
 
 test("wall trace records the required legal runtime coverage without incoherent RAM seeding", () => {
@@ -239,15 +344,26 @@ test("wall trace records the required legal runtime coverage without incoherent 
     "world_near_with_far_erase",
     "hull_event",
     "active_muzzles",
-    "live_raider",
+    "live_interceptor",
     "fighter_explosion",
+    "broadside_projectiles",
     "capital_explosion",
     "music_with_sfx_preemption",
+    "director_world_row",
+    "director_request",
+    "director_sparse_event",
   ]) {
     assert.equal(report.coverage[name].observed, true, `${name} was not observed`);
   }
-  assert.ok(report.coverage.maximum_projectile_pool.maximum_observed >= 18);
-  assert.equal(report.coverage.maximum_projectile_pool.legal_capacity, 19);
+  const pool = report.coverage.maximum_projectile_pool;
+  assert.equal(pool.scope,
+    "combined active PlayerFighter and Interceptor fighter-projectile slots in legal Atari800 replays");
+  assert.deepEqual([pool.combined_physical_capacity, pool.maximum_combined_active_observed,
+    pool.full_combined_capacity_observed], [19, 13, false]);
+  assert.equal(pool.full_combined_capacity_matching_frames, 0);
+  assert.equal(pool.heaviest_at_full_combined_capacity, null);
+  assert.deepEqual(pool.component_physical_capacities, { player_fighter: 10, interceptor: 9 });
+  assert.match(pool.evidence_note, /does not claim a full state/);
   assert.equal(report.coverage.broadside_projectiles.pool_capacity, 3);
   assert.equal(report.coverage.broadside_projectiles.release_source_turrets, 2);
   assert.match(report.coverage.broadside_projectiles.classification,
@@ -293,22 +409,22 @@ test("wall trace records the required legal runtime coverage without incoherent 
   });
   assert.deepEqual(report.coverage.parallax_cadence.map((entry) =>
     entry.measured_rows_per_second), [
-    { world: 20, near: 10, far: 5, debris: 12 },
-    { world: 22.5, near: 11.25, far: 5.625, debris: 13.5 },
-    { world: 25, near: 12.5, far: 6.25, debris: 15 },
+    { world: 20, near: 20, far: 5, debris: 12 },
+    { world: 22.5, near: 22.5, far: 5.625, debris: 13.5 },
+    { world: 25, near: 25, far: 6.25, debris: 15 },
   ]);
   assert.deepEqual(report.coverage.parallax_cadence.map((entry) =>
-    [...new Set(entry.full_debris_flight_frames)]), [[91], [82], [74]]);
+    [...new Set(entry.full_debris_flight_frames)]), [[], [], []]);
   assert.deepEqual(report.coverage.post_capital_transition, {
-    session: "2-neutral-fire0",
-    open_gameplay_frame: 0,
-    drain_frame: 496,
-    complete_frame: 565,
-    next_open_frame: 652,
-    post_capital_spawn_frame: 682,
-    post_capital_spawn_active_frame: 683,
+    session: "director-complete-1-natural-sweep-fire0",
+    open_gameplay_frame: 4125,
+    drain_frame: 4674,
+    complete_frame: 4725,
+    next_open_frame: 4774,
+    post_capital_spawn_frame: 6980,
+    post_capital_spawn_active_frame: 6981,
     configured_spawn_delay_scheduler_ticks: 32,
-    observable_open_to_spawn_frame_delta: 30,
+    observable_open_to_spawn_frame_delta: 2206,
   });
 });
 
@@ -359,7 +475,7 @@ test("debris visual polish preserves foundation history and passes its +256 PAL 
   assert.ok(feature.actual_delta_cycles <= feature.approved_delta_cycles);
   assert.ok(feature.measured_physical_headroom >= feature.minimum_physical_headroom);
   assert.equal(feature.budget_overrun_frames, 0);
-  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 123, true);
+  assert.equal(manifest.runtimeTiming.entityEffects.emptyPathCpuCycles <= 124, true);
   assert.equal(manifest.entityEffects.runtimeBudget.debrisVisualPolish.actualDeltaCycles,
     feature.actual_delta_cycles);
 });
@@ -429,7 +545,7 @@ test("destructible debris passes PAL, inactive-path and linked-code budgets", ()
   assert.equal(feature.target_overrun_frames, 0);
   assert.equal(feature.hard_overrun_frames, 0);
   assert.ok(feature.no_active_debris_path_delta_cpu_cycles <= 32);
-  assert.equal(feature.no_active_viper_projectile_path_delta_cpu_cycles, 0);
+  assert.equal(feature.no_active_player_fighter_projectile_path_delta_cpu_cycles, 0);
   assert.equal(feature.passed, true);
   assert.ok(feature.debris_shot_path.events.includes("debris-shot"));
   assert.deepEqual(manifest.entityEffects.runtimeBudget.destructibleDebris, {
@@ -480,14 +596,14 @@ test("enemy breakup passes the hard PAL gate and executes the five-slot runtime 
   assert.equal(report.gate.deadline_overrun_frames, 0);
   assert.equal(report.gate.extra_vbi_boundaries, 0);
   assert.deepEqual([
-    report.coverage.raider_breakup_effects.observed,
-    report.coverage.raider_breakup_effects.active_mask,
-    report.coverage.raider_breakup_effects.active_count,
-    report.coverage.raider_breakup_effects.spawn_updated_and_rendered,
-    report.coverage.raider_breakup_effects.full_screen_flash_preserved,
+    report.coverage.interceptor_breakup_effects.observed,
+    report.coverage.interceptor_breakup_effects.active_mask,
+    report.coverage.interceptor_breakup_effects.active_count,
+    report.coverage.interceptor_breakup_effects.spawn_updated_and_rendered,
+    report.coverage.interceptor_breakup_effects.full_screen_flash_preserved,
   ], [true, 0x1f, 5, true, true]);
-  assert.ok(report.coverage.raider_breakup_effects.spawner_frames > 0);
-  assert.ok(report.coverage.raider_breakup_effects.yellow_death_then_red_materialisation_frames > 0);
+  assert.ok(report.coverage.interceptor_breakup_effects.spawner_frames > 0);
+  assert.ok(report.coverage.interceptor_breakup_effects.yellow_death_then_red_materialisation_frames > 0);
   assert.deepEqual(manifest.entityEffects.runtimeBudget.enemyBreakupEffects, {
     baselineWallCycles: 32_719,
     baselinePhysicalHeadroomCycles: 2_849,
@@ -531,6 +647,69 @@ test("ten heaviest frames retain exact clock positions, VBI IDs and state", () =
     assert.equal(frame.nmi_en, 0x80);
     assert.equal(frame.state.music_active, true);
     assert.equal(frame.state.sound_enabled, true);
-    assert.ok(frame.cpu_dma_off_reference?.main_loop_cycles > 0);
+    if (frame.cpu_dma_off_reference !== null) {
+      assert.ok(frame.cpu_dma_off_reference.main_loop_cycles > 0);
+    }
   }
+  assert.ok(report.ten_heaviest_frames_in_9040_replay.some((frame) =>
+    frame.cpu_dma_off_reference?.main_loop_cycles > 0));
+});
+
+test("current frontend maximum, subsystem profile and accepted PAL-recovery baseline are exact", () => {
+  const maximum = report.five_heaviest_frames[0];
+  assert.deepEqual([maximum.wall_cycles, maximum.physical_headroom], [24_264, 11_304]);
+  assert.ok(maximum.wall_cycles <= 32_584);
+  assert.ok(maximum.physical_headroom >= 2_984);
+  assert.equal(maximum.wall_cycles, report.semantics.measured_wall_cycles_dma_on);
+  assert.ok(report.five_heaviest_frames.every((frame, index, frames) =>
+    index === 0 || frames[index - 1].wall_cycles >= frame.wall_cycles));
+
+  const profile = report.heaviest_frame_cost_breakdown;
+  assert.deepEqual([profile.session, profile.frame, profile.wall_cycles],
+    [maximum.session, maximum.frame, maximum.wall_cycles]);
+  assert.equal(Object.values(profile.subsystem_cycles)
+    .reduce((sum, cycles) => sum + cycles, 0), profile.wall_cycles);
+  for (const name of ["vbi_and_synchronization", "world_ring_playfield", "broadside",
+    "player_fighter_projectiles", "interceptor_projectiles", "enemy_update_collision",
+    "entity_debris", "effects", "capsule_interactive_entity", "music_sound",
+    "remaining_runtime"]) assert.ok(Number.isInteger(profile.subsystem_cycles[name]));
+  assert.equal(profile.synchronization_wait_cycles, 0);
+  assert.equal(profile.sequential_segments.reduce((sum, segment) =>
+    sum + segment.wall_cycles, 0), profile.wall_cycles);
+
+  const gate = report.gate.shield_preimplementation_baseline;
+  assert.deepEqual([gate.baseline_wall_cycles, gate.maximum_wall_cycles,
+    gate.minimum_physical_headroom, gate.required_recovery_cycles,
+    gate.measured_wall_cycles, gate.measured_physical_headroom,
+    gate.recovered_cycles, gate.preserved_as_accepted_baseline, gate.passed],
+  [33_020, 32_068, 3_500, 952, 32_040, 3_528, 980, true, true]);
+
+  const shield = report.gate.weapon_pickup_shield;
+  assert.deepEqual([shield.baseline_wall_cycles, shield.measured_wall_cycles,
+    shield.actual_delta_cycles, shield.measured_physical_headroom,
+    shield.remaining_target_cycles, shield.remaining_hard_cycles,
+    shield.shield_frames, shield.passed],
+  [32_072, 24_264, -7_808, 11_304, 8_158, 8_304, 500, true]);
+});
+
+test("every difficulty preserves exact introductory parallax cadence before debris admission", () => {
+  const cadence = report.coverage.parallax_cadence;
+  assert.deepEqual(cadence.map(({ difficulty, full_debris_flight_frames }) =>
+    [difficulty, full_debris_flight_frames]), [[0, []], [1, []], [2, []]]);
+  const sessions = report.replay.sessions.filter(({ kind }) => kind === "parallax-cadence");
+  assert.deepEqual(sessions.map(({ id, fire_delay }) => [id, fire_delay]), [
+    ["cadence-0-sweep-nofire", 4_000],
+    ["cadence-1-sweep-nofire", 4_000],
+    ["cadence-2-sweep-nofire", 4_000],
+  ]);
+});
+
+test("XEX and ATR legal hunt traces have identical maxima and a reproducible fingerprint", () => {
+  const sessions = report.replay.sessions.filter(({ kind, policy }) =>
+    kind === "memory-integrity-160s" && policy === "hunt");
+  assert.deepEqual(sessions.map(({ medium, maximum_wall_cycles }) =>
+    [medium, maximum_wall_cycles]), [["XEX", 24_264], ["ATR", 24_264]]);
+  assert.equal(report.determinism.replay_fingerprint_sha256,
+    "a9fd33b54b57f06d776580f13d25809c72c60110e7dbc300cc43d8febaebe734");
+  assert.ok(report.determinism.ordered_frames > 0);
 });

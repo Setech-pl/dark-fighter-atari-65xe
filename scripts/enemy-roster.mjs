@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 export const ENEMY_ROSTER_IDS = Object.freeze([
-  "RAIDER",
+  "INTERCEPTOR",
   "TALON",
   "SCYTHE_BOMBER",
   "TRIDENT_GUNSHIP",
@@ -10,12 +11,12 @@ export const ENEMY_ROSTER_IDS = Object.freeze([
   "HUNTER",
   "LEECH_DRONE",
   "AEGIS_ESCORT",
-  "CROWN_RAIDER",
+  "CROWN_INTERCEPTOR",
   "HYDRA_CARRIER",
 ]);
 
 export const ENEMY_IMPLEMENTED_IDS = Object.freeze([
-  "RAIDER",
+  "INTERCEPTOR",
   "TALON",
   "SCYTHE_BOMBER",
 ]);
@@ -27,7 +28,7 @@ const WIDTH_MODES = new Map([
 ]);
 
 const MOVEMENT_PROFILES = new Map([
-  ["CURRENT_RAIDER", 0],
+  ["CURRENT_INTERCEPTOR", 0],
   ["FUTURE_TALON", 1],
   ["FUTURE_SCYTHE", 2],
 ]);
@@ -223,27 +224,43 @@ function compileImplementedArchetype(source, index, runtime) {
 }
 
 export function loadEnemyRosterDefinition(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const definition = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const pursuit = definition.runtime.movementPolicy.interceptorSoftPursuit;
+  return {
+    ...definition,
+    runtime: {
+      ...definition.runtime,
+      movementPolicy: {
+        ...definition.runtime.movementPolicy,
+        interceptorSoftPursuit: {
+          ...pursuit,
+          attackActiveTop: canonicalPlayfield.gameplayTop,
+          attackActiveBottomExclusive: canonicalPlayfield.gameplayBottom,
+        },
+      },
+    },
+  };
 }
 
 export function compileEnemyRoster(definition, rootDirectory) {
   invariant(definition?.formatVersion === 1, "Unsupported enemy-roster formatVersion");
   const runtime = definition.runtime;
-  invariant(runtime?.releaseArchetype === "RAIDER", "Pass 1 release archetype must be RAIDER");
+  invariant(runtime?.releaseArchetype === "INTERCEPTOR", "Pass 1 release archetype must be INTERCEPTOR");
   invariant(runtime.frameStride === 16, "Enemy PMG frame stride must remain 16 bytes");
   invariant(runtime.accentFrames === 3, "Enemy scanner animation must contain three phases");
   invariant(runtime.animationPhaseFrames === 8,
     "Enemy animation phase must remain eight PAL frames");
-  const pursuit = runtime.movementPolicy?.raiderSoftPursuit;
+  const pursuit = runtime.movementPolicy?.interceptorSoftPursuit;
   invariant(pursuit?.targetSamplingIntervalFrames === 8 && pursuit.deadZoneHpos === 3 &&
     pursuit.horizontalAccelerationHpos === 1 &&
     pursuit.maximumHorizontalVelocityHpos === 1 &&
-    pursuit.viperReferenceSpeedHposPerFrame === 2 && pursuit.movementStepHpos === 2 &&
+    pursuit.player_fighterReferenceSpeedHposPerFrame === 2 && pursuit.movementStepHpos === 2 &&
     pursuit.maximumSpeedRatioNumerator === 4 &&
     pursuit.maximumSpeedRatioDenominator === 5 &&
     pursuit.weaveAmplitudeHpos === 4 && pursuit.weavePeriodFrames === 32 &&
-    pursuit.attackActiveTop === 16 && pursuit.attackActiveBottomExclusive === 200,
-  "Raider soft-pursuit parameters must remain the reviewed bounded profile");
+    pursuit.attackActiveTop === canonicalPlayfield.gameplayTop &&
+    pursuit.attackActiveBottomExclusive === canonicalPlayfield.gameplayBottom,
+  "Interceptor soft-pursuit parameters must remain the reviewed bounded profile");
   invariant(runtime.corridor?.leftHpos === 80 && runtime.corridor?.rightHposExclusive === 176,
     "Enemy roster must use the accepted 24-column corridor bounds");
   invariant(runtime.colourPolicy?.bodyRegister === "COLPM1" &&
@@ -253,24 +270,24 @@ export function compileEnemyRoster(definition, rootDirectory) {
     runtime.colourPolicy.candidates.length === 3,
   "Enemy roster must define exactly three reviewed body-colour candidates");
   const paletteCandidates = new Map(runtime.colourPolicy.candidates.map(({ id, value }) => [id, value]));
-  invariant(paletteCandidates.get("CYLON_OXBLOOD") === 0x42 &&
-    paletteCandidates.get("CYLON_BURGUNDY") === 0x44 &&
-    paletteCandidates.get("CYLON_SCARLET") === 0x48,
-  "Enemy palette candidates must remain Cylon-family $42/$44/$48");
-  invariant(runtime.colourPolicy.selected === "CYLON_BURGUNDY" &&
+  invariant(paletteCandidates.get("HOSTILE_OXBLOOD") === 0x42 &&
+    paletteCandidates.get("HOSTILE_BURGUNDY") === 0x44 &&
+    paletteCandidates.get("HOSTILE_SCARLET") === 0x48,
+  "Enemy palette candidates must remain Hostile-family $42/$44/$48");
+  invariant(runtime.colourPolicy.selected === "HOSTILE_BURGUNDY" &&
     runtime.colourPolicy.bodyValue === paletteCandidates.get(runtime.colourPolicy.selected) &&
     runtime.colourPolicy.accentValue === 0x46,
-  "Enemy roster must select Cylon burgundy $44 with a brighter red $46 scanner");
+  "Enemy roster must select Hostile burgundy $44 with a brighter red $46 scanner");
   const pulse = runtime.weaponPolicy?.singlePulse;
   invariant(pulse?.renderer === "ANTIC4_GLYPH_POOL" && pulse.poolSlots === 9,
-    "Raider burst must use its nine-slot ANTIC 4 glyph pool");
+    "Interceptor burst must use its nine-slot ANTIC 4 glyph pool");
   invariant(pulse.burstCount === 10 && pulse.burstIntervalFrames === 4 &&
     JSON.stringify(pulse.postBurstFrames) === JSON.stringify([60, 50, 40]),
-  "Raider burst count, interval, or Easy/Medium/Hard pauses changed");
+  "Interceptor burst count, interval, or Easy/Medium/Hard pauses changed");
   invariant(pulse.speed === 5 && pulse.height === 3 && pulse.widthHpos === 2 &&
     pulse.damage === 10 && pulse.lifetimeFrames === 96 &&
     pulse.colourRegister === "COLPF3" && pulse.colourValue === 0x46,
-  "Raider pulse geometry, damage, lifetime, or red playfield colour changed");
+  "Interceptor pulse geometry, damage, lifetime, or red playfield colour changed");
   invariant(Array.isArray(definition.archetypes) &&
     definition.archetypes.length === ENEMY_ROSTER_IDS.length,
   "Enemy roster must inventory exactly ten identities");
@@ -301,7 +318,7 @@ export function compileEnemyRoster(definition, rootDirectory) {
   });
   invariant(inventory[0].weaponProfile === "SINGLE_PULSE" &&
     inventory[1].weaponProfile === "NONE" && inventory[2].weaponProfile === "NONE",
-  "Only the release Raider may use WEAPON_SINGLE_PULSE in pass 1");
+  "Only the release Interceptor may use WEAPON_SINGLE_PULSE in pass 1");
 
   const implemented = inventory.slice(0, ENEMY_IMPLEMENTED_IDS.length)
     .map((source, index) => compileImplementedArchetype(source, index, runtime));
@@ -309,7 +326,7 @@ export function compileEnemyRoster(definition, rootDirectory) {
     "Only the three pass-1 anchors may have runtime definitions");
   invariant(implemented.filter(({ releaseEnabled }) => releaseEnabled).length === 1 &&
     implemented[0].releaseEnabled,
-  "Only RAIDER may enter normal release waves in pass 1");
+  "Only INTERCEPTOR may enter normal release waves in pass 1");
 
   const bodyBytes = Uint8Array.from(implemented.flatMap(({ bodyBytes }) => [...bodyBytes]));
   const accentBytes = Uint8Array.from(implemented.flatMap(({ accentValues }) => [...accentValues]));
@@ -333,7 +350,7 @@ function byteMacro(name, values) {
 
 export function renderEnemyRosterCa65Include(asset) {
   const implemented = asset.implemented;
-  const pursuit = asset.runtime.movementPolicy.raiderSoftPursuit;
+  const pursuit = asset.runtime.movementPolicy.interceptorSoftPursuit;
   const lines = [
     "; Generated by scripts/enemy-roster.mjs. Do not edit by hand.",
     ...ENEMY_ROSTER_IDS.map((id, index) => `ENEMY_ARCHETYPE_${id} = ${index}`),
@@ -344,23 +361,23 @@ export function renderEnemyRosterCa65Include(asset) {
     `ENEMY_ACCENT_FRAME_COUNT = ${asset.runtime.accentFrames}`,
     `ENEMY_ANIMATION_PHASE_FRAMES = ${asset.runtime.animationPhaseFrames}`,
     `ENEMY_ANIMATION_CYCLE_FRAMES = ${asset.runtime.accentFrames * asset.runtime.animationPhaseFrames}`,
-    `RAIDER_TARGET_SAMPLE_INTERVAL = ${pursuit.targetSamplingIntervalFrames}`,
-    `RAIDER_TARGET_DEAD_ZONE = ${pursuit.deadZoneHpos}`,
-    `RAIDER_HORIZONTAL_ACCELERATION = ${pursuit.horizontalAccelerationHpos}`,
-    `RAIDER_MAX_HORIZONTAL_VELOCITY = ${pursuit.maximumHorizontalVelocityHpos}`,
-    `VIPER_HORIZONTAL_STEP_HPOS = ${pursuit.viperReferenceSpeedHposPerFrame}`,
-    `RAIDER_HORIZONTAL_STEP_HPOS = ${pursuit.movementStepHpos}`,
-    `RAIDER_SPEED_NUMERATOR = ${pursuit.maximumSpeedRatioNumerator}`,
-    `RAIDER_SPEED_DENOMINATOR = ${pursuit.maximumSpeedRatioDenominator}`,
-    `RAIDER_WEAVE_AMPLITUDE = ${pursuit.weaveAmplitudeHpos}`,
-    `RAIDER_WEAVE_PERIOD_FRAMES = ${pursuit.weavePeriodFrames}`,
-    `RAIDER_ATTACK_ACTIVE_TOP = ${pursuit.attackActiveTop}`,
-    `RAIDER_ATTACK_ACTIVE_BOTTOM = ${pursuit.attackActiveBottomExclusive}`,
+    `INTERCEPTOR_TARGET_SAMPLE_INTERVAL = ${pursuit.targetSamplingIntervalFrames}`,
+    `INTERCEPTOR_TARGET_DEAD_ZONE = ${pursuit.deadZoneHpos}`,
+    `INTERCEPTOR_HORIZONTAL_ACCELERATION = ${pursuit.horizontalAccelerationHpos}`,
+    `INTERCEPTOR_MAX_HORIZONTAL_VELOCITY = ${pursuit.maximumHorizontalVelocityHpos}`,
+    `PLAYER_FIGHTER_HORIZONTAL_STEP_HPOS = ${pursuit.player_fighterReferenceSpeedHposPerFrame}`,
+    `INTERCEPTOR_HORIZONTAL_STEP_HPOS = ${pursuit.movementStepHpos}`,
+    `INTERCEPTOR_SPEED_NUMERATOR = ${pursuit.maximumSpeedRatioNumerator}`,
+    `INTERCEPTOR_SPEED_DENOMINATOR = ${pursuit.maximumSpeedRatioDenominator}`,
+    `INTERCEPTOR_WEAVE_AMPLITUDE = ${pursuit.weaveAmplitudeHpos}`,
+    `INTERCEPTOR_WEAVE_PERIOD_FRAMES = ${pursuit.weavePeriodFrames}`,
+    `INTERCEPTOR_ATTACK_ACTIVE_TOP = ${pursuit.attackActiveTop}`,
+    `INTERCEPTOR_ATTACK_ACTIVE_BOTTOM = ${pursuit.attackActiveBottomExclusive}`,
     `ENEMY_RELEASE_VISIBLE_WIDTH = ${implemented[0].visibleWidth}`,
     `ENEMY_RELEASE_FRAME_HEIGHT = ${implemented[0].height}`,
-    `ENEMY_BODY_COLOR_CYLON_OXBLOOD = ${byteHex(asset.runtime.colourPolicy.candidates[0].value)}`,
-    `ENEMY_BODY_COLOR_CYLON_BURGUNDY = ${byteHex(asset.runtime.colourPolicy.candidates[1].value)}`,
-    `ENEMY_BODY_COLOR_CYLON_SCARLET = ${byteHex(asset.runtime.colourPolicy.candidates[2].value)}`,
+    `ENEMY_BODY_COLOR_HOSTILE_OXBLOOD = ${byteHex(asset.runtime.colourPolicy.candidates[0].value)}`,
+    `ENEMY_BODY_COLOR_HOSTILE_BURGUNDY = ${byteHex(asset.runtime.colourPolicy.candidates[1].value)}`,
+    `ENEMY_BODY_COLOR_HOSTILE_SCARLET = ${byteHex(asset.runtime.colourPolicy.candidates[2].value)}`,
     `ENEMY_BODY_COLOR = ${byteHex(asset.runtime.colourPolicy.bodyValue)}`,
     `ENEMY_SCANNER_COLOR = ${byteHex(asset.runtime.colourPolicy.accentValue)}`,
     `ENEMY_WEAPON_NONE = ${ENEMY_WEAPON_PROFILES.NONE}`,

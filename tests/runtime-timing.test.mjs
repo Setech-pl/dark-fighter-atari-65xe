@@ -17,7 +17,7 @@ test("linked release replay covers every reviewed runtime timing scenario", () =
     "hullEvent",
     "maximumProjectilePool",
     "threeBroadside",
-    "liveRaider",
+    "liveInterceptor",
     "activeExplosion",
     "musicWithSfx",
   ]) {
@@ -27,17 +27,17 @@ test("linked release replay covers every reviewed runtime timing scenario", () =
   assert.equal(timing.scenarios.threeBroadside.broadsideOccupancy, 3);
   assert.equal(timing.legalHeavyCombination.origin, "deterministic legal replay");
   assert.ok(timing.legalHeavyCombination.events.includes("hull-copy"));
-  assert.ok(timing.legalHeavyCombination.events.includes("music+sfx"));
+  assert.ok(timing.scenarios.musicWithSfx.events.includes("music+sfx"));
   assert.ok(timing.scenarios.debrisShotPath.events.includes("active-debris"));
   assert.ok(timing.scenarios.debrisShotPath.events.includes("debris-shot"));
-  assert.ok(timing.scenarios.debrisShotPath.viperProjectileOccupancy > 0);
-  assert.equal(timing.scenarios.noViperProjectilePath.viperProjectileOccupancy, 0);
-  assert.equal(timing.scenarios.noViperProjectilePath.procedureCallCounts
-    .entity_viper_projectile_target ?? 0, 0);
+  assert.ok(timing.scenarios.debrisShotPath.player_fighterProjectileOccupancy > 0);
+  assert.equal(timing.scenarios.noPlayerFighterProjectilePath.player_fighterProjectileOccupancy, 0);
+  assert.equal(timing.scenarios.noPlayerFighterProjectilePath.procedureCallCounts
+    .entity_player_fighter_projectile_target ?? 0, 0);
   assert.ok(timing.destructibleDebris.noActiveDebrisPathDeltaCpuCycles <=
     timing.destructibleDebris.noActiveDebrisPathLimitCpuCycles);
-  assert.ok(timing.destructibleDebris.noActiveViperProjectilePathDeltaCpuCycles <=
-    timing.destructibleDebris.noActiveViperProjectilePathLimitCpuCycles);
+  assert.ok(timing.destructibleDebris.noActivePlayerFighterProjectilePathDeltaCpuCycles <=
+    timing.destructibleDebris.noActivePlayerFighterProjectilePathLimitCpuCycles);
 });
 
 test("DMA-off CPU comparison stays below its executable comparison gate", () => {
@@ -69,7 +69,7 @@ test("measured DMA-on fields come only from an artifact-matched Atari800 trace",
     trace.semantics.measured_wall_cycles_dma_on);
   assert.equal(timing.measured_physical_headroom,
     timing.palFrameCycles - timing.measured_wall_cycles_dma_on);
-  assert.equal(trace.artifact.sha256, manifest.artifacts["dark-fighter.xex"].sha256);
+  assert.equal(trace.artifact.sha256, manifest.artifacts["void-strike-65.xex"].sha256);
   assert.equal(trace.instrumentation.guest_cycles_added, 0);
   assert.equal(trace.instrumentation.production_dma_ctl, 0x3e);
   assert.equal(trace.instrumentation.production_nmi_en, 0x80);
@@ -83,14 +83,30 @@ test("protected linked segments do not regress beyond the accepted feature basel
       assert.equal(segment.freeReservedBytes, segment.reservedMaximumBytes - segment.bytes);
     }
   }
-  assert.deepEqual(manifest.runtimeCodeBudget.weaponPickupRapidFire, {
-    baselineBytes: 14_316,
-    actualBytes: manifest.runtimeCodeBudget.actualBytes,
-    actualDeltaBytes: manifest.runtimeCodeBudget.actualBytes - 14_316,
+  assert.deepEqual(manifest.runtimeCodeBudget.weaponPickupSpreadShot, {
+    baselineBytes: 14_948,
+    actualBytes: 15_346,
+    actualDeltaBytes: 398,
+    targetDeltaBytes: 320,
+    hardDeltaBytes: 448,
   });
-  assert.ok(manifest.runtimeCodeBudget.weaponPickupRapidFire.actualDeltaBytes <= 640,
-    `Rapid Fire runtime delta ${manifest.runtimeCodeBudget.weaponPickupRapidFire.actualDeltaBytes} exceeds 640 bytes`);
-  assert.ok(manifest.payloadBudget.weaponPickupRapidFire.remainingReserveBytes >= 512);
+  assert.ok(manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes <= 448,
+    `Spread Shot runtime delta ${manifest.runtimeCodeBudget.weaponPickupSpreadShot.actualDeltaBytes} exceeds 448 bytes`);
+  assert.deepEqual(manifest.runtimeCodeBudget.weaponPickupShield, {
+    baselineBytes: 15_346,
+    actualBytes: 15_346,
+    actualDeltaBytes: 0,
+    hardDeltaBytes: 512,
+  });
+  assert.deepEqual(manifest.runtimeCodeBudget.frontendH31, {
+    baselineBytes: 15_346,
+    actualBytes: 16_735,
+    actualDeltaBytes: 1_389,
+    hardDeltaBytes: 1280,
+  });
+  assert.equal(manifest.encounterDirector.enabled, true);
+  assert.equal(manifest.encounterDirector.safeResidencyBytes, 4_766);
+  assert.ok(manifest.payloadBudget.weaponPickupSpreadShot.remainingReserveBytes >= 64);
 });
 
 test("post-loader runtime and future entity ranges are non-overlapping", () => {
@@ -147,11 +163,14 @@ test("logical gameplay row pointers keep a fixed divider plus 22 linear ring row
   assert.match(source,
     /set_gameplay_row_ptr:[\s\S]+beq @divider[\s\S]+lda PLAYFIELD_ROW_LO,x\s+sta dst_ptr[\s\S]+@divider:[\s\S]+lda #<GAMEPLAY_DIVIDER_SCREEN/);
   assert.match(source,
-    /initialize_projectile_screen_pointer:[\s\S]+sbc #GAMEPLAY_TOP\s+lsr\s+lsr\s+lsr\s+jsr set_gameplay_row_ptr/);
+    /initialize_projectile_screen_pointer = \*[\s\S]+lsr\s+lsr\s+lsr\s+tay\s+\.repeat \(GAMEPLAY_TOP\/8\)\s+dey\s+\.endrepeat\s+bne @playfield[\s\S]+@playfield:\s+dey\s+lda PLAYFIELD_ROW_LO,y[\s\S]+lda PLAYFIELD_ROW_HI,y/);
   assert.doesNotMatch(source.slice(
-    source.indexOf("initialize_projectile_screen_pointer:"),
-    source.indexOf("render_fighter_projectile_overlays:"),
+    source.indexOf("initialize_projectile_screen_pointer = *"),
+    source.indexOf("profile_projectile_pointer_end = *"),
   ), /sta row_counter\s+lda row_counter/);
+  assert.match(source,
+    /render_fighter_projectile_overlays:[\s\S]+@code_ready:\s+;[^\n]*\n(?:\s*;[^\n]*\n)*initialize_projectile_screen_pointer = \*/,
+    "projectile mapping must stay inline in the per-slot renderer");
   assert.match(source,
     /init_far_star_population:[\s\S]+sta STAR_FAR_ROW,x[\s\S]+sta STAR_FAR_COLUMN,x/);
   assert.match(source,

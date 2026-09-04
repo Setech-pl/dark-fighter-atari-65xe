@@ -16,4 +16,4 @@ and a melody-forward balance that stays within a summed POKEY volume of 13.
 packed two-channel score: each byte stores one event nibble for channel 1 and
 one for channel 2. `0` is HOLD, `1` is REST, and `2` through `15` select a
 frequency. One row lasts six PAL frames. Channels 1 and 2 are always
-preemptible by the Viper-shot and hit SFX; channels 3 and 4 remain SFX-only.
+preemptible by the Player Fighter-shot and hit SFX; channels 3 and 4 remain SFX-only.

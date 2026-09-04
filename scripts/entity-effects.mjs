@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { canonicalPlayfield } from "./playfield.mjs";
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -15,7 +16,21 @@ function byte(value) {
 }
 
 export function loadEntityEffectsDefinition(sourcePath) {
-  const definition = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+  const source = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+  const definition = {
+    ...source,
+    coordinateSystem: {
+      gameplayTopScanline: canonicalPlayfield.entityTop,
+      gameplayBottomExclusive: canonicalPlayfield.gameplayBottom,
+      logicalRows: canonicalPlayfield.ringRows,
+    },
+    weaponPickupRapidFire: {
+      ...source.weaponPickupRapidFire,
+      spawnTopScanline: canonicalPlayfield.activeImageTop,
+      activationTopScanline: canonicalPlayfield.entityTop,
+      releaseTopScanline: canonicalPlayfield.gameplayBottom,
+    },
+  };
   invariant(definition.formatVersion === 1, "Unsupported entity-effects formatVersion");
   const coordinates = definition.coordinateSystem;
   integer(coordinates?.gameplayTopScanline, "coordinateSystem.gameplayTopScanline", 0, 255);
@@ -24,12 +39,12 @@ export function loadEntityEffectsDefinition(sourcePath) {
   integer(coordinates?.logicalRows, "coordinateSystem.logicalRows", 1, 32);
   invariant(coordinates.gameplayTopScanline === 24,
     "Entity gameplay must begin below the divider at scanline 24");
-  invariant(coordinates.gameplayBottomExclusive === 200,
-    "Entity gameplay must end after scanline 199");
-  invariant(coordinates.logicalRows === 22 &&
+  invariant(coordinates.gameplayBottomExclusive === 240,
+    "Entity gameplay must end after scanline 239");
+  invariant(coordinates.logicalRows === 27 &&
     coordinates.gameplayBottomExclusive - coordinates.gameplayTopScanline ===
       coordinates.logicalRows * 8,
-  "Entity coordinates must describe exactly 22 eight-scanline ring rows");
+  "Entity coordinates must describe exactly 27 eight-scanline ring rows");
 
   const pools = definition.pools;
   invariant(pools?.interactiveSlots === 4, "Interactive pool must contain four slots");
@@ -90,9 +105,9 @@ export function loadEntityEffectsDefinition(sourcePath) {
   const worldEventsToDespawn = Math.ceil(
     verticalStepsToDespawn * motion.verticalStepDenominator / motion.verticalStepNumerator,
   );
-  invariant(motion.maximumHorizontalSteps ===
+  invariant(motion.maximumHorizontalSteps <=
     Math.floor((worldEventsToDespawn - 1) / motion.horizontalStepWorldRows),
-  "Maximum horizontal steps must cover the complete visible spawn-to-despawn path");
+  "Maximum horizontal steps must remain bounded within the complete visible path");
   invariant(spawn.safeFirstColumn ===
     spawn.corridorFirstColumn + motion.maximumHorizontalSteps,
   "Safe spawn left edge must absorb the complete slight-left trajectory");
@@ -110,6 +125,7 @@ export function loadEntityEffectsDefinition(sourcePath) {
   invariant(visuals.variants.map(({ id }) => id).join(",") ===
     "armour-shard,truss-fragment",
   "Debris variants must retain their stable identities");
+  const debrisOccupancies = [];
   for (const [variantIndex, variant] of visuals.variants.entries()) {
     invariant(Array.isArray(variant.phases) && variant.phases.length === 2,
       `debrisVisuals.variants[${variantIndex}] must contain two phases`);
@@ -135,21 +151,25 @@ export function loadEntityEffectsDefinition(sourcePath) {
           }
         });
       });
-      const xs = occupiedPixels.map(([x]) => x);
       const ys = occupiedPixels.map(([, y]) => y);
-      invariant(Math.max(...xs) - Math.min(...xs) + 1 >= 15 &&
-        Math.max(...ys) - Math.min(...ys) + 1 >= 7,
-      `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must occupy at least 15x7 of its 16x8 canvas`);
-      invariant(selectors.every((selector) => selector === 2 || selector === 3),
-        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must avoid white star selectors`);
-      invariant(variantIndex !== 0 || selectors.length >= 45 && selectors.length <= 48,
-        `armour-shard phase ${phaseIndex} must contain 45-48 lit ANTIC pixels`);
-      invariant(variantIndex !== 1 || selectors.length >= 43 && selectors.length <= 45,
-        `truss-fragment phase ${phaseIndex} must contain 43-45 lit ANTIC pixels and retain openings`);
+      invariant(Math.max(...ys) - Math.min(...ys) + 1 >= 6,
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must use at least six rows`);
+      invariant(glyphs.every((rows) => rows.some((row) => row !== 0)),
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must use both glyph cells`);
+      invariant(selectors.every((selector) => selector === 1 || selector === 2),
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must use only white and steel`);
+      invariant(selectors.filter((selector) => selector === 1).length >= 8 &&
+        selectors.filter((selector) => selector === 2).length >= 8,
+      `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must retain clear white and steel fields`);
+      invariant(selectors.length >= 36 && selectors.length <= 44,
+        `debrisVisuals variant ${variantIndex} phase ${phaseIndex} must contain 36-44 lit ANTIC pixels`);
+      debrisOccupancies.push(selectors.length);
     }
     invariant(JSON.stringify(variant.phases[0]) !== JSON.stringify(variant.phases[1]),
       `debrisVisuals variant ${variantIndex} phases must remain visibly distinct`);
   }
+  invariant(Math.max(...debrisOccupancies) - Math.min(...debrisOccupancies) <= 6,
+    "Debris phase occupancy spread must not exceed six ANTIC pixels");
 
   const destruction = definition.debrisDestruction;
   invariant(destruction?.hitFlashFrames === 2,
@@ -186,22 +206,22 @@ export function loadEntityEffectsDefinition(sourcePath) {
       `fragment phase ${phaseIndex} must contain four through seven ANTIC pixels`);
   }
 
-  const raiderBreakup = definition.raiderBreakup;
-  invariant(raiderBreakup?.coreFrames >= 5 && raiderBreakup.coreFrames <= 7,
-    "Raider breakup core must last five through seven PAL frames");
-  invariant(raiderBreakup.fragmentFrames >= 24 && raiderBreakup.fragmentFrames <= 30,
-    "Raider breakup fragments must last twenty-four through thirty PAL frames");
-  invariant(raiderBreakup.coreOffsetHpos === 6,
-    "Raider character core must centre its four-HPOS cell in the sixteen-HPOS hull");
-  invariant(Array.isArray(raiderBreakup.fragments) && raiderBreakup.fragments.length === 4,
-    "Raider breakup must define four deterministic fragment identities");
-  invariant(raiderBreakup.fragments.map(({ id }) => id).join(",") ===
+  const interceptorBreakup = definition.interceptorBreakup;
+  invariant(interceptorBreakup?.coreFrames >= 5 && interceptorBreakup.coreFrames <= 7,
+    "Interceptor breakup core must last five through seven PAL frames");
+  invariant(interceptorBreakup.fragmentFrames >= 24 && interceptorBreakup.fragmentFrames <= 30,
+    "Interceptor breakup fragments must last twenty-four through thirty PAL frames");
+  invariant(interceptorBreakup.coreOffsetHpos === 6,
+    "Interceptor character core must centre its four-HPOS cell in the sixteen-HPOS hull");
+  invariant(Array.isArray(interceptorBreakup.fragments) && interceptorBreakup.fragments.length === 4,
+    "Interceptor breakup must define four deterministic fragment identities");
+  invariant(interceptorBreakup.fragments.map(({ id }) => id).join(",") ===
     "left-wing,right-wing,central,red-eye",
-  "Raider fragment identities or order changed");
-  invariant(raiderBreakup.fragments.every(({ phaseGlyphs }) =>
+  "Interceptor fragment identities or order changed");
+  invariant(interceptorBreakup.fragments.every(({ phaseGlyphs }) =>
     Array.isArray(phaseGlyphs) && phaseGlyphs.length === 2 &&
       phaseGlyphs[0] !== phaseGlyphs[1]),
-  "Every Raider fragment must expose two distinct visual phases");
+  "Every Interceptor fragment must expose two distinct visual phases");
 
   const pickup = definition.weaponPickupRapidFire;
   invariant(pickup?.slot === 1,
@@ -209,9 +229,15 @@ export function loadEntityEffectsDefinition(sourcePath) {
   invariant(pickup.qualifiedKillsPerDrop === 3 && pickup.pendingFrames === 30,
     "Rapid Fire must enter pending after three qualified kills for thirty frames");
   invariant(pickup.movementNumerator === 1 && pickup.movementDenominator === 2,
-    "Rapid Fire pickup must inherit the native near-ring cadence");
-  invariant(pickup.safeTopScanline === 40 && pickup.safeBottomScanline === 152,
-    "Rapid Fire activation must clamp to the reviewed visible Y range");
+    "Rapid Fire pickup must retain one-half world speed");
+  invariant(pickup.fineMotionDenominator === 5 && pickup.verticalPhaseCount === 8 &&
+    pickup.maximumFootprintRows === 3,
+  "Every pickup must use eight scanline phases in a bounded two-by-three compositor");
+  invariant(pickup.spawnTopScanline === 8 &&
+    pickup.activationTopScanline === coordinates.gameplayTopScanline &&
+    pickup.releaseTopScanline === coordinates.gameplayBottomExclusive,
+  "Every pickup must spawn fully above, activate at the playfield top, and release only " +
+    "after its top edge leaves the playfield");
   invariant(pickup.widthHpos === 8 && pickup.heightScanlines === 16,
     "Rapid Fire capsule must occupy exactly two-by-two ANTIC 4 cells");
   invariant(Array.isArray(pickup.glyphs) && pickup.glyphs.length === 4 &&
@@ -230,6 +256,42 @@ export function loadEntityEffectsDefinition(sourcePath) {
     fillRegister: "COLPF2", fillValue: 0x1e,
     letterRegister: "COLBK", letterValue: 0x00,
   }), "Rapid Fire must use the accepted static steel/yellow/black palette");
+
+  const spreadPickup = definition.weaponPickupSpreadShot;
+  invariant(Array.isArray(spreadPickup?.glyphs) && spreadPickup.glyphs.length === 4 &&
+    spreadPickup.glyphs.every((rows) => Array.isArray(rows) && rows.length === 8),
+  "Spread Shot must use exactly four eight-row glyphs for its two-by-two footprint");
+  spreadPickup.glyphs.flat().forEach((row, index) =>
+    integer(row, `weaponPickupSpreadShot.glyphs[${index}]`, 0, 255));
+  const spreadSelectors = spreadPickup.glyphs.flatMap((rows) => rows.flatMap((row) =>
+    [6, 4, 2, 0].map((shift) => row >> shift & 3)));
+  invariant(spreadSelectors.filter(Boolean).length >= 90 &&
+    spreadSelectors.includes(0) && spreadSelectors.includes(2) &&
+    spreadSelectors.includes(3) && !spreadSelectors.includes(1),
+  "Spread Shot glyphs must use black cut-outs, steel corners and a dense red casing");
+  invariant(JSON.stringify(spreadPickup.palette) === JSON.stringify({
+    outlineRegister: "COLPF1", outlineValue: 0x84,
+    casingRegister: "COLPF3", casingValue: 0x46,
+    symbolRegister: "COLBK", symbolValue: 0x00,
+  }), "Spread Shot must use the existing static steel/red/black palette");
+
+  const shieldPickup = definition.weaponPickupShield;
+  invariant(Array.isArray(shieldPickup?.glyphs) && shieldPickup.glyphs.length === 4 &&
+    shieldPickup.glyphs.every((rows) => Array.isArray(rows) && rows.length === 8),
+  "Shield must use exactly four eight-row glyphs for its two-by-two footprint");
+  shieldPickup.glyphs.flat().forEach((row, index) =>
+    integer(row, `weaponPickupShield.glyphs[${index}]`, 0, 255));
+  const shieldSelectors = shieldPickup.glyphs.flatMap((rows) => rows.flatMap((row) =>
+    [6, 4, 2, 0].map((shift) => row >> shift & 3)));
+  invariant(shieldSelectors.filter(Boolean).length >= 75 &&
+    shieldSelectors.includes(0) && shieldSelectors.includes(1) &&
+    shieldSelectors.includes(2) && !shieldSelectors.includes(3),
+  "Shield glyphs must use black cut-outs, white fill and steel outline only");
+  invariant(JSON.stringify(shieldPickup.palette) === JSON.stringify({
+    outlineRegister: "COLPF1", outlineValue: 0x84,
+    fillRegister: "COLPF0", fillValue: 0x0e,
+    symbolRegister: "COLBK", symbolValue: 0x00,
+  }), "Shield must use the static steel/white/black palette");
 
   invariant(Array.isArray(definition.archetypes) && definition.archetypes.length === 1,
     "First slice must contain exactly one archetype");
@@ -293,12 +355,39 @@ export function compileEntityEffects(definition) {
   const trajectoryVx = Uint8Array.from(definition.debrisMotion.trajectorySelector.map((id) =>
     definition.debrisMotion.trajectories.find((trajectory) => trajectory.id === id).vxSignedHpos));
   const pickupGlyphs = Uint8Array.from(definition.weaponPickupRapidFire.glyphs.flat());
+  const spreadPickupGlyphs = Uint8Array.from(definition.weaponPickupSpreadShot.glyphs.flat());
+  const shieldPickupGlyphs = Uint8Array.from(definition.weaponPickupShield.glyphs.flat());
+  const pickupPhaseBank = Uint8Array.from([
+    pickupGlyphs, spreadPickupGlyphs, shieldPickupGlyphs,
+  ].flatMap((source) => {
+    const phases = [];
+    for (let phase = 0; phase < 8; phase += 1) {
+      const output = new Uint8Array(48);
+      for (let sourceY = 0; sourceY < 16; sourceY += 1) {
+        const destinationY = phase + sourceY;
+        const destinationRow = Math.floor(destinationY / 8);
+        const destinationByte = destinationY & 7;
+        for (let column = 0; column < 2; column += 1) {
+          const sourceGlyph = (sourceY >= 8 ? 2 : 0) + column;
+          output[destinationRow * 16 + column * 8 + destinationByte] =
+            source[sourceGlyph * 8 + (sourceY & 7)];
+        }
+      }
+      phases.push(...output);
+    }
+    return phases;
+  }));
+  invariant(pickupPhaseBank.length === 3 * 8 * 6 * 8,
+    "Pickup phase bank must contain three types, eight phases and six glyphs");
   return Object.freeze({
     ...definition,
     descriptor,
     glyphs,
     effectGlyphs,
     pickupGlyphs,
+    spreadPickupGlyphs,
+    shieldPickupGlyphs,
+    pickupPhaseBank,
     trajectoryVx,
   });
 }
@@ -306,7 +395,7 @@ export function compileEntityEffects(definition) {
 export function renderEntityEffectsCa65Include(asset) {
   const { coordinateSystem: coordinates, pools, spawn,
     debrisMotion: motion, debrisVisuals: visuals, debrisDestruction: destruction,
-    raiderBreakup, weaponPickupRapidFire: pickup } = asset;
+    interceptorBreakup, weaponPickupRapidFire: pickup } = asset;
   return [
     "; Generated from assets/graphics/entity-effects.json by scripts/entity-effects.mjs.",
     "; Do not edit this file by hand.",
@@ -344,7 +433,11 @@ export function renderEntityEffectsCa65Include(asset) {
     `ENTITY_EFFECT_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length}`,
     `WEAPON_PICKUP_GLYPH_COUNT = ${asset.pickupGlyphs.length / 8}`,
     `WEAPON_PICKUP_GLYPH_BYTES = ${asset.pickupGlyphs.length}`,
-    `ENTITY_EFFECT_TOTAL_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length + asset.pickupGlyphs.length}`,
+    `WEAPON_PICKUP_SPREAD_GLYPH_COUNT = ${asset.spreadPickupGlyphs.length / 8}`,
+    `WEAPON_PICKUP_SPREAD_GLYPH_BYTES = ${asset.spreadPickupGlyphs.length}`,
+    `WEAPON_PICKUP_SHIELD_GLYPH_COUNT = ${asset.shieldPickupGlyphs.length / 8}`,
+    `WEAPON_PICKUP_SHIELD_GLYPH_BYTES = ${asset.shieldPickupGlyphs.length}`,
+    `ENTITY_EFFECT_TOTAL_GLYPH_BYTES = ${asset.glyphs.length + asset.effectGlyphs.length + asset.pickupGlyphs.length + asset.spreadPickupGlyphs.length + asset.shieldPickupGlyphs.length}`,
     "ENTITY_ARCHETYPE_DESCRIPTOR_BYTES = 16",
     "ENTITY_DESC_INITIAL_STATE = 0",
     "ENTITY_DESC_FLAGS = 1",
@@ -369,6 +462,12 @@ export function renderEntityEffectsCa65Include(asset) {
     "WEAPON_PICKUP_STATE_PENDING = 1",
     "WEAPON_PICKUP_STATE_ACTIVE = 2",
     "WEAPON_PICKUP_STATE_RAPID = 3",
+    "WEAPON_PICKUP_STATE_SPREAD = 4",
+    "WEAPON_PICKUP_STATE_SHIELD = 5",
+    "WEAPON_PICKUP_TYPE_RAPID = 0",
+    "WEAPON_PICKUP_TYPE_SPREAD = 1",
+    "WEAPON_PICKUP_TYPE_SHIELD = 2",
+    "WEAPON_PICKUP_TYPE_COUNT = 3",
     "ENTITY_FLAG_WORLD_ATTACHED = $01",
     "ENTITY_FLAG_MULTICELL = $02",
     "ENTITY_FLAG_COLLIDE_PLAYER = $04",
@@ -384,10 +483,12 @@ export function renderEntityEffectsCa65Include(asset) {
     `ENTITY_HIT_FLASH_FRAMES = ${destruction.hitFlashFrames}`,
     `ENTITY_HIT_FLASH_TIMER_LOAD = ${destruction.hitFlashFrames + 1}`,
     `WEAPON_PICKUP_SLOT = ${pickup.slot}`,
+    "WEAPON_PICKUP_NEXT_TYPE_SLOT = 2",
+    "WEAPON_BOOSTER_SLOT = 2",
     `WEAPON_PICKUP_ACTIVE_MASK = $${(1 << pickup.slot).toString(16).padStart(2, "0").toUpperCase()}`,
     `WEAPON_PICKUP_QUALIFIED_KILLS = ${pickup.qualifiedKillsPerDrop}`,
     `WEAPON_PICKUP_PENDING_FRAMES = ${pickup.pendingFrames}`,
-    // The trigger occurs before the entity update and Raider effects are
+    // The trigger occurs before the entity update and Interceptor effects are
     // materialised one frame later. Two preload ticks preserve thirty complete
     // hidden frames and make the first visible frame follow effect expiry.
     // Collision resolution precedes the entity update in the same active PAL
@@ -396,18 +497,22 @@ export function renderEntityEffectsCa65Include(asset) {
     `WEAPON_PICKUP_PENDING_TIMER_LOAD = ${pickup.pendingFrames + 2}`,
     `WEAPON_PICKUP_MOVE_NUMERATOR = ${pickup.movementNumerator}`,
     `WEAPON_PICKUP_MOVE_DENOMINATOR = ${pickup.movementDenominator}`,
-    `WEAPON_PICKUP_SAFE_TOP = ${pickup.safeTopScanline}`,
-    `WEAPON_PICKUP_SAFE_BOTTOM = ${pickup.safeBottomScanline}`,
+    `WEAPON_PICKUP_FINE_RATE_DENOMINATOR = ${pickup.fineMotionDenominator}`,
+    `WEAPON_PICKUP_VERTICAL_PHASE_COUNT = ${pickup.verticalPhaseCount}`,
+    `WEAPON_PICKUP_PHASE_GLYPH_COUNT = ${pickup.maximumFootprintRows * 2}`,
+    `WEAPON_PICKUP_SPAWN_TOP = ${pickup.spawnTopScanline}`,
+    `WEAPON_PICKUP_ACTIVATION_TOP = ${pickup.activationTopScanline}`,
+    `WEAPON_PICKUP_RELEASE_TOP = ${pickup.releaseTopScanline}`,
     `WEAPON_PICKUP_WIDTH_HPOS = ${pickup.widthHpos}`,
     `WEAPON_PICKUP_HEIGHT_SCANLINES = ${pickup.heightScanlines}`,
     "ENTITY_EVENT_WORLD_ROW_ADVANCED = $01",
     "EFFECT_TYPE_DEBRIS_CORE = 1",
     "EFFECT_TYPE_DEBRIS_FRAGMENT = 2",
-    "EFFECT_TYPE_RAIDER_CORE = 3",
-    "EFFECT_TYPE_RAIDER_LEFT_WING = 4",
-    "EFFECT_TYPE_RAIDER_RIGHT_WING = 5",
-    "EFFECT_TYPE_RAIDER_CENTRAL = 6",
-    "EFFECT_TYPE_RAIDER_RED_EYE = 7",
+    "EFFECT_TYPE_INTERCEPTOR_CORE = 3",
+    "EFFECT_TYPE_INTERCEPTOR_LEFT_WING = 4",
+    "EFFECT_TYPE_INTERCEPTOR_RIGHT_WING = 5",
+    "EFFECT_TYPE_INTERCEPTOR_CENTRAL = 6",
+    "EFFECT_TYPE_INTERCEPTOR_RED_EYE = 7",
     "EFFECT_STATE_ACTIVE = 1",
     "EFFECT_FLAG_MULTICELL = $02",
     `EFFECT_DEBRIS_CORE_FRAMES = ${destruction.coreFrames}`,
@@ -418,12 +523,12 @@ export function renderEntityEffectsCa65Include(asset) {
     `EFFECT_FRAGMENT_LOCAL_X_SPEED = ${destruction.fragmentLocalXSpeedHpos}`,
     `EFFECT_FRAGMENT_LOCAL_Y_SPEED = ${destruction.fragmentLocalYSpeedScanlines}`,
     "EFFECT_DEBRIS_ACTIVE_MASK = $1F",
-    `EFFECT_RAIDER_CORE_FRAMES = ${raiderBreakup.coreFrames}`,
-    `EFFECT_RAIDER_CORE_TIMER_LOAD = ${raiderBreakup.coreFrames + 1}`,
-    `EFFECT_RAIDER_FRAGMENT_FRAMES = ${raiderBreakup.fragmentFrames}`,
-    `EFFECT_RAIDER_FRAGMENT_TIMER_LOAD = ${raiderBreakup.fragmentFrames + 1}`,
-    `EFFECT_RAIDER_CORE_X_OFFSET = ${raiderBreakup.coreOffsetHpos}`,
-    "EFFECT_RAIDER_ACTIVE_MASK = $1F",
+    `EFFECT_INTERCEPTOR_CORE_FRAMES = ${interceptorBreakup.coreFrames}`,
+    `EFFECT_INTERCEPTOR_CORE_TIMER_LOAD = ${interceptorBreakup.coreFrames + 1}`,
+    `EFFECT_INTERCEPTOR_FRAGMENT_FRAMES = ${interceptorBreakup.fragmentFrames}`,
+    `EFFECT_INTERCEPTOR_FRAGMENT_TIMER_LOAD = ${interceptorBreakup.fragmentFrames + 1}`,
+    `EFFECT_INTERCEPTOR_CORE_X_OFFSET = ${interceptorBreakup.coreOffsetHpos}`,
+    "EFFECT_INTERCEPTOR_ACTIVE_MASK = $1F",
     ".macro EMIT_ENTITY_ARCHETYPE_DESCRIPTORS",
     `    .byte ${[...asset.descriptor].map(byte).join(",")}`,
     ".endmacro",
@@ -435,6 +540,12 @@ export function renderEntityEffectsCa65Include(asset) {
     ".endmacro",
     ".macro EMIT_WEAPON_PICKUP_GLYPHS",
     `    .byte ${[...asset.pickupGlyphs].map(byte).join(",")}`,
+    ".endmacro",
+    ".macro EMIT_WEAPON_PICKUP_SPREAD_GLYPHS",
+    `    .byte ${[...asset.spreadPickupGlyphs].map(byte).join(",")}`,
+    ".endmacro",
+    ".macro EMIT_WEAPON_PICKUP_SHIELD_GLYPHS",
+    `    .byte ${[...asset.shieldPickupGlyphs].map(byte).join(",")}`,
     ".endmacro",
     ".macro EMIT_ENTITY_TRAJECTORY_VX",
     `    .byte ${[...asset.trajectoryVx].map(byte).join(",")}`,

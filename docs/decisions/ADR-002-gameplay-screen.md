@@ -1,22 +1,29 @@
-# ADR-002: hybrydowy ekran ANTIC 4 i Player/Missile Graphics
+# ADR-002: mixed ANTIC and Player/Missile gameplay screen
 
-Status: zaakceptowane
+Status: accepted
 
-## Kontekst
+## Context
 
-Zaakceptowany koncept ekranu łączy nieruchomy HUD, przewijane konstrukcje boczne, pole gwiazd, kilka statków oraz pociski. Bezpośrednia bitmapa byłaby kosztowna pamięciowo i utrudniałaby płynne przewijanie na Atari 65XE.
+The accepted composition combines a fixed text HUD, scrolling capital hulls,
+stars, fighters, pickups, effects, and many projectiles. A full bitmap would
+consume too much RAM and make smooth scrolling harder on a stock 65XE.
 
-## Decyzja
+## Decision
 
-- HUD, gwiazdy i konstrukcje korytarza używają ANTIC mode 4 z własnym zestawem znaków w RAM.
-- Tło ma efektywną szerokość 160 color clocks i paletę: czerń, chłodna biel, stalowy granat, bursztyn oraz przełączany czerwony akcent.
-- Player 0 i Player 3 składają się na statek gracza.
-- Player 1 i Player 2 składają się na przeciwnika oraz jego ruchomy czerwony sensor.
-- Missile 0 pozostaje wyłącznie zarezerwowane dla broni gracza. Bieżący
-  żółty burst korzysta z przywracanych glifów ANTIC 4, aby nie dziedziczyć
-  białego `COLPM0` Vipera i nie ograniczać go do jednego strzału.
-- Kolejne statki przeciwnika będą multipleksowane albo realizowane znakami dopiero po pomiarze czasu i testach kolizji na sprzęcie.
+- The fixed HUD and divider use ANTIC 2 with a dedicated RAM charset.
+- The 27-row scrolling ring uses ANTIC 4 with a separate gameplay charset; a
+  fixed divider row above it completes the 28-row gameplay raster.
+- The playfield palette is black, cold white/steel, amber/yellow, and a switched
+  red/burgundy bank.
+- P0 and P3 form the Player Fighter; P1 is the Interceptor and P2 its red scanner.
+- M0 remains reserved for a possible player weapon. Current Player Fighter projectiles
+  use restored ANTIC 4 overlays so their ten-slot pool and yellow colour do not
+  inherit `COLPM0`.
+- New independently coloured moving objects require fresh PMG, memory, and PAL
+  timing evidence before multiplexing is considered.
 
-## Konsekwencje
+## Consequences
 
-Ekran zachowuje język wizualny konceptu bez przechowywania pełnej bitmapy. Ograniczona liczba PMG oznacza, że liczba niezależnych, wielokolorowych obiektów nie może być przeniesiona z konceptu dosłownie. W zamian otrzymujemy sprzętowe kolizje, stabilne sylwetki i realny budżet na 50 FPS PAL.
+The layout keeps the accepted visual hierarchy without a full-frame bitmap.
+PMG capacity remains explicitly bounded, while character overlays support
+stable multi-projectile weapons and backing restoration over moving hulls.

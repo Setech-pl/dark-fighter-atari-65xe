@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseAtr, parseXex } from "./formats.mjs";
 import { Nmos6502 } from "./nmos6502.mjs";
+import { installBootArtifact } from "./runtime-image.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..");
@@ -29,22 +29,11 @@ function runRoutine(memory, labels, name) {
   cpu.push((stop - 1) & 0xff);
   cpu.pc = requiredLabel(labels, name);
   for (let steps = 0; steps < 300_000 && cpu.pc !== stop; steps += 1) cpu.step();
-  if (cpu.pc !== stop) throw new Error(`${name} did not return`);
+  if (cpu.pc !== stop) {
+    throw new Error(`${name} did not return (pc=$${cpu.pc.toString(16).padStart(4, "0")}, ` +
+      `opcode=$${memory[cpu.pc].toString(16).padStart(2, "0")})`);
+  }
   return cpu.cycles;
-}
-
-function loadPayload(root, artifact, manifest) {
-  if (artifact === "xex") {
-    return parseXex(fs.readFileSync(path.join(root, "dist", "dark-fighter.xex"))).segments[0];
-  }
-  if (artifact === "atr") {
-    return {
-      start: manifest.loadAddress,
-      data: parseAtr(fs.readFileSync(path.join(root, "dist", "dark-fighter.atr")))
-        .body.subarray(0, manifest.payloadBytes),
-    };
-  }
-  throw new Error(`Unknown debris trace artifact ${artifact}`);
 }
 
 function logicalScreen(memory, labels) {
@@ -142,19 +131,26 @@ function snapshot(memory, labels, { phase, frame, eraseCycles, updateCycles, ren
 }
 
 export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "xex" } = {}) {
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "dark-fighter-manifest.json")));
-  const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "void-strike-65-manifest.json")));
+  const labels = labelsFromFile(path.join(root, "build", "void-strike-65.lbl"));
   const memory = new Uint8Array(0x10000);
-  const payload = loadPayload(root, artifact, manifest);
-  memory.set(payload.data, payload.start);
-
+  const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
+  if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "stage_boot_streams");
-  runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "unpack_resident_runtime");
   runRoutine(memory, labels, "unpack_entity_runtime");
-  runRoutine(memory, labels, "init_entity_effects");
   runRoutine(memory, labels, "stage_a2_kernel");
+  runRoutine(memory, labels, "init_entity_effects");
+  runRoutine(memory, labels, "unpack_weapon_pickup_phase_runtime");
   runRoutine(memory, labels, "unpack_starfield_runtime");
+  memory.set(fs.readFileSync(path.join(root, "build", "integration-glue.bin")), 0x4efe);
+  memory.fill(0, 0x80f4, 0x8100);
+  memory[0x80fb] = 0x6d;
+  memory[0x80fc] = 0xff;
+  memory[0x80f6] = 3;
+  memory[0x80f9] = 0;
+  memory[0x80fa] = 0;
+  memory[0x80ff] = 0xff;
   runRoutine(memory, labels, "copy_charset");
   runRoutine(memory, labels, "install_entity_effects_glyph");
   initialiseRows(memory, labels);
@@ -217,27 +213,34 @@ export function executeDebrisDestructionTrace({ root = defaultRoot, artifact = "
   };
 }
 
-export function executeRaiderBreakupTrace({ root = defaultRoot, artifact = "xex" } = {}) {
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "dark-fighter-manifest.json")));
-  const labels = labelsFromFile(path.join(root, "build", "dark-fighter.lbl"));
+export function executeInterceptorBreakupTrace({ root = defaultRoot, artifact = "xex" } = {}) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "dist", "void-strike-65-manifest.json")));
+  const labels = labelsFromFile(path.join(root, "build", "void-strike-65.lbl"));
   const memory = new Uint8Array(0x10000);
-  const payload = loadPayload(root, artifact, manifest);
-  memory.set(payload.data, payload.start);
-
+  const { requiresBroadsideUnpack } = installBootArtifact(memory, root, artifact);
+  if (requiresBroadsideUnpack) runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "stage_boot_streams");
-  runRoutine(memory, labels, "unpack_boot_broadside_runtime");
   runRoutine(memory, labels, "unpack_resident_runtime");
   runRoutine(memory, labels, "unpack_entity_runtime");
-  runRoutine(memory, labels, "init_entity_effects");
   runRoutine(memory, labels, "stage_a2_kernel");
+  runRoutine(memory, labels, "init_entity_effects");
+  runRoutine(memory, labels, "unpack_weapon_pickup_phase_runtime");
   runRoutine(memory, labels, "unpack_starfield_runtime");
+  memory.set(fs.readFileSync(path.join(root, "build", "integration-glue.bin")), 0x4efe);
+  memory.fill(0, 0x80f4, 0x8100);
+  memory[0x80fb] = 0x6d;
+  memory[0x80fc] = 0xff;
+  memory[0x80f6] = 3;
+  memory[0x80f9] = 0;
+  memory[0x80fa] = 0;
+  memory[0x80ff] = 0xff;
   runRoutine(memory, labels, "copy_charset");
   runRoutine(memory, labels, "init_fighter_projectiles");
   runRoutine(memory, labels, "install_entity_effects_glyph");
   initialiseRows(memory, labels);
   memory.fill(0, 0x3800, 0x4000);
   memory.fill(0, 0x4000, 0x4400);
-  // Keep this Raider-only visual trace independent from the normal neutral
+  // Keep this Interceptor-only visual trace independent from the normal neutral
   // entity scheduler, whose first legal spawn occurs after the same 32-frame
   // window used to prove complete effect expiry.
   memory[requiredLabel(labels, "ENTITY_SPAWN_TIMER_LO")] = 0xff;
@@ -328,9 +331,9 @@ export function debrisDestructionTraceCsv(trace) {
   return `${rows.join("\n")}\n`;
 }
 
-export function raiderBreakupTraceCsv(trace) {
+export function interceptorBreakupTraceCsv(trace) {
   const header = [
-    "artifact", "phase", "frame", "raider_hp", "raider_active",
+    "artifact", "phase", "frame", "interceptor_hp", "interceptor_active",
     "fighter_explosion_timer", "colbk", "effects_active_mask", "effects_active_count",
     "effect_pending", "slot", "type", "x", "y", "ttl", "render_id", "screen_address", "screen_code",
     "erase", "update", "render", "score",
@@ -382,6 +385,6 @@ export function assertDebrisDestructionTraceParity(left, right) {
   return true;
 }
 
-export function assertRaiderBreakupTraceParity(left, right) {
+export function assertInterceptorBreakupTraceParity(left, right) {
   return assertDebrisDestructionTraceParity(left, right);
 }

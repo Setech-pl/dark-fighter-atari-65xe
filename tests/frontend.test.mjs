@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { readRuntimeBytes } from "../scripts/runtime-image.mjs";
+import { LOADER_DISPLAY_LIST_ADDRESS } from "../scripts/loader-assets.mjs";
 import {
   readFrontendGraphicsSource,
   readStartMenuRuntimeState,
@@ -12,10 +13,11 @@ import {
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(testDirectory, "..");
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
-const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
+const residentSource = source.slice(0, source.indexOf('.segment "BOOT_STAGE2"'));
+const map = fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.map"), "utf8");
 const labels = new Map(
   fs
-    .readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+    .readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -69,7 +71,7 @@ test("main menu labels are exact, ordered, and default to START GAME", () => {
   const title = frontend.mainMenuRecords.find(({ mode }) => mode === 7);
   assert.deepEqual(
     [title.text, title.column, title.y],
-    ["DARK FIGHTER", 4, 0],
+    ["VOID STRIKE 65", 4, 24],
   );
   assert.equal(frontend.defaultSelection, 0);
   assert.equal(frontend.markerAddresses.length, 13);
@@ -85,12 +87,14 @@ test("frontend uses distinct clean 6x7 glyphs within ANTIC 6/7 indices", () => {
   for (let index = 1; index <= constants.get("CH_FRONT_MARKER"); index += 1) {
     const rows = frontendCharset.subarray(index * 8, index * 8 + 8);
     assert.equal(rows[7], 0, `glyph ${index} needs a blank eighth row`);
-    assert.ok([...rows].every((row) => (row & 0x03) === 0));
+    assert.ok([...rows].every((row) => (row & 0x01) === 0));
   }
   for (const [left, right] of [["E","F"],["O","D"],["R","P"],["I","T"]]) {
     assert.notDeepEqual(glyph(left), glyph(right), `${left}/${right} must remain distinct`);
   }
   assert.ok(constants.get("CH_FRONT_MARKER") < 64);
+  assert.equal(constants.get("CH_FRONT_GAP"), 44);
+  assert.deepEqual([...frontendCharset.subarray(44 * 8, 45 * 8)], Array(8).fill(0));
 });
 
 test("UP and DOWN move once per neutral release and wrap at both bounds", () => {
@@ -167,7 +171,7 @@ test("SOUND defaults ON, toggles in RAM, and OFF silences all POKEY channels", (
   ]) {
     assert.match(silence, new RegExp(`sta ${register}`));
   }
-  assert.match(routine("allocate_viper_projectile"), /lda sound_enabled\s+beq @accepted/);
+  assert.match(routine("play_player_fighter_projectile_sound"), /lda sound_enabled\s+beq @accepted/);
   assert.match(routine("play_hit_sound"), /lda sound_enabled\s+beq @done/);
   assert.match(
     routine("update_sound"),
@@ -186,7 +190,9 @@ test("OPTIONS persists GAME MUSIC and a MEDIUM-default difficulty", () => {
     [0, 1, 2, 1],
   );
   assert.match(source,
-    /options_screen_data:[\s\S]+"SOUND: OFF"[\s\S]+"GAME MUSIC: OFF"[\s\S]+"DIFFICULTY: MEDIUM"[\s\S]+"BACK"/);
+    /options_screen_data:[\s\S]+"OPTIONS"[\s\S]+"L\/R CHANGE   FIRE SELECT"/);
+  assert.match(source,
+    /option_label_sound:[\s\S]+option_label_music:[\s\S]+option_label_difficulty:[\s\S]+option_label_back:/);
   assert.match(routine("handle_options_input"), /jmp handle_options_input_resident/);
   assert.match(routine("handle_options_input_resident"),
     /ldx #\$03[\s\S]+beq @sound_row[\s\S]+beq @game_music_row[\s\S]+beq @difficulty_row[\s\S]+jmp enter_main_menu/);
@@ -198,7 +204,9 @@ test("OPTIONS persists GAME MUSIC and a MEDIUM-default difficulty", () => {
     /cmp #DIFFICULTY_HARD[\s\S]+lda #DIFFICULTY_EASY[\s\S]+adc #\$01/);
   assert.match(routine("set_difficulty"), /sta DIFFICULTY_SETTING[\s\S]+jmp draw_difficulty_value/);
   assert.match(routine("render_frontend_state"),
-    /jsr draw_sound_value[\s\S]+jsr draw_game_music_value[\s\S]+jsr draw_difficulty_value[\s\S]+jmp update_frontend_marker/);
+    /cmp #STATE_OPTIONS[\s\S]+jsr draw_options_structure[\s\S]+jmp update_frontend_marker/);
+  assert.match(routine("draw_options_labels"),
+    /cpx #\$04[\s\S]+jsr draw_sound_value[\s\S]+jsr draw_game_music_value[\s\S]+jmp draw_difficulty_value/);
 
   const startupAddress = labels.get("finish_startup_after_loader");
   const startupBytes = readXexBytes(startupAddress,
@@ -212,21 +220,21 @@ test("OPTIONS persists GAME MUSIC and a MEDIUM-default difficulty", () => {
   ]);
   assert.doesNotMatch(routine("enter_frontend_state"), /DIFFICULTY_SETTING/);
   assert.doesNotMatch(routine("init_state"), /DIFFICULTY_SETTING/);
+  assert.match(routine("draw_options_structure"),
+    /CH_FRONT_PIPE\|ANTIC67_COLOR_PF2[\s\S]+OPTIONS_SOUND_OFFSET\+19[\s\S]+OPTIONS_MUSIC_OFFSET\+19[\s\S]+OPTIONS_DIFFICULTY_OFFSET\+19[\s\S]+OPTIONS_BACK_OFFSET\+19/);
 });
 
-test("TOP SCORES renders ten rows with the session record first and returns only on FIRE", () => {
-  assert.match(
-    source,
-    /top_score_row_template:[\s\S]+CH_FRONT_DASH,CH_FRONT_DASH,CH_FRONT_DASH/,
-  );
+test("TOP SCORES renders all ten RAM records and returns only on FIRE", () => {
+  assert.match(source, /top_score_row_template:[\s\S]+CH_FRONT_PIPE\|ANTIC67_COLOR_PF2/);
   assert.match(routine("draw_top_score_rows"), /cpx #10\s+bne @row/);
   assert.match(routine("draw_top_score_rows"), /cpx #\$09\s+beq @ten/);
-  assert.match(routine("draw_top_score_rows"), /jmp draw_session_top_score/);
+  assert.match(routine("draw_top_score_rows"),
+    /TOP_SCORE_TABLE_HI,x[\s\S]+TOP_SCORE_TABLE_LO,x[\s\S]+cpx #10/);
   assert.match(source,
-    /draw_session_top_score:[\s\S]+TOP_SCORE_BCD_HI[\s\S]+TOP_SCORE_BCD_LO[\s\S]+CH_FRONT_ZERO/);
+    /TOP_SCORE_RECORD_COUNT\s*=\s*10[\s\S]+draw_top_score_bcd_byte:[\s\S]+CH_FRONT_ZERO/);
   assert.match(routine("handle_top_scores_input"), /jmp handle_game_over_input/);
   assert.match(routine("handle_game_over_input"), /lda TRIG0[\s\S]+jmp enter_main_menu/);
-  assert.doesNotMatch(source, /jsr SIOV|initials_entry|save_high_scores/i);
+  assert.doesNotMatch(residentSource, /jsr SIOV|initials_entry|save_high_scores/i);
 });
 
 test("ANTIC 6 attributes route the selected marker and full label to $D8", () => {
@@ -328,10 +336,10 @@ test("EXIT defaults to NO and reaches a stable, silent reset-only state", () => 
   const exited = routine("enter_exited_state");
   assert.match(exited, /jsr music_stop/);
   assert.match(exited, /@wait:\s+jsr wait_frame\s+jmp @wait/);
-  assert.match(source, /\.byte "DARK FIGHTER ENDED",0/);
-  assert.match(source, /\.byte "PRESS RESET TO RESTART",0/);
+  assert.match(source, /\.byte "VOID STRIKE 65 ENDED",0/);
+  assert.match(source, /\.byte "PRESS RESET: RESTART",0/);
   assert.doesNotMatch(exited, /DOSVEC|SIOV/);
-  assert.doesNotMatch(source, /jmp \(DOSVEC\)|jsr SIOV/);
+  assert.doesNotMatch(residentSource, /jmp \(DOSVEC\)|jsr SIOV/);
 });
 
 test("frontend charset and transient loader tail stay in their bounded ranges", () => {
@@ -353,10 +361,9 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
   assert.ok(zeroPage);
   assert.ok(Number.parseInt(rodata[2], 16) < 0x4000);
   assert.ok(Number.parseInt(zeroPage[2], 16) < 0x0100);
-  assert.ok(labels.get("draw_main_menu_hangar") < charsetStart);
+  assert.ok(labels.get("draw_main_menu_scene") >= labels.get("__ENTITY_CODE_RUN__"));
   assert.ok(labels.get("frontend_glyph_rows") >= frontendStart);
-  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_bitmap_lzss"));
-  assert.ok(labels.get("main_menu_display_list") < labels.get("loader_display_list_lzss"));
+  assert.ok(labels.get("main_menu_display_list") >= labels.get("__ENTITY_CODE_RUN__"));
   assert.ok(labels.get("loader_display_list_lzss") < labels.get("loader_bitmap_lzss"));
   assert.ok(labels.get("loader_bitmap_lzss") < 0x4000);
   assert.equal(
@@ -364,7 +371,7 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
     (labels.get("frontend_display_lists_end") - 1) & 0xfc00,
     "frontend display lists must not cross ANTIC's 1 KiB counter boundary",
   );
-  assert.ok(labels.get("frontend_display_lists_end") <= constants.get("MISSILES"));
+  assert.ok(labels.get("frontend_display_lists_end") <= 0xa000);
 
   const clearPmg = routine("clear_pmg", "copy_charset");
   assert.doesNotMatch(clearPmg, /PMG_BASE\+\$(?:000|100|200)/);
@@ -382,36 +389,59 @@ test("frontend charset and transient loader tail stay in their bounded ranges", 
   assert.match(source, /jsr show_loader[\s\S]+jsr clear_pmg[\s\S]+jsr copy_frontend_charset/);
 });
 
+test("OPTIONS persistent tables stay outside the loader display-list destination", () => {
+  const optionsStart = labels.get("options_persistent_tables_start");
+  const optionsEnd = labels.get("options_persistent_tables_end");
+  const difficultyStart = labels.get("difficulty_value_table");
+  const difficultyEnd = labels.get("difficulty_value_table_end");
+  const labelSources = labels.get("options_label_sources");
+  const loaderStart = LOADER_DISPLAY_LIST_ADDRESS;
+  const loaderEnd = loaderStart + 202;
+  const entityCode = /ENTITY_CODE\s+([0-9A-F]+)\s+([0-9A-F]+)\s+([0-9A-F]+)/i.exec(map);
+
+  assert.ok(entityCode, "missing persistent ENTITY_CODE linker range");
+  const entityCodeStart = Number.parseInt(entityCode[1], 16);
+  const entityCodeEnd = Number.parseInt(entityCode[2], 16) + 1;
+  assert.ok(optionsStart >= entityCodeStart && optionsEnd <= entityCodeEnd,
+    "OPTIONS tables must remain in resident read-only memory");
+  assert.equal(difficultyStart, optionsStart);
+  assert.equal(difficultyEnd - difficultyStart, 18);
+  assert.ok(labelSources >= difficultyEnd && labelSources < optionsEnd);
+  assert.ok(optionsStart >= labels.get("main_menu_display_list_end"));
+  assert.ok(optionsEnd <= labels.get("options_display_list"));
+  assert.equal(optionsEnd <= loaderStart || optionsStart >= loaderEnd, true,
+    `OPTIONS tables $${optionsStart.toString(16)}-$${(optionsEnd - 1).toString(16)} ` +
+    `overlap loader DLIST $${loaderStart.toString(16)}-$${(loaderEnd - 1).toString(16)}`);
+});
+
 test("mixed display list, screen offsets, title, menu, and hint are bounded", () => {
   const state = readStartMenuRuntimeState(source);
   const { constants, mainMenuLayout } = state.graphics;
   assert.equal(mainMenuLayout.screenBytes, constants.get("MAIN_MENU_SCREEN_BYTES"));
-  assert.equal(mainMenuLayout.screenBytes, 820);
+  assert.equal(mainMenuLayout.screenBytes, 340);
   assert.equal(
     mainMenuLayout.rows.reduce((height, row) => height + row.height, 0),
-    192,
+    96,
   );
   assert.deepEqual(
     mainMenuLayout.rows.map(({ mode }) => mode),
-    [7,4,4,4,6,4,6,4,6,4,6,4,4,4,4,4,4,4,4,4,4,2,4],
+    [7,4,4,4,4,6,6,6,6,4,2],
   );
   assert.deepEqual(
     mainMenuLayout.rows.filter(({ dli }) => dli).map(({ index }) => index),
-    [20],
+    [9],
   );
 
-  const title = state.graphics.mainMenuRecords.find(({ text }) => text === "DARK FIGHTER");
-  assert.deepEqual([title.mode, title.column, title.text.length], [7, 4, 12]);
+  const title = state.graphics.mainMenuRecords.find(({ text }) => text === "VOID STRIKE 65");
+  assert.deepEqual([title.mode, title.column, title.text.length, title.y], [7, 4, 14, 24]);
   const menuRecords = state.graphics.mainMenuRecords.filter(({ mode }) => mode === 6);
   assert.equal(menuRecords.length, 4);
-  for (const record of menuRecords) {
-    assert.equal(record.column, 9);
-    assert.ok(record.column + record.text.length <= 20);
-  }
+  assert.deepEqual(menuRecords.map(({ column }) => column), [4,6,4,8]);
+  assert.ok(menuRecords.every((record) => record.column + record.text.length <= 20));
   const hint = state.graphics.mainMenuRecords.find(({ mode }) => mode === 2);
   assert.deepEqual(
     [hint.text, hint.column, hint.text.length],
-    ["UP/DOWN MOVE  FIRE SELECT", 7, 25],
+    ["UP/DOWN MOVE FIRE SELECT", 7, 24],
   );
   const visibleColors = (record, cellWidth, height) => {
     const colors = new Set();
@@ -426,25 +456,18 @@ test("mixed display list, screen offsets, title, menu, and hint are bounded", ()
     }
     return colors;
   };
-  assert.deepEqual(visibleColors(title, 16, 16), new Set([0x00, 0x0e]));
+  assert.deepEqual(visibleColors(title, 16, 16), new Set([0x00, 0x1e]));
   assert.deepEqual(visibleColors(hint, 8, 8), new Set([0x00, 0x0e]));
-
-  for (const layer of ["OUTER", "MID", "INNER", "BAY"]) {
-    assert.ok(constants.get(`MAIN_MENU_HANGAR_${layer}_LAST`) < 21);
-    for (const edge of ["TOP", "BOTTOM"]) {
-      const screenOffset = constants.get(`MAIN_MENU_HANGAR_${layer}_${edge}_OFFSET`);
-      const row = mainMenuLayout.rows.find((candidate) => candidate.screenOffset === screenOffset);
-      assert.equal(row.mode, 4);
-    }
-  }
-  for (let index = 0; index < 7; index += 1) {
-    const offset = constants.get(`MAIN_MENU_STAR_${index}`);
-    const row = mainMenuLayout.rows.find(
-      (candidate) => offset >= candidate.screenOffset &&
-        offset < candidate.screenOffset + candidate.columns,
-    );
-    assert.equal(row.mode, 4);
-  }
+  assert.deepEqual(
+    [...state.screen.subarray(constants.get("MAIN_MENU_PLAYER_FIGHTER_TOP_OFFSET") + 18,
+      constants.get("MAIN_MENU_PLAYER_FIGHTER_TOP_OFFSET") + 21)],
+    [58,59,60],
+  );
+  assert.deepEqual(
+    [...state.screen.subarray(constants.get("MAIN_MENU_PLAYER_FIGHTER_BOTTOM_OFFSET") + 18,
+      constants.get("MAIN_MENU_PLAYER_FIGHTER_BOTTOM_OFFSET") + 21)],
+    [61,62,63],
+  );
 
   const assembledDisplayList = readXexBytes(
     labels.get("main_menu_display_list"),
@@ -466,27 +489,18 @@ test("mixed display list, screen offsets, title, menu, and hint are bounded", ()
   );
 });
 
-test("menu PMG craft is bounded, main-menu-only, and gameplay setup is restored", () => {
+test("menu PlayerFighter is charset-only, frontend PMG stays disabled, and gameplay setup is restored", () => {
   const state = readStartMenuRuntimeState(source);
-  const { constants, mainMenuHardwareState, hardwareState } = state.graphics;
-  const left = (mainMenuHardwareState.get("HPOSP0") - 48) * 2;
-  const width = 8 * 8;
-  const top = constants.get("MAIN_MENU_PLAYER_Y") - 32;
-  const height = 16 * constants.get("MAIN_MENU_PLAYER_VERTICAL_SCALE");
-  const markerLeft = 7 * 16;
-  assert.ok(left >= 0 && left + width <= markerLeft);
-  assert.ok(top >= 48 && top + height <= 136);
-  assert.equal(mainMenuHardwareState.get("SIZEP0"), 3);
-  assert.equal(mainMenuHardwareState.get("SIZEP3"), 3);
-  assert.equal(constants.get("MAIN_MENU_PLAYER_VERTICAL_SCALE"), 2);
-  assert.match(
-    routine("draw_main_menu_scene"),
-    /sta PLAYER3\+1,y[\s\S]+iny\s+iny\s+inx/,
-  );
+  const { constants, hardwareState } = state.graphics;
+  assert.equal(constants.get("CH_FRONT_PLAYER_FIGHTER_TOP_LEFT"), 58);
+  assert.equal(constants.get("FRONTEND_GLYPH_COUNT"), 43);
+  assert.doesNotMatch(routine("draw_main_menu_scene"), /PLAYER[0-3]|HPOSP|SIZEP/);
 
   const frontendEntry = routine("enter_frontend_state");
-  assert.match(frontendEntry, /sta GRACTL[\s\S]+sta NMIEN[\s\S]+jsr select_frontend_display/);
-  assert.match(frontendEntry, /cpx #STATE_MAIN_MENU[\s\S]+lda #\$02[\s\S]+sta GRACTL[\s\S]+sta NMIEN/);
+  assert.match(frontendEntry,
+    /sta GRACTL[\s\S]+jsr clear_pmg_graphics_latches[\s\S]+jsr select_frontend_display/);
+  assert.doesNotMatch(frontendEntry, /lda #\$02[\s\S]+sta GRACTL/);
+  assert.match(frontendEntry, /cpx #STATE_OPTIONS[\s\S]+cpx #STATE_MAIN_MENU[\s\S]+lda #\$80[\s\S]+sta NMIEN/);
   assert.equal(hardwareState.get("SIZEP0"), 1);
   assert.equal(hardwareState.get("SIZEP3"), 1);
   assert.equal(hardwareState.get("COLPF2"), 0x1e);
@@ -504,4 +518,30 @@ test("menu PMG craft is bounded, main-menu-only, and gameplay setup is restored"
     routine("select_frontend_display"),
     /cmp #STATE_MAIN_MENU[\s\S]+main_menu_display_list[\s\S]+frontend_text_display_list/,
   );
+});
+
+test("frontend entry clears stale player and missile graphics latches before DMA resumes", () => {
+  const entry = routine("enter_frontend_state");
+  const pauseEntry = routine("enter_pause");
+  const clear = routine("clear_pmg_graphics_latches");
+  assert.match(source, /GRAFP0\s*=\s*\$D00D/);
+  assert.match(entry,
+    /sta DMACTL\s+sta GRACTL\s+jsr clear_pmg_graphics_latches[\s\S]+jsr select_frontend_display/,
+    "main frontend entry must clear PMG graphics latches while display DMA is blanked",
+  );
+  assert.match(pauseEntry,
+    /sta DMACTL\s+sta GRACTL\s+jsr clear_pmg_graphics_latches\s+jsr pause_silence_audio/,
+    "pause frontend entry must clear PMG graphics latches while display DMA is blanked",
+  );
+  assert.match(clear,
+    /sta NMIEN\s+ldx #\$04\s+@loop:\s+sta GRAFP0,x\s+dex\s+bpl @loop\s+rts/);
+
+  assert.deepEqual(readXexBytes(labels.get("clear_pmg_graphics_latches"), 12), Buffer.from([
+    0x8d, 0x0e, 0xd4, // STA NMIEN
+    0xa2, 0x04,       // LDX #4
+    0x9d, 0x0d, 0xd0, // STA GRAFP0,X (GRAFP0..3 and GRAFM)
+    0xca,             // DEX
+    0x10, 0xfa,       // BPL back to the store
+    0x60,             // RTS
+  ]), "assembled helper must clear all five PMG graphics latches");
 });

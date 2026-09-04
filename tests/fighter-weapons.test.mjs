@@ -5,14 +5,14 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   compileFighterWeapons,
-  buildRaiderProjectileGlyphBank,
+  buildInterceptorProjectileGlyphBank,
   createSharedFighterExplosion,
-  createViperBurstState,
+  createPlayerFighterBurstState,
   loadFighterWeaponsDefinition,
   renderSharedFighterExplosionPmg,
-  simulateViperBurst,
+  simulatePlayerFighterBurst,
   stepSharedFighterExplosion,
-  stepViperBurst,
+  stepPlayerFighterBurst,
 } from "../scripts/fighter-weapons.mjs";
 import {
   compileEnemyRoster,
@@ -21,6 +21,7 @@ import {
 import { Nmos6502 } from "../scripts/nmos6502.mjs";
 import { installRuntimeSegments, readRuntimeBytes } from "../scripts/runtime-image.mjs";
 import { loadCapitalHullsDefinition } from "../scripts/capital-hulls.mjs";
+import { canonicalPlayfield } from "../scripts/playfield.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(directory, "..");
@@ -32,7 +33,7 @@ const weapons = compileFighterWeapons(loadFighterWeaponsDefinition(
 const hulls = loadCapitalHullsDefinition(
   path.join(root, "assets", "graphics", "capital-hulls.json"));
 const labels = new Map(
-  fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(root, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -43,38 +44,28 @@ function xexBytes(address, length) {
   return readRuntimeBytes(root, address, length);
 }
 
-test("assembled gameplay display keeps HUD, divider and 22 ring rows distinct", () => {
+test("assembled gameplay display keeps HUD, divider and 27 ring rows distinct", () => {
   assert.match(source, /PLAYFIELD_DLIST_BYTES\s*=\s*3\+3\+PLAYFIELD_RING_ROWS\*3\+3/);
   assert.match(source, /lda #\$C2[\s\S]+lda #\$44[\s\S]+lda #\$C4[\s\S]+lda #\$41/);
   assert.doesNotMatch(source.slice(
     source.indexOf("build_playfield_display_list:"),
     source.indexOf("rotate_playfield_rows:"),
   ), /lda #\$70/);
-  assert.deepEqual(weapons.viewport, {
-    activeImageTop: 8,
-    hudRows: 1,
-    gameplayRows: 23,
-    screenColumns: 40,
-    leftHpos: 48,
-    hudTop: 8,
-    hudBottom: 16,
-    gameplayTop: 16,
-    gameplayBottom: 200,
-  });
+  assert.deepEqual(weapons.viewport, canonicalPlayfield);
 });
 
-test("Raider PMG drawing clips every frame to the gameplay viewport", () => {
-  const raider = roster.implemented[0];
+test("Interceptor PMG drawing clips every frame to the gameplay viewport", () => {
+  const interceptor = roster.implemented[0];
   const visibleCounts = [];
-  for (let logicalY = weapons.viewport.gameplayTop - raider.height;
+  for (let logicalY = weapons.viewport.gameplayTop - interceptor.height;
     logicalY < weapons.viewport.gameplayTop; logicalY += 1) {
     const p1 = new Uint8Array(256);
     const p2 = new Uint8Array(256);
-    for (let row = 0; row < raider.height; row += 1) {
+    for (let row = 0; row < interceptor.height; row += 1) {
       const y = logicalY + row;
       if (y < weapons.viewport.gameplayTop || y >= weapons.viewport.gameplayBottom) continue;
-      p1[y] = raider.bodyRows[row];
-      p2[y] = raider.accentFrameBytes[row];
+      p1[y] = interceptor.bodyRows[row];
+      p2[y] = interceptor.accentFrameBytes[row];
     }
     assert.equal(p1.subarray(0, weapons.viewport.gameplayTop).some(Boolean), false);
     assert.equal(p2.subarray(0, weapons.viewport.gameplayTop).some(Boolean), false);
@@ -89,71 +80,82 @@ test("Raider PMG drawing clips every frame to the gameplay viewport", () => {
   assert.match(renderer, /cpy #GAMEPLAY_TOP[\s\S]+bcc @accent_done/);
 });
 
-test("held FIRE emits an exact ten-shot Viper burst at three-frame intervals", () => {
-  const simulation = simulateViperBurst(weapons, 40);
+test("held FIRE emits an exact eight-shot normal PlayerFighter burst at three-frame intervals", () => {
+  const simulation = simulatePlayerFighterBurst(weapons, 40);
   const allocations = simulation.trace.filter(({ allocationResult }) =>
     allocationResult === "ALLOCATED");
-  assert.deepEqual(allocations.slice(0, 10).map(({ frame }) => frame),
-    [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]);
-  assert.equal(allocations[9].burstState, "POST_BURST_COOLDOWN");
-  assert.equal(allocations[9].timer, 12);
-  assert.equal(allocations[10].frame, 40);
+  assert.deepEqual(allocations.slice(0, 8).map(({ frame }) => frame),
+    [1, 4, 7, 10, 13, 16, 19, 22]);
+  assert.equal(allocations[7].burstState, "POST_BURST_COOLDOWN");
+  assert.equal(allocations[7].timer, 12);
+  assert.equal(allocations[8].frame, 34);
   assert.ok(Math.max(...simulation.trace.map(({ active }) => active.length)) >= 8);
 });
 
-test("FIRE release stops new emissions while launched Viper shots remain independent", () => {
-  let state = createViperBurstState(weapons);
-  state = stepViperBurst(weapons, state, { fireHeld: true, playerX: 100 });
+test("Rapid keeps ten shots, its two-frame interval and the common post-burst pause", () => {
+  const simulation = simulatePlayerFighterBurst(weapons, 32, { weaponMode: "RAPID" });
+  const allocations = simulation.trace.filter(({ allocationResult }) =>
+    allocationResult === "ALLOCATED");
+  assert.deepEqual(allocations.slice(0, 10).map(({ frame }) => frame),
+    [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]);
+  assert.equal(allocations[9].burstState, "POST_BURST_COOLDOWN");
+  assert.equal(allocations[9].timer, 12);
+  assert.equal(allocations[10].frame, 31);
+});
+
+test("FIRE release stops new emissions while launched PlayerFighter shots remain independent", () => {
+  let state = createPlayerFighterBurstState(weapons);
+  state = stepPlayerFighterBurst(weapons, state, { fireHeld: true, playerX: 100 });
   const launchedX = state.pool[0].x;
-  state = stepViperBurst(weapons, state, { fireHeld: false, playerX: 150 });
+  state = stepPlayerFighterBurst(weapons, state, { fireHeld: false, playerX: 150 });
   assert.equal(state.shotsEmitted, 1);
   assert.equal(state.pool[0].x, launchedX);
   assert.equal(state.pool[0].y, 176);
   assert.equal(state.burstState, "WAITING");
 });
 
-test("Viper pool rejection neither overwrites shots nor counts a rejected emission", () => {
-  let state = createViperBurstState(weapons);
-  state.pool = state.pool.map((_, index) => ({ owner: "VIPER", x: 80 + index, y: 100,
+test("PlayerFighter pool rejection neither overwrites shots nor counts a rejected emission", () => {
+  let state = createPlayerFighterBurstState(weapons);
+  state.pool = state.pool.map((_, index) => ({ owner: "PLAYER_FIGHTER", x: 80 + index, y: 100,
     previousY: 100, width: 1, height: 2, colour: 0x1e }));
   const before = state.pool.map(({ x }) => x);
-  state = stepViperBurst(weapons, state, { fireHeld: true });
+  state = stepPlayerFighterBurst(weapons, state, { fireHeld: true });
   assert.equal(state.shotsEmitted, 0);
   assert.deepEqual(state.pool.map(({ x }) => x), before);
-  assert.equal(state.burstRemaining, 10);
+  assert.equal(state.burstRemaining, 8);
 });
 
 test("fighter projectiles use fixed pools and remain independent of DRAIN and M0-M3", () => {
-  assert.deepEqual([weapons.viper.poolSlots, weapons.raider.poolSlots, weapons.totalSlots],
+  assert.deepEqual([weapons.player_fighter.poolSlots, weapons.interceptor.poolSlots, weapons.totalSlots],
     [10, 9, 19]);
-  let state = simulateViperBurst(weapons, 12).state;
+  let state = simulatePlayerFighterBurst(weapons, 12).state;
   assert.ok(state.pool.some(Boolean));
-  state = stepViperBurst(weapons, state, { drain: true });
+  state = stepPlayerFighterBurst(weapons, state, { drain: true });
   assert.equal(state.pool.some(Boolean), true);
   const renderer = source.slice(source.indexOf("render_fighter_projectile_overlays:"),
     source.indexOf("; -----------------------------------------------------------------------------\n; Enemy"));
   assert.doesNotMatch(renderer, /MISSILES|HPOSM|SIZEM|COLPM/);
 });
 
-test("Viper fire remains continuous through DRAIN and COMPLETE", () => {
-  let held = simulateViperBurst(weapons, 8, { fireHeld: true }).state;
+test("PlayerFighter fire remains continuous through DRAIN and COMPLETE", () => {
+  let held = simulatePlayerFighterBurst(weapons, 8, { fireHeld: true }).state;
   assert.ok(held.pool.some(Boolean));
-  held = stepViperBurst(weapons, held, { fireHeld: true, drain: true });
+  held = stepPlayerFighterBurst(weapons, held, { fireHeld: true, drain: true });
   assert.equal(held.pool.some(Boolean), true);
   assert.notEqual(held.burstState, "WAITING");
-  held = stepViperBurst(weapons, held, { fireHeld: true, sectorComplete: true });
+  held = stepPlayerFighterBurst(weapons, held, { fireHeld: true, sectorComplete: true });
   assert.equal(held.shotsEmitted, 4,
     "COMPLETE preserves the canonical burst cadence rather than forcing a new shot");
   assert.ok(held.pool.some(Boolean));
 
-  let fresh = createViperBurstState(weapons);
-  fresh = stepViperBurst(weapons, fresh, { fireHeld: false, drain: true });
-  fresh = stepViperBurst(weapons, fresh, { fireHeld: true, drain: true });
+  let fresh = createPlayerFighterBurstState(weapons);
+  fresh = stepPlayerFighterBurst(weapons, fresh, { fireHeld: false, drain: true });
+  fresh = stepPlayerFighterBurst(weapons, fresh, { fireHeld: true, drain: true });
   assert.equal(fresh.shotsEmitted, 1);
   const completion = source.slice(source.indexOf("update_sector_completion:"),
     source.indexOf("apply_broadside_player_damage:"));
-  const weapon = source.slice(source.indexOf("update_viper_weapon:"),
-    source.indexOf("allocate_viper_projectile:"));
+  const weapon = source.slice(source.indexOf("update_player_fighter_weapon:"),
+    source.indexOf("allocate_player_fighter_projectile:"));
   assert.doesNotMatch(completion, /clear_fighter_projectiles/);
   assert.doesNotMatch(weapon, /CAPITAL_SECTOR_STATE|clear_fighter_projectiles/);
 });
@@ -174,13 +176,14 @@ test("shared fighter explosion has six distinct expanding and fading native phas
   assert.equal(new Set(frames.map((frame) => frame.join(","))).size, 6);
   const occupied = frames.map((frame) => frame.reduce((sum, byte) =>
     sum + byte.toString(2).replaceAll("0", "").length, 0));
+  assert.deepEqual(occupied, [4, 18, 44, 22, 14, 7]);
   assert.ok(occupied[0] < occupied[1] && occupied[1] < occupied[2]);
-  assert.ok(occupied[3] >= occupied[2]);
+  assert.ok(occupied[3] < occupied[2]);
   assert.ok(occupied[4] < occupied[3] && occupied[5] < occupied[4]);
 });
 
 test("shared explosion remains fixed, holds every phase four frames, and clears at frame 24", () => {
-  let state = createSharedFighterExplosion(weapons, { x: 120, y: 88, owner: "RAIDER" });
+  let state = createSharedFighterExplosion(weapons, { x: 120, y: 88, owner: "INTERCEPTOR" });
   const trace = [];
   for (let visibleFrame = 0; visibleFrame < 24; visibleFrame += 1) {
     trace.push({ ...state });
@@ -194,19 +197,19 @@ test("shared explosion remains fixed, holds every phase four frames, and clears 
 });
 
 test("explosion adapters keep a stable centre and clear the full eight-row union", () => {
-  const viperCollisionLeft = 124;
-  const viperOrigin = viperCollisionLeft - 4;
-  const viperY = 184 + 4;
+  const player_fighterCollisionLeft = 124;
+  const player_fighterOrigin = player_fighterCollisionLeft - 4;
+  const player_fighterY = 184 + 4;
   let state = createSharedFighterExplosion(weapons,
-    { x: viperOrigin, y: viperY, owner: "VIPER" });
+    { x: player_fighterOrigin, y: player_fighterY, owner: "PLAYER_FIGHTER" });
   let outer = new Uint8Array(256).fill(0xa5);
   let core = new Uint8Array(256).fill(0x5a);
-  const beforeGuard = [outer[viperY - 1], core[viperY - 1]];
-  const afterGuard = [outer[viperY + 8], core[viperY + 8]];
+  const beforeGuard = [outer[player_fighterY - 1], core[player_fighterY - 1]];
+  const afterGuard = [outer[player_fighterY + 8], core[player_fighterY + 8]];
   const visibleCentres = [];
   for (let frame = 0; frame < 24; frame += 1) {
     ({ outer, core } = renderSharedFighterExplosionPmg(weapons, state, { outer, core }));
-    const rows = outer.subarray(viperY, viperY + 8);
+    const rows = outer.subarray(player_fighterY, player_fighterY + 8);
     const occupiedColumns = [];
     for (const value of rows) {
       for (let bit = 0; bit < 8; bit += 1) if (value & (0x80 >> bit)) occupiedColumns.push(bit);
@@ -217,15 +220,15 @@ test("explosion adapters keep a stable centre and clear the full eight-row union
   ({ outer, core } = renderSharedFighterExplosionPmg(weapons, state, { outer, core }));
   assert.equal(visibleCentres.every((centre) => centre === 3.5), true,
     "every shared radial phase remains centred on the same 8-bit PMG origin");
-  assert.deepEqual([...outer.subarray(viperY, viperY + 8)], Array(8).fill(0));
-  assert.deepEqual([...core.subarray(viperY, viperY + 8)], Array(8).fill(0));
-  assert.deepEqual([outer[viperY - 1], core[viperY - 1]], beforeGuard);
-  assert.deepEqual([outer[viperY + 8], core[viperY + 8]], afterGuard);
+  assert.deepEqual([...outer.subarray(player_fighterY, player_fighterY + 8)], Array(8).fill(0));
+  assert.deepEqual([...core.subarray(player_fighterY, player_fighterY + 8)], Array(8).fill(0));
+  assert.deepEqual([outer[player_fighterY - 1], core[player_fighterY - 1]], beforeGuard);
+  assert.deepEqual([outer[player_fighterY + 8], core[player_fighterY + 8]], afterGuard);
   assert.match(source,
     /begin_player_fighter_explosion:[\s\S]+sbc #\(\(SHARED_FIGHTER_EXPLOSION_WIDTH_BITS\*2-PLAYER_COLLISION_WIDTH\)\/2\)/);
 });
 
-test("assembled PMG renderer shares one explosion bank between Viper and Raider slots", () => {
+test("assembled PMG renderer shares one explosion bank between PlayerFighter and Interceptor slots", () => {
   const explosion = weapons.sharedFighterExplosion;
   assert.deepEqual([...xexBytes(labels.get("shared_fighter_explosion_masks"),
     explosion.outerBytes.length)], [...explosion.outerBytes]);
@@ -248,7 +251,7 @@ test("assembled PMG renderer shares one explosion bank between Viper and Raider 
     /tick_shared_fighter_explosions:[\s\S]+cmp #\$01[\s\S]+erase_shared_fighter_explosion_slot/);
 });
 
-test("Viper glyphs and the assembled Raider glyph builder match authoritative runtime masks", () => {
+test("PlayerFighter glyphs and the assembled Interceptor glyph builder match authoritative runtime masks", () => {
   const memory = new Uint8Array(0x10000);
   const { manifest } = installRuntimeSegments(memory, root);
   const run = (name) => {
@@ -267,48 +270,48 @@ test("Viper glyphs and the assembled Raider glyph builder match authoritative ru
   assert.equal(memory.subarray(labels.get("FIGHTER_PROJECTILE_ACTIVE"),
     labels.get("FIGHTER_PROJECTILE_STATE_END")).every((byte) => byte === 0), true,
   "the compact reset loop must clear every owned projectile/burst/explosion byte");
-  const viperBytes = memory.subarray(0x4400 + weapons.glyphLayout.viperBase * 8,
-    0x4400 + (weapons.glyphLayout.viperBase + weapons.glyphs.viper.length) * 8);
+  const player_fighterBytes = memory.subarray(0x4400 + weapons.glyphLayout.player_fighterBase * 8,
+    0x4400 + (weapons.glyphLayout.player_fighterBase + weapons.glyphs.player_fighter.length) * 8);
   const packed = fs.readFileSync(path.join(root, "build", "broadside-runtime.bin"));
   const runtimeBytes = (label, length) => {
     const offset = labels.get(label) - manifest.broadsideRuntime.runAddress;
     return packed.subarray(offset, offset + length);
   };
-  const groupMasks = runtimeBytes("raider_projectile_group_masks", 2);
-  const startRows = runtimeBytes("raider_projectile_start_rows", 10);
-  const rowCounts = runtimeBytes("raider_projectile_row_counts", 10);
-  const raiderBytes = buildRaiderProjectileGlyphBank(weapons,
-    new Uint8Array(weapons.glyphs.raider.length * 8).fill(0xa5));
+  const groupMasks = runtimeBytes("interceptor_projectile_group_masks", 2);
+  const startRows = runtimeBytes("interceptor_projectile_start_rows", 10);
+  const rowCounts = runtimeBytes("interceptor_projectile_row_counts", 10);
+  const interceptorBytes = buildInterceptorProjectileGlyphBank(weapons,
+    new Uint8Array(weapons.glyphs.interceptor.length * 8).fill(0xa5));
   for (let group = 0; group < 2; group += 1) {
     for (let glyph = 0; glyph < 10; glyph += 1) {
       for (let row = 0; row < rowCounts[glyph]; row += 1) {
-        assert.equal(raiderBytes[(group * 10 + glyph) * 8 + startRows[glyph] + row],
+        assert.equal(interceptorBytes[(group * 10 + glyph) * 8 + startRows[glyph] + row],
           groupMasks[group]);
       }
     }
   }
-  assert.deepEqual([...viperBytes], weapons.glyphs.viper.flat());
-  assert.deepEqual([...raiderBytes], weapons.glyphs.raider.flat());
+  assert.deepEqual([...player_fighterBytes], weapons.glyphs.player_fighter.flat());
+  assert.deepEqual([...interceptorBytes], weapons.glyphs.interceptor.flat());
   assert.match(source,
-    /build_raider_projectile_glyphs:[\s\S]+raider_projectile_start_rows[\s\S]+sta \(dst_ptr\),y/);
+    /build_interceptor_projectile_glyphs:[\s\S]+interceptor_projectile_start_rows[\s\S]+sta \(dst_ptr\),y/);
   assert.match(source,
-    /build_raider_projectile_glyphs:[\s\S]+ldx #\$00[\s\S]+inx[\s\S]+cpx #\(RAIDER_PROJECTILE_GLYPH_COUNT\*8\)[\s\S]+bne @clear/);
-  const builder = runtimeBytes("build_raider_projectile_glyphs", 12);
+    /build_interceptor_projectile_glyphs:[\s\S]+ldx #\$00[\s\S]+inx[\s\S]+cpx #\(INTERCEPTOR_PROJECTILE_GLYPH_COUNT\*8\)[\s\S]+bne @clear/);
+  const builder = runtimeBytes("build_interceptor_projectile_glyphs", 12);
   assert.deepEqual([...builder],
     [0xa9, 0x00, 0xa2, 0x00, 0x9d, 0xd0, 0x46, 0xe8, 0xe0, 0xa0, 0xd0, 0xf8],
   "assembled loop clears all 160 bytes instead of terminating after the first high-bit index");
-  assert.equal(weapons.glyphs.viper.some((glyph) => glyph.includes(0xc0)), true);
-  assert.equal(weapons.glyphs.raider.some((glyph) => glyph.includes(0xf0)), true);
+  assert.equal(weapons.glyphs.player_fighter.some((glyph) => glyph.includes(0xc0)), true);
+  assert.equal(weapons.glyphs.interceptor.some((glyph) => glyph.includes(0xf0)), true);
 });
 
-test("Raider inverse screen code selects the intended ANTIC 4 glyph and red bank", () => {
+test("Interceptor inverse screen code selects the intended ANTIC 4 glyph and red bank", () => {
   const charsetBase = 0x4400;
   const glyphIndex = 7;
-  const screenByte = 0x80 | (weapons.glyphLayout.raiderBase + glyphIndex);
+  const screenByte = 0x80 | (weapons.glyphLayout.interceptorBase + glyphIndex);
   const effectiveGlyph = screenByte & 0x7f;
   const glyphAddress = charsetBase + effectiveGlyph * 8;
-  const generated = buildRaiderProjectileGlyphBank(weapons,
-    new Uint8Array(weapons.glyphs.raider.length * 8));
+  const generated = buildInterceptorProjectileGlyphBank(weapons,
+    new Uint8Array(weapons.glyphs.interceptor.length * 8));
   const glyphBytes = generated.subarray(glyphIndex * 8, glyphIndex * 8 + 8);
 
   assert.deepEqual({ screenByte, effectiveGlyph, glyphAddress }, {
@@ -319,17 +322,17 @@ test("Raider inverse screen code selects the intended ANTIC 4 glyph and red bank
   assert.deepEqual([...glyphBytes], [0, 0, 0, 0, 0, 0, 0, 0xf0]);
   assert.equal(screenByte >>> 7, 1,
     "inverse ANTIC 4 code maps pixel value 3 to COLPF3 without changing glyph 97");
-  assert.equal(weapons.raider.colourRegister, "COLPF3");
-  assert.equal(weapons.raider.colourValue, 0x46);
+  assert.equal(weapons.interceptor.colourRegister, "COLPF3");
+  assert.equal(weapons.interceptor.colourValue, 0x46);
   const renderer = source.slice(source.indexOf("render_fighter_projectile_overlays:"),
     source.indexOf("; -----------------------------------------------------------------------------\n; Enemy"));
   assert.match(renderer,
-    /@raider_code:[\s\S]+adc #RAIDER_PROJECTILE_GLYPH_BASE[\s\S]+ora #\$80/);
+    /@interceptor_code:[\s\S]+adc #INTERCEPTOR_PROJECTILE_GLYPH_BASE[\s\S]+ora #\$80/);
 });
 
-test("actual Viper projectile bank is Atari yellow without changing Viper PMG colours", () => {
-  assert.deepEqual([weapons.viper.colourRegister, weapons.viper.colourValue], ["COLPF2", 0x1e]);
-  assert.match(source, /GAMEPLAY_COLPF2 = VIPER_PROJECTILE_COLOR/);
+test("actual PlayerFighter projectile bank is Atari yellow without changing PlayerFighter PMG colours", () => {
+  assert.deepEqual([weapons.player_fighter.colourRegister, weapons.player_fighter.colourValue], ["COLPF2", 0x1e]);
+  assert.match(source, /GAMEPLAY_COLPF2 = PLAYER_FIGHTER_PROJECTILE_COLOR/);
   assert.match(source, /lda #GAMEPLAY_COLPF2\s+sta COLPF2/);
   assert.match(source, /lda #\$0E[^\n]*\n\s*sta COLPM0/);
   assert.match(source, /lda #\$28[^\n]*\n\s*sta COLPM3/);
@@ -340,32 +343,37 @@ test("actual Viper projectile bank is Atari yellow without changing Viper PMG co
 });
 
 test("capital shells remain materially longer than both fighter projectile classes", () => {
-  const { player, raider, capital } = hulls.broadside.projectileVisuals;
-  assert.deepEqual([player.widthHpos, player.height, raider.widthHpos, raider.height],
+  const { player, interceptor, capital } = hulls.broadside.projectileVisuals;
+  assert.deepEqual([player.widthHpos, player.height, interceptor.widthHpos, interceptor.height],
     [1, 2, 2, 3]);
   assert.deepEqual([capital.widthHpos, capital.height], [8, 6]);
   assert.ok(capital.widthHpos >= player.widthHpos * 2);
-  assert.ok(capital.widthHpos >= raider.widthHpos * 2);
+  assert.ok(capital.widthHpos >= interceptor.widthHpos * 2);
   assert.match(source, /render_capital_shell_overlay:[\s\S]+sta \(dst_ptr\),y[\s\S]+iny[\s\S]+sta \(dst_ptr\),y/);
 });
 
 test("assembled burst controllers use accepted counts, intervals, speeds and damage", () => {
   assert.deepEqual({
-    viperCount: weapons.viper.burstCount,
-    viperInterval: weapons.viper.burstIntervalFrames,
-    viperSpeed: weapons.viper.speedScanlines,
-    viperPost: weapons.viper.postBurstFrames,
-    raiderCount: weapons.raider.burstCount,
-    raiderInterval: weapons.raider.burstIntervalFrames,
-    raiderSpeed: weapons.raider.speedScanlines,
-    raiderPost: weapons.raider.postBurstFrames,
-    raiderDamage: weapons.raider.damage,
+    player_fighterCount: weapons.player_fighter.burstCount,
+    player_fighterRapidCount: weapons.player_fighter.rapidFireBurstCount,
+    player_fighterSpreadCount: weapons.player_fighter.spreadShotBurstCount,
+    player_fighterSpreadCooldown: weapons.player_fighter.spreadShotCooldownFrames,
+    player_fighterInterval: weapons.player_fighter.burstIntervalFrames,
+    player_fighterSpeed: weapons.player_fighter.speedScanlines,
+    player_fighterPost: weapons.player_fighter.postBurstFrames,
+    interceptorCount: weapons.interceptor.burstCount,
+    interceptorInterval: weapons.interceptor.burstIntervalFrames,
+    interceptorSpeed: weapons.interceptor.speedScanlines,
+    interceptorPost: weapons.interceptor.postBurstFrames,
+    interceptorDamage: weapons.interceptor.damage,
   }, {
-    viperCount: 10, viperInterval: 3, viperSpeed: 6, viperPost: 12,
-    raiderCount: 10, raiderInterval: 4, raiderSpeed: 5,
-    raiderPost: [60, 50, 40], raiderDamage: 10,
+    player_fighterCount: 8, player_fighterRapidCount: 10, player_fighterSpreadCount: 8, player_fighterSpreadCooldown: 10,
+    player_fighterInterval: 3, player_fighterSpeed: 6, player_fighterPost: 12,
+    interceptorCount: 10, interceptorInterval: 4, interceptorSpeed: 5,
+    interceptorPost: [60, 50, 40], interceptorDamage: 10,
   });
-  assert.match(source, /update_viper_weapon:[\s\S]+VIPER_BURST_COUNT[\s\S]+VIPER_BURST_INTERVAL/);
-  assert.match(source, /update_enemy_weapon_runtime:[\s\S]+RAIDER_BURST_COUNT[\s\S]+RAIDER_BURST_INTERVAL/);
-  assert.match(source, /update_fighter_projectiles:[\s\S]+raider_projectile_hits_player[\s\S]+ENEMY_PULSE_DAMAGE_UNITS[\s\S]+apply_player_damage/);
+  assert.match(source,
+    /update_player_fighter_weapon:[\s\S]+PLAYER_FIGHTER_RAPID_FIRE_BURST_COUNT-PLAYER_FIGHTER_NORMAL_BURST_COUNT[\s\S]+player_fighter_fire_intervals/);
+  assert.match(source, /update_enemy_weapon_runtime:[\s\S]+INTERCEPTOR_BURST_COUNT[\s\S]+INTERCEPTOR_BURST_INTERVAL/);
+  assert.match(source, /update_fighter_projectiles:[\s\S]+interceptor_projectile_hits_player[\s\S]+ENEMY_PULSE_DAMAGE_UNITS[\s\S]+apply_player_damage/);
 });

@@ -1,43 +1,45 @@
 {
   "formatVersion": 1,
-  "viewport": {
-    "activeImageTop": 8,
-    "hudRows": 1,
-    "gameplayRows": 23,
-    "screenColumns": 40,
-    "leftHpos": 48
-  },
   "glyphLayout": {
-    "viperBase": 11,
-    "raiderBase": 90
+    "player_fighterBase": 11,
+    "interceptorBase": 90
   },
-  "viper": {
+  "player_fighter": {
     "poolSlots": 10,
-    "burstCount": 10,
+    "burstCount": 8,
     "burstIntervalFrames": 3,
+    "rapidFireBurstCount": 10,
     "rapidFireIntervalFrames": 2,
     "rapidFireDurationFrames": 500,
+    "spreadShotDurationFrames": 500,
+    "shieldDurationFrames": 250,
+    "spreadShotBurstCount": 8,
+    "spreadShotCooldownFrames": 10,
+    "spreadShotProjectileCount": 3,
+    "spreadShotInitialOffsetHpos": 4,
+    "spreadShotLateralStepHpos": 1,
+    "spreadShotLateralPeriodFrames": 2,
     "postBurstFrames": 12,
     "speedScanlines": 6,
     "widthHpos": 1,
     "heightScanlines": 2,
     "colourRegister": "COLPF2",
     "colourValue": 30,
-    "rapidFireColourRegister": "COLPF3",
-    "rapidFireColourValue": 70
+    "rapidFireColourRegister": "COLPF2",
+    "rapidFireColourValue": 30
   },
   "sharedFighterExplosion": {
     "frameDurationFrames": 4,
     "heightScanlines": 8,
     "widthBits": 8,
     "outerMasks": [
-      ["00000000", "00000000", "00011000", "00111100", "00111100", "00011000", "00000000", "00000000"],
-      ["00000000", "00011000", "00111100", "00111100", "00111100", "00111100", "00011000", "00000000"],
-      ["00011000", "00011000", "00111100", "00111100", "00111100", "00111100", "00011000", "00011000"],
-      ["00100100", "00111100", "00011000", "00111100", "00111100", "00011000", "00111100", "00100100"],
-      ["00000000", "00100100", "00000000", "00011000", "00100100", "00000000", "00011000", "00000000"],
-      ["00000000", "00000000", "00100100", "00000000", "00000000", "00011000", "00000000", "00000000"]
+      ["00000000", "00000000", "00000000", "00011000", "00011000", "00000000", "00000000", "00000000"],
+      ["00000000", "00011000", "00111100", "01111110", "00111100", "00011000", "00000000", "00000000"],
+      ["00100100", "01111110", "11111111", "11111111", "11111111", "01111110", "00111100", "00011000"],
+      ["01000010", "10100101", "01011010", "10100101", "01011010", "00100100", "01000010", "00000000"],
+      ["10000001", "00100100", "01000010", "00011000", "00100100", "01000010", "00000000", "00011000"],
+      ["10000000", "00000100", "00100000", "00000001", "00010000", "00000000", "01000000", "00000010"]
     ],
-    "coreMasks": [60, 60, 60, 24, 0, 0]
+    "coreMasks": [24, 24, 60, 24, 0, 0]
   }
 }

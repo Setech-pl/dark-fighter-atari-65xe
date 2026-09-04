@@ -42,9 +42,9 @@ const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8"
 const definition = loadCapitalHullsDefinition(definitionPath);
 const asset = compileCapitalHulls(definition);
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
-const map = fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.map"), "utf8");
+const map = fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.map"), "utf8");
 const labels = new Map(
-  fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -185,12 +185,18 @@ test("assembled gameplay display list and DLI switch a dedicated ANTIC 2 HUD", (
       `HUD glyph ${code} must be present in the dedicated charset`,
     );
   }
-  const percentCode = "%".charCodeAt(0) - 0x20;
-  assert.deepEqual(
-    graphics.hudCharset.subarray(percentCode * 8, percentCode * 8 + 8),
-    Uint8Array.from([0xcc, 0xd8, 0x18, 0x30, 0x60, 0x6c, 0xcc, 0xff]),
-    "HUD percent sign must use the native dedicated glyph copied at startup",
-  );
+  for (const [name, expected] of [
+    ["CH_HUD_HULL_FULL", [0, 0, 0, 0x3c, 0x7e, 0xff, 0x7e, 0xff]],
+    ["CH_HUD_HULL_DAMAGED", [0, 0, 0, 0x3c, 0x42, 0x5a, 0x24, 0xff]],
+    ["CH_HUD_BOOSTER_FULL", [0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0xff]],
+  ]) {
+    const code = graphics.constants.get(name);
+    assert.deepEqual(
+      graphics.hudCharset.subarray(code * 8, code * 8 + 8),
+      Uint8Array.from(expected),
+      `${name} must use its shape-distinct dedicated HUD glyph`,
+    );
+  }
 
   const state = readGameplayRuntimeState(source, definition);
   const hudRegisters = new Set(state.registerPixels.subarray(0, 8 * 320));
@@ -238,14 +244,11 @@ test("assembled ANTIC 2 HUD keeps independent live score, life, and hull fields"
     statusAddress,
     labels.get("begin_broadside_impact") - statusAddress,
   );
-  for (const offset of [18, 26, 27]) {
-    assert.notEqual(
-      statusBytes.indexOf(absoluteStore(0x4000 + offset)),
-      -1,
-      `HUD status digit at screen offset ${offset} must remain live`,
-    );
-  }
-  assert.match(source, /hud_ascii:\s*\.byte "SCORE 00000  LIFE 3  HULL 100%"/);
+  assert.notEqual(statusBytes.indexOf(absoluteStore(0x4000 + 18)), -1,
+    "HUD LIFE digit at screen offset 18 must remain live");
+  assert.notEqual(statusBytes.indexOf(Buffer.from([0x9d, 0x19, 0x40])), -1,
+    "HUD HULL plates must update only the indexed 25-28 field");
+  assert.match(source, /hud_ascii:\s*\.byte "SCORE 00000  LIFE 3 HULL "/);
   assert.doesNotMatch(source, /hud_ascii:[\s\S]*?\.byte [^\n]*\b(?:FUEL|ARM)\b/);
   assert.match(source,
     /update_hud_status:[\s\S]+lda PLAYER_LIVES[\s\S]+HUD_LIFE_DIGIT_OFFSET[\s\S]+lda BROAD_PLAYER_HEALTH/);
@@ -290,12 +293,12 @@ test("generated include, packed maps, codebooks, and turret records match assemb
   );
   assert.deepEqual(
     readXexBytes(labels.get("broadside_schedule"), asset.scheduleBytes.length),
-    Buffer.from([1, 68, 0, 126, 1, 68, 0, 138]),
+    Buffer.from([1, 68, 1, 68, 1, 68, 0, 138]),
     "assembled opportunities retain their PAL delays but select a faction side",
   );
   assert.deepEqual(
     readXexBytes(labels.get("turret_warning_last_safe_rows"), 3),
-    Buffer.from([12, 10, 9]),
+    Buffer.from(asset.warningLastSafeRowBytes),
     "assembled firing bounds reserve the complete 25-frame warning plus one hull row",
   );
   for (const side of ["allied", "enemy"]) {
@@ -356,7 +359,7 @@ test("turret metadata points to complete multi-cell emplacements and real muzzle
   assert.deepEqual(asset.schedule.map(({ side, delayAfterFrames }) =>
     [side, delayAfterFrames]), [
     ["enemy", 68],
-    ["allied", 126],
+    ["enemy", 68],
     ["enemy", 68],
     ["allied", 138],
   ]);
@@ -386,16 +389,16 @@ test("turret metadata points to complete multi-cell emplacements and real muzzle
   }
 });
 
-test("allied armour is steel-led while enemy armour is dark-red with deep recesses", () => {
+test("accepted H4.2 C INDUSTRIAL armour remains steel-led allied and dark-red enemy", () => {
   const allied = colorCounts("allied");
   const enemy = colorCounts("enemy");
   const alliedTotal = allied.reduce((sum, count) => sum + count, 0);
   const enemyTotal = enemy.reduce((sum, count) => sum + count, 0);
   assert.ok(allied[2] / alliedTotal >= 0.65 && allied[2] / alliedTotal <= 0.83);
-  assert.ok(enemy[3] / enemyTotal >= 0.55 && enemy[3] / enemyTotal <= 0.70);
-  assert.ok(enemy[2] / enemyTotal >= 0.10 && enemy[2] / enemyTotal <= 0.20);
-  assert.ok(enemy[1] / enemyTotal <= 0.08);
-  assert.ok(enemy[0] > allied[0] * 1.5);
+  assert.ok(enemy[3] / enemyTotal >= 0.70 && enemy[3] / enemyTotal <= 0.75);
+  assert.ok(enemy[2] / enemyTotal >= 0.08 && enemy[2] / enemyTotal <= 0.12);
+  assert.ok(enemy[1] / enemyTotal <= 0.05);
+  assert.ok(enemy[0] > allied[0] * 1.25);
   assert.ok(allied[1] > enemy[1] * 10);
   assert.ok(enemy[0] / enemyTotal >= 0.15);
   assert.ok(allied[3] / alliedTotal < 0.01);
@@ -531,7 +534,7 @@ test("runtime map reservation and payload remain bounded and do not consume PMG 
     [0x4c00, 0x4d20, 0x4e40],
   );
   assert.equal(asset.runtimeMapBytes, 576);
-  assert.equal(asset.packedDataBytes, 945);
+  assert.equal(asset.packedDataBytes, 1005);
   assert.deepEqual(
     Uint8Array.from(readXexBytes(labels.get("allied_collision_boundaries"), asset.segmentRows)),
     asset.collisionBoundaries.get("allied"),
@@ -549,11 +552,11 @@ test("runtime map reservation and payload remain bounded and do not consume PMG 
   assert.match(source, /scroll_hull_columns:[\s\S]+jsr draw_hull_row/);
 });
 
-test("loader and accepted menu previews remain unchanged while hull previews are source-derived", () => {
+test("loader remains unchanged and the accepted H3.1 menu preview is source-derived", () => {
   const loader = createLoaderPreview(loadLoaderBitmapDefinition(loaderDefinitionPath));
   const menu = createStartMenuPreview(source);
   assert.equal(sha256(loader), "83a8b4f7fff4791206b220e773272b2bb014b517049aedd83e070cecc3edd494");
-  assert.equal(sha256(menu), "5a1af8a1757930d053e0f50a1c0b67c8e22048587d7c80b08a405accdb688551");
+  assert.equal(sha256(menu), "90c24ccbf0c00122896b959059f76f4748e55fbf304f58672d0cc4f867e7ae2c");
 
   const gameplay = createGameplayPreview(source, definition);
   const strip = createCapitalHullsStripPreview(source, definition);
@@ -574,15 +577,17 @@ test("loader and accepted menu previews remain unchanged while hull previews are
 });
 
 test("joystick, FIRE, projectile, enemy, and scoring routines remain connected", () => {
-  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_viper_weapon[\s\S]+jsr update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
+  assert.match(source, /main_loop:[\s\S]+jsr read_input[\s\S]+jsr integration_update_enemy[\s\S]+jsr handle_collisions[\s\S]+jsr update_player_fighter_weapon[\s\S]+jsr integration_update_enemy_weapon[\s\S]+jsr update_starfield[\s\S]+jsr update_sound/);
   assert.match(source, /read_input:[\s\S]+lda STICK0[\s\S]+lda TRIG0/);
   assert.match(source,
-    /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #VIPER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #RAIDER_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
+    /update_fighter_projectiles:\s+ldx #\$00[\s\S]+cpx #PLAYER_FIGHTER_PROJECTILE_SLOT_COUNT[\s\S]+ldx #INTERCEPTOR_PROJECTILE_SLOT_BASE[\s\S]+cpx #FIGHTER_PROJECTILE_SLOT_COUNT/);
   assert.doesNotMatch(source, /\b(?:bullet_x|bullet_y|bullet_active|refresh_bullet_active)\b/);
   assert.match(source,
-    /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jsr update_top_score[\s\S]+jmp update_score_display/);
+    /add_archetype_score:[\s\S]+adc enemy_scores,x[\s\S]+cld[\s\S]+jmp update_score_display/);
   assert.match(source,
-    /update_enemy:[\s\S]+jsr update_raider_soft_pursuit[\s\S]+update_enemy_animation/);
+    /update_player_death:[\s\S]+@game_over:[\s\S]+jsr insert_top_score/);
   assert.match(source,
-    /update_raider_soft_pursuit:[\s\S]+enemy_velocity_x[\s\S]+jmp clamp_enemy_x/);
+    /update_enemy:[\s\S]+jsr update_interceptor_soft_pursuit[\s\S]+update_enemy_animation/);
+  assert.match(source,
+    /update_interceptor_soft_pursuit:[\s\S]+enemy_velocity_x[\s\S]+jmp clamp_enemy_x/);
 });

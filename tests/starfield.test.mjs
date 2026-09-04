@@ -30,7 +30,7 @@ const generated = fs.readFileSync(path.join(root, "build", "starfield.inc"), "ut
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "build", "manifest.json"), "utf8"));
 const starRuntime = fs.readFileSync(path.join(root, "build", "starfield-runtime.bin"));
 const labels = new Map(
-  fs.readFileSync(path.join(root, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(root, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -163,13 +163,13 @@ test("starfield source is compact, table-driven, and assembled byte-for-byte", (
     stateBytes: asset.stateBytes,
   }, {
     seed: 0xa7,
-    farPopulation: 24,
+    farPopulation: 29,
     farRate: [1, 4],
     nearRate: [1, 2],
     nearDensity: [3, 8],
     twinkle: 16,
     glyphBytes: 48,
-    stateBytes: 102,
+    stateBytes: 122,
   });
   assert.equal(generated, renderStarfieldCa65Include(asset));
   assert.deepEqual([...runtimeBytes("star_glyph_bytes", asset.glyphBytes.length)],
@@ -186,8 +186,8 @@ test("ANTIC 4 star screen codes select six isolated glyphs and two safe colour b
   assert.ok(asset.nearLayer.glyphs.every((glyph) =>
     pixelValues(glyph).every((value) => value === 1)), "near glyphs select COLPF0");
   assert.ok(asset.glyphs.every(({ screenCode }) => screenCode < 11));
-  assert.equal(manifest.fighterWeapons.viper.colourValue, 0x1e);
-  assert.equal(manifest.fighterWeapons.raider.colourValue, 0x46);
+  assert.equal(manifest.fighterWeapons.player_fighter.colourValue, 0x1e);
+  assert.equal(manifest.fighterWeapons.interceptor.colourValue, 0x46);
   assert.deepEqual([manifest.starfield.farLayer.colourRegister,
     manifest.starfield.nearLayer.colourRegister], ["COLPF1", "COLPF0"]);
 });
@@ -198,7 +198,7 @@ test("deterministic seed reproduces layouts while a different seed changes them"
   const different = composeStarfield(asset, createStarfieldState(asset, { seed: 0x53 }));
   assert.equal(screenHash(first), screenHash(repeat));
   assert.notEqual(screenHash(first), screenHash(different));
-  assert.deepEqual(counts(first), { far: 20, near: 6 });
+  assert.deepEqual(counts(first), { far: 19, near: 8 });
 });
 
 test("hulls keep the legacy world rate while stars hold exact 50% and 25% ratios", () => {
@@ -231,7 +231,7 @@ test("hulls keep the legacy world rate while stars hold exact 50% and 25% ratios
   ], [1, 2, 1, 4]);
 });
 
-test("assembled 6502 phases execute one complete 100/50/25 rate period", () => {
+test("assembled 6502 keeps physical scene recycle at 100% and far stars at 25%", () => {
   const memory = new Uint8Array(0x10000);
   memory.set(starRuntime, manifest.starfieldRuntime.runAddress);
   const addresses = {
@@ -251,6 +251,7 @@ test("assembled 6502 phases execute one complete 100/50/25 rate period", () => {
     [addresses.erase, 0],
     [addresses.nearStep, 0],
     [addresses.farStep, 0],
+    [0x4efe, 0],
   ]);
   const gcd = (left, right) => right === 0 ? left : gcd(right, left % right);
   const period = asset.nearLayer.rateDenominator * asset.farLayer.rateDenominator /
@@ -264,9 +265,9 @@ test("assembled 6502 phases execute one complete 100/50/25 rate period", () => {
   const hullSteps = period;
   const nearSteps = calls.get(addresses.nearStep);
   const farSteps = calls.get(addresses.farStep);
-  assert.deepEqual([hullSteps, nearSteps, farSteps], [4, 2, 1]);
+  assert.deepEqual([hullSteps, nearSteps, farSteps], [4, 4, 1]);
   assert.deepEqual([hullSteps * 100 / hullSteps, nearSteps * 100 / hullSteps,
-    farSteps * 100 / hullSteps], [100, 50, 25]);
+    farSteps * 100 / hullSteps], [100, 100, 25]);
   assert.deepEqual(phaseTrace.at(-1), [0, 0],
     "both assembled accumulators close exactly over the common period");
   assert.ok(phaseTrace.every(([near, far]) =>
@@ -326,7 +327,9 @@ test("broadside stars stay inside the corridor and never touch hull ownership", 
     assert.ok(state.far.every(({ column }) => column >= 9 && column <= 30));
     state = stepStarfieldWorld(asset, state);
   }
-  assert.match(source, /render_far_star_overlays:[\s\S]+RESOLVE_FAR_STAR_PTR[\s\S]+ldy #\$00[\s\S]+lda \(dst_ptr\),y\s+bne render_far_star_next/);
+  assert.match(source, /STAR_FAR_SCREEN_LO\s*=\s*\$8100[\s\S]+STAR_FAR_SCREEN_HI\s*=\s*STAR_FAR_SCREEN_LO\+STAR_FAR_CAPACITY/);
+  assert.match(source, /render_far_star_overlays:[\s\S]+RESOLVE_FAR_STAR_PTR[\s\S]+ldy #\$00[\s\S]+lda \(dst_ptr\),y\s+bne render_far_star_next[\s\S]+sta STAR_FAR_SCREEN_LO,x[\s\S]+sta STAR_FAR_SCREEN_HI,x/);
+  assert.match(source, /erase_far_star_overlays:[\s\S]+lda STAR_FAR_SCREEN_LO,x\s+sta dst_ptr[\s\S]+lda STAR_FAR_SCREEN_HI,x\s+sta dst_ptr\+1[\s\S]+sta \(dst_ptr\),y/);
   assert.doesNotMatch(source.slice(source.indexOf("handle_collisions:"),
     source.indexOf("update_score_display:")), /STAR_FAR|STAR_NEAR|star_glyph/);
 });
@@ -396,7 +399,7 @@ test("assembly erases overlays before scroll and renders them in stacking order"
 test("starfield relocation preserves broadside and protected finale memory", () => {
   assert.equal(manifest.starfieldRuntime.runAddress, 0x552a);
   assert.ok(manifest.starfieldRuntime.bytes <= manifest.starfieldRuntime.reservedBytes);
-  assert.ok(manifest.starfieldRuntime.packedBytes <= 0x700);
+  assert.ok(manifest.starfieldRuntime.packedBytes <= 0x706);
   assert.equal(manifest.broadsideRuntime.runAddress, 0x5e10);
   assert.ok(manifest.broadsideRuntime.bytes <= manifest.broadsideRuntime.reservedBytes);
   assert.ok(manifest.broadsideRuntime.runAddress + manifest.broadsideRuntime.bytes <= 0x7810);
@@ -423,7 +426,7 @@ test("starfield staging is disjoint from the packed loader and loader bitmap", (
   assert.ok(loaderEnd < manifest.broadsideRuntime.loadAddress);
   assert.equal(stagingStart, 0x7810);
   assert.ok(stagingEnd < stagingStart + manifest.starfieldRuntime.stagingBytes);
-  assert.equal(stagingStart + manifest.starfieldRuntime.stagingBytes - 1, 0x7f0f);
+  assert.equal(stagingStart + manifest.starfieldRuntime.stagingBytes - 1, 0x7f15);
   assert.equal(overlaps(stagingStart, stagingEnd, loaderStart, loaderEnd), false);
   assert.equal(overlaps(stagingStart, stagingEnd, bitmapStart, bitmapEnd), false);
   assert.ok(stagingStart >= manifest.broadsideRuntime.runAddress +

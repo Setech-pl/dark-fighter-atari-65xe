@@ -268,13 +268,13 @@ export function createAssetSheets() {
     drawHudText(canvas, "COMPILED PMG ART USED BY THE RELEASE", 32, 62, 1, muted, graphics);
     canvas.fillRect(30, 100, 420, 250, panel);
     canvas.frame(30, 100, 420, 250, outline);
-    drawHudText(canvas, "VIPER", 60, 120, 2, steel, graphics);
+    drawHudText(canvas, "PLAYER_FIGHTER", 60, 120, 2, steel, graphics);
     drawPmg(canvas, graphics.playerShape, 160, 178, 7, white, 1);
     drawPmg(canvas, graphics.playerEngineShape, 160, 178, 7, yellow, 1);
     drawHudText(canvas, "PLAYER FIGHTER", 84, 318, 1, muted, graphics);
     canvas.fillRect(510, 100, 420, 250, panel);
     canvas.frame(510, 100, 420, 250, outline);
-    drawHudText(canvas, "CYLON RAIDER", 540, 120, 2, burgundy, graphics);
+    drawHudText(canvas, "HOSTILE INTERCEPTOR", 540, 120, 2, burgundy, graphics);
     drawPmg(canvas, graphics.releaseEnemy.bodyRows, 640, 174, 7, burgundy, 2);
     drawPmg(canvas, graphics.releaseEnemy.accentFrames[2], 640, 174, 7, red, 2);
     drawHudText(canvas, "ACTIVE RELEASE ENEMY", 580, 318, 1, muted, graphics);
@@ -288,9 +288,9 @@ export function createAssetSheets() {
     drawHudText(canvas, "WEAPONS AND EFFECTS", 32, 24, 2, white, graphics);
     drawHudText(canvas, "ACTUAL PROJECTILE GLYPHS AND EXPLOSION MASKS", 32, 62, 1, muted, graphics);
     const cards = [
-      ["VIPER SHOT", graphics.fighterWeapons.glyphs.viper[0], yellow, false],
-      ["RAPID SHOT", graphics.fighterWeapons.glyphs.viper[0], red, true],
-      ["RAIDER PULSE", graphics.fighterWeapons.glyphs.raider[0], red, true],
+      ["PLAYER_FIGHTER SHOT", graphics.fighterWeapons.glyphs.player_fighter[0], yellow, false],
+      ["RAPID SHOT", graphics.fighterWeapons.glyphs.player_fighter[0], red, true],
+      ["INTERCEPTOR PULSE", graphics.fighterWeapons.glyphs.interceptor[0], red, true],
     ];
     cards.forEach(([label, glyph, color, inverse], index) => {
       const x = 30 + index * 300;
@@ -407,10 +407,11 @@ function requireCaptureSources() {
   const sources = {
     loader: path.join(runtimeTraceDirectory, "boot-smoke", "xex-a5-frame250.png"),
     standard: path.join(captureDirectory, "neutral-combat-025.png"),
-    raider: path.join(captureDirectory, "neutral-combat-031.png"),
+    interceptor: path.join(captureDirectory, "neutral-combat-031.png"),
     debris: path.join(captureDirectory, "neutral-combat-113.png"),
     pickup: path.join(runtimeTraceDirectory, "weapon-pickup-static-atari800.png"),
     rapid: path.join(runtimeTraceDirectory, "weapon-pickup-rapid-projectiles-atari800.png"),
+    spread: path.join(runtimeTraceDirectory, "weapon-pickup-spread-projectiles-atari800.png"),
     broadside: path.join(captureDirectory, "neutral-combat-100.png"),
     engines: path.join(runtimeTraceDirectory, "engine-xex-a5-0-immediate-096.png"),
   };
@@ -424,15 +425,22 @@ function requireCaptureSources() {
 
 export function createGameplayGallery() {
   const sources = requireCaptureSources();
+  const runtimeReport = JSON.parse(fs.readFileSync(
+    path.join(rootDirectory, "docs", "runtime-wall-trace.json"), "utf8"));
+  const spreadCaptureFrame =
+    runtimeReport.coverage?.weapon_pickup_spread_shot?.screenshot?.capture_frame;
+  invariant(Number.isInteger(spreadCaptureFrame),
+    "Runtime report is missing the authentic Spread Shot capture frame");
   const definitions = [
-    ["01-title-loader.png", sources.loader, "XEX", 250, "Loader title and recovered BSG ship art"],
-    ["02-standard-combat.png", sources.standard, "XEX", 25, "Viper, Raider, starfield and capital hull corridor"],
-    ["03-raider-breakup.png", sources.raider, "XEX", 31, "Raider local breakup after a Viper projectile kill"],
+    ["01-title-loader.png", sources.loader, "XEX", 250, "Loader title and capital-ship art"],
+    ["02-standard-combat.png", sources.standard, "XEX", 25, "PlayerFighter, Interceptor, starfield and capital hull corridor"],
+    ["03-interceptor-breakup.png", sources.interceptor, "XEX", 31, "Interceptor local breakup after a PlayerFighter projectile kill"],
     ["04-debris-breakup.png", sources.debris, "XEX", 113, "Destructible debris with four transient fragments"],
     ["05-rapid-fire-pickup.png", sources.pickup, "XEX", 385, "Static 2x2 Rapid Fire capsule in active gameplay"],
-    ["06-rapid-fire-active.png", sources.rapid, "XEX", 449, "RF HUD countdown and red Rapid Fire projectiles"],
+    ["06-rapid-fire-active.png", sources.rapid, "XEX", 449, "Full BOOST HUD label, energy cells, and yellow Rapid Fire projectiles"],
     ["07-capital-broadside.png", sources.broadside, "XEX", 100, "Capital corridor combat and broadside fire"],
     ["08-capital-engines.png", sources.engines, "XEX", 96, "Capital engine bank in its deterministic 8-frame phase"],
+    ["09-spread-shot-active.png", sources.spread, "XEX", spreadCaptureFrame, "Full BOOST HUD label, energy cells, and all-yellow three-projectile fan"],
   ];
   return definitions.map(([fileName, sourcePath, medium, frame, description]) => {
     const { sourceBytes, png, width, height } = cropRuntimeFrame(sourcePath);
@@ -458,8 +466,8 @@ function readCommittedGameplayGallery() {
   invariant(fs.existsSync(manifestPath),
     "The committed gameplay manifest is missing; rerun npm run showcase -- --capture");
   const committed = JSON.parse(fs.readFileSync(manifestPath, "utf8")).gameplay;
-  invariant(Array.isArray(committed) && committed.length === 8,
-    "The committed gameplay manifest must contain eight Atari800 frames");
+  invariant(Array.isArray(committed) && committed.length === 9,
+    "The committed gameplay manifest must contain nine Atari800 frames");
   return committed.map((item) => {
     const outputPath = path.join(rootDirectory, item.path);
     invariant(fs.existsSync(outputPath), `Committed showcase frame is missing: ${item.path}`);
@@ -476,12 +484,12 @@ function readCommittedGameplayGallery() {
 function readOwnerSuppliedConceptArt() {
   const definitions = [
     {
-      fileName: "dark-fighter-concept-from-floppy-to-stars.jpg",
+      fileName: "void-strike-65-concept-from-floppy-to-stars.jpg",
       title: "From Floppy to the Stars",
       caption: "Concept art — From Floppy to the Stars. An AI-assisted visualization of the project’s journey from its 1990 origins to the current release. Not an in-game screenshot.",
     },
     {
-      fileName: "dark-fighter-concept-gauntlet-run.jpg",
+      fileName: "void-strike-65-concept-gauntlet-run.jpg",
       title: "Gauntlet Run",
       caption: "Concept art — Gauntlet Run. An AI-assisted visualization of the intended scale, atmosphere and future battlefield composition. Not an in-game screenshot.",
     },
@@ -510,8 +518,8 @@ export function generateShowcase({ capture = false } = {}) {
   fs.mkdirSync(gameplayDirectory, { recursive: true });
   fs.mkdirSync(assetDirectory, { recursive: true });
   if (capture) captureBreakupFrames();
-  const xex = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.xex"));
-  const atr = fs.readFileSync(path.join(rootDirectory, "dist", "dark-fighter.atr"));
+  const xex = fs.readFileSync(path.join(rootDirectory, "dist", "void-strike-65.xex"));
+  const atr = fs.readFileSync(path.join(rootDirectory, "dist", "void-strike-65.atr"));
   const runtimeReport = JSON.parse(fs.readFileSync(
     path.join(rootDirectory, "docs", "runtime-wall-trace.json"), "utf8"));
   invariant(runtimeReport.artifact.sha256 === sha256(xex),
@@ -523,8 +531,8 @@ export function generateShowcase({ capture = false } = {}) {
     formatVersion: 1,
     generatedBy: "scripts/github-showcase.mjs",
     runtimeEvidence: {
-      xex: { path: "dist/dark-fighter.xex", bytes: xex.length, sha256: sha256(xex) },
-      atr: { path: "dist/dark-fighter.atr", bytes: atr.length, sha256: sha256(atr) },
+      xex: { path: "dist/void-strike-65.xex", bytes: xex.length, sha256: sha256(xex) },
+      atr: { path: "dist/void-strike-65.atr", bytes: atr.length, sha256: sha256(atr) },
       wallTrace: { path: "docs/runtime-wall-trace.json", sha256: sha256(fs.readFileSync(
         path.join(rootDirectory, "docs", "runtime-wall-trace.json"))) },
       note: "Gameplay images are unenhanced 320x240 crops of Atari800's packed-release framebuffer. The eight-pixel emulator side borders are the only pixels removed.",

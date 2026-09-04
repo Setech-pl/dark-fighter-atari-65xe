@@ -1,20 +1,23 @@
-# ADR-001: przenośny toolchain ca65/ld65
+# ADR-001: portable ca65/ld65 toolchain
 
-Status: zaakceptowana
+Status: accepted
 
-## Kontekst
+## Context
 
-Projekt musi budować się na macOS z procesorem Intel oraz na Windows. Natywne paczki cc65 i dodatkowe narzędzia do ATR różnią się instalacją i wersjami.
+The project must build on Intel macOS and Windows. Native cc65 packages and ATR
+tools differ across hosts and versions.
 
-## Decyzja
+## Decision
 
-Używamy przypiętej paczki `romdev-toolchain-cc65` zawierającej `ca65` i `ld65` w WebAssembly. Własny skrypt Node.js montuje pliki w wirtualnym systemie narzędzi, odbiera wynik i generuje XEX/ATR bez zewnętrznych programów.
+Use the pinned `romdev-toolchain-cc65` package containing WebAssembly builds of
+`ca65` and `ld65`. Node.js scripts mount inputs in the toolchain's virtual file
+system, collect the linker output, and build XEX/ATR without host-specific
+binary utilities.
 
-## Konsekwencje
+## Consequences
 
-- build jest identyczny na wspieranych hostach;
-- wymaga Node.js 24+ i jednorazowego `npm install`;
-- nie zależy od Homebrew, Chocolatey, Pythona ani natywnego cc65;
-- wersja toolchainu jest utrwalona w lockfile;
-- w razie potrzeby można później dodać zgodny tryb użycia natywnych `ca65/ld65`.
-
+- Supported hosts produce deterministic output from the locked dependencies.
+- The build requires Node.js 24 or newer and `npm install`/`npm ci`.
+- Homebrew, Chocolatey, Python, and a system cc65 install are not required.
+- A native ca65/ld65 compatibility path may be added later only if it preserves
+  byte-identical output and validation.

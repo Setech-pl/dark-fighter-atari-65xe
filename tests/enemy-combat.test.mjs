@@ -15,10 +15,10 @@ import {
   projectileVisualMetrics,
   queueEnemyDamage,
   resolveEnemyDamage,
-  createRaiderPursuitState,
-  simulateRaiderSoftPursuit,
+  createInterceptorPursuitState,
+  simulateInterceptorSoftPursuit,
   simulateEnemyCombatFrames,
-  simulateNaturalRaiderFire,
+  simulateNaturalInterceptorFire,
   stepEnemyCombatFrame,
   sweptHorizontalProjectileTargets,
   sweptEnemyPulseHitsPlayer,
@@ -32,7 +32,7 @@ import { readRuntimeBytes as readAssembledRuntimeBytes } from "../scripts/runtim
 import {
   createEnemyCombatSequencePreview,
   createEnemyPaletteCandidatePreview,
-  createRaiderNaturalFireTrace,
+  createInterceptorNaturalFireTrace,
   createProjectileCollisionScoringPreview,
   createProjectileVisualLanguagePreview,
   inspectPng,
@@ -51,11 +51,11 @@ const hulls = loadCapitalHullsDefinition(
   path.join(rootDirectory, "assets", "graphics", "capital-hulls.json"),
 );
 const asset = compileEnemyRoster(loadEnemyRosterDefinition(definitionPath), rootDirectory);
-const [raider, talon, bomber] = asset.implemented;
+const [interceptor, talon, bomber] = asset.implemented;
 const source = fs.readFileSync(path.join(rootDirectory, "src", "main.s"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json"), "utf8"));
 const labels = new Map(
-  fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -66,11 +66,11 @@ function readRuntimeBytes(address, length) {
   return readAssembledRuntimeBytes(rootDirectory, address, length);
 }
 
-test("selected Raider palette matches the Cylon hull hue with independent luminance and eye", () => {
+test("selected Interceptor palette matches the Hostile hull hue with independent luminance and eye", () => {
   assert.deepEqual(asset.runtime.colourPolicy.candidates, [
-    { id: "CYLON_OXBLOOD", value: 0x42 },
-    { id: "CYLON_BURGUNDY", value: 0x44 },
-    { id: "CYLON_SCARLET", value: 0x48 },
+    { id: "HOSTILE_OXBLOOD", value: 0x42 },
+    { id: "HOSTILE_BURGUNDY", value: 0x44 },
+    { id: "HOSTILE_SCARLET", value: 0x48 },
   ]);
   assert.deepEqual(
     [asset.runtime.colourPolicy.bodyValue, asset.runtime.colourPolicy.accentValue],
@@ -79,17 +79,17 @@ test("selected Raider palette matches the Cylon hull hue with independent lumina
   const graphics = readGameGraphicsSource(source);
   const body = asset.runtime.colourPolicy.bodyValue;
   const eye = asset.runtime.colourPolicy.accentValue;
-  const colonialHull = graphics.hardwareState.get("COLPF1");
-  const cylonHull = graphics.hardwareState.get("COLPF3");
+  const alliedHull = graphics.hardwareState.get("COLPF1");
+  const hostileHull = graphics.hardwareState.get("COLPF3");
   const background = graphics.hardwareState.get("COLBK");
-  assert.equal(body & 0xf0, cylonHull & 0xf0,
-    "Raider body must use the Cylon hull hue family");
-  assert.notEqual(body & 0x0f, cylonHull & 0x0f,
-    "Raider and Cylon hull must not share luminance");
+  assert.equal(body & 0xf0, hostileHull & 0xf0,
+    "Interceptor body must use the Hostile hull hue family");
+  assert.notEqual(body & 0x0f, hostileHull & 0x0f,
+    "Interceptor and Hostile hull must not share luminance");
   assert.notEqual(body & 0x0f, background & 0x0f,
-    "Raider must not share the background luminance");
-  assert.notEqual(body & 0xf0, colonialHull & 0xf0,
-    "Raider must no longer use the Colonial hull hue family");
+    "Interceptor must not share the background luminance");
+  assert.notEqual(body & 0xf0, alliedHull & 0xf0,
+    "Interceptor must no longer use the Allied hull hue family");
   assert.equal((eye & 0x0f) - (body & 0x0f), 2,
     "the red eye remains one GTIA luminance step brighter than the body");
   assert.deepEqual(
@@ -98,127 +98,127 @@ test("selected Raider palette matches the Cylon hull hue with independent lumina
     [0x0e, 0x44, 0x46, 0x28],
   );
   assert.match(source,
-    /resolve_enemy_damage:[\s\S]+lda #ENEMY_EXPLOSION_CORE_COLOR[\s\S]+sta COLPM1[\s\S]+jsr spawn_raider_breakup_effects/);
+    /resolve_enemy_damage:[\s\S]+lda #ENEMY_EXPLOSION_CORE_COLOR[\s\S]+sta COLPM1[\s\S]+jsr spawn_interceptor_breakup_effects/);
   assert.match(source,
-    /spawn_raider_breakup_effects:[\s\S]+jsr clear_transient_effects[\s\S]+sta EFFECT_ALLOCATION_RESULT[\s\S]+jmp begin_enemy_fighter_explosion/);
+    /spawn_interceptor_breakup_effects:[\s\S]+jsr clear_transient_effects[\s\S]+sta EFFECT_ALLOCATION_RESULT[\s\S]+jmp begin_enemy_fighter_explosion/);
   assert.match(source,
-    /materialize_raider_breakup_effects:[\s\S]+jsr spawn_breakup_effects_at[\s\S]+entity_raider_fragment_render_ids/);
+    /materialize_interceptor_breakup_effects:[\s\S]+jsr spawn_breakup_effects_at[\s\S]+entity_interceptor_fragment_render_ids/);
   assert.match(source,
     /tick_shared_fighter_explosions:[\s\S]+cpx #FIGHTER_EXPLOSION_ENEMY_SLOT[\s\S]+lda #ENEMY_RUNTIME_BODY_COLOR[\s\S]+sta COLPM1/);
   assert.match(source,
     /start_gameplay:[\s\S]+lda #ENEMY_RUNTIME_BODY_COLOR[\s\S]+sta COLPM1[\s\S]+music_start_gameplay/,
-  "a new game must restore the Raider body even after an interrupted explosion");
+  "a new game must restore the Interceptor body even after an interrupted explosion");
   assert.match(source, /ENEMY_EXPLOSION_CORE_COLOR = \$84/);
 });
 
-test("release Raider uses bounded soft pursuit rather than a player-independent sinusoid", () => {
-  const policy = asset.runtime.movementPolicy.raiderSoftPursuit;
+test("release Interceptor uses bounded soft pursuit rather than a player-independent sinusoid", () => {
+  const policy = asset.runtime.movementPolicy.interceptorSoftPursuit;
   assert.deepEqual(policy, {
     targetSamplingIntervalFrames: 8,
     deadZoneHpos: 3,
     horizontalAccelerationHpos: 1,
     maximumHorizontalVelocityHpos: 1,
-    viperReferenceSpeedHposPerFrame: 2,
+    player_fighterReferenceSpeedHposPerFrame: 2,
     movementStepHpos: 2,
     maximumSpeedRatioNumerator: 4,
     maximumSpeedRatioDenominator: 5,
     weaveAmplitudeHpos: 4,
     weavePeriodFrames: 32,
     attackActiveTop: 16,
-    attackActiveBottomExclusive: 200,
+    attackActiveBottomExclusive: 240,
   });
-  const start = createRaiderPursuitState(asset, { x: 128, y: 56 });
-  const left = simulateRaiderSoftPursuit(asset, {
+  const start = createInterceptorPursuitState(asset, { x: 128, y: 56 });
+  const left = simulateInterceptorSoftPursuit(asset, {
     frameCount: 64,
     initialState: start,
     playerXForFrame: () => 88,
   });
-  const right = simulateRaiderSoftPursuit(asset, {
+  const right = simulateInterceptorSoftPursuit(asset, {
     frameCount: 64,
     initialState: start,
     playerXForFrame: () => 160,
   });
-  assert.ok(left.trace[15].x < start.x, "sustained left target affects the Raider within 16 PAL frames");
-  assert.ok(right.trace[15].x > start.x, "sustained right target affects the Raider within 16 PAL frames");
+  assert.ok(left.trace[15].x < start.x, "sustained left target affects the Interceptor within 16 PAL frames");
+  assert.ok(right.trace[15].x > start.x, "sustained right target affects the Interceptor within 16 PAL frames");
   assert.notDeepEqual(left.trace.map(({ x }) => x), right.trace.map(({ x }) => x),
-    "identical Raider spawn state produces player-dependent trajectories");
+    "identical Interceptor spawn state produces player-dependent trajectories");
   for (const trace of [left.trace, right.trace]) {
-    assert.equal(trace.every(({ x }) => x >= raider.logicalBounds[0] &&
-      x <= raider.logicalBounds[1]), true);
+    assert.equal(trace.every(({ x }) => x >= interceptor.logicalBounds[0] &&
+      x <= interceptor.logicalBounds[1]), true);
     assert.equal(trace.every(({ velocityX }) => Math.abs(velocityX) <= 1), true);
   }
 });
 
-test("Raider maximum lateral speed is exactly 4/5 of the Viper reference", () => {
-  const policy = asset.runtime.movementPolicy.raiderSoftPursuit;
+test("Interceptor maximum lateral speed is exactly 4/5 of the PlayerFighter reference", () => {
+  const policy = asset.runtime.movementPolicy.interceptorSoftPursuit;
   const initialX = 112;
   const frames = policy.maximumSpeedRatioDenominator;
-  const pursuit = simulateRaiderSoftPursuit(asset, {
+  const pursuit = simulateInterceptorSoftPursuit(asset, {
     frameCount: frames,
-    initialState: createRaiderPursuitState(asset, { x: initialX, y: 56 }),
+    initialState: createInterceptorPursuitState(asset, { x: initialX, y: 56 }),
     playerXForFrame: () => 160,
   });
-  const raiderDistance = pursuit.trace.reduce((sum, frame) =>
+  const interceptorDistance = pursuit.trace.reduce((sum, frame) =>
     sum + Math.abs(frame.movedHpos), 0);
-  const viperDistance = frames * policy.viperReferenceSpeedHposPerFrame;
-  assert.equal(raiderDistance, 8);
-  assert.equal(viperDistance, 10);
-  assert.equal(raiderDistance * 5, viperDistance * 4);
+  const player_fighterDistance = frames * policy.player_fighterReferenceSpeedHposPerFrame;
+  assert.equal(interceptorDistance, 8);
+  assert.equal(player_fighterDistance, 10);
+  assert.equal(interceptorDistance * 5, player_fighterDistance * 4);
   assert.deepEqual(pursuit.trace.map(({ moveAccumulator }) => moveAccumulator), [4, 3, 2, 1, 0]);
   assert.deepEqual(pursuit.trace.map(({ movedHpos }) => movedHpos), [0, 2, 2, 2, 2],
-    "Raider moves two HPOS on exactly four of each five sustained pursuit frames");
-  assert.equal(pursuit.trace.at(-1).x, initialX + raiderDistance);
-  assert.deepEqual(manifest.enemyRoster.movementPolicy.raiderSoftPursuit, policy);
+    "Interceptor moves two HPOS on exactly four of each five sustained pursuit frames");
+  assert.equal(pursuit.trace.at(-1).x, initialX + interceptorDistance);
+  assert.deepEqual(manifest.enemyRoster.movementPolicy.interceptorSoftPursuit, policy);
   assert.match(source,
-    /update_raider_soft_pursuit:[\s\S]+RAIDER_MOVE_ACCUMULATOR[\s\S]+RAIDER_SPEED_NUMERATOR[\s\S]+RAIDER_SPEED_DENOMINATOR/);
+    /update_interceptor_soft_pursuit:[\s\S]+INTERCEPTOR_MOVE_ACCUMULATOR[\s\S]+INTERCEPTOR_SPEED_NUMERATOR[\s\S]+INTERCEPTOR_SPEED_DENOMINATOR/);
 });
 
-test("stationary Viper is intercepted while active manoeuvring opens the lateral gap", () => {
+test("stationary PlayerFighter is intercepted while active manoeuvring opens the lateral gap", () => {
   const stationaryPlayerX = 136;
-  const idlePursuit = simulateRaiderSoftPursuit(asset, {
+  const idlePursuit = simulateInterceptorSoftPursuit(asset, {
     frameCount: 32,
-    initialState: createRaiderPursuitState(asset, { x: 88, y: 56 }),
+    initialState: createInterceptorPursuitState(asset, { x: 88, y: 56 }),
     playerXForFrame: () => stationaryPlayerX,
   });
   assert.equal(idlePursuit.trace.some(({ x }) =>
-    x < stationaryPlayerX + 8 && x + raider.visibleWidth > stationaryPlayerX), true,
-  "a sustained Raider pursuit must reach an idle Viper envelope");
+    x < stationaryPlayerX + 8 && x + interceptor.visibleWidth > stationaryPlayerX), true,
+  "a sustained Interceptor pursuit must reach an idle PlayerFighter envelope");
 
-  const viperStartX = 120;
-  const raiderStartX = 100;
-  const centreCorrection = (raider.visibleWidth - 8) / 2;
-  const activePursuit = simulateRaiderSoftPursuit(asset, {
+  const player_fighterStartX = 120;
+  const interceptorStartX = 100;
+  const centreCorrection = (interceptor.visibleWidth - 8) / 2;
+  const activePursuit = simulateInterceptorSoftPursuit(asset, {
     frameCount: 5,
-    initialState: createRaiderPursuitState(asset, { x: raiderStartX, y: 56 }),
-    playerXForFrame: (frame) => viperStartX + (frame + 1) * 2,
+    initialState: createInterceptorPursuitState(asset, { x: interceptorStartX, y: 56 }),
+    playerXForFrame: (frame) => player_fighterStartX + (frame + 1) * 2,
   });
-  const initialGap = viperStartX - raiderStartX - centreCorrection;
+  const initialGap = player_fighterStartX - interceptorStartX - centreCorrection;
   const finalGap = activePursuit.trace.at(-1).playerX - activePursuit.state.x - centreCorrection;
   assert.equal(finalGap, initialGap + 2,
-    "a five-frame maximum-speed Viper manoeuvre must gain two HPOS on the Raider");
+    "a five-frame maximum-speed PlayerFighter manoeuvre must gain two HPOS on the Interceptor");
 });
 
-test("Raider fractional phase resets after spawn, player life, and new game", () => {
+test("Interceptor fractional phase resets after spawn, player life, and new game", () => {
   const routines = new Map([
     ["new game", source.slice(source.indexOf("init_state:"), source.indexOf("clear_pmg:"))],
     ["spawn", source.slice(source.indexOf("reset_enemy:"),
       source.indexOf("reset_enemy_fire_cooldown:"))],
     ["player life", source.slice(source.indexOf("clear_fighter_projectiles:"),
-      source.indexOf("clear_viper_projectiles:"))],
+      source.indexOf("clear_player_fighter_projectiles:"))],
   ]);
   for (const [pathName, routineSource] of routines) {
-    assert.match(routineSource, /lda #\$00[\s\S]+sta RAIDER_MOVE_ACCUMULATOR/,
+    assert.match(routineSource, /lda #\$00[\s\S]+sta INTERCEPTOR_MOVE_ACCUMULATOR/,
       `${pathName} must deterministically restart the 4/5 movement phase`);
   }
   assert.match(source.slice(source.indexOf("respawn_player:"),
     source.indexOf("tick_respawn_invulnerability:")), /jsr clear_fighter_projectiles/,
-  "player respawn must use the projectile reset path that restarts Raider phase");
+  "player respawn must use the projectile reset path that restarts Interceptor phase");
 });
 
-test("Raider pursuit reverses gradually and preserves a small deterministic weave", () => {
-  const reversal = simulateRaiderSoftPursuit(asset, {
+test("Interceptor pursuit reverses gradually and preserves a small deterministic weave", () => {
+  const reversal = simulateInterceptorSoftPursuit(asset, {
     frameCount: 64,
-    initialState: createRaiderPursuitState(asset, { x: 128, y: 56 }),
+    initialState: createInterceptorPursuitState(asset, { x: 128, y: 56 }),
     playerXForFrame: (frame) => frame < 24 ? 88 : 160,
   });
   const sampled = reversal.trace.filter(({ sampled }) => sampled);
@@ -226,18 +226,18 @@ test("Raider pursuit reverses gradually and preserves a small deterministic weav
   assert.ok(firstRight > 0);
   assert.equal(sampled[firstRight - 1].velocityX, 0,
     "a signed reversal passes through zero for one sample interval");
-  const stationary = simulateRaiderSoftPursuit(asset, {
+  const stationary = simulateInterceptorSoftPursuit(asset, {
     frameCount: 64,
-    initialState: createRaiderPursuitState(asset, { x: 120, y: 56 }),
+    initialState: createInterceptorPursuitState(asset, { x: 120, y: 56 }),
     playerXForFrame: () => 124,
   });
   assert.ok(new Set(stationary.trace.map(({ x }) => x)).size > 1,
-    "a stationary Viper retains the Raider's bounded weave");
+    "a stationary PlayerFighter retains the Interceptor's bounded weave");
   assert.match(source,
-    /update_raider_soft_pursuit:[\s\S]+RAIDER_TARGET_SAMPLE_INTERVAL[\s\S]+player_x[\s\S]+enemy_velocity_x/);
+    /update_interceptor_soft_pursuit:[\s\S]+INTERCEPTOR_TARGET_SAMPLE_INTERVAL[\s\S]+player_x[\s\S]+enemy_velocity_x/);
 });
 
-test("assembled archetype descriptors assign only Raider single-pulse fire", () => {
+test("assembled archetype descriptors assign only Interceptor single-pulse fire", () => {
   assert.deepEqual(asset.implemented.map(({ weaponProfileId }) => weaponProfileId),
     [ENEMY_WEAPON_PROFILES.SINGLE_PULSE, ENEMY_WEAPON_PROFILES.NONE,
       ENEMY_WEAPON_PROFILES.NONE]);
@@ -245,7 +245,7 @@ test("assembled archetype descriptors assign only Raider single-pulse fire", () 
     [...readRuntimeBytes(labels.get("enemy_weapon_profiles"), 3)],
     [ENEMY_WEAPON_PROFILES.SINGLE_PULSE, 0, 0],
   );
-  assert.deepEqual([...readRuntimeBytes(labels.get("raider_post_burst_frames"), 3)],
+  assert.deepEqual([...readRuntimeBytes(labels.get("interceptor_post_burst_frames"), 3)],
     [60, 50, 40]);
   assert.deepEqual(asset.runtime.weaponPolicy.singlePulse, {
     renderer: "ANTIC4_GLYPH_POOL",
@@ -268,7 +268,7 @@ test("ten-shot burst intervals and post-burst difficulty pauses are exact", () =
   assert.deepEqual([0, 1, 2].map((difficulty) => enemyFireCooldown(asset, difficulty)),
     [60, 50, 40]);
   for (const [difficulty, postBurst] of [[0, 60], [1, 50], [2, 40]]) {
-    const simulation = simulateNaturalRaiderFire(asset, {
+    const simulation = simulateNaturalInterceptorFire(asset, {
       difficulty,
       frameCount: 180,
       initialEnemyY: ENEMY_FULLY_VISIBLE_TOP,
@@ -276,23 +276,23 @@ test("ten-shot burst intervals and post-burst difficulty pauses are exact", () =
     const allocations = simulation.trace.filter(({ allocationResult }) =>
       allocationResult === "ALLOCATED");
     assert.deepEqual(allocations.slice(0, 10).map(({ frame }) => frame),
-      [1, 5, 9, 13, 17, 21, 25, 29, 33, 37]);
+      [1, 5, 9, 13, 17, 21, 25, 29, 33, 42]);
     assert.equal(allocations[9].cooldown, postBurst);
-    assert.equal(allocations[10]?.frame, 37 + postBurst);
+    assert.equal(allocations[10]?.frame, 42 + postBurst);
   }
 });
 
-test("release Raider enters progressively and naturally reaches burst allocation", () => {
+test("release Interceptor enters progressively and naturally reaches burst allocation", () => {
   for (const difficulty of [0, 1, 2]) {
-    const { state, trace } = simulateNaturalRaiderFire(asset, {
+    const { state, trace } = simulateNaturalInterceptorFire(asset, {
       difficulty,
       frameCount: 55,
-      initialEnemyY: ENEMY_FULLY_VISIBLE_TOP - raider.height,
+      initialEnemyY: ENEMY_FULLY_VISIBLE_TOP - interceptor.height,
     });
     const allocation = trace.find(({ allocationResult }) => allocationResult === "ALLOCATED");
-    assert.equal(allocation.frame, raider.height);
+    assert.equal(allocation.frame, interceptor.height);
     assert.equal(allocation.visibility, true);
-    assert.equal(allocation.projectileOwner, "RAIDER");
+    assert.equal(allocation.projectileOwner, "INTERCEPTOR");
     assert.equal(allocation.renderSlot, "PF0");
     assert.equal(allocation.hpos, 127);
     assert.equal(allocation.activePlayfieldProjectiles.length, 1);
@@ -304,13 +304,13 @@ test("release Raider enters progressively and naturally reaches burst allocation
   const resetBytes = readRuntimeBytes(labels.get("reset_enemy"),
     labels.get("reset_enemy_fire_cooldown") - labels.get("reset_enemy"));
   assert.notEqual(initBytes.indexOf(Buffer.from([0xa9, 0x02, 0x85, enemyY])), -1,
-    "assembled initial lifecycle starts one Raider height above GAMEPLAY_TOP");
+    "assembled initial lifecycle starts one Interceptor height above GAMEPLAY_TOP");
   assert.notEqual(resetBytes.indexOf(Buffer.from([0x38, 0xfd])), -1,
     "assembled slot reuse subtracts the active archetype height from GAMEPLAY_TOP");
 });
 
 test("natural playfield pulse remains visible while moving five scanlines per frame", () => {
-  const { trace } = simulateNaturalRaiderFire(asset, {
+  const { trace } = simulateNaturalInterceptorFire(asset, {
     difficulty: 1,
     frameCount: 12,
     initialEnemyY: ENEMY_FULLY_VISIBLE_TOP,
@@ -330,7 +330,7 @@ test("inactive, exploding, off-screen, and weaponless enemies cannot fire", () =
     { enemyActive: false },
     { enemyExploding: true },
     { enemyY: 20 },
-    { enemyY: 220 },
+    { enemyY: 240 },
     { archetype: talon },
     { archetype: bomber },
   ]) {
@@ -340,10 +340,10 @@ test("inactive, exploding, off-screen, and weaponless enemies cannot fire", () =
 
 test("pulse origin follows the active frame centre and moves down five scanlines per frame", () => {
   const policy = asset.runtime.weaponPolicy.singlePulse;
-  const origin = enemyPulseSpawnPosition(raider, 120, 56, policy);
+  const origin = enemyPulseSpawnPosition(interceptor, 120, 56, policy);
   assert.deepEqual(origin, {
-    x: 120 + Math.floor(raider.visibleWidth / 2) - 1,
-    y: 56 + raider.projectileSpawnYOffset,
+    x: 120 + Math.floor(interceptor.visibleWidth / 2) - 1,
+    y: 56 + interceptor.projectileSpawnYOffset,
   });
   let state = { ...createEnemyCombatState(asset), fireTimer: 0 };
   state = stepEnemyCombatFrame(asset, state, { enemyX: 120, enemyY: 56 });
@@ -400,7 +400,7 @@ test("respawn invulnerability consumes intersecting pulses without player damage
   assert.equal(state.pool[0], null);
 });
 
-test("Raider playfield pool cannot overwrite M0 or active capital missiles", () => {
+test("Interceptor playfield pool cannot overwrite M0 or active capital missiles", () => {
   let state = createEnemyCombatState(asset);
   for (let frame = 0; frame < 40; frame += 1) {
     state = stepEnemyCombatFrame(asset, state, { enemyX: 120, enemyY: 56 });
@@ -413,7 +413,7 @@ test("Raider playfield pool cannot overwrite M0 or active capital missiles", () 
   assert.doesNotMatch(fighterRenderer, /MISSILES|HPOSM|SIZEM|COLPM/);
 });
 
-test("EXPLODING and inactive Raiders never fall through to the live PMG renderer", () => {
+test("EXPLODING and inactive Interceptors never fall through to the live PMG renderer", () => {
   const update = source.slice(source.indexOf("update_enemy:"),
     source.indexOf("draw_enemy:"));
   assert.match(update,
@@ -425,27 +425,27 @@ test("EXPLODING and inactive Raiders never fall through to the live PMG renderer
 });
 
 test("natural broadside firing uses an independent pool and preserves capital registers", () => {
-  const broadside = simulateNaturalRaiderFire(asset, {
+  const broadside = simulateNaturalInterceptorFire(asset, {
     difficulty: 2,
     frameCount: 80,
     initialSizeM: 0x44,
   });
   assert.ok(broadside.state.shotsFired >= 8,
-    "capital M1-M3 ownership cannot starve the independent Raider pool");
+    "capital M1-M3 ownership cannot starve the independent Interceptor pool");
   assert.equal(broadside.trace.every(({ sizeM }) => sizeM === 0x44), true);
   assert.match(source, /jsr update_broadside[\s\S]+jsr resolve_enemy_damage/);
 });
 
 test("natural-fire trace records burst allocation and playfield movement", () => {
-  const trace = createRaiderNaturalFireTrace(source, hulls);
+  const trace = createInterceptorNaturalFireTrace(source, hulls);
   const lines = trace.trimEnd().split("\n");
   assert.match(lines[0],
     /frame,enemy_slot,archetype,visibility,enemy_y,burst_state,shot_index/);
   const openAllocation = lines.find((line) =>
-    line.startsWith("OPEN_MEDIUM,1,") && line.includes(",ALLOCATED,RAIDER,PF0,"));
+    line.startsWith("OPEN_MEDIUM,1,") && line.includes(",ALLOCATED,INTERCEPTOR,PF0,"));
   assert.ok(openAllocation);
   const broadsideAllocation = lines.find((line) =>
-    line.startsWith("BROADSIDE_HARD,1,") && line.includes(",ALLOCATED,RAIDER,PF0,"));
+    line.startsWith("BROADSIDE_HARD,1,") && line.includes(",ALLOCATED,INTERCEPTOR,PF0,"));
   assert.ok(broadsideAllocation);
   assert.match(openAllocation, /PF0:[0-9]+:[0-9]+>[0-9]+:2x3/);
 });
@@ -461,9 +461,9 @@ test("pulse cleanup is deterministic across drain, complete, death, and respawn 
   state = stepEnemyCombatFrame(asset, state, {
     sectorState: ENEMY_COMBAT_SECTOR_STATES.COMPLETE,
   });
-  assert.ok(state.pool[0], "ordinary Raider fire resumes after the finite sector exits DRAIN");
-  assert.match(source, /update_enemy_weapon_runtime:[\s\S]+cmp #CAPITAL_HULL_STATE_DRAIN[\s\S]+clear_raider_projectiles/);
-  assert.match(source, /apply_player_damage:[\s\S]+jsr clear_raider_pulses/);
+  assert.ok(state.pool[0], "ordinary Interceptor fire resumes after the finite sector exits DRAIN");
+  assert.match(source, /update_enemy_weapon_runtime:[\s\S]+cmp #CAPITAL_HULL_STATE_DRAIN[\s\S]+clear_interceptor_projectiles/);
+  assert.match(source, /apply_player_damage:[\s\S]+jsr clear_interceptor_pulses/);
   assert.match(source, /respawn_player:[\s\S]+jsr clear_fighter_projectiles/);
 });
 
@@ -471,26 +471,26 @@ test("runtime routes every fighter hit through canonical damage-source arbitrati
   const broadside = source.slice(source.indexOf("update_broadside:"),
     source.indexOf("schedule_broadside:"));
   assert.match(broadside,
-    /@flying:[\s\S]+jmp @targets[\s\S]+capital_shell_collision_flags[\s\S]+and #\$02[\s\S]+DAMAGE_CAPITAL_CYLON[\s\S]+queue_enemy_damage/);
-  assert.doesNotMatch(broadside.slice(broadside.indexOf("@raider_pulse:")), /add_ten_points/);
+    /@flying:[\s\S]+jmp @targets[\s\S]+capital_shell_collision_flags[\s\S]+and #\$02[\s\S]+DAMAGE_CAPITAL_HOSTILE[\s\S]+queue_enemy_damage/);
+  assert.doesNotMatch(broadside.slice(broadside.indexOf("@interceptor_pulse:")), /add_ten_points/);
   assert.match(source,
     /update_fighter_projectiles:[\s\S]+DAMAGE_PLAYER_PROJECTILE[\s\S]+jsr queue_enemy_damage/);
   assert.match(source,
     /handle_collisions:[\s\S]+DAMAGE_PLAYER_CONTACT[\s\S]+jsr resolve_enemy_damage/);
   assert.match(source,
-    /resolve_enemy_damage:[\s\S]+ENEMY_EXPLODING_STATE[\s\S]+jsr spawn_raider_breakup_effects[\s\S]+cmp #\(DAMAGE_CAPITAL_CYLON\+1\)[\s\S]+jsr add_archetype_score/);
+    /resolve_enemy_damage:[\s\S]+ENEMY_EXPLODING_STATE[\s\S]+jsr spawn_interceptor_breakup_effects[\s\S]+cmp #\(DAMAGE_CAPITAL_HOSTILE\+1\)[\s\S]+jsr add_archetype_score/);
 });
 
 test("canonical destruction policy awards descriptor score exactly once", () => {
   for (const [damageSource, expectedScore] of [
-    [ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE, raider.score],
-    [ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT, raider.score],
-    [ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON, raider.score],
-    [ENEMY_DAMAGE_SOURCES.CAPITAL_COLONIAL, 0],
+    [ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE, interceptor.score],
+    [ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT, interceptor.score],
+    [ENEMY_DAMAGE_SOURCES.CAPITAL_HOSTILE, interceptor.score],
+    [ENEMY_DAMAGE_SOURCES.CAPITAL_ALLIED, 0],
     [ENEMY_DAMAGE_SOURCES.CLEANUP, 0],
   ]) {
-    const enemy = createEnemyDamageState(raider);
-    queueEnemyDamage(enemy, raider.hitPoints, damageSource);
+    const enemy = createEnemyDamageState(interceptor);
+    queueEnemyDamage(enemy, interceptor.hitPoints, damageSource);
     const result = resolveEnemyDamage(enemy);
     assert.deepEqual([result.destroyed, result.score, result.source],
       [true, expectedScore, damageSource]);
@@ -502,25 +502,25 @@ test("canonical destruction policy awards descriptor score exactly once", () => 
     assert.equal(enemy.scoreAwarded, expectedScore);
   }
 
-  const differentScore = { ...raider, score: 70, hitPoints: 1 };
+  const differentScore = { ...interceptor, score: 70, hitPoints: 1 };
   const enemy = createEnemyDamageState(differentScore);
   queueEnemyDamage(enemy, 1, ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE);
   assert.equal(resolveEnemyDamage(enemy).score, 70,
-    "score comes from the active descriptor rather than a Raider literal");
+    "score comes from the active descriptor rather than a Interceptor literal");
 });
 
-test("Cylon capital friendly fire consumes the first shell hit and starts one scored explosion", () => {
-  const enemy = createEnemyDamageState(raider);
-  queueEnemyDamage(enemy, raider.hitPoints, ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON);
+test("Hostile capital friendly fire consumes the first shell hit and starts one scored explosion", () => {
+  const enemy = createEnemyDamageState(interceptor);
+  queueEnemyDamage(enemy, interceptor.hitPoints, ENEMY_DAMAGE_SOURCES.CAPITAL_HOSTILE);
   const first = resolveEnemyDamage(enemy);
   assert.deepEqual(first, {
     destroyed: true,
-    score: raider.score,
-    source: ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON,
+    score: interceptor.score,
+    source: ENEMY_DAMAGE_SOURCES.CAPITAL_HOSTILE,
   });
   assert.equal(enemy.exploding, true);
   assert.equal(enemy.destructionCount, 1);
-  assert.equal(enemy.scoreAwarded, raider.score);
+  assert.equal(enemy.scoreAwarded, interceptor.score);
   assert.deepEqual(resolveEnemyDamage(enemy), {
     destroyed: false,
     score: 0,
@@ -529,23 +529,23 @@ test("Cylon capital friendly fire consumes the first shell hit and starts one sc
   assert.match(source,
     /capital_shell_hits_enemy:[\s\S]+cmp #ENEMY_ACTIVE_STATE[\s\S]+jmp capital_shell_hits_target/);
   assert.match(source,
-    /@flying:[\s\S]+DAMAGE_CAPITAL_CYLON[\s\S]+jsr queue_enemy_damage/);
+    /@flying:[\s\S]+DAMAGE_CAPITAL_HOSTILE[\s\S]+jsr queue_enemy_damage/);
 });
 
-test("contact scoring is independent of Viper damage, death, and invulnerability", () => {
+test("contact scoring is independent of PlayerFighter damage, death, and invulnerability", () => {
   for (const player of [
     { health: 100, invulnerable: false, expectedHealth: 80 },
     { health: 20, invulnerable: false, expectedHealth: 0 },
     { health: 20, invulnerable: true, expectedHealth: 20 },
   ]) {
-    const enemy = createEnemyDamageState(raider);
+    const enemy = createEnemyDamageState(interceptor);
     beginEnemyDamageFrame(enemy);
     queueEnemyDamage(enemy, 1, ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT);
     if (!player.invulnerable) player.health = Math.max(0, player.health - 20);
     const result = resolveEnemyDamage(enemy);
-    assert.deepEqual([result.score, player.health], [raider.score, player.expectedHealth]);
+    assert.deepEqual([result.score, player.health], [interceptor.score, player.expectedHealth]);
   }
-  const tough = createEnemyDamageState({ ...raider, hitPoints: 2, score: 90 });
+  const tough = createEnemyDamageState({ ...interceptor, hitPoints: 2, score: 90 });
   queueEnemyDamage(tough, 1, ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT);
   assert.deepEqual(resolveEnemyDamage(tough), {
     destroyed: false,
@@ -554,12 +554,12 @@ test("contact scoring is independent of Viper damage, death, and invulnerability
   });
 });
 
-test("same-frame lethal credit follows projectile, contact, Cylon, colonial, cleanup priority", () => {
-  const enemy = createEnemyDamageState({ ...raider, hitPoints: 5, score: 30 });
+test("same-frame lethal credit follows projectile, contact, Hostile, allied, cleanup priority", () => {
+  const enemy = createEnemyDamageState({ ...interceptor, hitPoints: 5, score: 30 });
   for (const sourceId of [
     ENEMY_DAMAGE_SOURCES.CLEANUP,
-    ENEMY_DAMAGE_SOURCES.CAPITAL_COLONIAL,
-    ENEMY_DAMAGE_SOURCES.CAPITAL_CYLON,
+    ENEMY_DAMAGE_SOURCES.CAPITAL_ALLIED,
+    ENEMY_DAMAGE_SOURCES.CAPITAL_HOSTILE,
     ENEMY_DAMAGE_SOURCES.PLAYER_CONTACT,
     ENEMY_DAMAGE_SOURCES.PLAYER_PROJECTILE,
   ]) queueEnemyDamage(enemy, 1, sourceId);
@@ -573,71 +573,71 @@ test("same-frame lethal credit follows projectile, contact, Cylon, colonial, cle
 });
 
 test("capital-shell sweep chooses the first spatial target and consumes one hit", () => {
-  const raiderTarget = { id: "RAIDER", x: 122, y: 100, width: 16, height: 16, priority: 0 };
-  const viperTarget = { id: "VIPER", x: 120, y: 100, width: 8, height: 16, priority: 1 };
+  const interceptorTarget = { id: "INTERCEPTOR", x: 122, y: 100, width: 16, height: 16, priority: 0 };
+  const player_fighterTarget = { id: "PLAYER_FIGHTER", x: 120, y: 100, width: 8, height: 16, priority: 1 };
   const leftMoving = {
     previousX: 128, x: 126, y: 104,
     width: hulls.broadside.projectileVisuals.capital.widthHpos, height: 6, velocityX: -2,
   };
-  assert.equal(sweptHorizontalProjectileTargets(leftMoving, [viperTarget, raiderTarget]).id,
-    "RAIDER", "rightmost intersected target is first for a Cylon shell");
+  assert.equal(sweptHorizontalProjectileTargets(leftMoving, [player_fighterTarget, interceptorTarget]).id,
+    "INTERCEPTOR", "rightmost intersected target is first for a Hostile shell");
 
-  const colonial = {
+  const allied = {
     previousX: 118, x: 120, y: 104,
     width: hulls.broadside.projectileVisuals.capital.widthHpos, height: 6, velocityX: 2,
   };
-  assert.equal(sweptHorizontalProjectileTargets(colonial, [raiderTarget]).id,
-    "RAIDER");
-  assert.equal(sweptHorizontalProjectileTargets({ ...colonial, x: 110, previousX: 108 },
-    [raiderTarget]), null);
+  assert.equal(sweptHorizontalProjectileTargets(allied, [interceptorTarget]).id,
+    "INTERCEPTOR");
+  assert.equal(sweptHorizontalProjectileTargets({ ...allied, x: 110, previousX: 108 },
+    [interceptorTarget]), null);
 });
 
 test("projectile definitions preserve PMG colours and make capital fire materially heavier", () => {
   const visuals = projectileVisualMetrics(hulls);
   assert.deepEqual(
-    [visuals.player.color, visuals.raider.color, visuals.colonial.color, visuals.cylon.color],
+    [visuals.player.color, visuals.interceptor.color, visuals.allied.color, visuals.hostile.color],
     [0x1e, 0x46, 0x1e, 0x46],
   );
   assert.deepEqual(
-    [visuals.player.renderer, visuals.raider.renderer,
-      visuals.colonial.renderer, visuals.cylon.renderer],
+    [visuals.player.renderer, visuals.interceptor.renderer,
+      visuals.allied.renderer, visuals.hostile.renderer],
     ["ANTIC4_GLYPH_POOL", "ANTIC4_GLYPH_POOL",
       "ANTIC4_PLAYFIELD_OVERLAY", "ANTIC4_PLAYFIELD_OVERLAY"],
   );
   assert.deepEqual(
-    [visuals.player.width, visuals.player.height, visuals.raider.width, visuals.raider.height,
-      visuals.colonial.width, visuals.colonial.height],
+    [visuals.player.width, visuals.player.height, visuals.interceptor.width, visuals.interceptor.height,
+      visuals.allied.width, visuals.allied.height],
     [1, 2, 2, 3, 8, 6],
   );
-  assert.ok(visuals.colonial.width >= visuals.raider.width * 2,
+  assert.ok(visuals.allied.width >= visuals.interceptor.width * 2,
     "capital travel-axis length is at least twice fighter fire");
-  assert.ok(visuals.colonial.occupiedPixels > visuals.raider.occupiedPixels * 2);
-  assert.equal(visuals.colonial.occupiedPixels, visuals.cylon.occupiedPixels);
+  assert.ok(visuals.allied.occupiedPixels > visuals.interceptor.occupiedPixels * 2);
+  assert.equal(visuals.allied.occupiedPixels, visuals.hostile.occupiedPixels);
   assert.match(source,
-    /render_capital_shell_overlay:[\s\S]+CAPITAL_PROJECTILE_CYLON_ATTRIBUTE[\s\S]+sta \(dst_ptr\),y/);
+    /render_capital_shell_overlay:[\s\S]+CAPITAL_PROJECTILE_HOSTILE_ATTRIBUTE[\s\S]+sta \(dst_ptr\),y/);
   assert.doesNotMatch(source.slice(source.indexOf("render_capital_shell_overlay:"),
     source.indexOf("draw_broadside_span:")), /COLPM[0-3]|SIZEM/);
   assert.deepEqual(manifest.enemyRoster.projectileVisuals, hulls.broadside.projectileVisuals);
   assert.deepEqual(manifest.enemyRoster.damagePolicy, {
-    priority: ["PLAYER_PROJECTILE", "PLAYER_CONTACT", "CAPITAL_CYLON",
-      "CAPITAL_COLONIAL", "ENEMY_PROJECTILE", "CLEANUP"],
-    scoreAwarding: ["PLAYER_PROJECTILE", "PLAYER_CONTACT", "CAPITAL_CYLON"],
+    priority: ["PLAYER_PROJECTILE", "PLAYER_CONTACT", "CAPITAL_HOSTILE",
+      "CAPITAL_ALLIED", "ENEMY_PROJECTILE", "CLEANUP"],
+    scoreAwarding: ["PLAYER_PROJECTILE", "PLAYER_CONTACT", "CAPITAL_HOSTILE"],
   });
 });
 
 test("all three palette review sheets are deterministic source-derived PAL-register evidence", () => {
-  for (const [id, value] of [["CYLON_OXBLOOD", 0x42], ["CYLON_BURGUNDY", 0x44],
-    ["CYLON_SCARLET", 0x48]]) {
+  for (const [id, value] of [["HOSTILE_OXBLOOD", 0x42], ["HOSTILE_BURGUNDY", 0x44],
+    ["HOSTILE_SCARLET", 0x48]]) {
     const state = readEnemyPaletteCandidateRuntimeState(source, id, hulls);
     assert.equal(state.candidate.value, value);
     assert.equal(state.panelDefinitions.length, 4);
     assert.deepEqual(state.panelDefinitions.slice(1).map(({ label }) => label), [
       "LEFT BOUND BESIDE ALLIED HULL",
-      "CENTER WITH VIPER AND M0",
+      "CENTER WITH PLAYER_FIGHTER AND M0",
       "RIGHT BOUND BESIDE ENEMY HULL",
     ]);
     assert.equal(state.panelDefinitions.slice(1).every(({ enemyX }) =>
-      enemyX >= raider.logicalBounds[0] && enemyX <= raider.logicalBounds[1]), true);
+      enemyX >= interceptor.logicalBounds[0] && enemyX <= interceptor.logicalBounds[1]), true);
     const first = createEnemyPaletteCandidatePreview(source, id, hulls);
     const second = createEnemyPaletteCandidatePreview(source, id, hulls);
     assert.deepEqual(first, second);
@@ -654,14 +654,14 @@ test("combat review sheet derives burst geometry and playfield ownership from ru
   );
   assert.equal(state.panelDefinitions.length, 9);
   assert.deepEqual(state.panelDefinitions.map(({ label }) => label), [
-    "RAIDER READY  RED SCANNER",
+    "INTERCEPTOR READY  RED SCANNER",
     "RED BURST SHOT 1  PLAYFIELD",
-    "RED BURST PLUS YELLOW VIPER FIRE",
+    "RED BURST PLUS YELLOW PLAYER_FIGHTER FIRE",
     "PULSE APPROACH  FIVE LINES PER FRAME",
-    "VIPER HIT  10 DAMAGE  HEALTH 090",
+    "PLAYER_FIGHTER HIT  10 DAMAGE  HEALTH 090",
     "INVULNERABLE INTERSECTION  NO DAMAGE",
-    "CAPITAL SHELL PLUS RAIDER BURST",
-    "ALLIED CAPITAL SHELL DESTROYS RAIDER",
+    "CAPITAL SHELL PLUS INTERCEPTOR BURST",
+    "ALLIED CAPITAL SHELL DESTROYS INTERCEPTOR",
     "CLEAN POOL  NO GHOST PIXELS",
   ]);
   const first = createEnemyCombatSequencePreview(source, hulls);
@@ -672,16 +672,16 @@ test("combat review sheet derives burst geometry and playfield ownership from ru
 test("projectile visual-language sheet renders all four runtime classes and monochrome forms", () => {
   const state = readProjectileVisualLanguageRuntimeState(source, hulls);
   assert.deepEqual(state.panelDefinitions.map(({ label }) => label), [
-    "VIPER PLAYFIELD  BRIGHT YELLOW  1X2",
-    "RAIDER PLAYFIELD  SATURATED RED  2X3",
-    "COLONIAL CAPITAL  YELLOW GOLD  8X6",
-    "CYLON CAPITAL  CRIMSON  8X6",
+    "PLAYER_FIGHTER PLAYFIELD  BRIGHT YELLOW  1X2",
+    "INTERCEPTOR PLAYFIELD  SATURATED RED  2X3",
+    "ALLIED CAPITAL  YELLOW GOLD  8X6",
+    "HOSTILE CAPITAL  CRIMSON  8X6",
     "ALL FOUR  SAME NATIVE SCALE",
     "MONO FORM  FIGHTER SHORT  CAPITAL HEAVY",
   ]);
   assert.deepEqual(
-    [state.metrics.player.occupiedPixels, state.metrics.raider.occupiedPixels,
-      state.metrics.colonial.occupiedPixels, state.metrics.cylon.occupiedPixels],
+    [state.metrics.player.occupiedPixels, state.metrics.interceptor.occupiedPixels,
+      state.metrics.allied.occupiedPixels, state.metrics.hostile.occupiedPixels],
     [2, 6, 40, 40],
   );
   assert.equal(state.panelDefinitions.filter(({ capitalVisuals }) =>
@@ -699,10 +699,10 @@ test("projectile visual-language sheet renders all four runtime classes and mono
 
 test("collision-scoring sheet uses canonical results and proves first-target consumption", () => {
   const state = readProjectileCollisionScoringRuntimeState(source, hulls);
-  assert.equal(state.firstTarget.id, "RAIDER");
+  assert.equal(state.firstTarget.id, "INTERCEPTOR");
   assert.deepEqual(state.panelDefinitions.map(({ result }) => result.score),
     [10, 10, 10, 0, 10, 10, 0, 10]);
-  assert.equal(state.panelDefinitions[5].firstTarget, "RAIDER");
+  assert.equal(state.panelDefinitions[5].firstTarget, "INTERCEPTOR");
   assert.deepEqual(state.panelDefinitions[7].secondResult,
     { destroyed: false, score: 0, source: ENEMY_DAMAGE_SOURCES.CLEANUP });
   const first = createProjectileCollisionScoringPreview(source, hulls);

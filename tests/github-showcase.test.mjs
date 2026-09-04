@@ -20,13 +20,13 @@ function pngDimensions(bytes) {
 
 test("showcase manifest binds every image to the current packed release", () => {
   assert.equal(manifest.formatVersion, 1);
-  assert.equal(manifest.runtimeEvidence.xex.sha256, sha256(read("dist/dark-fighter.xex")));
-  assert.equal(manifest.runtimeEvidence.atr.sha256, sha256(read("dist/dark-fighter.atr")));
+  assert.equal(manifest.runtimeEvidence.xex.sha256, sha256(read("dist/void-strike-65.xex")));
+  assert.equal(manifest.runtimeEvidence.atr.sha256, sha256(read("dist/void-strike-65.atr")));
   assert.equal(manifest.runtimeEvidence.wallTrace.sha256,
     sha256(read("docs/runtime-wall-trace.json")));
   assert.deepEqual(
     [manifest.gameplay.length, manifest.assetSheets.length, manifest.concepts.length],
-    [8, 4, 2],
+    [9, 4, 2],
   );
 
   let totalBytes = 0;
@@ -46,6 +46,13 @@ test("showcase manifest binds every image to the current packed release", () => 
     assert.deepEqual([frame.width, frame.height], [320, 240]);
     assert.match(frame.source_sha256, /^[0-9a-f]{64}$/);
   }
+  const spread = manifest.gameplay.find(({ path: relativePath }) =>
+    relativePath.endsWith("09-spread-shot-active.png"));
+  assert.ok(spread, "showcase must include an authentic Spread Shot Atari800 frame");
+  assert.equal(spread.source, "build/runtime-wall-trace/weapon-pickup-spread-projectiles-atari800.png");
+  assert.equal(spread.frame,
+    JSON.parse(read("docs/runtime-wall-trace.json")).coverage
+      .weapon_pickup_spread_shot.screenshot.capture_frame);
 });
 
 test("showcase and asset sheets regenerate without ignored capture files", () => {
@@ -65,8 +72,8 @@ test("showcase and asset sheets regenerate without ignored capture files", () =>
 test("owner-supplied concept art is preserved and never classified as gameplay", () => {
   const gameplayPaths = new Set(manifest.gameplay.map(({ path: relativePath }) => relativePath));
   assert.deepEqual(manifest.concepts.map(({ path: relativePath }) => relativePath), [
-    "docs/media/concepts/dark-fighter-concept-from-floppy-to-stars.jpg",
-    "docs/media/concepts/dark-fighter-concept-gauntlet-run.jpg",
+    "docs/media/concepts/void-strike-65-concept-from-floppy-to-stars.jpg",
+    "docs/media/concepts/void-strike-65-concept-gauntlet-run.jpg",
   ]);
   for (const concept of manifest.concepts) {
     const bytes = read(concept.path);
@@ -87,34 +94,33 @@ test("public README is English, complete, and free of stale status language", ()
   const readme = read("README.md").toString("utf8");
   const prose = readme.replace(/\s+/g, " ");
   const requiredHeadings = [
-    "# Dark Fighter",
-    "## Gameplay gallery",
-    "## The story",
-    "## What you can play now",
-    "## Engineering an Atari game today",
-    "## Development workflow",
-    "### Git and SDLC",
-    "## Art direction and asset sets",
-    "## Build and play",
-    "## Current release and continuing development",
-    "## Credits and disclaimer",
+    "# VOID STRIKE 65",
+    "## Current gameplay",
+    "## Screenshots",
+    "## Controls",
+    "## Run",
+    "## Build",
+    "## Downloads",
+    "## Development status",
+    "### Implemented",
+    "### Planned",
+    "## Project history",
+    "## Technical highlights",
+    "## Credits and license",
   ];
   for (const heading of requiredHeadings) assert.ok(readme.includes(heading), heading);
-  assert.match(readme, /Dark Fighter began in 1990/);
-  assert.match(prose, /5¼-inch floppy disks using an Atari computer and SIO2SD/);
-  assert.match(prose, /completed a full playable release with AI-assisted engineering/);
-  assert.match(prose, /The tools changed\. The target did not/);
-  assert.match(prose, /return to programming for the joy of making a machine do/);
-  assert.match(prose, /commit and push happen only after owner acceptance/);
-  assert.match(readme,
-    /Concept art — From Floppy to the Stars[\s\S]*Not an in-game screenshot\./);
-  assert.match(readme, /Concept art — Gauntlet Run[\s\S]*Not an in-game screenshot\./);
-  assert.ok(readme.indexOf("dark-fighter-concept-from-floppy-to-stars.jpg") >
-    readme.indexOf("## The story"));
-  assert.ok(readme.indexOf("dark-fighter-concept-from-floppy-to-stars.jpg") <
-    readme.indexOf("## What you can play now"));
-  assert.ok(readme.indexOf("dark-fighter-concept-gauntlet-run.jpg") >
-    readme.indexOf("### Art direction and concepts"));
+  assert.match(readme, /original vertical space shooter/);
+  assert.match(readme, /Encounter Director/);
+  assert.match(readme, /BROADSIDE/);
+  assert.match(readme, /npm run play:xex/);
+  assert.match(readme, /npm run play:atr/);
+  assert.match(readme, /must not be passed to Atari800\s+with `-run`/);
+  assert.match(readme, /npm run build:candidate/);
+  assert.match(readme, /actively developed/);
+  assert.match(readme, /began on an Atari in 1990/);
+  assert.match(prose, /AI-assisted engineering under the creator's direction/);
+  assert.match(prose, /fast disk-access path must be repaired/);
+  assert.match(readme, /No repository license has been\s+declared/);
   assert.doesNotMatch(readme,
     /\bMVP\b|vertical[ -]slice|\bslice\b|proof[ -]of[ -]concept|\bPoC\b|\bprototype\b/i);
   assert.doesNotMatch(readme, /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/);
@@ -123,7 +129,7 @@ test("public README is English, complete, and free of stale status language", ()
   }
 });
 
-test("README links resolve and Mermaid blocks match their editable English sources", () => {
+test("README links and image sizes are suitable for the public showcase", () => {
   const readme = read("README.md").toString("utf8");
   for (const link of readme.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
     const target = decodeURIComponent(link[1].split("#", 1)[0]);
@@ -131,17 +137,11 @@ test("README links resolve and Mermaid blocks match their editable English sourc
     assert.ok(fs.existsSync(path.resolve(rootDirectory, target)), `broken README link: ${target}`);
   }
 
-  const blocks = [...readme.matchAll(/```mermaid\n([\s\S]*?)```/g)].map((match) => match[1].trim());
-  const diagrams = [
-    read("docs/diagrams/development-workflow.mmd").toString("utf8").trim(),
-    read("docs/diagrams/git-feature-lifecycle.mmd").toString("utf8").trim(),
-  ];
-  assert.deepEqual(blocks, diagrams);
-  for (const diagram of diagrams) {
-    assert.match(diagram, /^flowchart LR\n/);
-    assert.doesNotMatch(diagram, /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/);
-    assert.equal((diagram.match(/\[/g) ?? []).length, (diagram.match(/\]/g) ?? []).length);
-  }
-  assert.doesNotMatch(read("scripts/github-showcase.mjs").toString("utf8"),
-    /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/);
+  const imageTargets = [...readme.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)]
+    .map((match) => match[1]);
+  assert.equal(imageTargets.length, 9);
+  assert.equal(new Set(imageTargets).size, imageTargets.length);
+  const totalImageBytes = imageTargets.reduce((sum, target) =>
+    sum + read(decodeURIComponent(target)).length, 0);
+  assert.ok(totalImageBytes < 4_000_000, "README images should remain below 4 MB total");
 });

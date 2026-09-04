@@ -48,7 +48,7 @@ const asset = compileGameplayMusic(
 );
 const manifest = JSON.parse(fs.readFileSync(path.join(rootDirectory, "build", "manifest.json")));
 const labels = new Map(
-  fs.readFileSync(path.join(rootDirectory, "build", "dark-fighter.lbl"), "utf8")
+  fs.readFileSync(path.join(rootDirectory, "build", "void-strike-65.lbl"), "utf8")
     .split(/\r?\n/)
     .map((line) => /^al\s+([0-9a-f]+)\s+\.?([^\s]+)$/i.exec(line.trim()))
     .filter(Boolean)
@@ -264,11 +264,11 @@ test("assembly preserves SFX ownership, lifecycle, and GAME MUSIC persistence", 
     /\.assert GAME_MUSIC_EVENTS_PER_TICK_LIMIT = 1/);
   assert.match(gameplayInclude, /GAME_MUSIC_EVENTS_PER_TICK_LIMIT = 1/);
 
-  assert.match(routine("allocate_viper_projectile", "update_enemy_weapon_runtime"),
+  assert.match(routine("allocate_player_fighter_projectile", "update_enemy_weapon_runtime"),
     /lda #\$A8\s+sta AUDC1/);
   assert.match(routine("play_hit_sound", "update_sound"), /lda #\$88\s+sta AUDC2/);
   for (const sfxRoutine of [
-    routine("allocate_viper_projectile", "update_enemy_weapon_runtime"),
+    routine("allocate_player_fighter_projectile", "update_enemy_weapon_runtime"),
     routine("play_hit_sound", "update_sound"),
     routine("update_sound", "silence_audio"),
     routine("play_capital_explosion_sound", "tick_capital_explosions"),
