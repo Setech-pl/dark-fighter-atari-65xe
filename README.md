@@ -1,14 +1,29 @@
 # VOID STRIKE 65
 
-![Void Strike 65 key art showing the Player Fighter between opposing capital ships](assets/graphics/void-strike-65-banner-03-retro-box-art.png)
+![VOID STRIKE 65 key art showing the player fighter between opposing capital ships](assets/graphics/void-strike-65-banner-03-retro-box-art.png)
 
 **An original vertical space shooter for the Atari 65XE and Atari 8-bit family, written in 6502 assembly for PAL at 50 FPS.**
 
 [Download XEX](dist/void-strike-65.xex) · [Download bootable ATR](dist/void-strike-65.atr) · [Documentation](docs/README.md)
 
-Void Strike 65 is a dark, military science-fiction shooter built for a stock
+VOID STRIKE 65 is a dark, military science-fiction shooter built for a stock
 64 KB Atari 65XE. The same game is distributed as a self-contained XEX and a
 bootable ATR disk image.
+
+## Play on Windows
+
+**The XEX is the easiest and recommended way to play.**
+
+1. Download the game from [Releases](https://github.com/Setech-pl/void-strike-65/releases).
+2. Download the latest stable [Altirra for Windows](https://www.virtualdub.org/altirra.html) (usually x86/x64).
+3. Extract both ZIP archives: right-click each one and choose **Extract All**.
+4. Open the extracted Altirra folder and run **Altirra64.exe**.
+5. Drag **void-strike-65.xex** from the extracted game folder into Altirra. Wait for the loader, then select **START GAME**.
+
+No release archive is published yet. For the current repository build, download
+the [XEX](dist/void-strike-65.xex) using GitHub's **Download raw file** button.
+See the [full Windows guide](docs/windows-quick-start.md) for controls, setup,
+the archive alternative, and help if the game does not start.
 
 ## Current gameplay
 
@@ -30,23 +45,35 @@ bootable ATR disk image.
 
 ## Screenshots
 
-Runtime frames are unenhanced native captures from the current packed XEX in
-Atari800 7.1.2 PAL/XL mode. The menu image is generated from the current
-frontend source, and the Game Over image is a native-scale frontend capture.
+Gameplay and loader frames are unenhanced native captures from the current
+packed XEX in Atari800 7.1.2 PAL/XL mode. The menu image is generated from the
+current frontend source; Game Over is a native-scale frontend capture.
+Click any image to open the full file.
 
 | | |
 | --- | --- |
-| ![Void Strike 65 loader and capital-ship title art](docs/media/gameplay/01-title-loader.png) | ![Void Strike 65 current main menu](docs/media/frontend/main-menu.png) |
+| [<img src="docs/media/gameplay/01-title-loader.png" width="320" alt="VOID STRIKE 65 loader with capital-ship art and studio credit">](docs/media/gameplay/01-title-loader.png) | [<img src="docs/media/frontend/main-menu.png" width="320" alt="VOID STRIKE 65 main menu with START GAME selected">](docs/media/frontend/main-menu.png) |
 | **Loader** | **Main menu** |
-| ![Player Fighter in normal open-space combat](docs/media/gameplay/02-standard-combat.png) | ![Player Fighter flying between Allied and Hostile capital ships](docs/media/showcase/capital-ship-sector.png) |
+| [<img src="docs/media/gameplay/02-standard-combat.png" width="320" alt="Player fighter and starfield during normal gameplay">](docs/media/gameplay/02-standard-combat.png) | [<img src="docs/media/showcase/capital-ship-sector.png" width="320" alt="Player fighter between blue allied and purple enemy capital ships">](docs/media/showcase/capital-ship-sector.png) |
 | **Normal gameplay** | **Capital-ship sector** |
-| ![Heavy BROADSIDE projectile crossing the capital-ship corridor](docs/media/showcase/broadside.png) | ![Rapid Fire capsule in the expanded playfield](docs/media/gameplay/05-rapid-fire-pickup.png) |
-| **BROADSIDE** | **Rapid Fire pickup** |
-| ![Rapid Fire active with BOOST energy display](docs/media/gameplay/06-rapid-fire-active.png) | ![Void Strike 65 Game Over screen](docs/media/frontend/game-over.png) |
+| [<img src="docs/media/gameplay/06-rapid-fire-active.png" width="320" alt="Rapid Fire active with yellow shots and the BOOST energy display">](docs/media/gameplay/06-rapid-fire-active.png) | [<img src="docs/media/frontend/game-over.png" width="320" alt="VOID STRIKE 65 Game Over screen with final and top scores">](docs/media/frontend/game-over.png) |
 | **Rapid Fire active** | **Game Over** |
 
 Capture provenance and checksums for the packed-release gameplay frames are in
 the [media manifest](docs/media/manifest.json).
+
+## Boss direction
+
+**Concept art / planned feature — not implemented.** A boss wider than the
+screen will drift sideways, revealing sections of a layered structure. Destroy
+its protective modules to expose weapons, then eliminate the last weapon module
+to win.
+
+[![Blockade Breaker concept art: worn armour plates shielding recessed guns; planned boss, not gameplay](docs/media/concepts/void-strike-65-boss-01-blockade-breaker.png)](docs/media/concepts/void-strike-65-boss-01-blockade-breaker.png)
+
+See [all three boss concepts](docs/boss-concepts.md): Blockade Breaker,
+Siege Spine, and Void Citadel. These detailed illustrations show the intended
+art and mechanics, not final Atari sprites.
 
 ## Controls
 
@@ -100,8 +127,8 @@ separate runtime-evidence and final-build workflow.
 
 ## Downloads
 
-- [Void Strike 65 — XEX](dist/void-strike-65.xex)
-- [Void Strike 65 — bootable ATR](dist/void-strike-65.atr)
+- [VOID STRIKE 65 — XEX (recommended)](dist/void-strike-65.xex)
+- [VOID STRIKE 65 — bootable ATR](dist/void-strike-65.atr)
 
 ### Media status
 
@@ -113,7 +140,7 @@ hardware acceptance.
 
 ## Development status
 
-Void Strike 65 is actively developed.
+VOID STRIKE 65 is actively developed.
 
 ### Implemented
 
@@ -160,6 +187,7 @@ hardware checklists live under [`docs/`](docs/README.md).
 
 ## Credits and license
 
+- **Copyright:** `(C) 2026 SETECH GAME STUDIO`
 - **Creator, project owner, developer, and gameplay vision:** Marcin Krzetowski
 - **AI-assisted engineering:** Codex, supporting implementation, testing,
   analysis, and documentation under owner direction.

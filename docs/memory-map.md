@@ -41,18 +41,18 @@ are unchanged.
 
 The production Encounter Director transport is 20,608 bytes in 161 occupied
 sectors. BRCNT loads the 12,928-byte/101-sector initial block at `$2000-$527F`;
-the entry point remains `$201E`. Initial content is exactly 12,842 B and ends
-at `$5229`; the rest of the last sector is transport padding.
+the entry point remains `$201E`. Initial content is exactly 12,900 B and ends
+at `$5263`; the rest of the last sector is transport padding.
 
 | Initial address / ATR sectors | Size | Stored form and startup destination |
 | --- | ---: | --- |
 | `$2000-$21C0` | 449 B | raw bootstrap prefix |
 | `$21C1-$2667` | 1,191 B | stage-2 SIO/CRC/per-record-end/manifest overlay |
-| `$2668-$4036` | 6,607 B | packed resident suffix; staged at `$8100` |
-| `$4037-$4737` | 1,793 B | packed 2,252-byte starfield/music runtime; stages at `$7810` and expands to `$552A-$5DF5` |
-| `$4738-$4836` | 255 B | A2 source; staged at `$7F16`, then copied to `$9000-$90FE` before entity/effects clear |
-| `$4837-$5225` | 2,543 B | packed 3,112-byte ENTITY_CODE; staged at `$534B-$5D39`, expands to `$9100-$9D27` |
-| `$5226-$5229` | 4 B | source-owned `DFB1` trailer; consumed before the GLUE chunk reuses `$5261` |
+| `$2668-$4070` | 6,665 B | packed resident suffix; staged at `$8100` |
+| `$4071-$4771` | 1,793 B | packed 2,252-byte starfield/music runtime; stages at `$7810` and expands to `$552A-$5DF5` |
+| `$4772-$4870` | 255 B | A2 source; staged at `$7F16`, then copied to `$9000-$90FE` before entity/effects clear |
+| `$4871-$525F` | 2,543 B | packed 3,112-byte ENTITY_CODE; staged at `$534B-$5D39`, expands to `$9100-$9D27` |
+| `$5260-$5263` | 4 B | source-owned `DFB1` trailer; consumed before the GLUE chunk reuses `$5261` |
 | ATR sectors 102-146 | 5,760 B | external BROADSIDE record: 5,660 B packed / 6,643 B raw to `$5E10-$7802` |
 | ATR sectors 147-154 | 1,024 B | pickup/code/collision record: 921 B prepacked at cold `$8C80-$9018`; after preservation at `$4801-$4B99`, it expands 1,666 B to `$8800-$8E81` |
 | ATR sectors 155-156 | 256 B | GLUE record: 229 B packed / 234 B raw to staging `$5261-$534A` |

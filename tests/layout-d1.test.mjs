@@ -81,7 +81,7 @@ test("Layout D.2 startup order and call bytes are frozen", () => {
 });
 
 test("Layout D.2 exact memory and transport budgets remain frozen", () => {
-  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12842);
+  assert.equal(manifest.transportCapacity.initialBootContentBytes, 12900);
   assert.equal(manifest.transportCapacity.initialBootBytes, 12928);
   assert.equal(manifest.transportCapacity.totalTransportSectors, 161);
   assert.equal(manifest.transportCapacity.totalTransportBytes, 20608);

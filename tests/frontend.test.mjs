@@ -308,7 +308,7 @@ test("ANTIC 6 attributes route the selected marker and full label to $D8", () =>
   assert.match(routine("toggle_main_menu_highlight"), /eor #MAIN_MENU_HIGHLIGHT_XOR/);
 });
 
-test("main-menu studio credit is removed while loader studio source remains", () => {
+test("main-menu studio credit is removed while loader copyright source remains", () => {
   const frontend = readFrontendGraphicsSource(source);
   assert.equal(
     frontend.mainMenuRecords.some(({ text }) => text.includes("SETECH")),
@@ -322,7 +322,13 @@ test("main-menu studio credit is removed while loader studio source remains", ()
   );
   assert.ok(
     loader.elements.some(
-      ({ name, text }) => name === "studio" && text === "SETECH GAME STUDIO",
+      ({ name, text }) => name === "studio" &&
+        text === "SETECH GAME STUDIO",
+    ),
+  );
+  assert.ok(
+    loader.elements.some(
+      ({ name, text }) => name === "copyright" && text === "(C) 2026",
     ),
   );
 });
