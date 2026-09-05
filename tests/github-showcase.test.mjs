@@ -12,6 +12,17 @@ const read = (relativePath) => fs.readFileSync(path.join(rootDirectory, relative
 const sha256 = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const manifest = JSON.parse(read("docs/media/manifest.json"));
 
+function publicImages(markdown) {
+  return [
+    ...[...markdown.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)]
+      .map((match) => ({ alt: match[1], target: match[2] })),
+    ...[...markdown.matchAll(/<img\b[^>]*>/g)].map(([tag]) => ({
+      alt: tag.match(/\balt="([^"]*)"/)?.[1] ?? "",
+      target: tag.match(/\bsrc="([^"]*)"/)?.[1] ?? "",
+    })),
+  ];
+}
+
 function pngDimensions(bytes) {
   assert.deepEqual([...bytes.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   assert.equal(bytes.toString("ascii", 12, 16), "IHDR");
@@ -124,8 +135,9 @@ test("public README is English, complete, and free of stale status language", ()
   assert.doesNotMatch(readme,
     /\bMVP\b|vertical[ -]slice|\bslice\b|proof[ -]of[ -]concept|\bPoC\b|\bprototype\b/i);
   assert.doesNotMatch(readme, /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/);
-  for (const image of readme.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)) {
-    assert.notEqual(image[1].trim(), "", `missing alt text for ${image[2]}`);
+  for (const image of publicImages(readme)) {
+    assert.notEqual(image.alt.trim(), "", `missing alt text for ${image.target}`);
+    assert.notEqual(image.target, "", "missing image source");
   }
 });
 
@@ -137,9 +149,8 @@ test("README links and image sizes are suitable for the public showcase", () => 
     assert.ok(fs.existsSync(path.resolve(rootDirectory, target)), `broken README link: ${target}`);
   }
 
-  const imageTargets = [...readme.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)]
-    .map((match) => match[1]);
-  assert.equal(imageTargets.length, 9);
+  const imageTargets = publicImages(readme).map(({ target }) => target);
+  assert.equal(imageTargets.length, 8); // Banner, six current frames, one boss concept.
   assert.equal(new Set(imageTargets).size, imageTargets.length);
   const totalImageBytes = imageTargets.reduce((sum, target) =>
     sum + read(decodeURIComponent(target)).length, 0);
