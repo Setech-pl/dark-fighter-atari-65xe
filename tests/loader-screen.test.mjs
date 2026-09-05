@@ -195,16 +195,23 @@ test("bitmap has fitted title, detailed unmarked hull, three engines, and studio
   }
 });
 
-test("copyright footer has two small centered lines with the accepted spacing", () => {
+test("copyright footer has two bold centered ANTIC E lines with safe spacing", () => {
   const copyrightElement = definition.elements.find(({ name }) => name === "copyright");
   const studioElement = definition.elements.find(({ name }) => name === "studio");
   assert.equal(copyrightElement.text, "(C) 2026");
   assert.equal(studioElement.text, "SETECH GAME STUDIO");
-  assert.deepEqual(compiled.landmarks.copyright, { x: 132, y: 157, width: 56, height: 14 });
-  assert.deepEqual(compiled.landmarks.studio, { x: 94, y: 174, width: 132, height: 14 });
-  assert.deepEqual(compiled.landmarks.footer, { x: 94, y: 157, width: 132, height: 31 });
+  for (const element of [copyrightElement, studioElement]) {
+    assert.deepEqual(
+      [element.font, element.scaleX, element.scaleY, element.letterSpacing],
+      ["anticE3x7Bold", 2, 2, 2],
+    );
+    assert.equal(element.x & 1, 0, "paired ANTIC E text must start on an even source pixel");
+  }
+  assert.deepEqual(compiled.landmarks.copyright, { x: 130, y: 157, width: 60, height: 14 });
+  assert.deepEqual(compiled.landmarks.studio, { x: 90, y: 173, width: 140, height: 14 });
+  assert.deepEqual(compiled.landmarks.footer, { x: 90, y: 157, width: 140, height: 30 });
   for (const character of ["(", ")", "0", "2"]) {
-    assert.ok(definition.fonts.military5x7.glyphs[character], `missing ASCII ${character}`);
+    assert.ok(definition.fonts.anticE3x7Bold.glyphs[character], `missing ASCII ${character}`);
   }
 
   const occupiedInRows = (startLine, endLine) => {
@@ -222,29 +229,29 @@ test("copyright footer has two small centered lines with the accepted spacing", 
     return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   };
   const copyrightPixels = occupiedInRows(157, 170);
-  const studioPixels = occupiedInRows(174, 187);
-  assert.deepEqual(bounds(copyrightPixels), [132, 187, 157, 170]);
-  assert.deepEqual(bounds(studioPixels), [94, 225, 174, 187]);
+  const studioPixels = occupiedInRows(173, 186);
+  assert.deepEqual(bounds(copyrightPixels), [130, 189, 157, 170]);
+  assert.deepEqual(bounds(studioPixels), [90, 229, 173, 186]);
   for (const occupied of [copyrightPixels, studioPixels]) {
     const xs = occupied.map(([x]) => x);
     assert.equal(Math.min(...xs), 319 - Math.max(...xs), "each footer line must be centered");
   }
-  for (let y = 171; y <= 173; y += 1) {
+  for (let y = 171; y <= 172; y += 1) {
     for (let x = 0; x < 320; x += 1) {
       assert.equal(loaderBitmapPixelValueAt(compiled, x, y), 0, "footer gap must stay blank");
     }
   }
 
   const previous = structuredClone(definition);
-  previous.paletteZones[1].endLine = 163;
-  previous.paletteZones[2].startLine = 164;
-  previous.elements = previous.elements.filter(({ name }) => name !== "copyright");
+  const previousCopyright = previous.elements.find(({ name }) => name === "copyright");
   const previousStudio = previous.elements.find(({ name }) => name === "studio");
-  previousStudio.x = 91;
-  previousStudio.y = 174;
-  delete previous.landmarks.copyright;
-  delete previous.landmarks.footer;
-  previous.landmarks.studio = { x: 91, y: 174, width: 138, height: 14 };
+  Object.assign(previousCopyright,
+    { font: "military5x7", x: 131, scaleX: 1, letterSpacing: 3 });
+  Object.assign(previousStudio,
+    { font: "military5x7", x: 95, y: 174, scaleX: 1, letterSpacing: 3 });
+  previous.landmarks.copyright = { x: 132, y: 157, width: 56, height: 14 };
+  previous.landmarks.studio = { x: 94, y: 174, width: 132, height: 14 };
+  previous.landmarks.footer = { x: 94, y: 157, width: 132, height: 31 };
   const previousCompiled = compileLoaderBitmap(previous);
   let changed = 0;
   for (let y = 0; y < compiled.height; y += 1) {
@@ -253,7 +260,7 @@ test("copyright footer has two small centered lines with the accepted spacing", 
         previousCompiled.pixels[y * compiled.width + x];
       if (!differs) continue;
       changed += 1;
-      assert.ok(x >= 90 && x <= 225 && y >= 157 && y <= 187,
+      assert.ok(x >= 90 && x <= 229 && y >= 157 && y <= 187,
         `footer pixel escaped mask at ${x},${y}`);
     }
   }
@@ -261,48 +268,50 @@ test("copyright footer has two small centered lines with the accepted spacing", 
   assert.equal(compiled.bitmapBytes.length, 40 * 192);
 });
 
-test("packed XEX footer matches the two-line cd62731 ANTIC E visual oracle", () => {
+test("packed XEX footer uses distinct bold glyphs made of full ANTIC E pixels", () => {
   const acceptedGlyphs = {
-    "(": ["00010", "00100", "01000", "01000", "01000", "00100", "00010"],
-    ")": ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
-    "0": ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
-    "2": ["11110", "00001", "00001", "01110", "10000", "10000", "11110"],
-    "6": ["01111", "10000", "10000", "11110", "10001", "10001", "01110"],
-    A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
-    C: ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
-    D: ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
-    E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
-    G: ["01111", "10000", "10000", "10111", "10001", "10001", "01110"],
-    H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
-    I: ["11111", "00100", "00100", "00100", "00100", "00100", "11111"],
-    M: ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
-    O: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
-    S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
-    T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
-    U: ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
+    "(": ["010", "100", "100", "100", "100", "100", "010"],
+    ")": ["010", "001", "001", "001", "001", "001", "010"],
+    "0": ["111", "101", "101", "101", "101", "101", "111"],
+    "2": ["110", "001", "001", "010", "100", "100", "111"],
+    "6": ["011", "100", "100", "111", "101", "101", "111"],
+    A: ["010", "101", "101", "111", "101", "101", "101"],
+    C: ["011", "100", "100", "100", "100", "100", "011"],
+    D: ["110", "101", "101", "101", "101", "101", "110"],
+    E: ["111", "100", "100", "110", "100", "100", "111"],
+    G: ["011", "100", "100", "101", "101", "101", "011"],
+    H: ["101", "101", "101", "111", "101", "101", "101"],
+    I: ["111", "010", "010", "010", "010", "010", "111"],
+    M: ["101", "111", "111", "101", "101", "101", "101"],
+    O: ["0110", "1001", "1001", "1001", "1001", "1001", "0110"],
+    S: ["011", "100", "100", "010", "001", "001", "110"],
+    T: ["111", "010", "010", "010", "010", "010", "010"],
+    U: ["101", "101", "101", "101", "101", "101", "111"],
   };
   const lines = [
-    { text: "(C) 2026", x: 131, y: 157 },
-    { text: "SETECH GAME STUDIO", x: 95, y: 174 },
+    { text: "(C) 2026", x: 130, y: 157 },
+    { text: "SETECH GAME STUDIO", x: 90, y: 173 },
   ];
   const sourcePixels = new Uint8Array(320 * 192);
   for (const line of lines) {
     let cursorX = line.x;
     for (const character of line.text) {
       if (character === " ") {
-        cursorX += 3;
+        cursorX += 6;
         continue;
       }
       const glyph = acceptedGlyphs[character];
       assert.ok(glyph, `accepted glyph snapshot missing ${character}`);
       for (let glyphY = 0; glyphY < 7; glyphY += 1) {
-        for (let glyphX = 0; glyphX < 5; glyphX += 1) {
+        for (let glyphX = 0; glyphX < glyph[glyphY].length; glyphX += 1) {
           if (glyph[glyphY][glyphX] !== "1") continue;
-          sourcePixels[(line.y + glyphY * 2) * 320 + cursorX + glyphX] = 1;
-          sourcePixels[(line.y + glyphY * 2 + 1) * 320 + cursorX + glyphX] = 1;
+          for (let pixelX = 0; pixelX < 2; pixelX += 1) {
+            sourcePixels[(line.y + glyphY * 2) * 320 + cursorX + glyphX * 2 + pixelX] = 1;
+            sourcePixels[(line.y + glyphY * 2 + 1) * 320 + cursorX + glyphX * 2 + pixelX] = 1;
+          }
         }
       }
-      cursorX += 8;
+      cursorX += glyph[0].length * 2 + 2;
     }
   }
 
@@ -334,12 +343,13 @@ test("packed XEX footer matches the two-line cd62731 ANTIC E visual oracle", () 
     let cursorX = line.x;
     for (const [characterIndex, character] of [...line.text].entries()) {
       if (character === " ") {
-        cursorX += 3;
+        cursorX += 6;
         continue;
       }
       for (let scanline = 0; scanline < 14; scanline += 1) {
         const firstPairX = cursorX & ~1;
-        const lastPairX = (cursorX + 4) & ~1;
+        const glyph = acceptedGlyphs[character];
+        const lastPairX = cursorX + glyph[0].length * 2 - 2;
         for (let x = firstPairX; x <= lastPairX; x += 2) {
           assert.equal(
             anticEPixel(actual, x, line.y + scanline),
@@ -348,7 +358,7 @@ test("packed XEX footer matches the two-line cd62731 ANTIC E visual oracle", () 
           );
         }
       }
-      cursorX += 8;
+      cursorX += acceptedGlyphs[character][0].length * 2 + 2;
     }
   }
   assert.deepEqual(
@@ -357,15 +367,9 @@ test("packed XEX footer matches the two-line cd62731 ANTIC E visual oracle", () 
     "actual ANTIC E bytes must contain only the exact centered two-line footer",
   );
 
-  const shiftedStudioOracle = [];
-  for (let y = 174; y <= 187; y += 1) {
-    for (let x = 94; x <= 225; x += 2) shiftedStudioOracle.push(anticEPixel(actual, x, y));
-  }
-  assert.equal(
-    sha256(Buffer.from(shiftedStudioOracle)),
-    "cec7c32a265edd5820198c9329175f1c5f2d25175c1da45102743507e21273cd",
-    "SETECH GAME STUDIO must be the cd62731 native raster shifted intact by four pixels",
-  );
+  const signatures = Object.values(acceptedGlyphs).map((glyph) => glyph.join("/"));
+  assert.equal(new Set(signatures).size, signatures.length,
+    "every footer glyph must remain visually distinguishable");
 
   const outsideMask = Buffer.from(actual);
   for (let y = 157; y <= 187; y += 1) {
@@ -437,10 +441,10 @@ test("studio ANTIC E pixels use COLBK=$00 and assembled COLPF1=$D8", () => {
     }
   }
   assert.deepEqual([...footerPixelValues].sort(), [0, 2]);
-  assert.equal(loaderBitmapPixelValueAt(compiled, 134, 157), 2);
-  assert.equal(loaderBitmapPixelValueAt(compiled, 130, 157), 0);
-  assert.equal(loaderBitmapPixelValueAt(compiled, 188, 157), 0);
-  assert.equal(loaderBitmapPixelValueAt(compiled, 96, 174), 2);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 132, 157), 2);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 128, 157), 0);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 190, 157), 0);
+  assert.equal(loaderBitmapPixelValueAt(compiled, 92, 173), 2);
   assert.equal(anticERegisterForBitmapPixel(studio.values, 2), 0xd8);
   assert.equal(anticERegisterForBitmapPixel(studio.values, 0), 0x00);
   assert.notEqual(anticERegisterForBitmapPixel(studio.values, 0), 0xd0);
@@ -588,10 +592,10 @@ test("capital-hull integration preserves gameplay preview dimensions", () => {
 test("loader preview follows ANTIC F title/ship and ANTIC E studio semantics", () => {
   const { loaderAsset, registerPixels } = readLoaderRuntimeState(definition);
   const studio = loaderAsset.paletteZones[2];
-  assert.equal(registerPixels[157 * loaderAsset.width + 134], 0xd8);
-  assert.equal(registerPixels[157 * loaderAsset.width + 130], 0x00);
-  assert.equal(registerPixels[157 * loaderAsset.width + 188], 0x00);
-  assert.equal(registerPixels[174 * loaderAsset.width + 96], 0xd8);
+  assert.equal(registerPixels[157 * loaderAsset.width + 132], 0xd8);
+  assert.equal(registerPixels[157 * loaderAsset.width + 128], 0x00);
+  assert.equal(registerPixels[157 * loaderAsset.width + 190], 0x00);
+  assert.equal(registerPixels[173 * loaderAsset.width + 92], 0xd8);
   for (let y = studio.startLine; y <= studio.endLine; y += 1) {
     for (let x = 0; x < loaderAsset.width; x += 1) {
       if (loaderBitmapPixelValueAt(loaderAsset, x, y) === 0) {
